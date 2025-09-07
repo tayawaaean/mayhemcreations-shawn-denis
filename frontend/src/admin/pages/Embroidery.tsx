@@ -15,6 +15,7 @@ import {
   Square
 } from 'lucide-react'
 import { AddEmbroideryModal, EditEmbroideryModal, DeleteEmbroideryModal } from '../components/modals/EmbroideryModals'
+import HelpModal from '../components/modals/HelpModal'
 import { EmbroideryOption } from '../types'
 
 const Embroidery: React.FC = () => {
@@ -28,6 +29,7 @@ const Embroidery: React.FC = () => {
   const [selectedType, setSelectedType] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   const filteredOptions = embroideryOptions.filter(option => 
     selectedType === 'all' || option.type === selectedType
@@ -159,14 +161,23 @@ const Embroidery: React.FC = () => {
               Manage embroidery styles, materials, and pricing options
             </p>
           </div>
-           <button
-             onClick={() => setIsAddModalOpen(true)}
-             className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
-           >
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-            <span className="hidden sm:inline">Add Option</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              <span className="hidden sm:inline">How to use</span>
+              <span className="sm:hidden">?</span>
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
+            >
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="hidden sm:inline">Add Option</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -468,6 +479,17 @@ const Embroidery: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Embroidery Options">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Filter options by Type using the dropdown.</li>
+          <li>Use Add Option to create a new embroidery option.</li>
+          <li>Edit to change name, price, type, image, and description.</li>
+          <li>Toggle status to show/hide options.</li>
+          <li>Use pagination at the bottom to navigate.</li>
+        </ol>
+      </HelpModal>
 
       {/* Modals */}
       <AddEmbroideryModal

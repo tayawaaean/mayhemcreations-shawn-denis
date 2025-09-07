@@ -12,6 +12,7 @@ import {
   TrendingDown,
   X
 } from 'lucide-react'
+import HelpModal from '../components/modals/HelpModal'
 
 const Inventory: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -20,6 +21,7 @@ const Inventory: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [lowStockThreshold, setLowStockThreshold] = useState(10)
   const [isAddVariantOpen, setIsAddVariantOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditVariantOpen, setIsEditVariantOpen] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -195,14 +197,23 @@ const Inventory: React.FC = () => {
             Manage stock levels and track inventory across all products
           </p>
         </div>
-        <button
-          onClick={() => setIsAddVariantOpen(true)}
-          className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center transition-colors text-sm sm:text-base"
-        >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-          <span className="hidden sm:inline">Add Variant</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            <span className="hidden sm:inline">How to use</span>
+            <span className="sm:hidden">?</span>
+          </button>
+          <button
+            onClick={() => setIsAddVariantOpen(true)}
+            className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center transition-colors text-sm sm:text-base"
+          >
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+            <span className="hidden sm:inline">Add Variant</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
       </div>
 
       {/* Inventory Summary */}
@@ -572,6 +583,18 @@ const Inventory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Inventory">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Search by product name or SKU using the search box.</li>
+          <li>Filter by category using the Category dropdown.</li>
+          <li>Use −/+ buttons to quickly adjust stock for a variant.</li>
+          <li>Click the edit icon to modify variant details like size, SKU, and stock.</li>
+          <li>Use Add Variant to create a new variant for a product.</li>
+          <li>Navigate pages using the pagination controls at the bottom.</li>
+        </ol>
+      </HelpModal>
 
 
       {/* Add Variant Modal */}

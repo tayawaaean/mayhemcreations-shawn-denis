@@ -11,6 +11,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { AddProductModal, EditProductModal, DeleteProductModal } from '../components/modals/ProductModals'
+import HelpModal from '../components/modals/HelpModal'
 import { AdminProduct } from '../types'
 
 const Products: React.FC = () => {
@@ -21,6 +22,7 @@ const Products: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null)
@@ -111,14 +113,23 @@ const Products: React.FC = () => {
             Manage your product catalog and inventory
           </p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 flex items-center font-medium text-sm sm:text-base"
-        >
-          <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-          <span className="hidden sm:inline">Add Product</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            <span className="hidden sm:inline">How to use</span>
+            <span className="sm:hidden">?</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 flex items-center font-medium text-sm sm:text-base"
+          >
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+            <span className="hidden sm:inline">Add Product</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters and search */}
@@ -401,6 +412,17 @@ const Products: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Products">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Use the filters to search by name or category.</li>
+          <li>Click Add Product to create a new product with images and variants.</li>
+          <li>Use the Edit action to update product info, price, or images.</li>
+          <li>Use the Delete action to remove a product from the catalog.</li>
+          <li>Pagination shows 10 items per page; use controls at the bottom to navigate.</li>
+        </ol>
+      </HelpModal>
 
       {/* Pagination */}
       {totalPages > 1 && (

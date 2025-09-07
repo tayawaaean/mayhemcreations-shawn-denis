@@ -12,6 +12,7 @@ import {
   Clock
 } from 'lucide-react'
 import { OrderDetailModal, StatusUpdateModal } from '../components/modals/OrderModals'
+import HelpModal from '../components/modals/HelpModal'
 import { Order } from '../types'
 
 const Orders: React.FC = () => {
@@ -25,6 +26,7 @@ const Orders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,6 +137,15 @@ const Orders: React.FC = () => {
           <p className="mt-2 text-gray-600">
             Manage customer orders and track fulfillment
           </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            <span className="hidden sm:inline">How to use</span>
+            <span className="sm:hidden">?</span>
+          </button>
         </div>
       </div>
 
@@ -454,6 +465,17 @@ const Orders: React.FC = () => {
         onUpdate={handleStatusUpdate}
         order={selectedOrder}
       />
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Orders">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Search by order ID or customer name/email.</li>
+          <li>Filter by Status to narrow results.</li>
+          <li>Click View to see order details, items, and totals.</li>
+          <li>Use Update Status to change order status.</li>
+          <li>Navigate pages using pagination at the bottom.</li>
+        </ol>
+      </HelpModal>
     </div>
   )
 }

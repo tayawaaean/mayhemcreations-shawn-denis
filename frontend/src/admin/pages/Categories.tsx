@@ -11,6 +11,7 @@ import {
   EyeOff
 } from 'lucide-react'
 import { AddCategoryModal, EditCategoryModal, DeleteCategoryModal } from '../components/modals/CategoryModals'
+import HelpModal from '../components/modals/HelpModal'
 import { Category } from '../types'
 
 const Categories: React.FC = () => {
@@ -18,6 +19,7 @@ const Categories: React.FC = () => {
   const { categories } = state
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
@@ -199,14 +201,23 @@ const Categories: React.FC = () => {
               Organize your products with categories and subcategories
             </p>
           </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
-          >
-            <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-            <span className="hidden sm:inline">Add Category</span>
-            <span className="sm:hidden">Add</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              <span className="hidden sm:inline">How to use</span>
+              <span className="sm:hidden">?</span>
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
+            >
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="hidden sm:inline">Add Category</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -388,6 +399,17 @@ const Categories: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Categories">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Use Add Category to create parent or child categories.</li>
+          <li>Pick a parent to nest a category; leave blank for a top-level one.</li>
+          <li>Toggle visibility using the status action.</li>
+          <li>Edit to change name, slug, description, or parent.</li>
+          <li>Navigate with pagination at the bottom.</li>
+        </ol>
+      </HelpModal>
 
       {/* Modals */}
       <AddCategoryModal

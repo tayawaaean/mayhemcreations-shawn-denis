@@ -14,6 +14,7 @@ import {
   ToggleRight,
   Clock
 } from 'lucide-react'
+import HelpModal from '../components/modals/HelpModal'
 
 const ChatSettings: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -30,6 +31,7 @@ const ChatSettings: React.FC = () => {
   })
   const [autoReplyEnabled, setAutoReplyEnabled] = useState(true)
   const [responseDelay, setResponseDelay] = useState(1000)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   useEffect(() => {
     loadSettings()
@@ -92,6 +94,13 @@ const ChatSettings: React.FC = () => {
                 <p className="text-sm text-gray-500">Manage quick reply templates for customer chat</p>
               </div>
             </div>
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              <span className="hidden sm:inline">How to use</span>
+              <span className="sm:hidden">?</span>
+            </button>
           </div>
         </div>
       </div>
@@ -356,6 +365,16 @@ const ChatSettings: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Chat Settings">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Toggle Auto-Reply on to enable automated quick replies.</li>
+          <li>Adjust Response Delay to control when options appear.</li>
+          <li>Use Add Template to create a new quick reply.</li>
+          <li>Edit or Delete templates from the list; toggle Active state.</li>
+          <li>Save Settings after changing system-wide options.</li>
+        </ol>
+      </HelpModal>
     </div>
   )
 }

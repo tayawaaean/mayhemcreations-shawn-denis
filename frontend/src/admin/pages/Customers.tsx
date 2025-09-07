@@ -13,6 +13,7 @@ import {
   User,
   TrendingUp
 } from 'lucide-react'
+import HelpModal from '../components/modals/HelpModal'
 import { CustomerDetailModal, EditCustomerModal } from '../components/modals/CustomerModals'
 import { Customer } from '../types'
 
@@ -27,6 +28,7 @@ const Customers: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   const filteredCustomers = customers.filter(customer => {
     const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -95,6 +97,15 @@ const Customers: React.FC = () => {
           <p className="mt-2 text-gray-600">
             Manage customer information and order history
           </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            <span className="hidden sm:inline">How to use</span>
+            <span className="sm:hidden">?</span>
+          </button>
         </div>
       </div>
 
@@ -488,6 +499,16 @@ const Customers: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Customers">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Use the search and status filter to find customers.</li>
+          <li>Click View to open the customer detail modal.</li>
+          <li>Click Edit to update customer information.</li>
+          <li>Use pagination at the bottom to browse pages.</li>
+        </ol>
+      </HelpModal>
 
       {/* Modals */}
       <CustomerDetailModal

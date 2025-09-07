@@ -12,12 +12,14 @@ import {
   Calendar,
   Filter
 } from 'lucide-react'
+import HelpModal from '../components/modals/HelpModal'
 
 const Analytics: React.FC = () => {
   const { state } = useAdmin()
   const { analytics } = state
   const [selectedPeriod, setSelectedPeriod] = useState('7d')
   const [selectedMetric, setSelectedMetric] = useState('revenue')
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   const periodOptions = [
     { value: '7d', label: 'Last 7 days' },
@@ -55,6 +57,13 @@ const Analytics: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          >
+            <span className="hidden sm:inline">How to use</span>
+            <span className="sm:hidden">?</span>
+          </button>
           <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center">
             <Filter className="h-4 w-4 mr-2" />
             Filters
@@ -330,6 +339,15 @@ const Analytics: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Analytics">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Select a time period and metric to adjust charts.</li>
+          <li>Review key metrics in the summary cards.</li>
+          <li>Use charts for trends and top products for insights.</li>
+          <li>Export data via the Export button.</li>
+        </ol>
+      </HelpModal>
     </div>
   )
 }

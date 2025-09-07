@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Users
 } from 'lucide-react'
+import HelpModal from '../components/modals/HelpModal'
 
 const Messages: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -23,6 +24,7 @@ const Messages: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
 
   // Group messages by customer
   const messagesByCustomer = messages.reduce((acc, message) => {
@@ -142,6 +144,13 @@ const Messages: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              <span className="hidden sm:inline">How to use</span>
+              <span className="sm:hidden">?</span>
+            </button>
             <div className="hidden sm:flex items-center space-x-2 text-sm text-gray-500">
               <Circle className="w-2 h-2 bg-green-500 rounded-full" />
               <span>{customerList.length} customers</span>
@@ -502,6 +511,16 @@ const Messages: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Help Modal */}
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Messages">
+        <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
+          <li>Use the search to find a customer conversation.</li>
+          <li>Select a customer on the left to open the chat.</li>
+          <li>Type and press Enter to send, Shift+Enter for a new line.</li>
+          <li>Unread counts show on customers and in the sidebar badge.</li>
+          <li>The chat auto-scrolls to the latest message.</li>
+        </ol>
+      </HelpModal>
     </div>
   )
 }
