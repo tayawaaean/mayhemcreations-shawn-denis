@@ -1,44 +1,123 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
-import Navbar from './components/Navbar'
-import Footer from './components/Footer'
-import ChatWidget from './components/ChatWidget'
-import { ChatProvider } from './context/ChatContext'
-import { CartProvider } from './context/CartContext'
-import { CustomizationProvider } from './context/CustomizationContext'
-import Home from './routes/Home'
-import Products from './routes/Products'
-import ProductPage from './routes/ProductPage'
-import Customize from './routes/Customize'
-import About from './routes/About'
-import FAQ from './routes/FAQ'
-import Contact from './routes/Contact'
-import Cart from './routes/Cart'
-import Checkout from './routes/Checkout'
+import Navbar from './ecommerce/components/Navbar'
+import Footer from './ecommerce/components/Footer'
+import ChatWidget from './ecommerce/components/ChatWidget'
+import { ChatProvider } from './ecommerce/context/ChatContext'
+import { CartProvider } from './ecommerce/context/CartContext'
+import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
+import AdminApp from './admin/AdminApp'
+import Home from './ecommerce/routes/Home'
+import Products from './ecommerce/routes/Products'
+import ProductPage from './ecommerce/routes/ProductPage'
+import Customize from './ecommerce/routes/Customize'
+import About from './ecommerce/routes/About'
+import FAQ from './ecommerce/routes/FAQ'
+import Contact from './ecommerce/routes/Contact'
+import Cart from './ecommerce/routes/Cart'
+import Checkout from './ecommerce/routes/Checkout'
 
 export default function App() {
   return (
     <CartProvider>
       <ChatProvider>
         <CustomizationProvider>
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <div className="flex-1">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/product/:id" element={<ProductPage />} />
-                <Route path="/customize/:id" element={<Customize />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/faq" element={<FAQ />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
-              </Routes>
-            </div>
-            <Footer />
-            <ChatWidget />
-          </div>
+          <Routes>
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminApp />} />
+            
+            {/* Public Routes */}
+            <Route path="/" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Home />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/products" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Products />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/product/:id" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <ProductPage />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/customize/:id" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Customize />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/about" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <About />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/faq" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <FAQ />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/contact" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Contact />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/cart" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Cart />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/checkout" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <Checkout />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+          </Routes>
         </CustomizationProvider>
       </ChatProvider>
     </CartProvider>

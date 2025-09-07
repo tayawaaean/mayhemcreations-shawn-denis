@@ -1,6 +1,6 @@
 import React from 'react'
 import { Award, Users, Clock, Heart, CheckCircle, Star, Quote, MapPin, Phone, Mail } from 'lucide-react'
-import Button from '../components/Button'
+import Button from '../../components/Button'
 
 export default function About() {
   return (

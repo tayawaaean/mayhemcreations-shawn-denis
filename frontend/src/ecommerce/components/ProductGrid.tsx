@@ -1,6 +1,6 @@
 import React from 'react'
 import ProductCard from './ProductCard'
-import type { Product } from '../types'
+import type { Product } from '../../types'
 
 export default function ProductGrid({ products }: { products: Product[] }) {
   if (products.length === 0) {

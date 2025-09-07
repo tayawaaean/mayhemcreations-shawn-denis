@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft } from 'lucide-react'
 import { useCustomization } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
-import { products } from '../data/products'
-import Button from '../components/Button'
+import { products } from '../../data/products'
+import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
 
 export default function Customize() {

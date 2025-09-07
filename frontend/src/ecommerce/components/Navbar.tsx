@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { ShoppingCart, Menu, X, Search, ChevronDown, User, LogIn } from 'lucide-react'
 import { useCart } from '../context/CartContext'
-import AuthModal from './AuthModal'
+import AuthModal from '../../components/AuthModal'
 
 const NavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () => void }> = ({ to, children, onClick }) => (
-  <NavLink 
-    to={to} 
+  <NavLink
+    to={to}
     onClick={onClick}
-    className={({ isActive }) => 
+    className={({ isActive }) =>
       `px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-        isActive 
-          ? 'text-accent border-b-2 border-accent' 
+        isActive
+          ? 'text-accent border-b-2 border-accent'
           : 'text-gray-700 hover:text-accent hover:border-b-2 hover:border-accent'
       }`
     }
@@ -22,15 +22,15 @@ const NavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () =>
 
 const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const categories = [
-    { 
-      name: 'All Products', 
-      href: '/products', 
+    {
+      name: 'All Products',
+      href: '/products',
       description: 'Browse our complete collection',
       subcategories: []
     },
-    { 
-      name: 'Apparel', 
-      href: '/products?category=apparel', 
+    {
+      name: 'Apparel',
+      href: '/products?category=apparel',
       description: 'Tees, hoodies, and clothing',
       subcategories: [
         { name: 'T-Shirts', href: '/products?category=apparel&subcategory=tshirt' },
@@ -38,18 +38,18 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         { name: 'Hoodies', href: '/products?category=apparel&subcategory=hoodie' }
       ]
     },
-    { 
-      name: 'Accessories', 
-      href: '/products?category=accessories', 
+    {
+      name: 'Accessories',
+      href: '/products?category=accessories',
       description: 'Caps, bags, and more',
       subcategories: [
         { name: 'Caps', href: '/products?category=accessories&subcategory=cap' },
         { name: 'Bags', href: '/products?category=accessories&subcategory=bag' }
       ]
     },
-    { 
-      name: 'Embroidery', 
-      href: '/products?category=embroidery', 
+    {
+      name: 'Embroidery',
+      href: '/products?category=embroidery',
       description: 'Patches and custom work',
       subcategories: []
     }
@@ -67,7 +67,7 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <div className="font-medium text-gray-900">{category.name}</div>
             <div className="text-sm text-gray-500">{category.description}</div>
           </Link>
-          
+
           {/* Subcategories */}
           {category.subcategories.length > 0 && (
             <div className="ml-4 border-l border-gray-200 pl-2">
@@ -141,14 +141,14 @@ export default function Navbar() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <NavItem to="/">Home</NavItem>
-            
+
             {/* Products Dropdown */}
-            <div 
+            <div
               className="relative group"
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
             >
-              <button 
+              <button
                 className="flex items-center space-x-1 px-4 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
               >
@@ -161,7 +161,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
-            
+
             <NavItem to="/about">About</NavItem>
             <NavItem to="/faq">FAQ</NavItem>
             <NavItem to="/contact">Contact</NavItem>
@@ -187,7 +187,7 @@ export default function Navbar() {
                 <div className="flex items-center space-x-2">
                   <User className="w-5 h-5 text-gray-700" />
                   <span className="text-sm text-gray-700">Welcome back!</span>
-                  <button 
+                  <button
                     onClick={() => setIsLoggedIn(false)}
                     className="text-sm text-gray-500 hover:text-gray-700"
                   >
@@ -253,14 +253,14 @@ export default function Navbar() {
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
                 />
               </div>
-              
+
               {/* Mobile Menu Items */}
               <nav className="space-y-2">
                 <NavItem to="/" onClick={() => setMobileMenuOpen(false)}>Home</NavItem>
                 <div className="space-y-1">
                   <div className="px-3 py-2 text-sm font-medium text-gray-500">Products</div>
                   <NavItem to="/products" onClick={() => setMobileMenuOpen(false)}>All Products</NavItem>
-                  
+
                   {/* Apparel */}
                   <div className="ml-2">
                     <NavItem to="/products?category=apparel" onClick={() => setMobileMenuOpen(false)}>Apparel</NavItem>
@@ -270,7 +270,7 @@ export default function Navbar() {
                       <NavItem to="/products?category=apparel&subcategory=hoodie" onClick={() => setMobileMenuOpen(false)}>Hoodies</NavItem>
                     </div>
                   </div>
-                  
+
                   {/* Accessories */}
                   <div className="ml-2">
                     <NavItem to="/products?category=accessories" onClick={() => setMobileMenuOpen(false)}>Accessories</NavItem>
@@ -279,13 +279,13 @@ export default function Navbar() {
                       <NavItem to="/products?category=accessories&subcategory=bag" onClick={() => setMobileMenuOpen(false)}>Bags</NavItem>
                     </div>
                   </div>
-                  
+
                   <NavItem to="/products?category=embroidery" onClick={() => setMobileMenuOpen(false)}>Embroidery</NavItem>
                 </div>
                 <NavItem to="/about" onClick={() => setMobileMenuOpen(false)}>About</NavItem>
                 <NavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>FAQ</NavItem>
                 <NavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</NavItem>
-                
+
                 {/* Mobile Auth */}
                 <div className="border-t border-gray-200 pt-4">
                   {isLoggedIn ? (
@@ -294,7 +294,7 @@ export default function Navbar() {
                         <User className="w-4 h-4 text-gray-700" />
                         <span className="text-sm text-gray-700">Welcome back!</span>
                       </div>
-                      <button 
+                      <button
                         onClick={() => {
                           setIsLoggedIn(false)
                           setMobileMenuOpen(false)

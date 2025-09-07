@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import Button from './Button'
+import Button from '../../components/Button'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Star } from 'lucide-react'
 
@@ -18,7 +18,7 @@ export default function Hero() {
                 <span className="block text-accent">That Stands Out</span>
               </h1>
               <p className="text-lg text-gray-600 max-w-lg">
-                Transform your ideas into stunning embroidered apparel, patches, and accessories. 
+                Transform your ideas into stunning embroidered apparel, patches, and accessories.
                 Professional quality, fast turnaround, and exceptional customer service since 2018.
               </p>
             </div>

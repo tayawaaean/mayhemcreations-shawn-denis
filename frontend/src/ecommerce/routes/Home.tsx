@@ -1,10 +1,10 @@
 import React from 'react'
 import Hero from '../components/Hero'
 import ProductGrid from '../components/ProductGrid'
-import { products } from '../data/products'
+import { products } from '../../data/products'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw } from 'lucide-react'
-import Button from '../components/Button'
+import Button from '../../components/Button'
 
 export default function Home() {
   const featured = products.slice(0, 4)

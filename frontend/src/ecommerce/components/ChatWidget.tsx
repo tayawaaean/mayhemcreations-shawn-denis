@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Minimize2, Maximize2, Phone, Mail } from 'lucide-react'
-import { useChat, quickQuestions } from '../context/ChatContext'
-import Button from './Button'
+import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react'
+import { useChat } from '../context/ChatContext'
+import Button from '../../components/Button'
 
 export default function ChatWidget() {
-  const { isOpen, setIsOpen, messages, sendMessage, isAdminTyping, isConnected } = useChat()
+  const { isOpen, setIsOpen, messages, sendMessage, isAdminTyping, isConnected, quickQuestions } = useChat()
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -178,22 +178,6 @@ export default function ChatWidget() {
               </form>
             </div>
 
-            {/* Contact Options */}
-            <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between text-xs text-gray-600">
-                <div className="flex items-center space-x-4">
-                  <a href="tel:+15551234567" className="flex items-center space-x-1 hover:text-accent transition-colors">
-                    <Phone className="w-3 h-3" />
-                    <span>Call</span>
-                  </a>
-                  <a href="mailto:hello@mayhemcreation.com" className="flex items-center space-x-1 hover:text-accent transition-colors">
-                    <Mail className="w-3 h-3" />
-                    <span>Email</span>
-                  </a>
-                </div>
-                <span>Sarah • Admin</span>
-              </div>
-            </div>
           </>
         )}
       </div>

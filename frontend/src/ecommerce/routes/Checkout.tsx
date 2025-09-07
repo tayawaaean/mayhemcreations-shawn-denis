@@ -14,8 +14,8 @@ import {
   Truck
 } from 'lucide-react'
 import { useCart } from '../context/CartContext'
-import { products } from '../data/products'
-import Button from '../components/Button'
+import { products } from '../../data/products'
+import Button from '../../components/Button'
 
 export default function Checkout() {
   const navigate = useNavigate()

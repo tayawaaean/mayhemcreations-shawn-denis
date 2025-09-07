@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users } from 'lucide-react'
-import Button from '../components/Button'
+import Button from '../../components/Button'
 
 export default function Contact() {
   const [formData, setFormData] = useState({

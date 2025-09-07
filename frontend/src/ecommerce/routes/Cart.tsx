@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { useCart } from '../context/CartContext'
-import { products } from '../data/products'
+import { products } from '../../data/products'
 import { Link, useNavigate } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Eye, X, CheckCircle } from 'lucide-react'
-import Button from '../components/Button'
+import Button from '../../components/Button'
 
 export default function Cart() {
   const navigate = useNavigate()

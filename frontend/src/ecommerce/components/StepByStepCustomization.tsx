@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useCustomization, embroideryStyles } from '../context/CustomizationContext'
-import Button from './Button'
+import Button from '../../components/Button'
 import { ArrowRight, ArrowLeft, Check, X, Star, Info } from 'lucide-react'
 
 interface StepByStepCustomizationProps {
@@ -78,7 +78,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
       <div className="space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-2xl font-bold text-gray-900 mb-6">Review Your Selections</h3>
-          
+
           <div className="space-y-6">
             {stepCategories.map((category) => {
               const selected = customizationData.selectedStyles[category.key]
@@ -159,7 +159,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
           <span className="text-sm text-gray-500">{currentCategory.description}</span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
+          <div
             className="bg-accent h-2 rounded-full transition-all duration-300"
             style={{ width: `${getStepProgress()}%` }}
           />
@@ -185,19 +185,19 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
                   Most Popular
                 </div>
               )}
-              
+
               <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                 <div className="w-8 h-8 bg-gray-300 rounded"></div>
               </div>
-              
+
               <h4 className="font-semibold text-gray-900 text-center mb-2 text-sm">
                 {style.name}
               </h4>
-              
+
               <p className="text-xs text-gray-600 text-center mb-3">
                 {style.description}
               </p>
-              
+
               <div className="text-center">
                 <p className="text-sm font-bold text-accent">
                   {style.price === 0 ? 'Free' : `+$${style.price.toFixed(2)}`}
@@ -226,7 +226,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
             <ArrowLeft className="w-4 h-4 mr-2" />
             Previous
           </Button>
-          
+
           <div className="flex space-x-2">
             <Button
               variant="outline"

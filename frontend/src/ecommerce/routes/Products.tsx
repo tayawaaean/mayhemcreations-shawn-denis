@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import ProductGrid from '../components/ProductGrid'
-import { products } from '../data/products'
+import { products } from '../../data/products'
 import { Filter, SortAsc, Grid, List, ShoppingCart, ArrowRight } from 'lucide-react'
-import Button from '../components/Button'
+import Button from '../../components/Button'
 import { useSearchParams } from 'react-router-dom'
 
 export default function Products() {

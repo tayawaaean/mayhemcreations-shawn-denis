@@ -1,7 +1,7 @@
 import React from 'react'
 import { useParams } from 'react-router-dom'
-import { products } from '../data/products'
-import Button from '../components/Button'
+import { products } from '../../data/products'
+import Button from '../../components/Button'
 import { ArrowRight, Truck } from 'lucide-react'
 
 export default function ProductPage() {

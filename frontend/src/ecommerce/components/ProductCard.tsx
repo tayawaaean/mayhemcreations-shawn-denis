@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
-import type { Product } from '../types'
+import type { Product } from '../../types'
 import { Link } from 'react-router-dom'
 import { Heart, Eye } from 'lucide-react'
-import Button from './Button'
+import Button from '../../components/Button'
 
 export default function ProductCard({ product }: { product: Product }) {
   const [isHovered, setIsHovered] = useState(false)
 
   return (
-    <article 
+    <article
       className="card-hover group relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -16,18 +16,18 @@ export default function ProductCard({ product }: { product: Product }) {
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         <Link to={`/product/${product.id}`} className="block">
-          <img 
-            src={product.image} 
-            alt={product.alt} 
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+          <img
+            src={product.image}
+            alt={product.alt}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         </Link>
-        
+
         {/* Badges */}
         {product.badges && product.badges.length > 0 && (
           <div className="absolute top-3 left-3 flex flex-col gap-2">
             {product.badges.map((badge, index) => (
-              <span 
+              <span
                 key={index}
                 className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
               >
@@ -74,7 +74,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <p className="text-sm text-gray-600 mb-3 line-clamp-2">
           {product.description}
         </p>
-        
+
         <div className="flex items-center justify-between">
           <div className="text-lg font-bold text-gray-900">
             ${product.price.toFixed(2)}
