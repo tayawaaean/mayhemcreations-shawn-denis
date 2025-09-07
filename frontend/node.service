@@ -1,0 +1,43 @@
+# /etc/systemd/system/ecommerce-api.service
+[Unit]
+Description=E-commerce Node.js API Server
+Documentation=https://github.com/yourcompany/ecommerce-api
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=nodeuser
+Group=nodeuser
+WorkingDirectory=/var/www/ecommerce-api
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/var/www/ecommerce-api/.env
+ExecStart=/usr/bin/node dist/server.js
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ecommerce-api
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/www/ecommerce-api/uploads /var/www/ecommerce-api/logs /var/www/ecommerce-api/jobs
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Health check
+ExecStartPost=/bin/sleep 10
+ExecStartPost=/usr/bin/curl -f http://localhost:3000/health
+
+[Install]
+WantedBy=multi-user.target

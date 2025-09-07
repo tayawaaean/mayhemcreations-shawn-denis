@@ -1,0 +1,650 @@
+# 🚀 Enhanced Full Stack E-commerce Tech Review (TypeScript + Tailwind + Express) - MariaDB Sessions
+
+============================================================
+1️⃣ Frontend Framework & Libraries (Enhanced)
+============================================================
+✅ React + TypeScript – Core frontend framework
+✅ Vite – Faster dev environment + PWA plugin
+✅ TailwindCSS – Utility-first styling framework
+✅ Headless UI / Radix UI (optional) – Accessible UI primitives
+✅ React Router v6+ – Navigation
+✅ Redux Toolkit (with RTK Query) – State management & API caching for complex global state
+✅ Axios – API calls with typed responses
+✅ React.lazy() + Suspense – Code splitting for large product catalogs
+✅ react-window / react-virtualized – Virtual scrolling for product lists
+✅ react-image / Optimized Image Components – Product image optimization
+✅ Framer Motion – Smooth animations for cart/checkout UX
+✅ Workbox – Service worker for offline functionality & caching
+✅ react-intersection-observer – Lazy loading optimization
+✅ @sentry/react – Error monitoring & performance tracking
+✅ react-helmet-async – SEO optimization
+✅ react-hotjar – User behavior analytics
+✅ algoliasearch / @elastic/search-ui – Advanced search UI components
+
+============================================================
+2️⃣ Frontend Authentication & Security (Enhanced)
+============================================================
+✅ Session-based auth with MariaDB – Backend managed
+✅ Refresh token logic – Handled in frontend with typed API responses
+✅ RBAC with Enums/Types – Safer role checks
+✅ CSRF Protection & Secure Cookies – Tokens & headers fully typed
+✅ DOMPurify – XSS protection for user-generated content
+✅ Content Security Policy (CSP) – XSS prevention headers
+✅ @google-cloud/recaptcha-enterprise – Bot protection
+
+============================================================
+3️⃣ Frontend API Communication (Enhanced)
+============================================================
+✅ Custom API Wrapper – With generics for request/response typing
+✅ Global Error Handling – Typed error responses
+✅ Loading & Toast Notifications – Tailwind components for UX
+✅ Circuit Breaker Pattern – Graceful API failure handling
+✅ Retry Logic – Exponential backoff for failed requests
+✅ Request Deduplication – Prevent duplicate API calls
+✅ Real-time Updates – WebSocket integration for cart/inventory
+
+============================================================
+4️⃣ Frontend Project Structure (Enhanced TypeScript + Tailwind)
+============================================================
+/src
+  /api
+    ├── authApi.ts             # Authentication API
+    ├── userApi.ts             # User API
+    ├── productApi.ts          # Product catalog, search, filters
+    ├── cartApi.ts             # Cart operations
+    ├── orderApi.ts            # Order management
+    ├── paymentApi.ts          # Payment processing
+    ├── reviewApi.ts           # Product reviews & ratings
+    ├── wishlistApi.ts         # Wishlist management
+    ├── searchApi.ts           # Advanced search with Algolia/Elasticsearch
+    ├── analyticsApi.ts        # User behavior tracking
+    ├── axiosInstance.ts       # Pre-configured Axios instance with interceptors
+    /types
+      ├── auth.d.ts
+      ├── user.d.ts
+      ├── product.d.ts
+      ├── cart.d.ts
+      ├── order.d.ts
+      ├── payment.d.ts
+      ├── review.d.ts
+      ├── wishlist.d.ts
+      ├── search.d.ts
+      ├── analytics.d.ts
+
+  /components
+    ├── Navbar.tsx             # Tailwind-styled navigation bar
+    ├── Sidebar.tsx
+    ├── ProtectedRoute.tsx     # RBAC
+    ├── ErrorBoundary.tsx      # React error boundary
+    ├── LoadingSkeleton.tsx    # Skeleton screens
+    ├── SearchBar.tsx          # Advanced search with autocomplete
+    ├── NotificationCenter.tsx # Toast notifications
+    /ecommerce
+      ├── ProductCard.tsx
+      ├── ProductGrid.tsx      # Virtual scrolling
+      ├── CartDrawer.tsx
+      ├── CheckoutForm.tsx
+      ├── OrderSummary.tsx
+      ├── ProductReviews.tsx
+      ├── WishlistButton.tsx
+      ├── CompareProducts.tsx
+      ├── ProductImageGallery.tsx # Optimized image carousel
+      ├── StockIndicator.tsx
+      ├── PriceComparison.tsx
+    /admin
+      ├── ProductManager.tsx
+      ├── OrderFulfillment.tsx
+      ├── AnalyticsDashboard.tsx
+      ├── CustomerSupport.tsx
+      ├── InventoryManager.tsx
+    /ui                      # Reusable UI (button, input, card, modal)
+
+  /hooks
+    ├── useAuth.ts
+    ├── useFetch.ts
+    ├── useCart.ts
+    ├── useProducts.ts
+    ├── useOrders.ts
+    ├── useSearch.ts
+    ├── useWishlist.ts
+    ├── useReviews.ts
+    ├── useAnalytics.ts
+    ├── useIntersectionObserver.ts
+    ├── useOfflineStatus.ts
+    ├── usePerformanceMonitoring.ts
+
+  /layouts
+    ├── AdminLayout.tsx
+    ├── UserLayout.tsx
+    ├── ShopLayout.tsx
+    ├── MobileLayout.tsx
+
+  /pages
+    /Auth
+      ├── Login.tsx
+      ├── Register.tsx
+      ├── ForgotPassword.tsx
+      ├── EmailVerification.tsx
+    /Dashboard
+      ├── AdminDashboard.tsx
+      ├── UserDashboard.tsx
+      ├── SellerDashboard.tsx
+    /Shop
+      ├── ProductList.tsx
+      ├── ProductDetail.tsx
+      ├── Cart.tsx
+      ├── Checkout.tsx
+      ├── OrderHistory.tsx
+      ├── Wishlist.tsx
+      ├── SearchResults.tsx
+      ├── ProductComparison.tsx
+      ├── ReviewsAndRatings.tsx
+    /Admin
+      ├── ProductManagement.tsx
+      ├── OrderManagement.tsx
+      ├── CustomerManagement.tsx
+      ├── AnalyticsReports.tsx
+      ├── InventoryReports.tsx
+    ├── NotFound.tsx
+    ├── OfflinePage.tsx
+
+  /store
+    /slices
+      ├── authSlice.ts
+      ├── userSlice.ts
+      ├── cartSlice.ts          # Persistent cart state
+      ├── productSlice.ts       # Product filters/search state
+      ├── orderSlice.ts         # Order management state
+      ├── wishlistSlice.ts      # Wishlist/favorites
+      ├── searchSlice.ts        # Search state & filters
+      ├── reviewSlice.ts        # Product reviews
+      ├── uiSlice.ts            # UI state (modals, notifications)
+      ├── analyticsSlice.ts     # User behavior tracking
+      ├── offlineSlice.ts       # Offline queue management
+    ├── store.ts
+
+  /types
+    ├── global.d.ts
+    ├── api.d.ts
+    ├── analytics.d.ts
+    ├── seo.d.ts
+
+  /utils
+    ├── formatDate.ts
+    ├── validation.ts
+    ├── formatCurrency.ts
+    ├── cartUtils.ts
+    ├── imageOptimization.ts
+    ├── seoUtils.ts
+    ├── performanceUtils.ts
+    ├── offlineUtils.ts
+    ├── analyticsUtils.ts
+    ├── securityUtils.ts       # XSS/sanitization helpers
+
+  /styles
+    ├── globals.css
+    ├── tailwind.config.ts
+
+  /workers
+    ├── sw.ts                  # Service worker
+    ├── offlineSync.ts         # Background sync
+
+  ├── App.tsx
+  ├── main.tsx
+  ├── routes.tsx
+  ├── pwa-manifest.json
+
+
+============================================================
+5️⃣ Backend Framework & Libraries (MariaDB Sessions Only)
+============================================================
+✅ Express.js – Core backend framework
+✅ Sequelize (with TypeScript) – ORM for SQL databases
+✅ dotenv – Environment variable management
+✅ bcrypt – Password hashing
+✅ jsonwebtoken (optional) – Only if JWT is used
+✅ cookie-parser – Cookie handling
+✅ cors – Cross-origin resource sharing
+✅ helmet – Secure HTTP headers
+✅ winston or morgan – Logging
+✅ nodemailer – Email service
+✅ Jest / Mocha + Supertest – Testing framework
+✅ stripe / paypal-rest-sdk – Payment processing
+✅ multer – File uploads for product images
+✅ aws-sdk / cloudinary – Cloud storage for images
+✅ node-cache – In-memory caching layer
+✅ express-validator – Enhanced input validation
+🆕 elasticsearch / @elastic/elasticsearch – Advanced search engine
+🆕 bull / bee-queue – Job queue for background tasks
+🆕 express-rate-limit – Advanced rate limiting
+🆕 express-slow-down – Request throttling
+🆕 newrelic / @sentry/node – APM & error monitoring
+🆕 prometheus-api-metrics – Performance metrics
+🆕 sharp – Image processing & optimization
+🆕 websocket / socket.io – Real-time features
+🆕 opossum – Circuit breaker pattern
+🆕 joi / zod – Schema validation
+🆕 express-brute – Brute force protection
+🆕 csurf – Enhanced CSRF protection
+🆕 express-mongo-sanitize – NoSQL injection prevention
+🆕 dompurify – Server-side XSS protection
+✅ express-session – Session management with MariaDB store
+✅ express-mysql-session – MariaDB session store
+
+============================================================
+6️⃣ Backend Authentication & Security (MariaDB Sessions)
+============================================================
+✅ Session-based auth with MariaDB – Database-managed sessions using express-mysql-session
+✅ Refresh token logic – Stored in MariaDB sessions table with rotation
+✅ RBAC (Role-Based Access Control) – Managed via roles in DB
+✅ CSRF protection & Secure Cookies – Using csurf, httpOnly, secure, sameSite
+✅ Password reset flow – Secure token stored in MariaDB with expiration
+🆕 Multi-Factor Authentication (MFA) – TOTP with speakeasy, secrets stored in MariaDB
+🆕 Account lockout – Failed attempt tracking in MariaDB user table
+🆕 Session security – IP validation, user agent checking stored in sessions
+🆕 Password policy enforcement – Complexity requirements
+🆕 Security headers – Comprehensive helmet configuration
+🆕 Input sanitization – SQL injection & XSS prevention
+🆕 API key management – Secure external API integration
+
+============================================================
+7️⃣ Backend API Communication & Performance (MariaDB-Centric)
+============================================================
+✅ RESTful API endpoints – Standardized, versioned routes (/api/v1/...)
+✅ Global Error Handling – Centralized middleware with typed error responses
+✅ Logging – Track key actions (auth, password reset, DB queries)
+✅ Rate Limiting – Use express-rate-limit to prevent brute-force
+✅ In-Memory Caching Strategy (node-cache):
+  ├── Product catalog data (30min TTL)
+  ├── Search results (15min TTL)
+  ├── Category listings (1hr TTL)
+  ├── User sessions cached from MariaDB (5min TTL)
+✅ Database Optimization:
+  ├── Connection pooling for concurrent requests
+  ├── Indexes: Products (name, category, price, tags)
+  ├── Indexes: Orders (user_id, status, created_at)
+  ├── Indexes: Sessions (session_id, user_id, expires_at)
+  ├── Session cleanup job for expired MariaDB sessions
+
+🆕 Advanced Performance Features (MariaDB-Focused):
+  ├── Database Connection:
+      ├── Read replicas for product queries
+      ├── Connection pooling with retry logic
+      ├── Query optimization monitoring
+      ├── Database sharding strategy (future-ready)
+  ├── Caching Layers:
+      ├── Application-level caching with node-cache
+      ├── MariaDB query cache optimization
+      ├── CDN integration for static assets
+      ├── Session data caching from MariaDB
+  ├── Background Processing:
+      ├── File-based job queues for email sending
+      ├── Image processing pipeline
+      ├── Inventory update jobs
+      ├── Analytics data processing
+      ├── Session cleanup scheduled jobs
+  ├── Real-time Features:
+      ├── WebSocket for cart synchronization
+      ├── Live inventory updates
+      ├── Real-time order tracking
+      ├── Customer support chat
+
+============================================================
+8️⃣ Backend Project Structure (MariaDB Sessions)
+============================================================
+/src
+  /config
+    ├── database.ts         # Sequelize config + connection pooling
+    ├── session.ts          # MariaDB session store configuration
+    ├── payment.ts          # Stripe/PayPal configuration
+    ├── storage.ts          # Cloud storage configuration
+    ├── elasticsearch.ts    # Search engine configuration
+    ├── queue.ts            # Job queue configuration
+    ├── websocket.ts        # WebSocket server setup
+    ├── monitoring.ts       # APM & metrics configuration
+    ├── security.ts         # Security middleware configuration
+    ├── cache.ts            # node-cache configuration
+  /controllers
+    ├── authController.ts       # Auth logic (login, register, refresh, logout)
+    ├── userController.ts       # User CRUD
+    ├── productController.ts    # Product CRUD, search, filters
+    ├── cartController.ts       # Cart management
+    ├── orderController.ts      # Order processing
+    ├── paymentController.ts    # Payment processing
+    ├── reviewController.ts     # Product reviews & ratings
+    ├── wishlistController.ts   # Wishlist management
+    ├── searchController.ts     # Advanced search functionality
+    ├── adminController.ts      # Admin panel operations
+    ├── analyticsController.ts  # Business analytics
+    ├── notificationController.ts # Push notifications
+    ├── supportController.ts    # Customer support
+  /middlewares
+    ├── auth.ts             # Auth middleware (MariaDB sessions, RBAC)
+    ├── errorHandler.ts     # Central error handling
+    ├── cache.ts            # node-cache middleware
+    ├── upload.ts           # File upload middleware
+    ├── validation.ts       # Enhanced input validation
+    ├── session.ts          # MariaDB session middleware setup
+    ├── security.ts         # Comprehensive security middleware
+    ├── rateLimiting.ts     # Advanced rate limiting
+    ├── circuitBreaker.ts   # Circuit breaker for external APIs
+    ├── monitoring.ts       # Performance monitoring
+    ├── sanitization.ts     # Input sanitization
+    ├── compression.ts      # Response compression
+  /models
+    ├── userModel.ts        # Sequelize user schema
+    ├── roleModel.ts        # RBAC roles
+    ├── productModel.ts     # Product schema with indexes
+    ├── categoryModel.ts    # Product categories
+    ├── cartModel.ts        # Shopping cart schema
+    ├── orderModel.ts       # Order management
+    ├── paymentModel.ts     # Payment records
+    ├── sessionModel.ts     # MariaDB sessions schema (if custom needed)
+    ├── reviewModel.ts      # Product reviews & ratings
+    ├── wishlistModel.ts    # User wishlists
+    ├── inventoryModel.ts   # Stock management
+    ├── couponModel.ts      # Discount coupons
+    ├── notificationModel.ts # User notifications
+    ├── analyticsModel.ts   # User behavior tracking
+    ├── supportTicketModel.ts # Customer support
+    ├── passwordResetModel.ts # Password reset tokens in MariaDB
+    ├── mfaModel.ts         # MFA secrets in MariaDB
+    ├── index.ts            # Model init + associations
+  /routes
+    ├── authRoute.ts
+    ├── userRoute.ts
+    ├── productRoute.ts
+    ├── cartRoute.ts
+    ├── orderRoute.ts
+    ├── paymentRoute.ts
+    ├── reviewRoute.ts
+    ├── wishlistRoute.ts
+    ├── searchRoute.ts
+    ├── adminRoute.ts
+    ├── analyticsRoute.ts
+    ├── webhookRoute.ts     # Payment webhooks
+    ├── apiDocsRoute.ts     # API documentation
+  /services
+    ├── sessionService.ts   # MariaDB session/token logic
+    ├── emailService.ts     # Nodemailer setup + templates
+    ├── productService.ts   # Inventory, pricing logic
+    ├── cartService.ts      # Cart calculations, validation
+    ├── orderService.ts     # Order processing workflow
+    ├── paymentService.ts   # Payment gateway integration
+    ├── inventoryService.ts # Stock management
+    ├── cacheService.ts     # node-cache operations
+    ├── imageService.ts     # Image upload/optimization
+    ├── searchService.ts    # Elasticsearch operations
+    ├── queueService.ts     # Background job management
+    ├── notificationService.ts # Push & email notifications
+    ├── analyticsService.ts # Business intelligence
+    ├── reportingService.ts # Generate business reports
+    ├── auditService.ts     # Security audit logging
+    ├── backupService.ts    # Database backup operations
+    ├── webhookService.ts   # Handle external webhooks
+  /jobs
+    ├── emailJobs.ts        # Email sending jobs
+    ├── imageJobs.ts        # Image processing jobs
+    ├── inventoryJobs.ts    # Inventory sync jobs
+    ├── analyticsJobs.ts    # Data processing jobs
+    ├── cleanupJobs.ts      # Database cleanup jobs (including sessions)
+    ├── reportJobs.ts       # Scheduled report generation
+    ├── sessionJobs.ts      # Session cleanup and maintenance
+  /utils
+    ├── logger.ts           # Winston/Morgan setup
+    ├── validators.ts       # Input validation
+    ├── emailTemplates.ts   # Order confirmation templates
+    ├── priceCalculations.ts # Tax, shipping, discounts
+    ├── securityUtils.ts    # Security helper functions
+    ├── performanceUtils.ts # Performance monitoring helpers
+    ├── testUtils.ts        # Testing utilities
+    ├── migrationUtils.ts   # Database migration helpers
+    ├── seedUtils.ts        # Database seeding utilities
+    ├── sessionUtils.ts     # Session management helpers
+    ├── encryptionUtils.ts  # OAuth token encryption/decryption (AES-256)
+  /tests
+    ├── unit/               # Unit tests
+    ├── integration/        # Integration tests
+    ├── e2e/                # End-to-end tests
+    ├── fixtures/           # Test data
+  ├── server.ts             # Express app setup
+  ├── app.ts                # App entry (attach middlewares & routes)
+
+
+============================================================
+9️⃣ Backend Environment & Scripts (MariaDB-Focused)
+============================================================
+- .env → MariaDB credentials, email SMTP, secrets
+  + Stripe/PayPal keys, AWS/Cloudinary credentials
+  + monitoring keys, external API keys
+  + Security configurations, rate limit settings
+  + MariaDB session store configuration
+
+- package.json → Scripts:
+  - dev – Run with nodemon & ts-node
+  - build – Compile TypeScript → dist/
+  - start – Run compiled build
+  - test – Run Jest/Mocha tests
+  - test:watch – Run tests in watch mode
+  - test:coverage – Generate test coverage reports
+  - lint – Run ESLint
+  - lint:fix – Auto-fix linting issues
+  - seed – Database seeding for products/categories
+  - cache:clear – Clear node-cache
+  - migrate – Run database migrations
+  - migrate:rollback – Rollback migrations
+  - search:reindex – Rebuild search indexes
+  - queue:work – Process background jobs
+  - monitor – Start monitoring dashboard
+  - backup – Create database backup
+  - restore – Restore from backup
+  - security:audit – Run security audit
+  - load:test – Run load testing
+  - docs:generate – Generate API documentation
+  - sessions:cleanup – Manual session cleanup
+
+============================================================
+🔟 Session Management Strategy (MariaDB-Only)
+============================================================
+
+✅ **MariaDB Session Storage:**
+  ├── express-mysql-session for session store
+  ├── Sessions table: session_id, user_id, data, expires_at, created_at
+  ├── Automatic session cleanup via express-mysql-session
+  ├── Session expiration: 24 hours (configurable)
+
+✅ **Session Security:**
+  ├── httpOnly cookies prevent XSS access
+  ├── secure flag for HTTPS-only transmission
+  ├── sameSite='strict' for CSRF protection
+  ├── Session rotation on privilege escalation
+
+✅ **Performance Optimization:**
+  ├── Session data cached in node-cache (5min TTL)
+  ├── Database indexes on session_id and user_id
+  ├── Connection pooling for session queries
+  ├── Batch session cleanup (hourly job)
+
+✅ **Refresh Token Handling:**
+  ├── Refresh tokens stored in sessions.data JSON field
+  ├── Token rotation on each refresh (invalidate old)
+  ├── Separate expiration tracking for refresh tokens
+  ├── Revoke all sessions on password change
+
+✅ **Session Monitoring:**
+  ├── Track active sessions per user
+  ├── Log session creation/destruction
+  ├── Monitor session table size and cleanup efficiency
+  ├── Alert on unusual session patterns
+
+============================================================
+🔟 Enhanced Best Practices (MariaDB-Focused)
+============================================================
+✅ Use async/await for all DB/API calls
+✅ Centralize error handling in middleware
+✅ Validate all inputs (zod/joi/Sequelize validators)
+✅ Secure cookies (httpOnly, secure, sameSite)
+✅ Log all critical actions (login, password reset, role changes)
+✅ Modularize code for maintainability
+✅ Keep frontend + backend types aligned (shared DTOs if possible)
+✅ Implement proper error boundaries in React
+✅ Cache frequently accessed data with node-cache
+✅ Optimize images for web delivery
+✅ Implement proper inventory management
+✅ Handle payment failures gracefully
+✅ Use database transactions for critical operations (orders, payments, sessions)
+✅ Implement proper logging for e-commerce events (purchases, cart additions)
+✅ Add monitoring for performance metrics
+✅ Implement graceful degradation for offline scenarios
+
+🆕 **MariaDB-Specific Best Practices:**
+  ├── Database Connection Management:
+      ├── Use connection pooling (min: 5, max: 20 connections)
+      ├── Implement connection retry logic with exponential backoff
+      ├── Monitor connection pool metrics
+      ├── Handle connection timeouts gracefully
+  ├── Session Management:
+      ├── Regular session cleanup jobs (every hour)
+      ├── Monitor session table size and performance
+      ├── Implement session analytics and monitoring
+      ├── Use database transactions for session operations
+  ├── Query Optimization:
+      ├── Create proper indexes for session, user, and product tables
+      ├── Use prepared statements for security
+      ├── Monitor slow query log
+      ├── Implement query result caching
+  ├── Data Integrity:
+      ├── Use foreign key constraints properly
+      ├── Implement database-level validation
+      ├── Regular database health checks
+      ├── Automated backup and recovery procedures
+
+============================================================
+📦 Enhanced Cart & Checkout Experience (MariaDB-Backed)
+============================================================
+✅ **Cart State Management:**
+  ├── Guest Cart: localStorage + cartSlice (temporary)
+  ├── Authenticated Cart: MariaDB + cartSlice (persistent)
+  ├── Cart data stored in MariaDB carts table with user_id
+  ├── Session-based cart for authenticated users
+
+✅ **Cart Synchronization:**
+  ├── Guest → Authenticated: Merge localStorage cart with MariaDB cart
+  ├── Multi-device: Real-time sync via WebSocket + MariaDB updates
+  ├── Offline handling: Queue cart mutations, sync on reconnection
+  ├── Cart persistence: 30-day retention for authenticated users
+
+✅ **Cart Performance:**
+  ├── Cart data cached in node-cache (key: user_id)
+  ├── Optimistic updates with rollback on error
+  ├── Batch cart updates to reduce MariaDB queries
+  ├── Real-time inventory validation on cart operations
+
+✅ **Cart Security:**
+  ├── Validate cart items against current pricing
+  ├── Check inventory availability before checkout
+  ├── Sanitize cart data on all operations
+  ├── Rate limiting on cart modification endpoints
+
+============================================================
+🔐 Enhanced OAuth & Social Authentication (MariaDB)
+============================================================
+✅ **OAuth Integration:**
+  ├── Google OAuth: Store provider data in users table
+  ├── OAuth tokens: Encrypted storage in MariaDB
+  ├── Account linking: Link multiple OAuth providers to one account
+  ├── Session creation: Standard MariaDB session after OAuth verification
+
+✅ **Account Management:**
+  ├── OAuth accounts table: user_id, provider, provider_id, tokens
+  ├── Email verification: Skip for pre-verified OAuth emails
+  ├── Password optional: Allow OAuth-only accounts
+  ├── Account recovery: OAuth providers as recovery method
+
+✅ **Security Implementation:**
+  ├── Server-side token verification only
+  ├── State parameter validation for CSRF protection
+  ├── Secure token storage with encryption
+  ├── OAuth token refresh handling
+
+============================================================
+📱 Caching Strategy (Without Redis)
+============================================================
+
+✅ **Application-Level Caching (node-cache):**
+  ├── Product catalog: 30min TTL, LRU eviction
+  ├── Search results: 15min TTL
+  ├── Category data: 1hr TTL
+  ├── User sessions: 5min TTL (from MariaDB)
+  ├── Shopping cart: 10min TTL (for authenticated users)
+  ├── User preferences: 1hr TTL
+
+✅ **Database-Level Caching:**
+  ├── MariaDB query cache enabled
+  ├── InnoDB buffer pool optimization
+  ├── Index optimization for frequently queried data
+  ├── Connection pooling for cache efficiency
+
+✅ **Cache Management:**
+  ├── Cache warming on application startup
+  ├── Selective cache invalidation on data updates
+  ├── Cache hit/miss ratio monitoring
+  ├── Memory usage monitoring and limits
+
+✅ **File-Based Caching:**
+  ├── Static asset caching (images, CSS, JS)
+  ├── API response caching for heavy queries
+  ├── Generated report caching
+  ├── Search index caching
+
+============================================================
+🔄 Background Processing (Without Redis)
+============================================================
+
+✅ **File-Based Job Queue:**
+  ├── JSON file-based job storage
+  ├── Worker processes for background tasks
+  ├── Job retry logic with exponential backoff
+  ├── Dead letter queue for failed jobs
+
+✅ **Scheduled Tasks:**
+  ├── Cron jobs for recurring tasks
+  ├── Session cleanup (hourly)
+  ├── Cache warming (daily)
+  ├── Analytics processing (nightly)
+  ├── Email sending queue processing
+
+✅ **Task Categories:**
+  ├── Email sending (order confirmations, password reset)
+  ├── Image processing and optimization
+  ├── Inventory synchronization
+  ├── Report generation
+  ├── Database maintenance tasks
+
+============================================================
+📊 Monitoring & Analytics (MariaDB-Centered)
+============================================================
+
+✅ **Database Monitoring:**
+  ├── Connection pool metrics
+  ├── Query performance tracking
+  ├── Session table size and cleanup efficiency
+  ├── Slow query analysis
+
+✅ **Application Monitoring:**
+  ├── node-cache hit/miss ratios
+  ├── API response times
+  ├── Error rates and patterns
+  ├── Background job processing metrics
+
+✅ **Business Analytics:**
+  ├── Sales data stored in MariaDB
+  ├── User behavior tracking
+  ├── Cart abandonment analysis
+  ├── Product performance metrics
+
+✅ **Security Monitoring:**
+  ├── Failed authentication attempts
+  ├── Session anomalies
+  ├── Suspicious user patterns
+  ├── Payment fraud indicators
