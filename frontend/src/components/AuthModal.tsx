@@ -2,12 +2,20 @@ import React, { useState } from 'react'
 import { X, Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Button from './Button'
 
+interface User {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  avatar?: string
+}
+
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
   mode: 'login' | 'register'
   onModeChange: (mode: 'login' | 'register') => void
-  onSuccess: () => void
+  onSuccess: (user: User) => void
 }
 
 export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSuccess }: AuthModalProps) {
@@ -29,7 +37,14 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
     // Simulate API call
     setTimeout(() => {
       setIsLoading(false)
-      onSuccess()
+      const userData: User = {
+        id: Date.now().toString(),
+        firstName: formData.firstName || 'User',
+        lastName: formData.lastName || 'Name',
+        email: formData.email,
+        avatar: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=random`
+      }
+      onSuccess(userData)
       onClose()
       // Reset form
       setFormData({
@@ -48,7 +63,14 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
     // Mock Google login
     setTimeout(() => {
       setIsLoading(false)
-      onSuccess()
+      const userData: User = {
+        id: Date.now().toString(),
+        firstName: 'Google',
+        lastName: 'User',
+        email: 'user@gmail.com',
+        avatar: 'https://ui-avatars.com/api/?name=Google+User&background=random'
+      }
+      onSuccess(userData)
       onClose()
       alert('Mock Google login successful! In a real app, this would authenticate with Google OAuth.')
     }, 1500)

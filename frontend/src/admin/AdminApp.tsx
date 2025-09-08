@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Orders from './pages/Orders'
 import Customers from './pages/Customers'
+import Reviews from './pages/Reviews'
 import Messages from './pages/Messages'
 import Inventory from './pages/Inventory'
 import Categories from './pages/Categories'
@@ -23,6 +24,7 @@ const AdminApp: React.FC = () => {
           <Route path="products" element={<Products />} />
           <Route path="orders" element={<Orders />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="reviews" element={<Reviews />} />
           <Route path="messages" element={<Messages />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="categories" element={<Categories />} />

@@ -14,7 +14,8 @@ import {
   Palette,
   FileText,
   Warehouse,
-  LogOut
+  LogOut,
+  Star
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Customers', href: '/admin/customers', icon: Users },
+  { name: 'Reviews', href: '/admin/reviews', icon: Star },
   { name: 'Messages', href: '/admin/messages', icon: MessageSquare },
   { name: 'Chat Settings', href: '/admin/chat-settings', icon: Settings },
   { name: 'Inventory', href: '/admin/inventory', icon: Warehouse },

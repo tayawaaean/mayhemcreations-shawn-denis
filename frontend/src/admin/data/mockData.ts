@@ -1,4 +1,4 @@
-import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, AdminUser } from '../types'
+import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, AdminUser, Review } from '../types'
 
 export const mockAdminUser: AdminUser = {
   id: 'admin-1',
@@ -405,6 +405,100 @@ export const mockEmbroideryOptions: EmbroideryOption[] = [
     status: 'active',
     sortOrder: 2,
     createdAt: new Date('2024-01-01')
+  }
+]
+
+export const mockReviews: Review[] = [
+  {
+    id: 'rev-1',
+    productId: 'prod-1',
+    product: mockProducts[0],
+    customerId: 'cust-1',
+    customer: mockCustomers[0],
+    rating: 5,
+    title: 'Amazing quality and fit!',
+    comment: 'I absolutely love this t-shirt. The embroidery is perfect and the fabric is so soft. Fits exactly as expected and the quality is outstanding. Will definitely order again!',
+    status: 'approved',
+    isVerified: true,
+    helpfulVotes: 8,
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-01-15'),
+    images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&crop=center']
+  },
+  {
+    id: 'rev-2',
+    productId: 'prod-1',
+    product: mockProducts[0],
+    customerId: 'cust-2',
+    customer: mockCustomers[1],
+    rating: 4,
+    title: 'Great shirt, fast shipping',
+    comment: 'Really happy with the purchase. The shirt is comfortable and the embroidery looks great. Shipping was faster than expected. Only minor issue is the sizing runs a bit small.',
+    status: 'approved',
+    isVerified: true,
+    helpfulVotes: 5,
+    createdAt: new Date('2024-01-18'),
+    updatedAt: new Date('2024-01-18')
+  },
+  {
+    id: 'rev-3',
+    productId: 'prod-2',
+    product: mockProducts[1],
+    customerId: 'cust-3',
+    customer: mockCustomers[2],
+    rating: 5,
+    title: 'Perfect hoodie!',
+    comment: 'This hoodie is exactly what I was looking for. The material is thick and warm, perfect for winter. The embroidery is beautifully done and the fit is spot on. Highly recommend!',
+    status: 'approved',
+    isVerified: true,
+    helpfulVotes: 12,
+    createdAt: new Date('2024-01-20'),
+    updatedAt: new Date('2024-01-20')
+  },
+  {
+    id: 'rev-4',
+    productId: 'prod-3',
+    product: mockProducts[2],
+    customerId: 'cust-1',
+    customer: mockCustomers[0],
+    rating: 3,
+    title: 'Decent cap but could be better',
+    comment: 'The cap is okay but the embroidery seems a bit off-center. The material is good quality but the fit is a bit tight. Overall decent but expected better for the price.',
+    status: 'approved',
+    isVerified: true,
+    helpfulVotes: 2,
+    createdAt: new Date('2024-01-22'),
+    updatedAt: new Date('2024-01-22')
+  },
+  {
+    id: 'rev-5',
+    productId: 'prod-1',
+    product: mockProducts[0],
+    customerId: 'cust-2',
+    customer: mockCustomers[1],
+    rating: 5,
+    title: 'Love the design!',
+    comment: 'The embroidery design is exactly what I wanted. The shirt is comfortable and the colors are vibrant. Great customer service too!',
+    status: 'pending',
+    isVerified: false,
+    helpfulVotes: 0,
+    createdAt: new Date('2024-01-25'),
+    updatedAt: new Date('2024-01-25')
+  },
+  {
+    id: 'rev-6',
+    productId: 'prod-2',
+    product: mockProducts[1],
+    customerId: 'cust-3',
+    customer: mockCustomers[2],
+    rating: 1,
+    title: 'Poor quality',
+    comment: 'The hoodie arrived with loose threads and the embroidery is crooked. Very disappointed with the quality. Would not recommend.',
+    status: 'rejected',
+    isVerified: true,
+    helpfulVotes: 1,
+    createdAt: new Date('2024-01-23'),
+    updatedAt: new Date('2024-01-24')
   }
 ]
 

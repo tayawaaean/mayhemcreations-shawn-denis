@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { ShoppingCart, Menu, X, Search, ChevronDown, User, LogIn } from 'lucide-react'
+import { ShoppingCart, Menu, X, Search, ChevronDown, User, LogIn, Package } from 'lucide-react'
 import { useCart } from '../context/CartContext'
+import { useAuth } from '../context/AuthContext'
 import AuthModal from '../../components/AuthModal'
 
 const NavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () => void }> = ({ to, children, onClick }) => (
@@ -91,12 +92,12 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 export default function Navbar() {
   const { items } = useCart()
+  const { user, isLoggedIn, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false)
   const [dropdownTimeout, setDropdownTimeout] = useState<NodeJS.Timeout | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const count = items.reduce((s, i) => s + i.quantity, 0)
 
   const handleMouseEnter = () => {
@@ -138,8 +139,8 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* Desktop Navigation - Large screens */}
+          <nav className="hidden lg:flex items-center space-x-6">
             <NavItem to="/">Home</NavItem>
 
             {/* Products Dropdown */}
@@ -149,7 +150,7 @@ export default function Navbar() {
               onMouseLeave={handleMouseLeave}
             >
               <button
-                className="flex items-center space-x-1 px-4 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
+                className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
                 onClick={() => setProductsDropdownOpen(!productsDropdownOpen)}
               >
                 <span>Products</span>
@@ -165,16 +166,29 @@ export default function Navbar() {
             <NavItem to="/about">About</NavItem>
             <NavItem to="/faq">FAQ</NavItem>
             <NavItem to="/contact">Contact</NavItem>
+            {isLoggedIn && (
+              <NavItem to="/my-orders">Orders</NavItem>
+            )}
+          </nav>
+
+          {/* Desktop Navigation - Medium screens */}
+          <nav className="hidden md:flex lg:hidden items-center space-x-4">
+            <NavItem to="/">Home</NavItem>
+            <NavItem to="/products">Products</NavItem>
+            <NavItem to="/about">About</NavItem>
+            {isLoggedIn && (
+              <NavItem to="/my-orders">Orders</NavItem>
+            )}
           </nav>
 
           {/* Search Bar - Desktop */}
-          <div className="hidden lg:flex items-center flex-1 max-w-lg mx-8">
+          <div className="hidden xl:flex items-center flex-1 max-w-md mx-4">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search products..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                placeholder="Search..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent text-sm"
               />
             </div>
           </div>
@@ -185,11 +199,11 @@ export default function Navbar() {
             <div className="hidden md:flex items-center space-x-2">
               {isLoggedIn ? (
                 <div className="flex items-center space-x-2">
-                  <User className="w-5 h-5 text-gray-700" />
-                  <span className="text-sm text-gray-700">Welcome back!</span>
+                  <User className="w-4 h-4 text-gray-700" />
+                  <span className="text-sm text-gray-700 hidden lg:inline">Hi, {user?.firstName}!</span>
                   <button
-                    onClick={() => setIsLoggedIn(false)}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    onClick={logout}
+                    className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
                   >
                     Logout
                   </button>
@@ -201,19 +215,20 @@ export default function Navbar() {
                       setAuthMode('login')
                       setShowAuthModal(true)
                     }}
-                    className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-700 hover:text-accent transition-colors"
+                    className="flex items-center space-x-1 px-2 py-1 text-sm text-gray-700 hover:text-accent transition-colors rounded"
                   >
                     <LogIn className="w-4 h-4" />
-                    <span>Login</span>
+                    <span className="hidden lg:inline">Login</span>
                   </button>
                   <button
                     onClick={() => {
                       setAuthMode('register')
                       setShowAuthModal(true)
                     }}
-                    className="px-3 py-2 text-sm bg-accent text-white rounded-md hover:bg-opacity-90 transition-colors"
+                    className="px-2 py-1 text-sm bg-accent text-white rounded hover:bg-opacity-90 transition-colors"
                   >
-                    Register
+                    <span className="hidden lg:inline">Register</span>
+                    <span className="lg:hidden">Sign Up</span>
                   </button>
                 </>
               )}
@@ -221,9 +236,9 @@ export default function Navbar() {
 
             {/* Cart */}
             <Link to="/cart" className="relative p-2 text-gray-700 hover:text-accent transition-colors">
-              <ShoppingCart className="w-6 h-6" />
+              <ShoppingCart className="w-5 h-5" />
               {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-accent text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-medium">
+                <span className="absolute -top-1 -right-1 bg-accent text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-xs">
                   {count}
                 </span>
               )}
@@ -285,6 +300,14 @@ export default function Navbar() {
                 <NavItem to="/about" onClick={() => setMobileMenuOpen(false)}>About</NavItem>
                 <NavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>FAQ</NavItem>
                 <NavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</NavItem>
+                {isLoggedIn && (
+                  <NavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                    <div className="flex items-center space-x-2">
+                      <Package className="w-4 h-4" />
+                      <span>Orders</span>
+                    </div>
+                  </NavItem>
+                )}
 
                 {/* Mobile Auth */}
                 <div className="border-t border-gray-200 pt-4">
@@ -292,11 +315,11 @@ export default function Navbar() {
                     <div className="px-3 py-2">
                       <div className="flex items-center space-x-2 mb-2">
                         <User className="w-4 h-4 text-gray-700" />
-                        <span className="text-sm text-gray-700">Welcome back!</span>
+                        <span className="text-sm text-gray-700">Welcome, {user?.firstName}!</span>
                       </div>
                       <button
                         onClick={() => {
-                          setIsLoggedIn(false)
+                          logout()
                           setMobileMenuOpen(false)
                         }}
                         className="text-sm text-gray-500 hover:text-gray-700"
@@ -342,7 +365,10 @@ export default function Navbar() {
         onClose={() => setShowAuthModal(false)}
         mode={authMode}
         onModeChange={setAuthMode}
-        onSuccess={() => setIsLoggedIn(true)}
+        onSuccess={(userData) => {
+          login(userData)
+          setShowAuthModal(false)
+        }}
       />
     </header>
   )

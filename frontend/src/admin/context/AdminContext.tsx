@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react'
-import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics } from '../types'
+import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, Review } from '../types'
 import { 
   mockProducts, 
   mockOrders, 
@@ -8,7 +8,8 @@ import {
   mockFAQs, 
   mockMessages, 
   mockEmbroideryOptions, 
-  mockAnalytics 
+  mockAnalytics,
+  mockReviews
 } from '../data/mockData'
 
 type AdminState = {
@@ -19,10 +20,12 @@ type AdminState = {
   faqs: FAQ[]
   messages: Message[]
   embroideryOptions: EmbroideryOption[]
+  reviews: Review[]
   analytics: Analytics
   selectedProduct: AdminProduct | null
   selectedOrder: Order | null
   selectedCustomer: Customer | null
+  selectedReview: Review | null
   loading: boolean
   error: string | null
 }
@@ -51,9 +54,14 @@ type AdminAction =
   | { type: 'ADD_EMBROIDERY_OPTION'; payload: EmbroideryOption }
   | { type: 'UPDATE_EMBROIDERY_OPTION'; payload: EmbroideryOption }
   | { type: 'DELETE_EMBROIDERY_OPTION'; payload: string }
+  | { type: 'SET_REVIEWS'; payload: Review[] }
+  | { type: 'ADD_REVIEW'; payload: Review }
+  | { type: 'UPDATE_REVIEW'; payload: Review }
+  | { type: 'DELETE_REVIEW'; payload: string }
   | { type: 'SET_SELECTED_PRODUCT'; payload: AdminProduct | null }
   | { type: 'SET_SELECTED_ORDER'; payload: Order | null }
   | { type: 'SET_SELECTED_CUSTOMER'; payload: Customer | null }
+  | { type: 'SET_SELECTED_REVIEW'; payload: Review | null }
 
 const initialState: AdminState = {
   products: mockProducts,
@@ -63,10 +71,12 @@ const initialState: AdminState = {
   faqs: mockFAQs,
   messages: mockMessages,
   embroideryOptions: mockEmbroideryOptions,
+  reviews: mockReviews,
   analytics: mockAnalytics,
   selectedProduct: null,
   selectedOrder: null,
   selectedCustomer: null,
+  selectedReview: null,
   loading: false,
   error: null
 }
@@ -146,12 +156,28 @@ const adminReducer = (state: AdminState, action: AdminAction): AdminState => {
         ...state,
         embroideryOptions: state.embroideryOptions.filter(e => e.id !== action.payload)
       }
+    case 'SET_REVIEWS':
+      return { ...state, reviews: action.payload }
+    case 'ADD_REVIEW':
+      return { ...state, reviews: [...state.reviews, action.payload] }
+    case 'UPDATE_REVIEW':
+      return {
+        ...state,
+        reviews: state.reviews.map(r => r.id === action.payload.id ? action.payload : r)
+      }
+    case 'DELETE_REVIEW':
+      return {
+        ...state,
+        reviews: state.reviews.filter(r => r.id !== action.payload)
+      }
     case 'SET_SELECTED_PRODUCT':
       return { ...state, selectedProduct: action.payload }
     case 'SET_SELECTED_ORDER':
       return { ...state, selectedOrder: action.payload }
     case 'SET_SELECTED_CUSTOMER':
       return { ...state, selectedCustomer: action.payload }
+    case 'SET_SELECTED_REVIEW':
+      return { ...state, selectedReview: action.payload }
     default:
       return state
   }

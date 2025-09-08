@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import type { Product } from '../../types'
 import { Link } from 'react-router-dom'
-import { Heart, Eye } from 'lucide-react'
+import { Heart, Eye, Star } from 'lucide-react'
 import Button from '../../components/Button'
 
 export default function ProductCard({ product }: { product: Product }) {
@@ -74,6 +74,27 @@ export default function ProductCard({ product }: { product: Product }) {
         <p className="text-sm text-gray-600 mb-3 line-clamp-2">
           {product.description}
         </p>
+
+        {/* Rating */}
+        {product.reviews && product.reviews.length > 0 && (
+          <div className="flex items-center space-x-1 mb-3">
+            <div className="flex items-center">
+              {Array.from({ length: 5 }, (_, i) => (
+                <Star
+                  key={i}
+                  className={`h-3 w-3 ${
+                    i < Math.round(product.averageRating || 0) 
+                      ? 'text-yellow-400 fill-current' 
+                      : 'text-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-xs text-gray-600">
+              {product.averageRating?.toFixed(1)} ({product.totalReviews})
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <div className="text-lg font-bold text-gray-900">

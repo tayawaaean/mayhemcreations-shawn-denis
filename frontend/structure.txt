@@ -44,155 +44,155 @@
 ✅ Real-time Updates – WebSocket integration for cart/inventory
 
 ============================================================
-4️⃣ Frontend Project Structure (Enhanced TypeScript + Tailwind)
-============================================================
-/src
-  /api
-    ├── authApi.ts             # Authentication API
-    ├── userApi.ts             # User API
-    ├── productApi.ts          # Product catalog, search, filters
-    ├── cartApi.ts             # Cart operations
-    ├── orderApi.ts            # Order management
-    ├── paymentApi.ts          # Payment processing
-    ├── reviewApi.ts           # Product reviews & ratings
-    ├── wishlistApi.ts         # Wishlist management
-    ├── searchApi.ts           # Advanced search with Algolia/Elasticsearch
-    ├── analyticsApi.ts        # User behavior tracking
-    ├── axiosInstance.ts       # Pre-configured Axios instance with interceptors
+  4️⃣ Frontend Project Structure (Enhanced TypeScript + Tailwind)
+  ============================================================
+  /src
+    /api
+      ├── authApi.ts             # Authentication API
+      ├── userApi.ts             # User API
+      ├── productApi.ts          # Product catalog, search, filters
+      ├── cartApi.ts             # Cart operations
+      ├── orderApi.ts            # Order management
+      ├── paymentApi.ts          # Payment processing
+      ├── reviewApi.ts           # Product reviews & ratings
+      ├── wishlistApi.ts         # Wishlist management
+      ├── searchApi.ts           # Advanced search with Algolia/Elasticsearch
+      ├── analyticsApi.ts        # User behavior tracking
+      ├── axiosInstance.ts       # Pre-configured Axios instance with interceptors
+      /types
+        ├── auth.d.ts
+        ├── user.d.ts
+        ├── product.d.ts
+        ├── cart.d.ts
+        ├── order.d.ts
+        ├── payment.d.ts
+        ├── review.d.ts
+        ├── wishlist.d.ts
+        ├── search.d.ts
+        ├── analytics.d.ts
+
+    /components
+      ├── Navbar.tsx             # Tailwind-styled navigation bar
+      ├── Sidebar.tsx
+      ├── ProtectedRoute.tsx     # RBAC
+      ├── ErrorBoundary.tsx      # React error boundary
+      ├── LoadingSkeleton.tsx    # Skeleton screens
+      ├── SearchBar.tsx          # Advanced search with autocomplete
+      ├── NotificationCenter.tsx # Toast notifications
+      /ecommerce
+        ├── ProductCard.tsx
+        ├── ProductGrid.tsx      # Virtual scrolling
+        ├── CartDrawer.tsx
+        ├── CheckoutForm.tsx
+        ├── OrderSummary.tsx
+        ├── ProductReviews.tsx
+        ├── WishlistButton.tsx
+        ├── CompareProducts.tsx
+        ├── ProductImageGallery.tsx # Optimized image carousel
+        ├── StockIndicator.tsx
+        ├── PriceComparison.tsx
+      /admin
+        ├── ProductManager.tsx
+        ├── OrderFulfillment.tsx
+        ├── AnalyticsDashboard.tsx
+        ├── CustomerSupport.tsx
+        ├── InventoryManager.tsx
+      /ui                      # Reusable UI (button, input, card, modal)
+
+    /hooks
+      ├── useAuth.ts
+      ├── useFetch.ts
+      ├── useCart.ts
+      ├── useProducts.ts
+      ├── useOrders.ts
+      ├── useSearch.ts
+      ├── useWishlist.ts
+      ├── useReviews.ts
+      ├── useAnalytics.ts
+      ├── useIntersectionObserver.ts
+      ├── useOfflineStatus.ts
+      ├── usePerformanceMonitoring.ts
+
+    /layouts
+      ├── AdminLayout.tsx
+      ├── UserLayout.tsx
+      ├── ShopLayout.tsx
+      ├── MobileLayout.tsx
+
+    /pages
+      /Auth
+        ├── Login.tsx
+        ├── Register.tsx
+        ├── ForgotPassword.tsx
+        ├── EmailVerification.tsx
+      /Dashboard
+        ├── AdminDashboard.tsx
+        ├── UserDashboard.tsx
+        ├── SellerDashboard.tsx
+      /Shop
+        ├── ProductList.tsx
+        ├── ProductDetail.tsx
+        ├── Cart.tsx
+        ├── Checkout.tsx
+        ├── OrderHistory.tsx
+        ├── Wishlist.tsx
+        ├── SearchResults.tsx
+        ├── ProductComparison.tsx
+        ├── ReviewsAndRatings.tsx
+      /Admin
+        ├── ProductManagement.tsx
+        ├── OrderManagement.tsx
+        ├── CustomerManagement.tsx
+        ├── AnalyticsReports.tsx
+        ├── InventoryReports.tsx
+      ├── NotFound.tsx
+      ├── OfflinePage.tsx
+
+    /store
+      /slices
+        ├── authSlice.ts
+        ├── userSlice.ts
+        ├── cartSlice.ts          # Persistent cart state
+        ├── productSlice.ts       # Product filters/search state
+        ├── orderSlice.ts         # Order management state
+        ├── wishlistSlice.ts      # Wishlist/favorites
+        ├── searchSlice.ts        # Search state & filters
+        ├── reviewSlice.ts        # Product reviews
+        ├── uiSlice.ts            # UI state (modals, notifications)
+        ├── analyticsSlice.ts     # User behavior tracking
+        ├── offlineSlice.ts       # Offline queue management
+      ├── store.ts
+
     /types
-      ├── auth.d.ts
-      ├── user.d.ts
-      ├── product.d.ts
-      ├── cart.d.ts
-      ├── order.d.ts
-      ├── payment.d.ts
-      ├── review.d.ts
-      ├── wishlist.d.ts
-      ├── search.d.ts
+      ├── global.d.ts
+      ├── api.d.ts
       ├── analytics.d.ts
+      ├── seo.d.ts
 
-  /components
-    ├── Navbar.tsx             # Tailwind-styled navigation bar
-    ├── Sidebar.tsx
-    ├── ProtectedRoute.tsx     # RBAC
-    ├── ErrorBoundary.tsx      # React error boundary
-    ├── LoadingSkeleton.tsx    # Skeleton screens
-    ├── SearchBar.tsx          # Advanced search with autocomplete
-    ├── NotificationCenter.tsx # Toast notifications
-    /ecommerce
-      ├── ProductCard.tsx
-      ├── ProductGrid.tsx      # Virtual scrolling
-      ├── CartDrawer.tsx
-      ├── CheckoutForm.tsx
-      ├── OrderSummary.tsx
-      ├── ProductReviews.tsx
-      ├── WishlistButton.tsx
-      ├── CompareProducts.tsx
-      ├── ProductImageGallery.tsx # Optimized image carousel
-      ├── StockIndicator.tsx
-      ├── PriceComparison.tsx
-    /admin
-      ├── ProductManager.tsx
-      ├── OrderFulfillment.tsx
-      ├── AnalyticsDashboard.tsx
-      ├── CustomerSupport.tsx
-      ├── InventoryManager.tsx
-    /ui                      # Reusable UI (button, input, card, modal)
+    /utils
+      ├── formatDate.ts
+      ├── validation.ts
+      ├── formatCurrency.ts
+      ├── cartUtils.ts
+      ├── imageOptimization.ts
+      ├── seoUtils.ts
+      ├── performanceUtils.ts
+      ├── offlineUtils.ts
+      ├── analyticsUtils.ts
+      ├── securityUtils.ts       # XSS/sanitization helpers
 
-  /hooks
-    ├── useAuth.ts
-    ├── useFetch.ts
-    ├── useCart.ts
-    ├── useProducts.ts
-    ├── useOrders.ts
-    ├── useSearch.ts
-    ├── useWishlist.ts
-    ├── useReviews.ts
-    ├── useAnalytics.ts
-    ├── useIntersectionObserver.ts
-    ├── useOfflineStatus.ts
-    ├── usePerformanceMonitoring.ts
+    /styles
+      ├── globals.css
+      ├── tailwind.config.ts
 
-  /layouts
-    ├── AdminLayout.tsx
-    ├── UserLayout.tsx
-    ├── ShopLayout.tsx
-    ├── MobileLayout.tsx
+    /workers
+      ├── sw.ts                  # Service worker
+      ├── offlineSync.ts         # Background sync
 
-  /pages
-    /Auth
-      ├── Login.tsx
-      ├── Register.tsx
-      ├── ForgotPassword.tsx
-      ├── EmailVerification.tsx
-    /Dashboard
-      ├── AdminDashboard.tsx
-      ├── UserDashboard.tsx
-      ├── SellerDashboard.tsx
-    /Shop
-      ├── ProductList.tsx
-      ├── ProductDetail.tsx
-      ├── Cart.tsx
-      ├── Checkout.tsx
-      ├── OrderHistory.tsx
-      ├── Wishlist.tsx
-      ├── SearchResults.tsx
-      ├── ProductComparison.tsx
-      ├── ReviewsAndRatings.tsx
-    /Admin
-      ├── ProductManagement.tsx
-      ├── OrderManagement.tsx
-      ├── CustomerManagement.tsx
-      ├── AnalyticsReports.tsx
-      ├── InventoryReports.tsx
-    ├── NotFound.tsx
-    ├── OfflinePage.tsx
-
-  /store
-    /slices
-      ├── authSlice.ts
-      ├── userSlice.ts
-      ├── cartSlice.ts          # Persistent cart state
-      ├── productSlice.ts       # Product filters/search state
-      ├── orderSlice.ts         # Order management state
-      ├── wishlistSlice.ts      # Wishlist/favorites
-      ├── searchSlice.ts        # Search state & filters
-      ├── reviewSlice.ts        # Product reviews
-      ├── uiSlice.ts            # UI state (modals, notifications)
-      ├── analyticsSlice.ts     # User behavior tracking
-      ├── offlineSlice.ts       # Offline queue management
-    ├── store.ts
-
-  /types
-    ├── global.d.ts
-    ├── api.d.ts
-    ├── analytics.d.ts
-    ├── seo.d.ts
-
-  /utils
-    ├── formatDate.ts
-    ├── validation.ts
-    ├── formatCurrency.ts
-    ├── cartUtils.ts
-    ├── imageOptimization.ts
-    ├── seoUtils.ts
-    ├── performanceUtils.ts
-    ├── offlineUtils.ts
-    ├── analyticsUtils.ts
-    ├── securityUtils.ts       # XSS/sanitization helpers
-
-  /styles
-    ├── globals.css
-    ├── tailwind.config.ts
-
-  /workers
-    ├── sw.ts                  # Service worker
-    ├── offlineSync.ts         # Background sync
-
-  ├── App.tsx
-  ├── main.tsx
-  ├── routes.tsx
-  ├── pwa-manifest.json
+    ├── App.tsx
+    ├── main.tsx
+    ├── routes.tsx
+    ├── pwa-manifest.json
 
 
 ============================================================
@@ -202,7 +202,6 @@
 ✅ Sequelize (with TypeScript) – ORM for SQL databases
 ✅ dotenv – Environment variable management
 ✅ bcrypt – Password hashing
-✅ jsonwebtoken (optional) – Only if JWT is used
 ✅ cookie-parser – Cookie handling
 ✅ cors – Cross-origin resource sharing
 ✅ helmet – Secure HTTP headers

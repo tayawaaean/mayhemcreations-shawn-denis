@@ -10,6 +10,22 @@ export type Product = {
   subcategory?: string
   availableColors?: string[]
   availableSizes?: string[]
+  reviews?: ProductReview[]
+  averageRating?: number
+  totalReviews?: number
+}
+
+export type ProductReview = {
+  id: string
+  customerName: string
+  customerAvatar?: string
+  rating: number
+  title: string
+  comment: string
+  isVerified: boolean
+  helpfulVotes: number
+  createdAt: Date
+  images?: string[]
 }
 
 export type CartItem = {

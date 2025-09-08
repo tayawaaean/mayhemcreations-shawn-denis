@@ -1,5 +1,71 @@
 import type { Product } from '../types'
 
+// Mock review data for products
+const mockProductReviews = {
+  'mayhem-001': [
+    {
+      id: 'rev-1',
+      customerName: 'Sarah Johnson',
+      customerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face',
+      rating: 5,
+      title: 'Amazing quality and fit!',
+      comment: 'I absolutely love this t-shirt. The embroidery is perfect and the fabric is so soft. Fits exactly as expected and the quality is outstanding. Will definitely order again!',
+      isVerified: true,
+      helpfulVotes: 8,
+      createdAt: new Date('2024-01-15'),
+      images: ['https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&crop=center']
+    },
+    {
+      id: 'rev-2',
+      customerName: 'Mike Chen',
+      customerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
+      rating: 4,
+      title: 'Great shirt, fast shipping',
+      comment: 'Really happy with the purchase. The shirt is comfortable and the embroidery looks great. Shipping was faster than expected. Only minor issue is the sizing runs a bit small.',
+      isVerified: true,
+      helpfulVotes: 5,
+      createdAt: new Date('2024-01-18')
+    },
+    {
+      id: 'rev-3',
+      customerName: 'Emily Davis',
+      customerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face',
+      rating: 5,
+      title: 'Love the design!',
+      comment: 'The embroidery design is exactly what I wanted. The shirt is comfortable and the colors are vibrant. Great customer service too!',
+      isVerified: false,
+      helpfulVotes: 0,
+      createdAt: new Date('2024-01-25')
+    }
+  ],
+  'mayhem-005': [
+    {
+      id: 'rev-4',
+      customerName: 'Emily Davis',
+      customerAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face',
+      rating: 5,
+      title: 'Perfect hoodie!',
+      comment: 'This hoodie is exactly what I was looking for. The material is thick and warm, perfect for winter. The embroidery is beautifully done and the fit is spot on. Highly recommend!',
+      isVerified: true,
+      helpfulVotes: 12,
+      createdAt: new Date('2024-01-20')
+    }
+  ],
+  'mayhem-003': [
+    {
+      id: 'rev-5',
+      customerName: 'Sarah Johnson',
+      customerAvatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100&h=100&fit=crop&crop=face',
+      rating: 3,
+      title: 'Decent cap but could be better',
+      comment: 'The cap is okay but the embroidery seems a bit off-center. The material is good quality but the fit is a bit tight. Overall decent but expected better for the price.',
+      isVerified: true,
+      helpfulVotes: 2,
+      createdAt: new Date('2024-01-22')
+    }
+  ]
+}
+
 export const products: Product[] = [
   // Apparel - T-Shirts
   {
@@ -13,7 +79,10 @@ export const products: Product[] = [
     category: 'apparel',
     subcategory: 'tshirt',
     availableColors: ['White', 'Black', 'Navy', 'Gray', 'Red', 'Forest Green'],
-    availableSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL']
+    availableSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+    reviews: mockProductReviews['mayhem-001'],
+    averageRating: 4.7,
+    totalReviews: 3
   },
   {
     id: 'mayhem-007',
@@ -80,7 +149,10 @@ export const products: Product[] = [
     category: 'apparel',
     subcategory: 'hoodie',
     availableColors: ['Black', 'Navy', 'Gray', 'Charcoal', 'Forest Green', 'Burgundy'],
-    availableSizes: ['S', 'M', 'L', 'XL', 'XXL']
+    availableSizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    reviews: mockProductReviews['mayhem-005'],
+    averageRating: 5.0,
+    totalReviews: 1
   },
   {
     id: 'mayhem-011',
@@ -104,7 +176,10 @@ export const products: Product[] = [
     alt: 'Black embroidered cap',
     badges: [],
     category: 'accessories',
-    subcategory: 'cap'
+    subcategory: 'cap',
+    reviews: mockProductReviews['mayhem-003'],
+    averageRating: 3.0,
+    totalReviews: 1
   },
   {
     id: 'mayhem-012',

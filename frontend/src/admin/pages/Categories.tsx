@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { AddCategoryModal, EditCategoryModal, DeleteCategoryModal } from '../components/modals/CategoryModals'
 import HelpModal from '../components/modals/HelpModal'
-import { Category } from '../types'
+ import { Category } from '../types'
 
 const Categories: React.FC = () => {
   const { state, dispatch } = useAdmin()

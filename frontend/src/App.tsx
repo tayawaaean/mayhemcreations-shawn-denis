@@ -6,6 +6,7 @@ import ChatWidget from './ecommerce/components/ChatWidget'
 import { ChatProvider } from './ecommerce/context/ChatContext'
 import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
+import { AuthProvider } from './ecommerce/context/AuthContext'
 import AdminApp from './admin/AdminApp'
 import Home from './ecommerce/routes/Home'
 import Products from './ecommerce/routes/Products'
@@ -16,13 +17,15 @@ import FAQ from './ecommerce/routes/FAQ'
 import Contact from './ecommerce/routes/Contact'
 import Cart from './ecommerce/routes/Cart'
 import Checkout from './ecommerce/routes/Checkout'
+import MyOrders from './ecommerce/routes/MyOrders'
 
 export default function App() {
   return (
-    <CartProvider>
-      <ChatProvider>
-        <CustomizationProvider>
-          <Routes>
+    <AuthProvider>
+      <CartProvider>
+        <ChatProvider>
+          <CustomizationProvider>
+            <Routes>
             {/* Admin Routes */}
             <Route path="/admin/*" element={<AdminApp />} />
             
@@ -117,9 +120,20 @@ export default function App() {
                 <ChatWidget />
               </div>
             } />
+            <Route path="/my-orders" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <MyOrders />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
           </Routes>
         </CustomizationProvider>
       </ChatProvider>
     </CartProvider>
+    </AuthProvider>
   )
 }

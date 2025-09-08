@@ -148,3 +148,20 @@ export type AdminUser = {
   lastLogin: Date
   status: 'active' | 'inactive'
 }
+
+export type Review = {
+  id: string
+  productId: string
+  product: AdminProduct
+  customerId: string
+  customer: Customer
+  rating: number
+  title: string
+  comment: string
+  status: 'pending' | 'approved' | 'rejected'
+  isVerified: boolean
+  helpfulVotes: number
+  createdAt: Date
+  updatedAt: Date
+  images?: string[]
+}
