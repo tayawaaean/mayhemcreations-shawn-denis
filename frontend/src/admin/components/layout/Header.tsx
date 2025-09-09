@@ -1,15 +1,17 @@
 import React, { useState } from 'react'
 import { Menu, Search, Bell } from 'lucide-react'
+import { UserRole } from '../../context/RoleContext'
 
 interface HeaderProps {
   onMenuClick: () => void
+  role: UserRole
 }
 
-const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick, role }) => {
   const [searchQuery, setSearchQuery] = useState('')
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
+    <header className="sticky top-0 z-30 bg-white shadow-sm border-b border-gray-200">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Left side */}

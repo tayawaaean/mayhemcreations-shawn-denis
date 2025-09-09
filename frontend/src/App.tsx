@@ -8,6 +8,8 @@ import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
 import { AuthProvider } from './ecommerce/context/AuthContext'
 import AdminApp from './admin/AdminApp'
+import SellerApp from './admin/SellerApp'
+import EmployeeApp from './admin/EmployeeApp'
 import Home from './ecommerce/routes/Home'
 import Products from './ecommerce/routes/Products'
 import ProductPage from './ecommerce/routes/ProductPage'
@@ -26,8 +28,14 @@ export default function App() {
         <ChatProvider>
           <CustomizationProvider>
             <Routes>
+            {/* Employee Login Route */}
+            <Route path="/employee-login" element={<EmployeeApp />} />
+            
             {/* Admin Routes */}
             <Route path="/admin/*" element={<AdminApp />} />
+            
+            {/* Seller Routes */}
+            <Route path="/seller/*" element={<SellerApp />} />
             
             {/* Public Routes */}
             <Route path="/" element={

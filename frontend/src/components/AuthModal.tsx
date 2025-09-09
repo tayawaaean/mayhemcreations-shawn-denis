@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { X, Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Button from './Button'
+import { loggingService } from '../shared/loggingService'
 
 interface User {
   id: string
@@ -44,6 +45,18 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         email: formData.email,
         avatar: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=random`
       }
+      
+      // Log successful customer registration/login
+      if (mode === 'register') {
+        loggingService.logUserAction('customer_registration', {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        }, { userId: userData.id, userEmail: userData.email, userRole: 'customer' })
+      } else {
+        loggingService.logLoginAttempt(formData.email, true, 'customer')
+      }
+      
       onSuccess(userData)
       onClose()
       // Reset form
@@ -70,6 +83,14 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         email: 'user@gmail.com',
         avatar: 'https://ui-avatars.com/api/?name=Google+User&background=random'
       }
+      
+      // Log Google login attempt
+      loggingService.logLoginAttempt('user@gmail.com', true, 'customer')
+      loggingService.logUserAction('google_oauth_login', {
+        provider: 'google',
+        email: 'user@gmail.com'
+      }, { userId: userData.id, userEmail: userData.email, userRole: 'customer' })
+      
       onSuccess(userData)
       onClose()
       alert('Mock Google login successful! In a real app, this would authenticate with Google OAuth.')

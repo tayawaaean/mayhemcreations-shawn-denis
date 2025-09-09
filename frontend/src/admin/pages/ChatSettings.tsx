@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAdmin } from '../context/AdminContext'
 import { autoReplyService, QuickReplyTemplate } from '../../shared/autoReplyService'
+import RoleGuard from '../components/RoleGuard'
 import {
   MessageSquare,
   Plus,
@@ -82,7 +83,8 @@ const ChatSettings: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <RoleGuard adminOnly>
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-white shadow rounded-lg">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -376,6 +378,7 @@ const ChatSettings: React.FC = () => {
         </ol>
       </HelpModal>
     </div>
+    </RoleGuard>
   )
 }
 

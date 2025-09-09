@@ -10,6 +10,37 @@ export const mockAdminUser: AdminUser = {
   status: 'active'
 }
 
+export const mockAdminUsers: AdminUser[] = [
+  mockAdminUser,
+  {
+    id: 'admin-2',
+    name: 'Ava Manager',
+    email: 'ava.manager@mayhemcreations.com',
+    role: 'manager',
+    avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=100&h=100&fit=crop&crop=face',
+    lastLogin: new Date('2024-01-24T11:45:00'),
+    status: 'active'
+  },
+  {
+    id: 'seller-1',
+    name: 'Sam Seller',
+    email: 'sam.seller@mayhemcreations.com',
+    role: 'staff',
+    avatar: 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100&h=100&fit=crop&crop=face',
+    lastLogin: new Date('2024-01-22T09:10:00'),
+    status: 'active'
+  },
+  {
+    id: 'seller-2',
+    name: 'Nina Seller',
+    email: 'nina.seller@mayhemcreations.com',
+    role: 'staff',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face',
+    lastLogin: new Date('2024-01-10T16:25:00'),
+    status: 'inactive'
+  }
+]
+
 export const mockCategories: Category[] = [
   {
     id: 'cat-1',
@@ -263,6 +294,15 @@ export const mockOrders: Order[] = [
     shippingAddress: mockCustomers[0].address,
     billingAddress: mockCustomers[0].address,
     paymentMethod: 'Credit Card',
+    paymentStatus: 'completed',
+    paymentProvider: 'stripe',
+    paymentDetails: {
+      transactionId: 'txn_1234567890',
+      providerTransactionId: 'pi_1234567890abcdef',
+      cardLast4: '4242',
+      cardBrand: 'visa',
+      processedAt: new Date('2024-01-20T10:30:15Z')
+    },
     notes: ['Express shipping requested'],
     createdAt: new Date('2024-01-20'),
     updatedAt: new Date('2024-01-21')
@@ -286,9 +326,80 @@ export const mockOrders: Order[] = [
     shippingAddress: mockCustomers[1].address,
     billingAddress: mockCustomers[1].address,
     paymentMethod: 'PayPal',
+    paymentStatus: 'completed',
+    paymentProvider: 'paypal',
+    paymentDetails: {
+      transactionId: 'txn_0987654321',
+      providerTransactionId: 'PAYID-1234567890ABCDEF',
+      processedAt: new Date('2024-01-18T14:22:30Z')
+    },
     notes: [],
     createdAt: new Date('2024-01-18'),
     updatedAt: new Date('2024-01-19')
+  },
+  {
+    id: 'order-3',
+    customerId: 'cust-3',
+    customer: mockCustomers[2],
+    items: [
+      {
+        id: 'item-3',
+        productId: 'prod-3',
+        product: mockProducts[2],
+        variant: mockProducts[2].variants[0],
+        quantity: 1,
+        price: 18.0
+      }
+    ],
+    status: 'pending',
+    total: 18.0,
+    shippingAddress: mockCustomers[2].address,
+    billingAddress: mockCustomers[2].address,
+    paymentMethod: 'Google Pay',
+    paymentStatus: 'failed',
+    paymentProvider: 'google_pay',
+    paymentDetails: {
+      transactionId: 'txn_5566778899',
+      providerTransactionId: 'google_pay_failed_1234567890',
+      failedAt: new Date('2024-01-22T16:45:05Z')
+    },
+    notes: ['Payment failed - card declined'],
+    createdAt: new Date('2024-01-22'),
+    updatedAt: new Date('2024-01-22')
+  },
+  {
+    id: 'order-4',
+    customerId: 'cust-1',
+    customer: mockCustomers[0],
+    items: [
+      {
+        id: 'item-4',
+        productId: 'prod-2',
+        product: mockProducts[1],
+        variant: mockProducts[1].variants[2],
+        quantity: 1,
+        price: 42.0
+      }
+    ],
+    status: 'delivered',
+    total: 42.0,
+    shippingAddress: mockCustomers[0].address,
+    billingAddress: mockCustomers[0].address,
+    paymentMethod: 'Credit Card',
+    paymentStatus: 'refunded',
+    paymentProvider: 'stripe',
+    paymentDetails: {
+      transactionId: 'txn_9988776655',
+      providerTransactionId: 'pi_refund_1234567890',
+      cardLast4: '4242',
+      cardBrand: 'visa',
+      processedAt: new Date('2024-01-15T11:20:15Z'),
+      refundedAt: new Date('2024-01-25T15:30:00Z'),
+      refundAmount: 42.0
+    },
+    notes: ['Customer requested refund - product defect'],
+    createdAt: new Date('2024-01-15'),
+    updatedAt: new Date('2024-01-25')
   }
 ]
 

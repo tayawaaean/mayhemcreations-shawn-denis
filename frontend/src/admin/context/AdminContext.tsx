@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react'
-import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, Review } from '../types'
+import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, Review, AdminUser } from '../types'
 import { 
   mockProducts, 
   mockOrders, 
@@ -9,13 +9,15 @@ import {
   mockMessages, 
   mockEmbroideryOptions, 
   mockAnalytics,
-  mockReviews
+  mockReviews,
+  mockAdminUsers
 } from '../data/mockData'
 
 type AdminState = {
   products: AdminProduct[]
   orders: Order[]
   customers: Customer[]
+  users: AdminUser[]
   categories: Category[]
   faqs: FAQ[]
   messages: Message[]
@@ -40,6 +42,10 @@ type AdminAction =
   | { type: 'SET_ORDERS'; payload: Order[] }
   | { type: 'UPDATE_ORDER'; payload: Order }
   | { type: 'SET_CUSTOMERS'; payload: Customer[] }
+  | { type: 'SET_USERS'; payload: AdminUser[] }
+  | { type: 'ADD_USER'; payload: AdminUser }
+  | { type: 'UPDATE_USER'; payload: AdminUser }
+  | { type: 'DELETE_USER'; payload: string }
   | { type: 'SET_CATEGORIES'; payload: Category[] }
   | { type: 'ADD_CATEGORY'; payload: Category }
   | { type: 'UPDATE_CATEGORY'; payload: Category }
@@ -67,6 +73,7 @@ const initialState: AdminState = {
   products: mockProducts,
   orders: mockOrders,
   customers: mockCustomers,
+  users: mockAdminUsers,
   categories: mockCategories,
   faqs: mockFAQs,
   messages: mockMessages,
@@ -110,6 +117,20 @@ const adminReducer = (state: AdminState, action: AdminAction): AdminState => {
       }
     case 'SET_CUSTOMERS':
       return { ...state, customers: action.payload }
+    case 'SET_USERS':
+      return { ...state, users: action.payload }
+    case 'ADD_USER':
+      return { ...state, users: [...state.users, action.payload] }
+    case 'UPDATE_USER':
+      return {
+        ...state,
+        users: state.users.map(u => u.id === action.payload.id ? action.payload : u)
+      }
+    case 'DELETE_USER':
+      return {
+        ...state,
+        users: state.users.filter(u => u.id !== action.payload)
+      }
     case 'SET_CATEGORIES':
       return { ...state, categories: action.payload }
     case 'ADD_CATEGORY':

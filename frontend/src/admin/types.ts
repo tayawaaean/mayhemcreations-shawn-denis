@@ -41,6 +41,18 @@ export type Order = {
   shippingAddress: Address
   billingAddress: Address
   paymentMethod: string
+  paymentStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded'
+  paymentProvider: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual'
+  paymentDetails?: {
+    transactionId?: string
+    providerTransactionId?: string
+    cardLast4?: string
+    cardBrand?: string
+    processedAt?: Date
+    failedAt?: Date
+    refundedAt?: Date
+    refundAmount?: number
+  }
   notes: string[]
   createdAt: Date
   updatedAt: Date
