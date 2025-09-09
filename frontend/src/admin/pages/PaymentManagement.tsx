@@ -4,125 +4,143 @@ import {
   Search, 
   Filter, 
   Eye, 
-  Edit, 
-  Package,
-  Truck,
   CheckCircle,
   XCircle,
   Clock,
-  CreditCard,
   DollarSign,
-  AlertCircle
+  CreditCard,
+  AlertCircle,
+  RefreshCw,
+  Download
 } from 'lucide-react'
-import { OrderDetailModal, StatusUpdateModal } from '../components/modals/OrderModals'
+import { PaymentLog } from '../types/paymentLogs'
+import { mockPaymentLogs } from '../data/mockPaymentLogs'
 import HelpModal from '../components/modals/HelpModal'
-import { Order } from '../types'
+import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
 
-const Orders: React.FC = () => {
+const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
   const { orders } = state
+  const [payments, setPayments] = useState<PaymentLog[]>(mockPaymentLogs)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [selectedOrders, setSelectedOrders] = useState<string[]>([])
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [selectedProvider, setSelectedProvider] = useState('all')
+  const [selectedPayments, setSelectedPayments] = useState<string[]>([])
+  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false)
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false)
+  const [selectedPayment, setSelectedPayment] = useState<PaymentLog | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [isHelpOpen, setIsHelpOpen] = useState(false)
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.customer.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = selectedStatus === 'all' || order.status === selectedStatus
-    return matchesSearch && matchesStatus
+  const filteredPayments = payments.filter(payment => {
+    const matchesSearch = payment.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         payment.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         payment.customerEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         payment.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = selectedStatus === 'all' || payment.status === selectedStatus
+    const matchesProvider = selectedProvider === 'all' || payment.provider === selectedProvider
+    return matchesSearch && matchesStatus && matchesProvider
   })
 
   // Pagination logic
-  const totalItems = filteredOrders.length
+  const totalItems = filteredPayments.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedOrders = filteredOrders.slice(startIndex, endIndex)
+  const paginatedPayments = filteredPayments.slice(startIndex, endIndex)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
-  const handleSelectOrder = (orderId: string) => {
-    setSelectedOrders(prev => 
-      prev.includes(orderId) 
-        ? prev.filter(id => id !== orderId)
-        : [...prev, orderId]
+  const handleSelectPayment = (paymentId: string) => {
+    setSelectedPayments(prev => 
+      prev.includes(paymentId) 
+        ? prev.filter(id => id !== paymentId)
+        : [...prev, paymentId]
     )
   }
 
   const handleSelectAll = () => {
-    if (selectedOrders.length === filteredOrders.length) {
-      setSelectedOrders([])
+    if (selectedPayments.length === filteredPayments.length) {
+      setSelectedPayments([])
     } else {
-      setSelectedOrders(filteredOrders.map(o => o.id))
+      setSelectedPayments(filteredPayments.map(p => p.id))
     }
   }
 
-  const handleStatusChange = (orderId: string, newStatus: string) => {
-    const order = orders.find(o => o.id === orderId)
-    if (order) {
-      const updatedOrder = { ...order, status: newStatus as any, updatedAt: new Date() }
-      dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder })
+  const handleConfirmPayment = (payment: PaymentLog) => {
+    setSelectedPayment(payment)
+    setIsConfirmationModalOpen(true)
+  }
+
+  const handleRefundPayment = (payment: PaymentLog) => {
+    setSelectedPayment(payment)
+    setIsRefundModalOpen(true)
+  }
+
+  const confirmPayment = (paymentId: string) => {
+    setPayments(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === paymentId 
+          ? { ...payment, status: 'completed', processedAt: new Date().toISOString() }
+          : payment
+      )
+    )
+
+    // Update corresponding order status to processing
+    const payment = payments.find(p => p.id === paymentId)
+    if (payment) {
+      const order = orders.find(o => o.id === payment.orderId)
+      if (order) {
+        const updatedOrder = { ...order, status: 'processing' as any, updatedAt: new Date() }
+        dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder })
+      }
     }
+
+    setIsConfirmationModalOpen(false)
+    setSelectedPayment(null)
   }
 
-  const handleViewOrder = (order: Order) => {
-    setSelectedOrder(order)
-    setIsDetailModalOpen(true)
-  }
+  const processRefund = (paymentId: string, refundAmount: number, reason: string) => {
+    setPayments(prevPayments => 
+      prevPayments.map(payment => 
+        payment.id === paymentId 
+          ? { 
+              ...payment, 
+              status: 'refunded', 
+              refundedAt: new Date().toISOString(),
+              refundAmount: refundAmount,
+              refunds: [...(payment.refunds || []), {
+                id: `refund_${Date.now()}`,
+                paymentId: paymentId,
+                amount: refundAmount,
+                reason: reason,
+                status: 'completed',
+                createdAt: new Date().toISOString(),
+                processedAt: new Date().toISOString()
+              }]
+            }
+          : payment
+      )
+    )
 
-  const handleUpdateStatus = (order: Order) => {
-    setSelectedOrder(order)
-    setIsStatusModalOpen(true)
-  }
+    // Update corresponding order status to cancelled
+    const payment = payments.find(p => p.id === paymentId)
+    if (payment) {
+      const order = orders.find(o => o.id === payment.orderId)
+      if (order) {
+        const updatedOrder = { ...order, status: 'cancelled' as any, updatedAt: new Date() }
+        dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder })
+      }
+    }
 
-  const handleStatusUpdate = (orderId: string, newStatus: string) => {
-    handleStatusChange(orderId, newStatus)
+    setIsRefundModalOpen(false)
+    setSelectedPayment(null)
   }
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-4 w-4" />
-      case 'processing':
-        return <Package className="h-4 w-4" />
-      case 'shipped':
-        return <Truck className="h-4 w-4" />
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4" />
-      case 'cancelled':
-        return <XCircle className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'processing':
-        return 'bg-blue-100 text-blue-800'
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800'
-      case 'delivered':
-        return 'bg-green-100 text-green-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getPaymentStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-600" />
@@ -131,7 +149,7 @@ const Orders: React.FC = () => {
       case 'pending':
         return <Clock className="h-4 w-4 text-yellow-600" />
       case 'processing':
-        return <Clock className="h-4 w-4 text-blue-600" />
+        return <RefreshCw className="h-4 w-4 text-blue-600" />
       case 'refunded':
         return <DollarSign className="h-4 w-4 text-orange-600" />
       case 'partially_refunded':
@@ -143,7 +161,7 @@ const Orders: React.FC = () => {
     }
   }
 
-  const getPaymentStatusColor = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800'
@@ -164,7 +182,7 @@ const Orders: React.FC = () => {
     }
   }
 
-  const getPaymentMethodIcon = (provider: string) => {
+  const getProviderIcon = (provider: string) => {
     switch (provider) {
       case 'stripe':
         return <CreditCard className="h-4 w-4" />
@@ -183,9 +201,18 @@ const Orders: React.FC = () => {
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending' },
     { value: 'processing', label: 'Processing' },
-    { value: 'shipped', label: 'Shipped' },
-    { value: 'delivered', label: 'Delivered' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'refunded', label: 'Refunded' },
     { value: 'cancelled', label: 'Cancelled' }
+  ]
+
+  const providerOptions = [
+    { value: 'all', label: 'All Providers' },
+    { value: 'stripe', label: 'Stripe' },
+    { value: 'paypal', label: 'PayPal' },
+    { value: 'google_pay', label: 'Google Pay' },
+    { value: 'apple_pay', label: 'Apple Pay' }
   ]
 
   return (
@@ -193,9 +220,9 @@ const Orders: React.FC = () => {
       {/* Page header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Payment Management</h1>
           <p className="mt-2 text-gray-600">
-            Manage customer orders and track fulfillment
+            Manage payments, confirm transactions, and handle refunds
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -209,16 +236,75 @@ const Orders: React.FC = () => {
         </div>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Completed</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {payments.filter(p => p.status === 'completed').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Pending</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {payments.filter(p => p.status === 'pending').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <XCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Failed</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {payments.filter(p => p.status === 'failed').length}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <DollarSign className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Refunded</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {payments.filter(p => p.status === 'refunded').length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Filters and search */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search orders, customers..."
+                placeholder="Search payments, customers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
@@ -239,6 +325,19 @@ const Orders: React.FC = () => {
             </select>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+            <select
+              value={selectedProvider}
+              onChange={(e) => setSelectedProvider(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              {providerOptions.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-end">
             <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center">
               <Filter className="h-4 w-4 mr-2" />
@@ -249,21 +348,21 @@ const Orders: React.FC = () => {
       </div>
 
       {/* Bulk actions */}
-      {selectedOrders.length > 0 && (
+      {selectedPayments.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-blue-700">
-              {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
+              {selectedPayments.length} payment{selectedPayments.length > 1 ? 's' : ''} selected
             </span>
             <div className="flex space-x-2">
-              <button className="text-sm text-blue-700 hover:text-blue-800">Bulk Update Status</button>
+              <button className="text-sm text-blue-700 hover:text-blue-800">Bulk Confirm</button>
               <button className="text-sm text-blue-700 hover:text-blue-800">Export</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Orders table */}
+      {/* Payments table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
@@ -272,25 +371,22 @@ const Orders: React.FC = () => {
                 <th className="px-6 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                    checked={selectedPayments.length === filteredPayments.length && filteredPayments.length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order
+                  Transaction
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Items
+                  Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment
+                  Provider
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -304,89 +400,75 @@ const Orders: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
+              {paginatedPayments.map((payment) => (
+                <tr key={payment.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
-                      checked={selectedOrders.includes(order.id)}
-                      onChange={() => handleSelectOrder(order.id)}
+                      checked={selectedPayments.includes(payment.id)}
+                      onChange={() => handleSelectPayment(payment.id)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">#{order.id}</div>
-                    <div className="text-sm text-gray-500">{order.paymentMethod}</div>
+                    <div className="text-sm font-medium text-gray-900">#{payment.orderNumber}</div>
+                    <div className="text-sm text-gray-500 font-mono">{payment.transactionId}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
                         <span className="text-gray-600 font-medium text-sm">
-                          {order.customer.name.charAt(0)}
+                          {payment.customerName.charAt(0)}
                         </span>
                       </div>
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">{order.customer.name}</div>
-                        <div className="text-sm text-gray-500">{order.customer.email}</div>
+                        <div className="text-sm font-medium text-gray-900">{payment.customerName}</div>
+                        <div className="text-sm text-gray-500">{payment.customerEmail}</div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>
-                      {order.items.length} item{order.items.length > 1 ? 's' : ''}
-                    </div>
-                    <div className="text-gray-500">
-                      {order.items.reduce((sum, item) => sum + item.quantity, 0)} total
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${order.total.toFixed(2)}
+                    ${payment.amount.toFixed(2)}
+                    {payment.refundAmount && (
+                      <div className="text-xs text-red-600">
+                        Refunded: ${payment.refundAmount.toFixed(2)}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        {getPaymentMethodIcon(order.paymentProvider)}
-                        <span className="text-sm text-gray-900">{order.paymentMethod}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
-                          {getPaymentStatusIcon(order.paymentStatus)}
-                          <span className="ml-1">{order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
-                        </span>
-                      </div>
-                      {order.paymentDetails?.cardLast4 && (
-                        <div className="text-xs text-gray-500">
-                          ****{order.paymentDetails.cardLast4}
-                        </div>
-                      )}
+                    <div className="flex items-center space-x-2">
+                      {getProviderIcon(payment.provider)}
+                      <span className="text-sm text-gray-900 capitalize">{payment.provider.replace('_', ' ')}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        <span className="ml-1">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(payment.status)}`}>
+                        {getStatusIcon(payment.status)}
+                        <span className="ml-1">{payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}</span>
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {order.createdAt.toLocaleDateString()}
+                    {new Date(payment.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
                       <button 
-                        onClick={() => handleViewOrder(order)}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                        title="View Details"
+                        onClick={() => handleConfirmPayment(payment)}
+                        disabled={payment.status === 'completed' || payment.status === 'refunded'}
+                        className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Confirm Payment"
                       >
-                        <Eye className="h-4 w-4" />
+                        <CheckCircle className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleUpdateStatus(order)}
-                        className="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50 transition-colors"
-                        title="Update Status"
+                        onClick={() => handleRefundPayment(payment)}
+                        disabled={payment.status !== 'completed'}
+                        className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Process Refund"
                       >
-                        <Edit className="h-4 w-4" />
+                        <DollarSign className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -397,73 +479,61 @@ const Orders: React.FC = () => {
 
           {/* Mobile Card Layout */}
           <div className="lg:hidden">
-            {paginatedOrders.map((order) => (
-              <div key={order.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
+            {paginatedPayments.map((payment) => (
+              <div key={payment.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
                 <div className="flex items-start space-x-3">
                   <input
                     type="checkbox"
-                    checked={selectedOrders.includes(order.id)}
-                    onChange={() => handleSelectOrder(order.id)}
+                    checked={selectedPayments.includes(payment.id)}
+                    onChange={() => handleSelectPayment(payment.id)}
                     className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900">#{order.id}</h3>
-                        <p className="text-sm text-gray-500 truncate">{order.customer.name}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          {getPaymentMethodIcon(order.paymentProvider)}
-                          <span className="text-xs text-gray-400">{order.paymentMethod}</span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
-                            {getPaymentStatusIcon(order.paymentStatus)}
-                            <span className="ml-1">{order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
-                          </span>
-                        </div>
+                        <h3 className="text-sm font-medium text-gray-900">#{payment.orderNumber}</h3>
+                        <p className="text-sm text-gray-500 truncate">{payment.customerName}</p>
+                        <p className="text-xs text-gray-400 mt-1 font-mono">{payment.transactionId}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
                         <button
-                          onClick={() => handleViewOrder(order)}
-                          className="text-blue-600 hover:text-blue-900"
+                          onClick={() => handleConfirmPayment(payment)}
+                          disabled={payment.status === 'completed' || payment.status === 'refunded'}
+                          className="text-green-600 hover:text-green-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Eye className="h-4 w-4" />
+                          <CheckCircle className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleUpdateStatus(order)}
-                          className="text-gray-600 hover:text-gray-900"
+                          onClick={() => handleRefundPayment(payment)}
+                          disabled={payment.status !== 'completed'}
+                          className="text-orange-600 hover:text-orange-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Edit className="h-4 w-4" />
+                          <DollarSign className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-xs text-gray-500">Items</p>
-                        <p className="text-sm text-gray-900">{order.items.length} item{order.items.length > 1 ? 's' : ''}</p>
+                        <p className="text-xs text-gray-500">Amount</p>
+                        <p className="text-sm font-medium text-gray-900">${payment.amount.toFixed(2)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Total</p>
-                        <p className="text-sm font-medium text-gray-900">${order.total.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">Provider</p>
+                        <div className="flex items-center space-x-1">
+                          {getProviderIcon(payment.provider)}
+                          <p className="text-sm text-gray-900 capitalize">{payment.provider.replace('_', ' ')}</p>
+                        </div>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Status</p>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          order.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : order.status === 'processing'
-                            ? 'bg-blue-100 text-blue-800'
-                            : order.status === 'shipped'
-                            ? 'bg-purple-100 text-purple-800'
-                            : order.status === 'delivered'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {order.status}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}>
+                          {payment.status}
                         </span>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Date</p>
-                        <p className="text-sm text-gray-900">{order.createdAt.toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-900">{new Date(payment.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
@@ -536,37 +606,38 @@ const Orders: React.FC = () => {
       )}
 
       {/* Modals */}
-      <OrderDetailModal
-        isOpen={isDetailModalOpen}
+      <PaymentConfirmationModal
+        isOpen={isConfirmationModalOpen}
         onClose={() => {
-          setIsDetailModalOpen(false)
-          setSelectedOrder(null)
+          setIsConfirmationModalOpen(false)
+          setSelectedPayment(null)
         }}
-        order={selectedOrder}
+        onConfirm={confirmPayment}
+        payment={selectedPayment}
       />
 
-      <StatusUpdateModal
-        isOpen={isStatusModalOpen}
+      <RefundModal
+        isOpen={isRefundModalOpen}
         onClose={() => {
-          setIsStatusModalOpen(false)
-          setSelectedOrder(null)
+          setIsRefundModalOpen(false)
+          setSelectedPayment(null)
         }}
-        onUpdate={handleStatusUpdate}
-        order={selectedOrder}
+        onRefund={processRefund}
+        payment={selectedPayment}
       />
 
       {/* Help Modal */}
-      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Orders">
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Payment Management">
         <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
-          <li>Search by order ID or customer name/email.</li>
-          <li>Filter by Status to narrow results.</li>
-          <li>Click View to see order details, items, and totals.</li>
-          <li>Use Update Status to change order status.</li>
-          <li>Navigate pages using pagination at the bottom.</li>
+          <li>Search by order number, customer name, email, or transaction ID.</li>
+          <li>Filter by Status and Provider to narrow results.</li>
+          <li>Click the checkmark to confirm pending payments (updates order to processing).</li>
+          <li>Click the dollar sign to process refunds for completed payments.</li>
+          <li>Use bulk actions to process multiple payments at once.</li>
         </ol>
       </HelpModal>
     </div>
   )
 }
 
-export default Orders
+export default PaymentManagement

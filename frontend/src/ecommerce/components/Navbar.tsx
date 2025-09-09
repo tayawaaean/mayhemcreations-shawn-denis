@@ -95,7 +95,7 @@ export default function Navbar() {
   const { user, isLoggedIn, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false)
-  const [dropdownTimeout, setDropdownTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [dropdownTimeout, setDropdownTimeout] = useState<number | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const count = items.reduce((s, i) => s + i.quantity, 0)

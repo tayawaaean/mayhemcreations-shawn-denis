@@ -130,6 +130,56 @@ export default function Checkout() {
     // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 3000))
     
+    // Simulate payment success/failure (90% success rate)
+    const paymentSuccess = Math.random() > 0.1
+    const paymentStatus = paymentSuccess ? 'completed' : 'failed'
+    
+    // Create order with payment information
+    const orderData = {
+      id: `order-${Date.now()}`,
+      orderNumber: `MC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
+      status: paymentSuccess ? 'processing' : 'pending',
+      orderDate: new Date().toISOString().split('T')[0],
+      estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      total: calculateTotal(),
+      items: items.map((item, index) => ({
+        id: `item-${index}`,
+        productId: item.productId,
+        productName: `Product ${item.productId}`,
+        productImage: 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=Product',
+        quantity: item.quantity,
+        price: item.price,
+        customization: item.customization
+      })),
+      shippingAddress: {
+        name: `${formData.firstName} ${formData.lastName}`,
+        street: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode
+      },
+      paymentMethod: paymentMethod === 'stripe' ? 'Credit Card' : 
+                    paymentMethod === 'paypal' ? 'PayPal' : 
+                    paymentMethod === 'google' ? 'Google Pay' : 'Credit Card',
+      paymentStatus: paymentStatus,
+      paymentProvider: paymentMethod,
+      paymentDetails: {
+        transactionId: `txn_${Date.now()}`,
+        providerTransactionId: `${paymentMethod}_${Date.now()}`,
+        ...(paymentMethod === 'stripe' && formData.cardNumber ? {
+          cardLast4: formData.cardNumber.slice(-4),
+          cardBrand: 'visa', // Simplified for demo
+          processedAt: paymentSuccess ? new Date().toISOString() : undefined,
+          failedAt: !paymentSuccess ? new Date().toISOString() : undefined
+        } : {}),
+        processedAt: paymentSuccess ? new Date().toISOString() : undefined,
+        failedAt: !paymentSuccess ? new Date().toISOString() : undefined
+      }
+    }
+    
+    // In a real app, this would be sent to your backend
+    console.log('Order created:', orderData)
+    
     setIsProcessing(false)
     setIsComplete(true)
     
@@ -154,6 +204,10 @@ export default function Checkout() {
           </p>
           <div className="space-y-2 text-sm text-gray-500">
             <p>Order ID: #MAY-{Date.now().toString().slice(-6)}</p>
+            <p>Payment Method: {paymentMethod === 'stripe' ? 'Credit Card' : 
+                               paymentMethod === 'paypal' ? 'PayPal' : 
+                               paymentMethod === 'google' ? 'Google Pay' : 'Credit Card'}</p>
+            <p>Payment Status: Completed</p>
             <p>Estimated delivery: 3-5 business days</p>
           </div>
         </div>

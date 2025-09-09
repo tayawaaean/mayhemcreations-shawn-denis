@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Package, Truck, CheckCircle, XCircle, Clock, User, Mail, Phone, MapPin } from 'lucide-react'
+import { X, Package, Truck, CheckCircle, XCircle, Clock, User, Mail, Phone, MapPin, CreditCard, DollarSign, AlertCircle } from 'lucide-react'
 import { Order } from '../../types'
 
 interface OrderDetailModalProps {
@@ -52,6 +52,63 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
     }
   }
 
+  const getPaymentStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="h-4 w-4 text-green-600" />
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-600" />
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-600" />
+      case 'processing':
+        return <Clock className="h-4 w-4 text-blue-600" />
+      case 'refunded':
+        return <DollarSign className="h-4 w-4 text-orange-600" />
+      case 'partially_refunded':
+        return <DollarSign className="h-4 w-4 text-orange-600" />
+      case 'cancelled':
+        return <XCircle className="h-4 w-4 text-gray-600" />
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800'
+      case 'failed':
+        return 'bg-red-100 text-red-800'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'processing':
+        return 'bg-blue-100 text-blue-800'
+      case 'refunded':
+        return 'bg-orange-100 text-orange-800'
+      case 'partially_refunded':
+        return 'bg-orange-100 text-orange-800'
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPaymentMethodIcon = (provider: string) => {
+    switch (provider) {
+      case 'stripe':
+        return <CreditCard className="h-4 w-4" />
+      case 'paypal':
+        return <span className="text-blue-600 font-bold text-xs">PP</span>
+      case 'google_pay':
+        return <span className="text-gray-900 font-bold text-xs">G</span>
+      case 'apple_pay':
+        return <span className="text-gray-900 font-bold text-xs">A</span>
+      default:
+        return <CreditCard className="h-4 w-4" />
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -81,6 +138,44 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                   <p className="text-sm text-gray-500">Order Date</p>
                   <p className="text-sm font-medium text-gray-900">{order.createdAt.toLocaleDateString()}</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Payment Information */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <CreditCard className="h-5 w-5 mr-2" />
+                Payment Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Payment Method</p>
+                  <div className="flex items-center space-x-2 mt-1">
+                    {getPaymentMethodIcon(order.paymentProvider)}
+                    <span className="text-sm font-medium text-gray-900">{order.paymentMethod}</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Payment Status</p>
+                  <div className="flex items-center mt-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
+                      {getPaymentStatusIcon(order.paymentStatus)}
+                      <span className="ml-1">{order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
+                    </span>
+                  </div>
+                </div>
+                {order.paymentDetails?.cardLast4 && (
+                  <div>
+                    <p className="text-sm text-gray-500">Card Details</p>
+                    <p className="text-sm font-medium text-gray-900">****{order.paymentDetails.cardLast4}</p>
+                  </div>
+                )}
+                {order.paymentDetails?.transactionId && (
+                  <div>
+                    <p className="text-sm text-gray-500">Transaction ID</p>
+                    <p className="text-sm font-medium text-gray-900 font-mono">{order.paymentDetails.transactionId}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -114,7 +209,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                   Shipping Address
                 </h3>
                 <div className="space-y-2">
-                  <p className="text-gray-900 font-medium">{order.shippingAddress.name}</p>
+                  <p className="text-gray-900 font-medium">{order.customer.name}</p>
                   <p className="text-gray-600">{order.shippingAddress.street}</p>
                   <p className="text-gray-600">
                     {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zipCode}
@@ -139,7 +234,10 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                       <div className="ml-4">
                         <p className="text-sm font-medium text-gray-900">{item.product.title}</p>
                         <p className="text-sm text-gray-500">SKU: {item.product.sku}</p>
-                        <p className="text-sm text-gray-500">Size: {item.size}, Color: {item.color}</p>
+                        <p className="text-sm text-gray-500">
+                          {item.variant.size && `Size: ${item.variant.size}`}
+                          {item.variant.color && `, Color: ${item.variant.color}`}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -160,15 +258,15 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="text-gray-900">${order.subtotal.toFixed(2)}</span>
+                  <span className="text-gray-900">${order.total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="text-gray-900">${order.shipping.toFixed(2)}</span>
+                  <span className="text-gray-900">$0.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Tax</span>
-                  <span className="text-gray-900">${order.tax.toFixed(2)}</span>
+                  <span className="text-gray-900">$0.00</span>
                 </div>
                 <div className="flex justify-between text-lg font-semibold border-t border-gray-200 pt-2">
                   <span className="text-gray-900">Total</span>
@@ -176,6 +274,20 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                 </div>
               </div>
             </div>
+
+            {/* Order Notes */}
+            {order.notes && order.notes.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Notes</h3>
+                <div className="space-y-2">
+                  {order.notes.map((note, index) => (
+                    <div key={index} className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-3 p-4 sm:p-6 border-t border-gray-200">

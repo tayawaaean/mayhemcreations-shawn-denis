@@ -50,7 +50,7 @@ const Dashboard: React.FC = () => {
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Page header */}
       <div className="flex justify-between items-start">
         <div>

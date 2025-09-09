@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { loggingService } from '../../shared/loggingService'
 
 interface User {
   id: string
@@ -51,9 +52,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = (userData: User) => {
     setUser(userData)
     localStorage.setItem('user', JSON.stringify(userData))
+    
+    // Log successful customer login
+    loggingService.logLoginSuccess(
+      userData.id,
+      userData.email,
+      'customer'
+    )
   }
 
   const logout = () => {
+    // Log logout before clearing user data
+    if (user) {
+      loggingService.logLogout(user.id, user.email, 'customer')
+    }
+    
     setUser(null)
     localStorage.removeItem('user')
   }
@@ -72,4 +85,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     </AuthContext.Provider>
   )
 }
+
 

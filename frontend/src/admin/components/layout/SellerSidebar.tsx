@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
-import { useRole } from '../../context/RoleContext'
 import {
   LayoutDashboard,
   Package,
@@ -17,13 +16,13 @@ import {
   Warehouse,
   LogOut,
   Star,
+  Store,
   CreditCard,
-  DollarSign,
   ChevronDown,
   ChevronRight,
-  Store,
   BarChart,
   Cog,
+  DollarSign,
   RotateCcw
 } from 'lucide-react'
 
@@ -32,86 +31,69 @@ interface SidebarProps {
   onClose: () => void
 }
 
+// Seller-specific navigation sections
 const navigationSections = [
   {
     name: 'Overview',
     icon: LayoutDashboard,
     items: [
-      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, adminOnly: false }
+      { name: 'Dashboard', href: '/seller', icon: LayoutDashboard }
     ]
   },
   {
-    name: 'Store Management',
+    name: 'My Store',
     icon: Store,
     items: [
-      { name: 'Products', href: '/admin/products', icon: Package, adminOnly: false },
-      { name: 'Categories', href: '/admin/categories', icon: FileText, adminOnly: false },
-      { name: 'Inventory', href: '/admin/inventory', icon: Warehouse, adminOnly: false },
-      { name: 'Embroidery', href: '/admin/embroidery', icon: Palette, adminOnly: false }
+      { name: 'My Products', href: '/seller/products', icon: Package },
+      { name: 'Categories', href: '/seller/categories', icon: FileText },
+      { name: 'Inventory', href: '/seller/inventory', icon: Warehouse },
+      { name: 'Embroidery', href: '/seller/embroidery', icon: Palette }
     ]
   },
   {
     name: 'Orders & Customers',
     icon: ShoppingCart,
     items: [
-      { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, adminOnly: false },
-      { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: false },
-      { name: 'Reviews', href: '/admin/reviews', icon: Star, adminOnly: false }
-    ]
-  },
-  {
-    name: 'User Management',
-    icon: Users,
-    items: [
-      { name: 'Users', href: '/admin/users', icon: Users, adminOnly: true }
+      { name: 'Orders', href: '/seller/orders', icon: ShoppingCart },
+      { name: 'Customers', href: '/seller/customers', icon: Users },
+      { name: 'Reviews', href: '/seller/reviews', icon: Star }
     ]
   },
   {
     name: 'Payments',
     icon: DollarSign,
     items: [
-      { name: 'Payment Management', href: '/admin/payment-management', icon: DollarSign, adminOnly: false },
-      { name: 'Payment Logs', href: '/admin/payment-logs', icon: CreditCard, adminOnly: true }
+      { name: 'Payment Management', href: '/seller/payment-management', icon: DollarSign }
     ]
   },
   {
     name: 'Refunds',
     icon: RotateCcw,
     items: [
-      { name: 'Refund Management', href: '/admin/refund-management', icon: RotateCcw, adminOnly: true }
+      { name: 'Refund Management', href: '/seller/refund-management', icon: RotateCcw }
     ]
   },
   {
     name: 'Communication',
     icon: MessageSquare,
     items: [
-      { name: 'Messages', href: '/admin/messages', icon: MessageSquare, adminOnly: false },
-      { name: 'FAQs', href: '/admin/faqs', icon: HelpCircle, adminOnly: false }
+      { name: 'Messages', href: '/seller/messages', icon: MessageSquare },
+      { name: 'FAQs', href: '/seller/faqs', icon: HelpCircle }
     ]
   },
   {
     name: 'Analytics & Reports',
     icon: BarChart,
     items: [
-      { name: 'Analytics', href: '/admin/analytics', icon: BarChart3, adminOnly: true },
-      { name: 'System Logs', href: '/admin/system-logs', icon: FileText, adminOnly: true }
-    ]
-  },
-  {
-    name: 'Settings',
-    icon: Cog,
-    items: [
-      { name: 'My Profile', href: '/admin/profile', icon: Users, adminOnly: false },
-      { name: 'Chat Settings', href: '/admin/chat-settings', icon: Settings, adminOnly: true }
+      { name: 'Analytics', href: '/seller/analytics', icon: BarChart3 }
     ]
   }
 ]
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+const SellerSidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { state } = useAdmin()
-  const { role } = useRole()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const unreadMessages = state.messages.filter(m => !m.isFromAdmin && !m.isRead).length
 
@@ -128,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   }
 
   const handleLogout = () => {
-    // Clear any admin session data if needed
+    // Clear any seller session data if needed
     // For now, just navigate to the public site
     navigate('/')
   }
@@ -155,10 +137,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
             <div className="flex items-center">
-              <div className="h-8 w-8 bg-black rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">MC</span>
+              <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Store className="h-5 w-5 text-white" />
               </div>
-              <span className="ml-2 text-xl font-bold text-gray-900">Admin</span>
+              <span className="ml-2 text-xl font-bold text-gray-900">Seller</span>
             </div>
             <button
               onClick={onClose}
@@ -170,12 +152,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
-            {navigationSections
-              .filter(section => {
-                // Show section if user is admin or if section has non-admin-only items
-                return role === 'admin' || section.items.some(item => !item.adminOnly)
-              })
-              .map((section) => {
+            {navigationSections.map((section) => {
               const isExpanded = expandedSections.has(section.name)
               const hasActiveItem = section.items.some(item => location.pathname === item.href)
               
@@ -187,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     className={`
                       w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors group
                       ${hasActiveItem 
-                        ? 'text-gray-900 bg-gray-100' 
+                        ? 'text-blue-700 bg-blue-50' 
                         : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }
                     `}
@@ -196,7 +173,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                       <section.icon 
                         className={`
                           mr-3 h-5 w-5 flex-shrink-0
-                          ${hasActiveItem ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-500'}
+                          ${hasActiveItem ? 'text-blue-700' : 'text-gray-400 group-hover:text-gray-500'}
                         `} 
                       />
                       {section.name}
@@ -211,9 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   {/* Section Items */}
                   {isExpanded && (
                     <div className="ml-6 space-y-1 mt-1">
-                      {section.items
-                        .filter(item => role === 'admin' || !item.adminOnly)
-                        .map((item) => {
+                      {section.items.map((item) => {
                         const isActive = location.pathname === item.href
                         return (
                           <Link
@@ -235,12 +210,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                               `} 
                             />
                             {item.name}
-                            {/* Admin-only indicator */}
-                            {item.adminOnly && (
-                              <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800">
-                                Admin
-                              </span>
-                            )}
                             {/* Unread badge for Messages */}
                             {item.name === 'Messages' && unreadMessages > 0 && (
                               <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-600 text-white">
@@ -260,12 +229,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           {/* Footer */}
           <div className="border-t border-gray-200 p-4">
             <div className="flex items-center mb-4">
-              <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-gray-600 font-medium text-sm">A</span>
+              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Store className="h-4 w-4 text-blue-600" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Admin User</p>
-                <p className="text-xs text-gray-500">admin@mayhemcreations.com</p>
+                <p className="text-sm font-medium text-gray-900">Seller Account</p>
+                <p className="text-xs text-gray-500">seller@mayhemcreations.com</p>
               </div>
             </div>
 
@@ -284,4 +253,4 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   )
 }
 
-export default Sidebar
+export default SellerSidebar

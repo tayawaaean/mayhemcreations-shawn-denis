@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X } from 'lucide-react'
+import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw } from 'lucide-react'
 import Button from '../../components/Button'
+import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
 
 interface OrderItem {
   id: string
@@ -33,6 +34,19 @@ interface Order {
     zipCode: string
   }
   trackingNumber?: string
+  paymentMethod: string
+  paymentStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded'
+  paymentProvider: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual'
+  paymentDetails?: {
+    transactionId?: string
+    providerTransactionId?: string
+    cardLast4?: string
+    cardBrand?: string
+    processedAt?: string
+    failedAt?: string
+    refundedAt?: string
+    refundAmount?: number
+  }
 }
 
 // Mock order data
@@ -66,7 +80,17 @@ const mockOrders: Order[] = [
       state: 'CA',
       zipCode: '12345'
     },
-    trackingNumber: '1Z999AA1234567890'
+    trackingNumber: '1Z999AA1234567890',
+    paymentMethod: 'Credit Card',
+    paymentStatus: 'completed',
+    paymentProvider: 'stripe',
+    paymentDetails: {
+      transactionId: 'txn_1234567890',
+      providerTransactionId: 'pi_1234567890abcdef',
+      cardLast4: '4242',
+      cardBrand: 'visa',
+      processedAt: '2024-01-15T10:30:15Z'
+    }
   },
   {
     id: '2',
@@ -110,7 +134,15 @@ const mockOrders: Order[] = [
       state: 'CA',
       zipCode: '12345'
     },
-    trackingNumber: '1Z999AA9876543210'
+    trackingNumber: '1Z999AA9876543210',
+    paymentMethod: 'PayPal',
+    paymentStatus: 'completed',
+    paymentProvider: 'paypal',
+    paymentDetails: {
+      transactionId: 'txn_0987654321',
+      providerTransactionId: 'PAYID-1234567890ABCDEF',
+      processedAt: '2024-01-20T14:22:30Z'
+    }
   },
   {
     id: '3',
@@ -140,6 +172,14 @@ const mockOrders: Order[] = [
       city: 'Anytown',
       state: 'CA',
       zipCode: '12345'
+    },
+    paymentMethod: 'Google Pay',
+    paymentStatus: 'failed',
+    paymentProvider: 'google_pay',
+    paymentDetails: {
+      transactionId: 'txn_5566778899',
+      providerTransactionId: 'google_pay_failed_1234567890',
+      failedAt: '2024-01-25T16:45:05Z'
     }
   },
   {
@@ -170,6 +210,13 @@ const mockOrders: Order[] = [
       city: 'Anytown',
       state: 'CA',
       zipCode: '12345'
+    },
+    paymentMethod: 'Credit Card',
+    paymentStatus: 'pending',
+    paymentProvider: 'stripe',
+    paymentDetails: {
+      transactionId: 'txn_4433221100',
+      providerTransactionId: 'pi_pending_1234567890'
     }
   }
 ]
@@ -225,6 +272,63 @@ const getStatusColor = (status: Order['status']) => {
   }
 }
 
+const getPaymentStatusIcon = (status: Order['paymentStatus']) => {
+  switch (status) {
+    case 'completed':
+      return <CheckCircle className="w-4 h-4 text-green-600" />
+    case 'failed':
+      return <XCircle className="w-4 h-4 text-red-600" />
+    case 'pending':
+      return <Clock className="w-4 h-4 text-yellow-600" />
+    case 'processing':
+      return <Clock className="w-4 h-4 text-blue-600" />
+    case 'refunded':
+      return <DollarSign className="w-4 h-4 text-orange-600" />
+    case 'partially_refunded':
+      return <DollarSign className="w-4 h-4 text-orange-600" />
+    case 'cancelled':
+      return <XCircle className="w-4 h-4 text-gray-600" />
+    default:
+      return <AlertCircle className="w-4 h-4 text-gray-600" />
+  }
+}
+
+const getPaymentStatusColor = (status: Order['paymentStatus']) => {
+  switch (status) {
+    case 'completed':
+      return 'bg-green-100 text-green-800'
+    case 'failed':
+      return 'bg-red-100 text-red-800'
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800'
+    case 'processing':
+      return 'bg-blue-100 text-blue-800'
+    case 'refunded':
+      return 'bg-orange-100 text-orange-800'
+    case 'partially_refunded':
+      return 'bg-orange-100 text-orange-800'
+    case 'cancelled':
+      return 'bg-gray-100 text-gray-800'
+    default:
+      return 'bg-gray-100 text-gray-800'
+  }
+}
+
+const getPaymentMethodIcon = (provider: Order['paymentProvider']) => {
+  switch (provider) {
+    case 'stripe':
+      return <CreditCard className="w-4 h-4" />
+    case 'paypal':
+      return <span className="text-blue-600 font-bold text-xs">PP</span>
+    case 'google_pay':
+      return <span className="text-gray-900 font-bold text-xs">G</span>
+    case 'apple_pay':
+      return <span className="text-gray-900 font-bold text-xs">A</span>
+    default:
+      return <CreditCard className="w-4 h-4" />
+  }
+}
+
 export default function MyOrders() {
   const { user, isLoggedIn } = useAuth()
   const [orders, setOrders] = useState<Order[]>(mockOrders)
@@ -235,6 +339,8 @@ export default function MyOrders() {
   const [showOrderDetails, setShowOrderDetails] = useState(false)
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showRefundModal, setShowRefundModal] = useState(false)
+  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order)
@@ -263,6 +369,24 @@ export default function MyOrders() {
       setShowCancelModal(false)
       setSelectedOrder(null)
     }
+  }
+
+  const handleRequestRefund = (order: Order) => {
+    setSelectedOrder(order)
+    setShowRefundModal(true)
+  }
+
+  const handleRefundRequestSubmit = (refundRequest: RefundRequest) => {
+    setRefundRequests(prev => [...prev, refundRequest])
+    // In a real app, this would send to the backend
+    console.log('Refund request submitted:', refundRequest)
+  }
+
+  const canRequestRefund = (order: Order) => {
+    // Can request refund if order is delivered or shipped, and payment is completed
+    return (order.status === 'delivered' || order.status === 'shipped') && 
+           order.paymentStatus === 'completed' &&
+           !refundRequests.some(req => req.orderId === order.id)
   }
 
   const handleCloseModal = () => {
@@ -381,8 +505,16 @@ export default function MyOrders() {
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-semibold text-gray-900">${order.total.toFixed(2)}</p>
+                    <div className="flex items-center justify-end space-x-2 mt-1">
+                      {getPaymentMethodIcon(order.paymentProvider)}
+                      <span className="text-sm text-gray-500">{order.paymentMethod}</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
+                        {getPaymentStatusIcon(order.paymentStatus)}
+                        <span className="ml-1">{order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
+                      </span>
+                    </div>
                     {order.trackingNumber && (
-                      <p className="text-sm text-gray-500">Tracking: {order.trackingNumber}</p>
+                      <p className="text-sm text-gray-500 mt-1">Tracking: {order.trackingNumber}</p>
                     )}
                   </div>
                 </div>
@@ -444,6 +576,17 @@ export default function MyOrders() {
                         Leave Review
                       </Button>
                     )}
+                    {canRequestRefund(order) && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="text-orange-600 hover:text-orange-700"
+                        onClick={() => handleRequestRefund(order)}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1" />
+                        Request Refund
+                      </Button>
+                    )}
                     {order.status === 'pending' && (
                       <Button 
                         variant="outline" 
@@ -503,6 +646,22 @@ export default function MyOrders() {
                     <div>
                       <p className="text-sm font-medium text-gray-500">Total</p>
                       <p className="text-lg font-semibold text-gray-900">${selectedOrder.total.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Payment Method</p>
+                      <div className="flex items-center space-x-2">
+                        {getPaymentMethodIcon(selectedOrder.paymentProvider)}
+                        <span className="text-lg font-semibold text-gray-900">{selectedOrder.paymentMethod}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Payment Status</p>
+                      <div className="flex items-center">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${getPaymentStatusColor(selectedOrder.paymentStatus)}`}>
+                          {getPaymentStatusIcon(selectedOrder.paymentStatus)}
+                          <span className="ml-2">{selectedOrder.paymentStatus.charAt(0).toUpperCase() + selectedOrder.paymentStatus.slice(1)}</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -745,6 +904,17 @@ export default function MyOrders() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Refund Request Modal */}
+      {selectedOrder && (
+        <RefundRequestModal
+          isOpen={showRefundModal}
+          onClose={() => setShowRefundModal(false)}
+          orderId={selectedOrder.id}
+          orderTotal={selectedOrder.total}
+          onRequestRefund={handleRefundRequestSubmit}
+        />
       )}
     </main>
   )
