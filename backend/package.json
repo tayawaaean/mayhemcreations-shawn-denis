@@ -11,7 +11,14 @@
     "test:watch": "jest --watch --env-file=.env",
     "test:coverage": "jest --coverage --env-file=.env",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "seed": "node --env-file=.env -r ts-node/register src/seeders/index.ts",
+    "seed:force": "node --env-file=.env -r ts-node/register src/seeders/index.ts --force",
+    "seed:clear": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear",
+    "seed:reset": "node --env-file=.env -r ts-node/register src/seeders/index.ts --reset",
+    "seed:roles": "node --env-file=.env -r ts-node/register src/seeders/index.ts --roles-only",
+    "seed:users": "node --env-file=.env -r ts-node/register src/seeders/index.ts --users-only",
+    "seed:clear-all": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear-all"
   },
   "keywords": [
     "ecommerce",

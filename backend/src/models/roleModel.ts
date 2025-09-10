@@ -5,9 +5,11 @@ import { sequelize } from '../config/database';
 export interface RoleAttributes {
   id: number;
   name: string;
+  displayName?: string;
   description?: string;
   permissions: string[]; // Array of permission strings
   isActive: boolean;
+  isSystem?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -19,9 +21,11 @@ export interface RoleCreationAttributes extends Optional<RoleAttributes, 'id' | 
 export class Role extends Model<RoleAttributes, RoleCreationAttributes> implements RoleAttributes {
   public id!: number;
   public name!: string;
+  public displayName?: string;
   public description?: string;
   public permissions!: string[];
   public isActive!: boolean;
+  public isSystem?: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -42,6 +46,10 @@ Role.init(
         notEmpty: true,
         len: [2, 50],
       },
+    },
+    displayName: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
     description: {
       type: DataTypes.TEXT,
@@ -64,6 +72,11 @@ Role.init(
       allowNull: false,
       defaultValue: true,
     },
+    isSystem: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     sequelize,
@@ -75,7 +88,7 @@ Role.init(
         fields: ['name'],
       },
       {
-        fields: ['isActive'],
+        fields: ['is_active'],
       },
     ],
   }

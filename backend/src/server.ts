@@ -2,12 +2,9 @@ import app from './app';
 import { testDatabaseConnection, syncDatabase } from './models';
 import { logger } from './utils/logger';
 
-// Load environment variables for development
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
+// Environment variables are loaded via --env-file flag
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Start server function
@@ -19,7 +16,7 @@ const startServer = async (): Promise<void> => {
     // Sync database (create tables if they don't exist)
     // In production, you should use migrations instead
     if (NODE_ENV === 'development') {
-      await syncDatabase(false); // Don't force sync in development
+      await syncDatabase(true); // Force sync to recreate tables with correct schema
     }
 
     // Start the server

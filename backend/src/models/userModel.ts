@@ -229,16 +229,16 @@ User.init(
         fields: ['email'],
       },
       {
-        fields: ['roleId'],
+        fields: ['role_id'],
       },
       {
-        fields: ['isActive'],
+        fields: ['is_active'],
       },
       {
-        fields: ['emailVerificationToken'],
+        fields: ['email_verification_token'],
       },
       {
-        fields: ['passwordResetToken'],
+        fields: ['password_reset_token'],
       },
     ],
     hooks: {

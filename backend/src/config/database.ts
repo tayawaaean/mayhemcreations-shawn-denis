@@ -37,4 +37,19 @@ const testConnection = async (): Promise<void> => {
   }
 };
 
-export { sequelize, testConnection };
+// Sync database with models
+const syncDatabase = async (force: boolean = false): Promise<void> => {
+  try {
+    // Import models to ensure they're registered
+    await import('../models');
+    
+    // Sync database
+    await sequelize.sync({ force });
+    console.log('✅ Database synchronized successfully.');
+  } catch (error) {
+    console.error('❌ Error synchronizing database:', error);
+    throw error;
+  }
+};
+
+export { sequelize, testConnection, syncDatabase };
