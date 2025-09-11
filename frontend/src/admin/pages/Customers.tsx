@@ -258,7 +258,7 @@ const Customers: React.FC = () => {
                 <th className="px-3 py-3 text-left w-12">
                   <input
                     type="checkbox"
-                    checked={selectedCustomers.length === filteredCustomers.length && filteredCustomers.length > 0}
+                    checked={selectedCustomers.length === customers.length && customers.length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />

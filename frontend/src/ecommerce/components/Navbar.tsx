@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { ShoppingCart, Menu, X, Search, ChevronDown, User, LogIn, Package } from 'lucide-react'
+import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, Package, Home, Info, HelpCircle, Mail, Shirt, Crown, Palette } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from '../../components/AuthModal'
@@ -14,6 +14,22 @@ const NavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () =>
         isActive
           ? 'text-accent border-b-2 border-accent'
           : 'text-gray-700 hover:text-accent hover:border-b-2 hover:border-accent'
+      }`
+    }
+  >
+    {children}
+  </NavLink>
+)
+
+const MobileNavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () => void }> = ({ to, children, onClick }) => (
+  <NavLink
+    to={to}
+    onClick={onClick}
+    className={({ isActive }) =>
+      `px-4 py-3 text-sm font-medium transition-colors duration-200 rounded-md ${
+        isActive
+          ? 'text-accent bg-accent/10'
+          : 'text-gray-700 hover:text-accent hover:bg-gray-50'
       }`
     }
   >
@@ -98,7 +114,19 @@ export default function Navbar() {
   const [dropdownTimeout, setDropdownTimeout] = useState<number | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
+    products: false,
+    apparel: false,
+    accessories: false
+  })
   const count = items.reduce((s, i) => s + i.quantity, 0)
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
 
   const handleMouseEnter = () => {
     if (dropdownTimeout) {
@@ -271,73 +299,189 @@ export default function Navbar() {
 
               {/* Mobile Menu Items */}
               <nav className="space-y-2">
-                <NavItem to="/" onClick={() => setMobileMenuOpen(false)}>Home</NavItem>
+                {/* Home */}
+                <MobileNavItem to="/" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="flex items-center space-x-3">
+                    <Home className="w-5 h-5 text-gray-600" />
+                    <span>Home</span>
+                  </div>
+                </MobileNavItem>
+
+                {/* Products Section */}
                 <div className="space-y-1">
-                  <div className="px-3 py-2 text-sm font-medium text-gray-500">Products</div>
-                  <NavItem to="/products" onClick={() => setMobileMenuOpen(false)}>All Products</NavItem>
-
-                  {/* Apparel */}
-                  <div className="ml-2">
-                    <NavItem to="/products?category=apparel" onClick={() => setMobileMenuOpen(false)}>Apparel</NavItem>
-                    <div className="ml-4 space-y-1">
-                      <NavItem to="/products?category=apparel&subcategory=tshirt" onClick={() => setMobileMenuOpen(false)}>T-Shirts</NavItem>
-                      <NavItem to="/products?category=apparel&subcategory=poloshirt" onClick={() => setMobileMenuOpen(false)}>Polo Shirts</NavItem>
-                      <NavItem to="/products?category=apparel&subcategory=hoodie" onClick={() => setMobileMenuOpen(false)}>Hoodies</NavItem>
+                  <button
+                    onClick={() => toggleSection('products')}
+                    className="flex items-center justify-between w-full px-4 py-3 text-left text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Package className="w-5 h-5 text-gray-600" />
+                      <span>Products</span>
                     </div>
-                  </div>
+                    {expandedSections.products ? (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
 
-                  {/* Accessories */}
-                  <div className="ml-2">
-                    <NavItem to="/products?category=accessories" onClick={() => setMobileMenuOpen(false)}>Accessories</NavItem>
-                    <div className="ml-4 space-y-1">
-                      <NavItem to="/products?category=accessories&subcategory=cap" onClick={() => setMobileMenuOpen(false)}>Caps</NavItem>
-                      <NavItem to="/products?category=accessories&subcategory=bag" onClick={() => setMobileMenuOpen(false)}>Bags</NavItem>
+                  {expandedSections.products && (
+                    <div className="ml-6 space-y-1 pl-4">
+                      <MobileNavItem to="/products" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="flex items-center space-x-3">
+                          <Package className="w-4 h-4 text-gray-500" />
+                          <span>All Products</span>
+                        </div>
+                      </MobileNavItem>
+
+                      {/* Apparel Section */}
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => toggleSection('apparel')}
+                          className="flex items-center justify-between w-full px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Shirt className="w-4 h-4 text-gray-500" />
+                            <span>Apparel</span>
+                          </div>
+                          {expandedSections.apparel ? (
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+
+                        {expandedSections.apparel && (
+                          <div className="ml-6 space-y-1 pl-3">
+                            <MobileNavItem to="/products?category=apparel&subcategory=tshirt" onClick={() => setMobileMenuOpen(false)}>
+                              <div className="flex items-center space-x-3">
+                                <Shirt className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm">T-Shirts</span>
+                              </div>
+                            </MobileNavItem>
+                            <MobileNavItem to="/products?category=apparel&subcategory=poloshirt" onClick={() => setMobileMenuOpen(false)}>
+                              <div className="flex items-center space-x-3">
+                                <Shirt className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm">Polo Shirts</span>
+                              </div>
+                            </MobileNavItem>
+                            <MobileNavItem to="/products?category=apparel&subcategory=hoodie" onClick={() => setMobileMenuOpen(false)}>
+                              <div className="flex items-center space-x-3">
+                                <Shirt className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm">Hoodies</span>
+                              </div>
+                            </MobileNavItem>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Accessories Section */}
+                      <div className="space-y-1">
+                        <button
+                          onClick={() => toggleSection('accessories')}
+                          className="flex items-center justify-between w-full px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Crown className="w-4 h-4 text-gray-500" />
+                            <span>Accessories</span>
+                          </div>
+                          {expandedSections.accessories ? (
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+
+                        {expandedSections.accessories && (
+                          <div className="ml-6 space-y-1 pl-3">
+                            <MobileNavItem to="/products?category=accessories&subcategory=cap" onClick={() => setMobileMenuOpen(false)}>
+                              <div className="flex items-center space-x-3">
+                                <Crown className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm">Caps</span>
+                              </div>
+                            </MobileNavItem>
+                            <MobileNavItem to="/products?category=accessories&subcategory=bag" onClick={() => setMobileMenuOpen(false)}>
+                              <div className="flex items-center space-x-3">
+                                <Crown className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm">Bags</span>
+                              </div>
+                            </MobileNavItem>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Embroidery */}
+                      <MobileNavItem to="/products?category=embroidery" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="flex items-center space-x-3">
+                          <Palette className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm">Embroidery</span>
+                        </div>
+                      </MobileNavItem>
                     </div>
-                  </div>
-
-                  <NavItem to="/products?category=embroidery" onClick={() => setMobileMenuOpen(false)}>Embroidery</NavItem>
+                  )}
                 </div>
-                <NavItem to="/about" onClick={() => setMobileMenuOpen(false)}>About</NavItem>
-                <NavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>FAQ</NavItem>
-                <NavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>Contact</NavItem>
+
+                {/* Other Menu Items */}
+                <MobileNavItem to="/about" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="flex items-center space-x-3">
+                    <Info className="w-5 h-5 text-gray-600" />
+                    <span>About</span>
+                  </div>
+                </MobileNavItem>
+                
+                <MobileNavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="flex items-center space-x-3">
+                    <HelpCircle className="w-5 h-5 text-gray-600" />
+                    <span>FAQ</span>
+                  </div>
+                </MobileNavItem>
+                
+                <MobileNavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="flex items-center space-x-3">
+                    <Mail className="w-5 h-5 text-gray-600" />
+                    <span>Contact</span>
+                  </div>
+                </MobileNavItem>
+
+                {/* Orders (if logged in) */}
                 {isLoggedIn && (
-                  <NavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
-                    <div className="flex items-center space-x-2">
-                      <Package className="w-4 h-4" />
-                      <span>Orders</span>
+                  <MobileNavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                    <div className="flex items-center space-x-3">
+                      <Package className="w-5 h-5 text-gray-600" />
+                      <span>My Orders</span>
                     </div>
-                  </NavItem>
+                  </MobileNavItem>
                 )}
 
                 {/* Mobile Auth */}
-                <div className="border-t border-gray-200 pt-4">
+                <div className="border-t-2 border-gray-100 pt-4 mt-6">
                   {isLoggedIn ? (
-                    <div className="px-3 py-2">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <User className="w-4 h-4 text-gray-700" />
-                        <span className="text-sm text-gray-700">Welcome, {user?.firstName}!</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg">
+                        <User className="w-5 h-5 text-accent" />
+                        <span className="text-base text-gray-700 font-medium">Welcome, {user?.firstName}!</span>
                       </div>
                       <button
                         onClick={() => {
                           logout()
                           setMobileMenuOpen(false)
                         }}
-                        className="text-sm text-gray-500 hover:text-gray-700"
+                        className="flex items-center justify-center space-x-3 w-full px-4 py-3 text-base text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
                       >
-                        Logout
+                        <LogIn className="w-5 h-5 rotate-180" />
+                        <span>Logout</span>
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <button
                         onClick={() => {
                           setAuthMode('login')
                           setShowAuthModal(true)
                           setMobileMenuOpen(false)
                         }}
-                        className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
+                        className="flex items-center justify-center space-x-3 w-full px-4 py-3 text-base text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
                       >
-                        <LogIn className="w-4 h-4" />
+                        <LogIn className="w-5 h-5" />
                         <span>Login</span>
                       </button>
                       <button
@@ -346,9 +490,10 @@ export default function Navbar() {
                           setShowAuthModal(true)
                           setMobileMenuOpen(false)
                         }}
-                        className="w-full px-3 py-2 text-sm bg-accent text-white rounded-md hover:bg-opacity-90"
+                        className="flex items-center justify-center space-x-3 w-full px-4 py-3 text-base bg-accent text-white rounded-md hover:bg-opacity-90 transition-colors shadow-sm"
                       >
-                        Register
+                        <User className="w-5 h-5" />
+                        <span>Register</span>
                       </button>
                     </div>
                   )}

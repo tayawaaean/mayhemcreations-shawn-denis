@@ -77,7 +77,6 @@ export default function App() {
                   <Customize />
                 </div>
                 <Footer />
-                <ChatWidget />
               </div>
             } />
             <Route path="/about" element={
