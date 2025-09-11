@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { loggingService } from '../../shared/loggingService'
-import AuthStorageService from '../../shared/authStorage'
+import { useMultiAccount } from '../../shared/multiAccountContext'
+import MultiAccountStorageService from '../../shared/multiAccountStorage'
 
 interface User {
   id: number
@@ -37,42 +38,52 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const { 
+    currentUser, 
+    currentAccountType, 
+    isAuthenticated, 
+    login: multiLogin, 
+    logout: multiLogout 
+  } = useMultiAccount()
+  
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored auth data on mount
-    const authData = AuthStorageService.getAuthData()
-    if (authData && AuthStorageService.isAuthenticated()) {
-      // Validate that user has customer role
-      if (authData.user.role !== 'customer') {
-        console.warn('Admin/employee account detected in customer area - clearing auth data')
-        AuthStorageService.clearAuthData()
-        setIsLoading(false)
-        return
+    // Check for customer account specifically, regardless of current account type
+    const customerData = MultiAccountStorageService.getAccountAuthData('customer');
+    const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
+    
+    if (customerData && isCustomerAuthenticated) {
+      // Convert customer account data to User format
+      const customerUser: User = {
+        id: customerData.user.id,
+        email: customerData.user.email,
+        firstName: customerData.user.firstName || '',
+        lastName: customerData.user.lastName || '',
+        role: customerData.user.role,
+        isEmailVerified: customerData.user.isEmailVerified || false,
+        lastLoginAt: customerData.user.lastLoginAt || new Date().toISOString(),
+        createdAt: customerData.user.createdAt || new Date().toISOString(),
+        avatar: customerData.user.avatar
       }
-
-      // Convert stored user data to User format
-      const user: User = {
-        id: authData.user.id,
-        email: authData.user.email,
-        firstName: authData.user.firstName || '',
-        lastName: authData.user.lastName || '',
-        role: authData.user.role,
-        isEmailVerified: authData.user.isEmailVerified || false,
-        lastLoginAt: authData.user.lastLoginAt || new Date().toISOString(),
-        createdAt: authData.user.createdAt || new Date().toISOString(),
-        avatar: authData.user.avatar
-      }
-      setUser(user)
+      setUser(customerUser)
+    } else {
+      setUser(null)
     }
     setIsLoading(false)
-  }, [])
+  }, [currentUser, currentAccountType, isAuthenticated])
 
   const login = (userData: User) => {
-    setUser(userData)
-    // Note: Auth data is already stored by the login components
-    // No need to store additional data here
+    // Convert to multi-account user format
+    const multiUser = {
+      ...userData,
+      accountType: 'customer' as const
+    }
+    
+    // Use multi-account login and switch to customer account
+    multiLogin(multiUser, 'customer')
+    MultiAccountStorageService.switchAccount('customer')
     
     // Log successful customer login
     loggingService.logLoginSuccess(
@@ -88,15 +99,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       loggingService.logLogout(user.id, user.email, 'customer')
     }
     
-    // Use secure logout that calls backend and clears all auth data
-    await AuthStorageService.secureLogout()
-    
-    setUser(null)
+    // Use multi-account logout for customer account only
+    await multiLogout('customer')
   }
 
   const value: AuthContextType = {
     user,
-    isLoggedIn: !!user,
+    isLoggedIn: !!user && currentAccountType === 'customer',
     login,
     logout,
     isLoading

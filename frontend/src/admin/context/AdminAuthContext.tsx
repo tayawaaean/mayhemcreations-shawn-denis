@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { loggingService } from '../../shared/loggingService'
-import AuthStorageService from '../../shared/authStorage'
+import MultiAccountStorageService from '../../shared/multiAccountStorage'
 
 export interface AdminUser {
   id: string
@@ -40,36 +40,40 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored auth data on mount
-    const authData = AuthStorageService.getAuthData()
-    if (authData && AuthStorageService.isAuthenticated()) {
+    // Check for employee account specifically, regardless of current account type
+    const employeeData = MultiAccountStorageService.getAccountAuthData('employee');
+    const isEmployeeAuthenticated = MultiAccountStorageService.isAccountAuthenticated('employee');
+    
+    if (employeeData && isEmployeeAuthenticated) {
       // Validate that user has admin/employee role
-      const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator']
-      if (!allowedRoles.includes(authData.user.role)) {
-        console.warn('Customer account detected in admin area - clearing auth data')
-        AuthStorageService.clearAuthData()
+      const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
+      if (!allowedRoles.includes(employeeData.user.role)) {
+        console.warn('Invalid employee role detected in admin area')
+        setUser(null)
         setIsLoading(false)
         return
       }
 
-      // Convert stored user data to AdminUser format
+      // Convert employee account data to AdminUser format
       const adminUser: AdminUser = {
-        id: authData.user.id.toString(),
-        email: authData.user.email,
-        firstName: '', // Will be fetched from API when needed
-        lastName: '', // Will be fetched from API when needed
-        role: authData.user.role as 'admin' | 'seller',
-        avatar: `https://ui-avatars.com/api/?name=${authData.user.email}&background=3b82f6&color=ffffff`
+        id: employeeData.user.id.toString(),
+        email: employeeData.user.email,
+        firstName: employeeData.user.firstName || '',
+        lastName: employeeData.user.lastName || '',
+        role: employeeData.user.role === 'admin' ? 'admin' : 'seller',
+        avatar: employeeData.user.avatar || `https://ui-avatars.com/api/?name=${employeeData.user.firstName}+${employeeData.user.lastName}&background=3b82f6&color=ffffff`
       }
       setUser(adminUser)
+    } else {
+      setUser(null)
     }
     setIsLoading(false)
   }, [])
 
   const login = (userData: AdminUser) => {
     setUser(userData)
-    // Note: Auth data is already stored by the login components
-    // No need to store additional data here
+    // Switch to employee account when logging in
+    MultiAccountStorageService.switchAccount('employee')
     
     // Log successful login
     loggingService.logLoginSuccess(
@@ -85,8 +89,8 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       loggingService.logLogout(user.id, user.email, user.role)
     }
     
-    // Use secure logout that calls backend and clears all auth data
-    await AuthStorageService.secureLogout()
+    // Use multi-account logout for employee account only
+    await MultiAccountStorageService.logoutAccount('employee')
     
     setUser(null)
   }

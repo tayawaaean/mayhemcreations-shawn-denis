@@ -201,7 +201,9 @@ export class OAuthService {
             role: (user as any).role.name,
             permissions: (user as any).role.permissions,
             isEmailVerified: user.isEmailVerified,
-            avatar: user.avatar
+            avatar: user.avatar,
+            lastLoginAt: user.lastLoginAt,
+            createdAt: user.createdAt
           },
           sessionId: sessionResult.sessionId,
           accessToken: sessionResult.accessToken,

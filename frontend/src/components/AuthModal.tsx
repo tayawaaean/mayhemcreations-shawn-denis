@@ -3,8 +3,8 @@ import { X, Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Button from './Button'
 import GoogleOAuthButton from './GoogleOAuthButton'
 import { loggingService } from '../shared/loggingService'
-import AuthStorageService from '../shared/authStorage'
-import { apiService } from '../admin/services/apiService'
+import MultiAccountStorageService from '../shared/multiAccountStorage'
+import { customerApiService } from '../shared/customerApiService'
 import { envConfig } from '../shared/envConfig'
 
 interface User {
@@ -84,7 +84,7 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         }
 
         // Call registration API
-        const response = await apiService.register({
+        const response = await customerApiService.register({
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
@@ -92,8 +92,8 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         })
 
         if (response.success) {
-          // Store auth data using streamlined storage
-          AuthStorageService.storeAuthData({
+          // Store auth data using multi-account storage
+          MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
               id: response.data.user.id,
               email: response.data.user.email,
@@ -103,7 +103,8 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
               isEmailVerified: response.data.user.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
               createdAt: response.data.user.createdAt || new Date().toISOString(),
-              avatar: response.data.user.avatar
+              avatar: response.data.user.avatar,
+              accountType: 'customer'
             },
             session: {
               sessionId: response.data.sessionId,
@@ -140,11 +141,11 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         }
       } else {
         // Handle login with customer role validation
-        const response = await apiService.login(formData.email, formData.password, 'customer')
+        const response = await customerApiService.login(formData.email, formData.password, 'customer')
 
         if (response.success) {
-          // Store auth data using streamlined storage
-          AuthStorageService.storeAuthData({
+          // Store auth data using multi-account storage
+          MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
               id: response.data.user.id,
               email: response.data.user.email,
@@ -154,7 +155,8 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
               isEmailVerified: response.data.user.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
               createdAt: response.data.user.createdAt || new Date().toISOString(),
-              avatar: response.data.user.avatar
+              avatar: response.data.user.avatar,
+              accountType: 'customer'
             },
             session: {
               sessionId: response.data.sessionId,
@@ -220,8 +222,8 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
       )
 
       if (result.success && result.data) {
-        // Store auth data using streamlined storage
-        AuthStorageService.storeAuthData({
+        // Store auth data using multi-account storage
+        MultiAccountStorageService.storeAccountAuthData('customer', {
           user: {
             id: result.data.user.id,
             email: result.data.user.email,
@@ -231,7 +233,8 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             isEmailVerified: result.data.user.isEmailVerified,
             lastLoginAt: new Date().toISOString(),
             createdAt: result.data.user.createdAt || new Date().toISOString(),
-            avatar: result.data.user.avatar
+            avatar: result.data.user.avatar,
+            accountType: 'customer'
           },
           session: {
             sessionId: result.data.sessionId,
@@ -292,15 +295,22 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
 
     try {
       // Call the real API for authentication with customer role validation
-      const response = await apiService.login(customer.email, customer.password, 'customer')
+      const response = await customerApiService.login(customer.email, customer.password, 'customer')
 
       if (response.success) {
-        // Store auth data using streamlined storage
-        AuthStorageService.storeAuthData({
+        // Store auth data using multi-account storage
+        MultiAccountStorageService.storeAccountAuthData('customer', {
           user: {
             id: response.data.user.id,
             email: response.data.user.email,
-            role: response.data.user.role
+            role: response.data.user.role,
+            firstName: response.data.user.firstName,
+            lastName: response.data.user.lastName,
+            isEmailVerified: response.data.user.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: response.data.user.createdAt || new Date().toISOString(),
+            avatar: response.data.user.avatar,
+            accountType: 'customer'
           },
           session: {
             sessionId: response.data.sessionId,

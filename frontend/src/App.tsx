@@ -7,6 +7,7 @@ import { ChatProvider } from './ecommerce/context/ChatContext'
 import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
 import { AuthProvider } from './ecommerce/context/AuthContext'
+import { MultiAccountProvider } from './shared/multiAccountContext'
 import AdminApp from './admin/AdminApp'
 import SellerApp from './admin/SellerApp'
 import EmployeeApp from './admin/EmployeeApp'
@@ -23,10 +24,11 @@ import MyOrders from './ecommerce/routes/MyOrders'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <ChatProvider>
-          <CustomizationProvider>
+    <MultiAccountProvider>
+      <AuthProvider>
+        <CartProvider>
+          <ChatProvider>
+            <CustomizationProvider>
             <Routes>
             {/* Employee Login Route */}
             <Route path="/employee-login" element={<EmployeeApp />} />
@@ -143,5 +145,6 @@ export default function App() {
       </ChatProvider>
     </CartProvider>
     </AuthProvider>
+    </MultiAccountProvider>
   )
 }

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { SessionService } from '../services/sessionService';
 import { logger } from '../utils/logger';
+import { Session, User, Role } from '../models';
 
 // Authentication middleware
 export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
@@ -19,6 +20,84 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
     next();
   } catch (error) {
     logger.error('Authentication middleware error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Authentication error',
+    });
+  }
+};
+
+// Hybrid authentication middleware - supports both session-based and token-based auth
+export const hybridAuthenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    // First try session-based authentication
+    if (SessionService.isAuthenticated(req)) {
+      SessionService.updateActivity(req);
+      next();
+      return;
+    }
+
+    // If no session, try token-based authentication
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      
+      try {
+        // Find session by access token
+        const session = await Session.findOne({
+          where: { accessToken: token },
+          include: [
+            { model: User, as: 'user', include: [{ model: Role, as: 'role' }] }
+          ]
+        }) as any; // Type assertion for association
+
+        if (session && session.user) {
+          // Check if session is expired
+          const now = new Date();
+          if (session.expiresAt && session.expiresAt < now) {
+            res.status(401).json({
+              success: false,
+              message: 'Token expired',
+              code: 'TOKEN_EXPIRED',
+            });
+            return;
+          }
+
+          // Attach user info to request for compatibility
+          (req as any).user = {
+            userId: session.user.id,
+            email: session.user.email,
+            role: session.user.role?.name || 'customer',
+            permissions: session.user.role?.permissions || [],
+            loginTime: session.createdAt,
+            lastActivity: session.updatedAt,
+            sessionId: session.sessionId, // Use sessionId string, not id number
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+          };
+
+          // Update session activity
+          await session.update({ 
+            lastActivity: now,
+            updatedAt: now 
+          });
+
+          next();
+          return;
+        }
+      } catch (tokenError) {
+        logger.warn('Token validation error:', tokenError);
+      }
+    }
+
+    // If neither session nor token authentication worked
+    res.status(401).json({
+      success: false,
+      message: 'Authentication required',
+      code: 'AUTH_REQUIRED',
+    });
+  } catch (error) {
+    logger.error('Hybrid authentication middleware error:', error);
     res.status(500).json({
       success: false,
       message: 'Authentication error',

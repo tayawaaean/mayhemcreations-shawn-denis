@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import crypto from 'crypto';
-import { User, Role, ROLES, DEFAULT_ROLE_PERMISSIONS } from '../models';
+import { User, Role, Session, ROLES, DEFAULT_ROLE_PERMISSIONS } from '../models';
 import { SessionService } from '../services/sessionService';
 import { OAuthService } from '../services/oauthService';
 import { logger } from '../utils/logger';
@@ -214,7 +214,9 @@ export class AuthController {
             role: (userWithRole as any).role.name,
             permissions: (userWithRole as any).role.permissions,
             isEmailVerified: userWithRole.isEmailVerified,
-            avatar: userWithRole.avatar
+            avatar: userWithRole.avatar,
+            lastLoginAt: userWithRole.lastLoginAt,
+            createdAt: userWithRole.createdAt
           },
           sessionId: sessionResult.sessionId,
           accessToken: sessionResult.accessToken,
@@ -453,6 +455,9 @@ export class AuthController {
             role: user.role.name,
             permissions: user.role.permissions,
             isEmailVerified: user.isEmailVerified,
+            avatar: user.avatar,
+            lastLoginAt: user.lastLoginAt,
+            createdAt: user.createdAt,
           },
           sessionId: sessionData.sessionId,
           accessToken: sessionData.accessToken,
@@ -510,23 +515,69 @@ export class AuthController {
    */
   static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const sessionInfo = SessionService.getSessionInfo(req);
+      let sessionInfo = SessionService.getSessionInfo(req);
+      let sessionId: string | undefined;
+      let userId: number | undefined;
+      let email: string | undefined;
+
+      // If no session info from SessionService, try to get it from the hybrid auth
+      if (!sessionInfo && (req as any).user) {
+        const userInfo = (req as any).user;
+        sessionId = userInfo.sessionId;
+        userId = userInfo.userId;
+        email = userInfo.email;
+      } else if (sessionInfo) {
+        sessionId = sessionInfo.sessionId;
+        userId = sessionInfo.userId;
+        email = sessionInfo.email;
+      }
       
-      // Revoke session in database
-      const success = await SessionService.revokeSession(req);
-      
-      if (!success) {
-        logger.error('Failed to revoke session during logout', {
-          userId: sessionInfo?.userId,
-          sessionId: sessionInfo?.sessionId,
-        });
+      // Revoke session in database if we have session info
+      let success = true;
+      if (sessionId) {
+        try {
+          // Find and revoke the session by sessionId (string)
+          const session = await Session.findOne({ where: { sessionId: sessionId } });
+          if (session) {
+            await session.revoke(); // Use the existing revoke() method
+            logger.info(`Session revoked: ${sessionId}`);
+          }
+        } catch (revokeError) {
+          logger.error('Failed to revoke session during logout', {
+            sessionId,
+            userId,
+            error: revokeError
+          });
+          success = false;
+        }
+      } else {
+        // Try to revoke by access token if available
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7);
+          try {
+            const session = await Session.findOne({ where: { accessToken: token } });
+            if (session) {
+              await session.revoke(); // Use the existing revoke() method
+              sessionId = session.sessionId; // sessionId is a string
+              userId = session.userId;
+              logger.info(`Session revoked by token: ${sessionId}`);
+            }
+          } catch (revokeError) {
+            logger.error('Failed to revoke session by token during logout', {
+              token: token.substring(0, 10) + '...',
+              error: revokeError
+            });
+            success = false;
+          }
+        }
       }
 
       // Log logout
-      if (sessionInfo) {
-        logger.info(`User logged out: ${sessionInfo.email}`, {
-          userId: sessionInfo.userId,
-          sessionId: sessionInfo.sessionId,
+      if (userId && email) {
+        logger.info(`User logged out: ${email}`, {
+          userId,
+          sessionId,
         });
       }
 

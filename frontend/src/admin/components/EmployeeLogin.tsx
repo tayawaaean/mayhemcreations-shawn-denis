@@ -4,7 +4,7 @@ import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle, Building2 } 
 import Button from '../../components/Button'
 import { loggingService } from '../../shared/loggingService'
 import { apiService } from '../services/apiService'
-import AuthStorageService from '../../shared/authStorage'
+import MultiAccountStorageService from '../../shared/multiAccountStorage'
 
 interface EmployeeUser {
   id: string
@@ -88,18 +88,18 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
           avatar: `https://ui-avatars.com/api/?name=${apiUser.firstName}+${apiUser.lastName}&background=3b82f6&color=ffffff`
         }
 
-        // Store auth data
-        AuthStorageService.storeAuthData({
+        // Store auth data using multi-account storage
+        MultiAccountStorageService.storeAccountAuthData('employee', {
           user: {
             id: apiUser.id,
             email: apiUser.email,
             firstName: apiUser.firstName,
             lastName: apiUser.lastName,
             role: apiUser.role,
-            permissions: apiUser.permissions,
             isEmailVerified: apiUser.isEmailVerified,
             lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            accountType: 'employee'
           },
           session: {
             sessionId,

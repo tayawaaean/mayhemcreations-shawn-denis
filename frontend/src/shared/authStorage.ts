@@ -3,6 +3,8 @@
  * Handles localStorage operations for user authentication data
  */
 
+import { envConfig } from './envConfig';
+
 // User data for localStorage - includes essential fields for persistence
 export interface StoredUser {
   id: number;
@@ -33,6 +35,13 @@ export interface AuthData {
 
 class AuthStorageService {
   private static readonly AUTH_KEY = 'mayhem_auth'; // Single key for all auth data
+
+  /**
+   * Get API base URL from environment configuration
+   */
+  private static getApiBaseUrl(): string {
+    return envConfig.getApiBaseUrl();
+  }
 
   /**
    * Store authentication data - includes user details for persistence
@@ -213,7 +222,8 @@ class AuthStorageService {
       }
 
       // Call backend logout endpoint to revoke session
-      const response = await fetch('/api/v1/auth/logout', {
+      const apiBaseUrl = this.getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

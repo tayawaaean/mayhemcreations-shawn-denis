@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuthController } from '../controllers/authController';
-import { authenticate, validateSession } from '../middlewares/auth';
+import { authenticate, validateSession, hybridAuthenticate } from '../middlewares/auth';
 import { authRateLimit } from '../config/security';
 
 const router = Router();
@@ -55,7 +55,7 @@ const loginValidation = [
 // Auth routes
 router.post('/register', registerValidation, AuthController.register);
 router.post('/login', authRateLimit, loginValidation, AuthController.login);
-router.post('/logout', authenticate, AuthController.logout);
+router.post('/logout', hybridAuthenticate, AuthController.logout);
 router.get('/profile', authenticate, validateSession, AuthController.getProfile);
 router.post('/refresh', authenticate, validateSession, AuthController.refreshSession);
 
