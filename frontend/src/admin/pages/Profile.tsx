@@ -13,9 +13,7 @@ const Profile: React.FC = () => {
     e.preventDefault()
     if (user) {
       login({ ...user, firstName, lastName, email })
-      if (password) {
-        try { localStorage.setItem(`password:${email}`, password) } catch {}
-      }
+      // Note: Passwords are never stored in localStorage for security
     }
   }
 

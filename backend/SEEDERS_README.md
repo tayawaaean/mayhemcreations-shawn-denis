@@ -46,27 +46,27 @@ npm run seed:clear-all
 ### **Admin** (`admin`)
 - **Full system access** with all permissions
 - **Permissions**: All CRUD operations on all resources
-- **Users**: `admin@mayhemcreations.com`, `shawn.denis@mayhemcreations.com`
+- **Users**: `admin@mayhemcreation.com`, `shawn.denis@mayhemcreation.com`
 
 ### **Manager** (`manager`)
 - **Store management** with product and order oversight
 - **Permissions**: Product management, inventory, orders, customers, analytics
-- **Users**: `manager@mayhemcreations.com`, `operations@mayhemcreations.com`
+- **Users**: `manager@mayhemcreation.com`, `operations@mayhemcreation.com`
 
 ### **Designer** (`designer`)
 - **Creative design** with product and embroidery focus
 - **Permissions**: Product design, embroidery management, content creation
-- **Users**: `designer@mayhemcreations.com`, `creative@mayhemcreations.com`
+- **Users**: `designer@mayhemcreation.com`, `creative@mayhemcreation.com`
 
 ### **Support** (`support`)
 - **Customer support** with limited admin access
 - **Permissions**: Customer management, orders, support tickets, messages
-- **Users**: `support@mayhemcreations.com`, `help@mayhemcreations.com`
+- **Users**: `support@mayhemcreation.com`, `help@mayhemcreation.com`
 
 ### **Moderator** (`moderator`)
 - **Content moderation** and community management
 - **Permissions**: Reviews, content, FAQ, support, messages
-- **Users**: `moderator@mayhemcreations.com`
+- **Users**: `moderator@mayhemcreation.com`
 
 ### **Customer** (`customer`)
 - **Standard customer** with basic shopping permissions
@@ -75,24 +75,24 @@ npm run seed:clear-all
 
 ## 🔐 Default Credentials
 
-All seeded users use the pattern: `{Role}Pass123!`
+All seeded users use secure passwords following the pattern: `Secure{Role}2024!` or `SecureCustomer2024!`
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `admin@mayhemcreations.com` | `AdminPass123!` |
-| Admin | `shawn.denis@mayhemcreations.com` | `ShawnPass123!` |
-| Manager | `manager@mayhemcreations.com` | `ManagerPass123!` |
-| Manager | `operations@mayhemcreations.com` | `OpsPass123!` |
-| Designer | `designer@mayhemcreations.com` | `DesignerPass123!` |
-| Designer | `creative@mayhemcreations.com` | `CreativePass123!` |
-| Support | `support@mayhemcreations.com` | `SupportPass123!` |
-| Support | `help@mayhemcreations.com` | `HelpPass123!` |
-| Moderator | `moderator@mayhemcreations.com` | `ModeratorPass123!` |
-| Customer | `customer1@example.com` | `CustomerPass123!` |
-| Customer | `customer2@example.com` | `CustomerPass123!` |
-| Customer | `customer3@example.com` | `CustomerPass123!` |
-| Customer | `customer4@example.com` | `CustomerPass123!` |
-| Customer | `customer5@example.com` | `CustomerPass123!` |
+| Admin | `admin@mayhemcreation.com` | `SecureAdmin2024!` |
+| Admin | `shawn.denis@mayhemcreation.com` | `SecureShawn2024!` |
+| Manager | `manager@mayhemcreation.com` | `SecureManager2024!` |
+| Manager | `operations@mayhemcreation.com` | `SecureCustomer2024!` |
+| Designer | `designer@mayhemcreation.com` | `SecureCustomer2024!` |
+| Designer | `creative@mayhemcreation.com` | `SecureCustomer2024!` |
+| Support | `support@mayhemcreation.com` | `SecureCustomer2024!` |
+| Support | `help@mayhemcreation.com` | `SecureCustomer2024!` |
+| Moderator | `moderator@mayhemcreation.com` | `SecureCustomer2024!` |
+| Customer | `customer1@example.com` | `SecureCustomer2024!` |
+| Customer | `customer2@example.com` | `SecureCustomer2024!` |
+| Customer | `customer3@example.com` | `SecureCustomer2024!` |
+| Customer | `customer4@example.com` | `SecureCustomer2024!` |
+| Customer | `customer5@example.com` | `SecureCustomer2024!` |
 
 ## 📊 Seeded Data Summary
 
@@ -116,7 +116,7 @@ All seeded users use the pattern: `{Role}Pass123!`
 - **Email Verified**: 13 users
 - **Phone Verified**: 12 users
 - **Active**: 14 users (1 inactive for testing)
-- **System Users**: 9 users (@mayhemcreations.com)
+- **System Users**: 9 users (@mayhemcreation.com)
 - **Customer Users**: 5 users (@example.com)
 
 ## 🛠️ Seeder Commands
@@ -155,7 +155,7 @@ All seeded users use the pattern: `{Role}Pass123!`
 # Test admin login
 curl -X POST http://localhost:5001/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "admin@mayhemcreations.com", "password": "AdminPass123!"}'
+  -d '{"email": "admin@mayhemcreation.com", "password": "AdminPass123!"}'
 
 # Test customer login
 curl -X POST http://localhost:5001/api/v1/auth/login \

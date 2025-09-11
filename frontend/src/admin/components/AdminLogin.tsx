@@ -2,45 +2,42 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle } from 'lucide-react'
 import Button from '../../components/Button'
+import { apiService } from '../services/apiService'
 
 interface AdminUser {
   id: string
   email: string
-  password: string
   firstName: string
   lastName: string
   role: 'admin' | 'seller'
   avatar?: string
 }
 
-// Demo accounts
+// Demo accounts with secure passwords
 const demoAccounts: AdminUser[] = [
   {
     id: 'admin-1',
-    email: 'admin@mayhemcreations.com',
-    password: 'admin123',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'admin',
-    avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=3b82f6&color=ffffff'
-  },
-  {
-    id: 'seller-1',
-    email: 'seller@mayhemcreations.com',
-    password: 'seller123',
+    email: 'admin@mayhemcreation.com',
     firstName: 'John',
-    lastName: 'Seller',
-    role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=John+Seller&background=10b981&color=ffffff'
+    lastName: 'Admin',
+    role: 'admin',
+    avatar: 'https://ui-avatars.com/api/?name=John+Admin&background=3b82f6&color=ffffff'
   },
   {
-    id: 'seller-2',
-    email: 'jane@mayhemcreations.com',
-    password: 'seller123',
-    firstName: 'Jane',
-    lastName: 'Smith',
+    id: 'admin-2',
+    email: 'shawn.denis@mayhemcreation.com',
+    firstName: 'Shawn',
+    lastName: 'Denis',
+    role: 'admin',
+    avatar: 'https://ui-avatars.com/api/?name=Shawn+Denis&background=8b5cf6&color=ffffff'
+  },
+  {
+    id: 'manager-1',
+    email: 'manager@mayhemcreation.com',
+    firstName: 'Sarah',
+    lastName: 'Johnson',
     role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=Jane+Smith&background=8b5cf6&color=ffffff'
+    avatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=10b981&color=ffffff'
   }
 ]
 
@@ -64,31 +61,67 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     setIsLoading(true)
     setError('')
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const user = demoAccounts.find(
-        account => account.email === formData.email && account.password === formData.password
-      )
+    try {
+      // Call the real API for authentication with admin role validation
+      const response = await apiService.login(formData.email, formData.password, 'admin')
+      
+      if (response.success && response.data) {
+        const { user: apiUser, sessionId, accessToken, refreshToken } = response.data
+        
+        // Create admin user object
+        const adminUser: AdminUser = {
+          id: apiUser.id.toString(),
+          email: apiUser.email,
+          firstName: apiUser.firstName,
+          lastName: apiUser.lastName,
+          role: apiUser.role === 'admin' ? 'admin' : 'seller',
+          avatar: `https://ui-avatars.com/api/?name=${apiUser.firstName}+${apiUser.lastName}&background=3b82f6&color=ffffff`
+        }
 
-      if (user) {
-        onLogin(user)
+        // Store auth data
+        AuthStorageService.storeAuthData({
+          user: {
+            id: apiUser.id,
+            email: apiUser.email,
+            firstName: apiUser.firstName,
+            lastName: apiUser.lastName,
+            role: apiUser.role,
+            permissions: apiUser.permissions,
+            isEmailVerified: apiUser.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          },
+          session: {
+            sessionId,
+            accessToken,
+            refreshToken,
+            lastActivity: new Date().toISOString()
+          }
+        })
+
+        onLogin?.(adminUser)
+        
         // Navigate based on role
-        if (user.role === 'admin') {
+        if (adminUser.role === 'admin') {
           navigate('/admin')
         } else {
           navigate('/seller')
         }
       } else {
-        setError('Invalid email or password')
+        setError(response.message || 'Login failed')
       }
+    } catch (error: any) {
+      console.error('Login error:', error)
+      setError(error.message || 'An error occurred during login')
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleDemoLogin = (user: AdminUser) => {
     setFormData({
       email: user.email,
-      password: user.password
+      password: '' // Don't pre-fill password for security
     })
     setSelectedDemo(user)
   }
@@ -168,6 +201,16 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                 </button>
               ))}
             </div>
+            
+            {/* Password Hints */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">Demo Account Passwords</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <div><strong>Admin:</strong> SecureAdmin2024!</div>
+                <div><strong>Shawn Denis:</strong> SecureShawn2024!</div>
+                <div><strong>Manager:</strong> SecureManager2024!</div>
+              </div>
+            </div>
           </div>
 
           {/* Login Form */}
@@ -192,7 +235,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
                   onChange={handleInputChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="admin@mayhemcreations.com"
+                  placeholder="admin@mayhemcreation.com"
                 />
               </div>
             </div>
@@ -262,9 +305,9 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h4 className="text-sm font-medium text-blue-900 mb-2">Demo Account Credentials</h4>
           <div className="text-xs text-blue-800 space-y-1">
-            <div><strong>Admin:</strong> admin@mayhemcreations.com / admin123</div>
-            <div><strong>Seller:</strong> seller@mayhemcreations.com / seller123</div>
-            <div><strong>Seller 2:</strong> jane@mayhemcreations.com / seller123</div>
+            <div><strong>Admin:</strong> admin@mayhemcreation.com / SecureAdmin2024!</div>
+            <div><strong>Shawn Denis:</strong> shawn.denis@mayhemcreation.com / SecureShawn2024!</div>
+            <div><strong>Manager:</strong> manager@mayhemcreation.com / SecureManager2024!</div>
           </div>
         </div>
       </div>

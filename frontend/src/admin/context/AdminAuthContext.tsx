@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { loggingService } from '../../shared/loggingService'
+import AuthStorageService from '../../shared/authStorage'
 
 export interface AdminUser {
   id: string
@@ -16,7 +17,7 @@ interface AdminAuthContextType {
   isAdmin: boolean
   isSeller: boolean
   login: (user: AdminUser) => void
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -39,23 +40,36 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored admin user data on mount
-    const storedUser = localStorage.getItem('adminUser')
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser)
-        setUser(userData)
-      } catch (error) {
-        console.error('Error parsing stored admin user data:', error)
-        localStorage.removeItem('adminUser')
+    // Check for stored auth data on mount
+    const authData = AuthStorageService.getAuthData()
+    if (authData && AuthStorageService.isAuthenticated()) {
+      // Validate that user has admin/employee role
+      const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator']
+      if (!allowedRoles.includes(authData.user.role)) {
+        console.warn('Customer account detected in admin area - clearing auth data')
+        AuthStorageService.clearAuthData()
+        setIsLoading(false)
+        return
       }
+
+      // Convert stored user data to AdminUser format
+      const adminUser: AdminUser = {
+        id: authData.user.id.toString(),
+        email: authData.user.email,
+        firstName: '', // Will be fetched from API when needed
+        lastName: '', // Will be fetched from API when needed
+        role: authData.user.role as 'admin' | 'seller',
+        avatar: `https://ui-avatars.com/api/?name=${authData.user.email}&background=3b82f6&color=ffffff`
+      }
+      setUser(adminUser)
     }
     setIsLoading(false)
   }, [])
 
   const login = (userData: AdminUser) => {
     setUser(userData)
-    localStorage.setItem('adminUser', JSON.stringify(userData))
+    // Note: Auth data is already stored by the login components
+    // No need to store additional data here
     
     // Log successful login
     loggingService.logLoginSuccess(
@@ -65,14 +79,16 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
     )
   }
 
-  const logout = () => {
+  const logout = async () => {
     // Log logout before clearing user data
     if (user) {
       loggingService.logLogout(user.id, user.email, user.role)
     }
     
+    // Use secure logout that calls backend and clears all auth data
+    await AuthStorageService.secureLogout()
+    
     setUser(null)
-    localStorage.removeItem('adminUser')
   }
 
   const value: AdminAuthContextType = {

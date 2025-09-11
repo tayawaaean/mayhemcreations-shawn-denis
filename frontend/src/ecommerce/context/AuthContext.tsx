@@ -1,11 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { loggingService } from '../../shared/loggingService'
+import AuthStorageService from '../../shared/authStorage'
 
 interface User {
-  id: string
+  id: number
   firstName: string
   lastName: string
   email: string
+  role: string
+  isEmailVerified: boolean
+  lastLoginAt: string
+  createdAt: string
   avatar?: string
 }
 
@@ -13,7 +18,7 @@ interface AuthContextType {
   user: User | null
   isLoggedIn: boolean
   login: (user: User) => void
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -36,22 +41,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check for stored user data on mount
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch (error) {
-        console.error('Error parsing stored user data:', error)
-        localStorage.removeItem('user')
+    // Check for stored auth data on mount
+    const authData = AuthStorageService.getAuthData()
+    if (authData && AuthStorageService.isAuthenticated()) {
+      // Validate that user has customer role
+      if (authData.user.role !== 'customer') {
+        console.warn('Admin/employee account detected in customer area - clearing auth data')
+        AuthStorageService.clearAuthData()
+        setIsLoading(false)
+        return
       }
+
+      // Convert stored user data to User format
+      const user: User = {
+        id: authData.user.id,
+        email: authData.user.email,
+        firstName: authData.user.firstName || '',
+        lastName: authData.user.lastName || '',
+        role: authData.user.role,
+        isEmailVerified: authData.user.isEmailVerified || false,
+        lastLoginAt: authData.user.lastLoginAt || new Date().toISOString(),
+        createdAt: authData.user.createdAt || new Date().toISOString(),
+        avatar: authData.user.avatar
+      }
+      setUser(user)
     }
     setIsLoading(false)
   }, [])
 
   const login = (userData: User) => {
     setUser(userData)
-    localStorage.setItem('user', JSON.stringify(userData))
+    // Note: Auth data is already stored by the login components
+    // No need to store additional data here
     
     // Log successful customer login
     loggingService.logLoginSuccess(
@@ -61,14 +82,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     )
   }
 
-  const logout = () => {
+  const logout = async () => {
     // Log logout before clearing user data
     if (user) {
       loggingService.logLogout(user.id, user.email, 'customer')
     }
     
+    // Use secure logout that calls backend and clears all auth data
+    await AuthStorageService.secureLogout()
+    
     setUser(null)
-    localStorage.removeItem('user')
   }
 
   const value: AuthContextType = {

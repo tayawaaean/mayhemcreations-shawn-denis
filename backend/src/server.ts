@@ -1,5 +1,5 @@
 import app from './app';
-import { testDatabaseConnection, syncDatabase } from './models';
+import { testDatabaseConnection, syncDatabase, sequelize } from './models';
 import { logger } from './utils/logger';
 
 // Environment variables are loaded via --env-file flag
@@ -16,7 +16,9 @@ const startServer = async (): Promise<void> => {
     // Sync database (create tables if they don't exist)
     // In production, you should use migrations instead
     if (NODE_ENV === 'development') {
-      await syncDatabase(true); // Force sync to recreate tables with correct schema
+      // Only sync without altering to avoid index issues
+      await sequelize.sync({ force: false });
+      logger.info('Database synchronized without altering existing tables');
     }
 
     // Start the server

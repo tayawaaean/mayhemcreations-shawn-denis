@@ -1,7 +1,6 @@
 import { User } from '../models/userModel';
 import { Role } from '../models/roleModel';
 import { logger } from '../utils/logger';
-import bcrypt from 'bcrypt';
 
 /**
  * User Seeder - Creates mock users for all roles
@@ -11,8 +10,8 @@ import bcrypt from 'bcrypt';
 export const userData = [
   // Admin Users
   {
-    email: 'admin@mayhemcreations.com',
-    password: 'AdminPass123!',
+    email: 'admin@mayhemcreation.com',
+    password: 'SecureAdmin2024!',
     firstName: 'John',
     lastName: 'Admin',
     phone: '+15550101',
@@ -32,8 +31,8 @@ export const userData = [
     }
   },
   {
-    email: 'shawn.denis@mayhemcreations.com',
-    password: 'ShawnPass123!',
+    email: 'shawn.denis@mayhemcreation.com',
+    password: 'SecureShawn2024!',
     firstName: 'Shawn',
     lastName: 'Denis',
     phone: '+15550102',
@@ -55,8 +54,8 @@ export const userData = [
 
   // Manager Users
   {
-    email: 'manager@mayhemcreations.com',
-    password: 'ManagerPass123!',
+    email: 'manager@mayhemcreation.com',
+    password: 'SecureManager2024!',
     firstName: 'Sarah',
     lastName: 'Johnson',
     phone: '+15550201',
@@ -76,7 +75,7 @@ export const userData = [
     }
   },
   {
-    email: 'operations@mayhemcreations.com',
+    email: 'operations@mayhemcreation.com',
     password: 'OpsPass123!',
     firstName: 'Michael',
     lastName: 'Chen',
@@ -99,7 +98,7 @@ export const userData = [
 
   // Designer Users
   {
-    email: 'designer@mayhemcreations.com',
+    email: 'designer@mayhemcreation.com',
     password: 'DesignerPass123!',
     firstName: 'Emma',
     lastName: 'Rodriguez',
@@ -120,7 +119,7 @@ export const userData = [
     }
   },
   {
-    email: 'creative@mayhemcreations.com',
+    email: 'creative@mayhemcreation.com',
     password: 'CreativePass123!',
     firstName: 'Alex',
     lastName: 'Thompson',
@@ -143,7 +142,7 @@ export const userData = [
 
   // Support Users
   {
-    email: 'support@mayhemcreations.com',
+    email: 'support@mayhemcreation.com',
     password: 'SupportPass123!',
     firstName: 'Lisa',
     lastName: 'Williams',
@@ -164,7 +163,7 @@ export const userData = [
     }
   },
   {
-    email: 'help@mayhemcreations.com',
+    email: 'help@mayhemcreation.com',
     password: 'HelpPass123!',
     firstName: 'David',
     lastName: 'Brown',
@@ -187,7 +186,7 @@ export const userData = [
 
   // Moderator Users
   {
-    email: 'moderator@mayhemcreations.com',
+    email: 'moderator@mayhemcreation.com',
     password: 'ModeratorPass123!',
     firstName: 'Jennifer',
     lastName: 'Davis',
@@ -211,7 +210,7 @@ export const userData = [
   // Customer Users
   {
     email: 'customer1@example.com',
-    password: 'CustomerPass123!',
+    password: 'SecureCustomer2024!',
     firstName: 'Robert',
     lastName: 'Wilson',
     phone: '+15551001',
@@ -232,7 +231,7 @@ export const userData = [
   },
   {
     email: 'customer2@example.com',
-    password: 'CustomerPass123!',
+    password: 'SecureCustomer2024!',
     firstName: 'Maria',
     lastName: 'Garcia',
     phone: '+15551002',
@@ -253,7 +252,7 @@ export const userData = [
   },
   {
     email: 'customer3@example.com',
-    password: 'CustomerPass123!',
+    password: 'SecureCustomer2024!',
     firstName: 'James',
     lastName: 'Anderson',
     phone: '+15551003',
@@ -274,7 +273,7 @@ export const userData = [
   },
   {
     email: 'customer4@example.com',
-    password: 'CustomerPass123!',
+    password: 'SecureCustomer2024!',
     firstName: 'Sophie',
     lastName: 'Taylor',
     phone: '+15551004',
@@ -295,7 +294,7 @@ export const userData = [
   },
   {
     email: 'customer5@example.com',
-    password: 'CustomerPass123!',
+    password: 'SecureCustomer2024!',
     firstName: 'Kevin',
     lastName: 'Martinez',
     phone: '+15551005',
@@ -328,7 +327,7 @@ export async function seedUsers(): Promise<void> {
     await User.destroy({
       where: {
         email: {
-          [require('sequelize').Op.notLike]: '%@mayhemcreations.com'
+          [require('sequelize').Op.notLike]: '%@mayhemcreation.com'
         }
       }
     });
@@ -341,18 +340,15 @@ export async function seedUsers(): Promise<void> {
         continue;
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(userDataItem.password, 12);
-
       // Check if user already exists
       const existingUser = await User.findOne({
         where: { email: userDataItem.email }
       });
 
       if (existingUser) {
-        // Update existing user
+        // Update existing user (password will be hashed by model hook)
         await existingUser.update({
-          password: hashedPassword,
+          password: userDataItem.password,
           firstName: userDataItem.firstName,
           lastName: userDataItem.lastName,
           phone: userDataItem.phone,
@@ -364,10 +360,10 @@ export async function seedUsers(): Promise<void> {
         });
         logger.info(`✅ Updated user: ${userDataItem.email}`);
       } else {
-        // Create new user
+        // Create new user (password will be hashed by model hook)
         await User.create({
           email: userDataItem.email,
-          password: hashedPassword,
+          password: userDataItem.password,
           firstName: userDataItem.firstName,
           lastName: userDataItem.lastName,
           phone: userDataItem.phone,
@@ -408,7 +404,7 @@ export async function clearNonSystemUsers(): Promise<void> {
     await User.destroy({
       where: {
         email: {
-          [require('sequelize').Op.notLike]: '%@mayhemcreations.com'
+          [require('sequelize').Op.notLike]: '%@mayhemcreation.com'
         }
       }
     });

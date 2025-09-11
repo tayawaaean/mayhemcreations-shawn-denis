@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
 import { useRole } from '../../context/RoleContext'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   LayoutDashboard,
   Package,
@@ -112,6 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
   const { state } = useAdmin()
   const { role } = useRole()
+  const { logout } = useAdminAuth()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const unreadMessages = state.messages.filter(m => !m.isFromAdmin && !m.isRead).length
 
@@ -127,10 +129,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     })
   }
 
-  const handleLogout = () => {
-    // Clear any admin session data if needed
-    // For now, just navigate to the public site
-    navigate('/')
+  const handleLogout = async () => {
+    try {
+      // Use secure logout that calls backend and clears all auth data
+      await logout()
+      // Navigate to the public site after successful logout
+      navigate('/')
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Still navigate even if logout fails
+      navigate('/')
+    }
   }
 
   return (
@@ -265,7 +274,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">Admin User</p>
-                <p className="text-xs text-gray-500">admin@mayhemcreations.com</p>
+                <p className="text-xs text-gray-500">admin@mayhemcreation.com</p>
               </div>
             </div>
 

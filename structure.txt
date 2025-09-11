@@ -229,9 +229,30 @@
 🆕 dompurify – Server-side XSS protection
 ✅ express-session – Session management with MariaDB store
 ✅ express-mysql-session – MariaDB session store
+✅ swagger-jsdoc – Generate OpenAPI spec from JSDoc comments
+✅ swagger-ui-express – Interactive API documentation UI
+✅ @types/swagger-jsdoc – TypeScript support for Swagger
+✅ @types/swagger-ui-express – TypeScript support for Swagger UI
 
 ============================================================
-6️⃣ Backend Authentication & Security (MariaDB Sessions)
+6️⃣ Backend API Documentation & Testing (Enhanced)
+============================================================
+✅ JSDoc Comments – Comprehensive API documentation in code
+✅ OpenAPI 3.0 Specification – Auto-generated from JSDoc
+✅ Swagger UI – Interactive API documentation interface
+✅ API Schema Definitions – Reusable request/response schemas
+✅ Request/Response Examples – Real-world usage examples
+✅ Error Documentation – Complete error code and message documentation
+✅ Authentication Documentation – Session-based auth flow documentation
+✅ Rate Limiting Documentation – API limits and throttling information
+✅ Validation Documentation – Input validation rules and error messages
+✅ API Versioning Documentation – Version management and migration guides
+✅ Testing Documentation – API testing examples and test data
+✅ Postman Collections – Ready-to-use API testing collections
+✅ API Health Monitoring – Service health and status endpoints
+
+============================================================
+7️⃣ Backend Authentication & Security (MariaDB Sessions)
 ============================================================
 ✅ Session-based auth with MariaDB – Database-managed sessions using express-mysql-session
 ✅ Refresh token logic – Stored in MariaDB sessions table with rotation
@@ -363,6 +384,21 @@
     ├── analyticsRoute.ts
     ├── webhookRoute.ts     # Payment webhooks
     ├── apiDocsRoute.ts     # API documentation
+  /docs
+    ├── swagger.ts          # Swagger configuration and setup
+    ├── schemas/            # OpenAPI schema definitions
+    │   ├── authSchemas.ts  # Authentication schemas
+    │   ├── userSchemas.ts  # User management schemas
+    │   ├── productSchemas.ts # Product catalog schemas
+    │   ├── orderSchemas.ts # Order management schemas
+    │   └── commonSchemas.ts # Common response schemas
+    ├── examples/           # API usage examples
+    │   ├── authExamples.ts # Authentication examples
+    │   ├── userExamples.ts # User management examples
+    │   └── productExamples.ts # Product catalog examples
+    └── templates/          # Documentation templates
+        ├── apiTemplate.ts  # API endpoint template
+        └── schemaTemplate.ts # Schema definition template
   /services
     ├── sessionService.ts   # MariaDB session/token logic
     ├── emailService.ts     # Nodemailer setup + templates
@@ -439,42 +475,58 @@
   - restore – Restore from backup
   - security:audit – Run security audit
   - load:test – Run load testing
-  - docs:generate – Generate API documentation
+  - docs:generate – Generate API documentation from JSDoc
+  - docs:serve – Serve Swagger UI documentation
+  - docs:validate – Validate OpenAPI specification
+  - docs:export – Export OpenAPI spec to JSON/YAML
   - sessions:cleanup – Manual session cleanup
 
 ============================================================
-🔟 Session Management Strategy (MariaDB-Only)
+🔟 Enhanced Session Management Strategy (Database Tokens + localStorage)
 ============================================================
 
-✅ **MariaDB Session Storage:**
-  ├── express-mysql-session for session store
-  ├── Sessions table: session_id, user_id, data, expires_at, created_at
-  ├── Automatic session cleanup via express-mysql-session
-  ├── Session expiration: 24 hours (configurable)
+✅ **Dual Session Storage:**
+  ├── Express-session with MariaDB store (server-side)
+  ├── Database-stored JWT tokens (access + refresh)
+  ├── localStorage integration (client-side persistence)
+  ├── Session model: sessionId, userId, accessToken, refreshToken, expiresAt
 
-✅ **Session Security:**
-  ├── httpOnly cookies prevent XSS access
-  ├── secure flag for HTTPS-only transmission
-  ├── sameSite='strict' for CSRF protection
-  ├── Session rotation on privilege escalation
+✅ **JWT Token Management:**
+  ├── Access tokens: 15 minutes expiration, stored in database
+  ├── Refresh tokens: 7 days expiration, stored in database
+  ├── Token revocation: Database tokens can be revoked on logout
+  ├── Auto-refresh: Frontend automatically refreshes tokens before expiration
+
+✅ **localStorage Integration:**
+  ├── User data persistence across browser sessions
+  ├── Token storage with automatic cleanup on logout
+  ├── Session validation on app initialization
+  ├── Activity tracking and token refresh management
+
+✅ **Enhanced Security:**
+  ├── Database token revocation on logout
+  ├── Session validation against database on each request
+  ├── Token rotation on refresh for enhanced security
+  ├── IP and user agent validation stored in database
 
 ✅ **Performance Optimization:**
   ├── Session data cached in node-cache (5min TTL)
-  ├── Database indexes on session_id and user_id
+  ├── Database indexes on sessionId, userId, accessToken, refreshToken
   ├── Connection pooling for session queries
   ├── Batch session cleanup (hourly job)
 
-✅ **Refresh Token Handling:**
-  ├── Refresh tokens stored in sessions.data JSON field
-  ├── Token rotation on each refresh (invalidate old)
-  ├── Separate expiration tracking for refresh tokens
-  ├── Revoke all sessions on password change
+✅ **Frontend Session Flow:**
+  ├── Check localStorage on app initialization
+  ├── Validate session against database
+  ├── Auto-refresh tokens when needed
+  ├── Clear localStorage on logout
+  ├── Handle session expiration gracefully
 
 ✅ **Session Monitoring:**
-  ├── Track active sessions per user
-  ├── Log session creation/destruction
-  ├── Monitor session table size and cleanup efficiency
-  ├── Alert on unusual session patterns
+  ├── Track active sessions per user in database
+  ├── Log session creation/destruction with token info
+  ├── Monitor token usage and refresh patterns
+  ├── Alert on unusual session or token patterns
 
 ============================================================
 🔟 Enhanced Best Practices (MariaDB-Focused)

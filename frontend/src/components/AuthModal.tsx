@@ -1,13 +1,21 @@
 import React, { useState } from 'react'
 import { X, Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Button from './Button'
+import GoogleOAuthButton from './GoogleOAuthButton'
 import { loggingService } from '../shared/loggingService'
+import AuthStorageService from '../shared/authStorage'
+import { apiService } from '../admin/services/apiService'
+import { envConfig } from '../shared/envConfig'
 
 interface User {
-  id: string
+  id: number
   firstName: string
   lastName: string
   email: string
+  role: string
+  isEmailVerified: boolean
+  lastLoginAt: string
+  createdAt: string
   avatar?: string
 }
 
@@ -18,6 +26,34 @@ interface AuthModalProps {
   onModeChange: (mode: 'login' | 'register') => void
   onSuccess: (user: User) => void
 }
+
+// Demo customer accounts for testing - using environment configuration
+const demoCustomers = [
+  {
+    id: 1,
+    firstName: 'John',
+    lastName: 'Customer',
+    email: envConfig.getDemoAccounts().customer,
+    password: 'SecureCustomer2024!',
+    role: 'customer'
+  },
+  {
+    id: 2,
+    firstName: 'Jane',
+    lastName: 'Smith',
+    email: envConfig.getDemoAccounts().jane,
+    password: 'SecureJane2024!',
+    role: 'customer'
+  },
+  {
+    id: 3,
+    firstName: 'Mike',
+    lastName: 'Johnson',
+    email: envConfig.getDemoAccounts().mike,
+    password: 'SecureMike2024!',
+    role: 'customer'
+  }
+]
 
 export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSuccess }: AuthModalProps) {
   const [formData, setFormData] = useState({
@@ -30,71 +66,215 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [selectedDemo, setSelectedDemo] = useState<typeof demoCustomers[0] | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError('')
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      const userData: User = {
-        id: Date.now().toString(),
-        firstName: formData.firstName || 'User',
-        lastName: formData.lastName || 'Name',
-        email: formData.email,
-        avatar: `https://ui-avatars.com/api/?name=${formData.firstName}+${formData.lastName}&background=random`
-      }
-      
-      // Log successful customer registration/login
+    try {
       if (mode === 'register') {
-        loggingService.logUserAction('customer_registration', {
-          email: formData.email,
+        // Handle registration
+        if (formData.password !== formData.confirmPassword) {
+          setError('Passwords do not match')
+          setIsLoading(false)
+          return
+        }
+
+        // Call registration API
+        const response = await apiService.register({
           firstName: formData.firstName,
-          lastName: formData.lastName
-        }, { userId: userData.id, userEmail: userData.email, userRole: 'customer' })
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password
+        })
+
+        if (response.success) {
+          // Store auth data using streamlined storage
+          AuthStorageService.storeAuthData({
+            user: {
+              id: response.data.user.id,
+              email: response.data.user.email,
+              role: response.data.user.role,
+              firstName: response.data.user.firstName,
+              lastName: response.data.user.lastName,
+              isEmailVerified: response.data.user.isEmailVerified,
+              lastLoginAt: new Date().toISOString(),
+              createdAt: response.data.user.createdAt || new Date().toISOString(),
+              avatar: response.data.user.avatar
+            },
+            session: {
+              sessionId: response.data.sessionId,
+              accessToken: response.data.accessToken,
+              refreshToken: response.data.refreshToken,
+              lastActivity: new Date().toISOString()
+            }
+          })
+
+          // Convert to User format for context
+          const userData: User = {
+            id: response.data.user.id,
+            firstName: response.data.user.firstName,
+            lastName: response.data.user.lastName,
+            email: response.data.user.email,
+            role: response.data.user.role,
+            isEmailVerified: response.data.user.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+          }
+
+          // Log successful registration
+          loggingService.logUserAction('customer_registration', {
+            email: formData.email,
+            firstName: formData.firstName,
+            lastName: formData.lastName
+          }, { userId: userData.id.toString(), userEmail: userData.email, userRole: 'customer' })
+
+          onSuccess(userData)
+          onClose()
+        } else {
+          setError(response.message || 'Registration failed')
+        }
       } else {
-        loggingService.logLoginAttempt(formData.email, true, 'customer')
+        // Handle login with customer role validation
+        const response = await apiService.login(formData.email, formData.password, 'customer')
+
+        if (response.success) {
+          // Store auth data using streamlined storage
+          AuthStorageService.storeAuthData({
+            user: {
+              id: response.data.user.id,
+              email: response.data.user.email,
+              role: response.data.user.role,
+              firstName: response.data.user.firstName,
+              lastName: response.data.user.lastName,
+              isEmailVerified: response.data.user.isEmailVerified,
+              lastLoginAt: new Date().toISOString(),
+              createdAt: response.data.user.createdAt || new Date().toISOString(),
+              avatar: response.data.user.avatar
+            },
+            session: {
+              sessionId: response.data.sessionId,
+              accessToken: response.data.accessToken,
+              refreshToken: response.data.refreshToken,
+              lastActivity: new Date().toISOString()
+            }
+          })
+
+          // Convert to User format for context
+          const userData: User = {
+            id: response.data.user.id,
+            firstName: response.data.user.firstName,
+            lastName: response.data.user.lastName,
+            email: response.data.user.email,
+            role: response.data.user.role,
+            isEmailVerified: response.data.user.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+          }
+
+          // Log successful login
+          loggingService.logLoginAttempt(formData.email, true, 'customer')
+
+          onSuccess(userData)
+          onClose()
+        } else {
+          setError(response.message || 'Login failed')
+        }
       }
+    } catch (error: any) {
+      console.error('Auth error:', error)
+      setError(error.message || 'An error occurred')
       
-      onSuccess(userData)
-      onClose()
-      // Reset form
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        password: '',
-        confirmPassword: ''
-      })
-    }, 1500)
+      // Log failed attempt
+      if (mode === 'register') {
+        loggingService.logUserAction('customer_registration_failed', {
+          email: formData.email,
+          error: error.message
+        }, { userRole: 'customer' })
+      } else {
+        loggingService.logFailedLoginAttempt(formData.email, error.message)
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleGoogleLogin = async () => {
+  // Google OAuth handler
+  const handleGoogleLogin = async (response: any) => {
     setIsLoading(true)
+    setError('')
 
-    // Mock Google login
-    setTimeout(() => {
-      setIsLoading(false)
-      const userData: User = {
-        id: Date.now().toString(),
-        firstName: 'Google',
-        lastName: 'User',
-        email: 'user@gmail.com',
-        avatar: 'https://ui-avatars.com/api/?name=Google+User&background=random'
+    try {
+      // Import OAuth API service dynamically to avoid circular imports
+      const { oauthApiService } = await import('../shared/oauthApiService')
+      
+      // Send the ID token to backend for verification
+      const result = await oauthApiService.authenticateWithGoogle(
+        response.credential,
+        'customer'
+      )
+
+      if (result.success && result.data) {
+        // Store auth data using streamlined storage
+        AuthStorageService.storeAuthData({
+          user: {
+            id: result.data.user.id,
+            email: result.data.user.email,
+            role: result.data.user.role,
+            firstName: result.data.user.firstName,
+            lastName: result.data.user.lastName,
+            isEmailVerified: result.data.user.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: result.data.user.createdAt || new Date().toISOString(),
+            avatar: result.data.user.avatar
+          },
+          session: {
+            sessionId: result.data.sessionId,
+            accessToken: result.data.accessToken,
+            refreshToken: result.data.refreshToken,
+            lastActivity: new Date().toISOString()
+          }
+        })
+
+        // Convert to User format for context
+        const userData: User = {
+          id: result.data.user.id,
+          firstName: result.data.user.firstName,
+          lastName: result.data.user.lastName,
+          email: result.data.user.email,
+          role: result.data.user.role,
+          isEmailVerified: result.data.user.isEmailVerified,
+          lastLoginAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          avatar: result.data.user.avatar || `https://ui-avatars.com/api/?name=${result.data.user.firstName}+${result.data.user.lastName}&background=3b82f6&color=ffffff`
+        }
+
+        // Log successful login
+        loggingService.logLoginAttempt(result.data.user.email, true, 'customer')
+
+        onSuccess(userData)
+        onClose()
+      } else {
+        setError(result.message || 'Google login failed')
       }
-      
-      // Log Google login attempt
-      loggingService.logLoginAttempt('user@gmail.com', true, 'customer')
-      loggingService.logUserAction('google_oauth_login', {
-        provider: 'google',
-        email: 'user@gmail.com'
-      }, { userId: userData.id, userEmail: userData.email, userRole: 'customer' })
-      
-      onSuccess(userData)
-      onClose()
-      alert('Mock Google login successful! In a real app, this would authenticate with Google OAuth.')
-    }, 1500)
+    } catch (error: any) {
+      console.error('❌ Google OAuth error:', error)
+      setError(error.message || 'An error occurred during Google login')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Google OAuth error handler
+  const handleGoogleError = (error: string) => {
+    console.error('❌ Google OAuth error:', error)
+    setError(error)
+    setIsLoading(false)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,6 +282,64 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
       ...prev,
       [e.target.name]: e.target.value
     }))
+    setError('') // Clear error when user types
+  }
+
+  const handleDemoLogin = async (customer: typeof demoCustomers[0]) => {
+    setIsLoading(true)
+    setError('')
+    setSelectedDemo(customer)
+
+    try {
+      // Call the real API for authentication with customer role validation
+      const response = await apiService.login(customer.email, customer.password, 'customer')
+
+      if (response.success) {
+        // Store auth data using streamlined storage
+        AuthStorageService.storeAuthData({
+          user: {
+            id: response.data.user.id,
+            email: response.data.user.email,
+            role: response.data.user.role
+          },
+          session: {
+            sessionId: response.data.sessionId,
+            accessToken: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+            lastActivity: new Date().toISOString()
+          }
+        })
+
+        // Convert to User format for context
+        const userData: User = {
+          id: response.data.user.id,
+          firstName: response.data.user.firstName,
+          lastName: response.data.user.lastName,
+          email: response.data.user.email,
+          role: response.data.user.role,
+          isEmailVerified: response.data.user.isEmailVerified,
+          lastLoginAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+        }
+
+        // Log successful login
+        loggingService.logLoginAttempt(customer.email, true, 'customer')
+
+        onSuccess(userData)
+        onClose()
+      } else {
+        setError(response.message || 'Demo login failed')
+      }
+    } catch (error: any) {
+      console.error('Demo login error:', error)
+      setError(error.message || 'An error occurred during demo login')
+      
+      // Log failed attempt
+      loggingService.logFailedLoginAttempt(customer.email, error.message)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   if (!isOpen) return null
@@ -124,21 +362,47 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
 
         {/* Form */}
         <div className="p-6">
-          {/* Google Login Button */}
-          <button
-            type="button"
-            onClick={handleGoogleLogin}
+          {/* Google OAuth Button */}
+          <GoogleOAuthButton
+            onSuccess={handleGoogleLogin}
+            onError={handleGoogleError}
             disabled={isLoading}
-            className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Continue with Google
-          </button>
+            className="mb-4"
+            buttonText="Continue with Google"
+          />
+
+          {/* Demo Accounts Section */}
+          <div className="mt-4">
+            <div className="text-center mb-3">
+              <span className="text-sm text-gray-500">Or try demo accounts</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {demoCustomers.map((customer) => (
+                <button
+                  key={customer.id}
+                  type="button"
+                  onClick={() => handleDemoLogin(customer)}
+                  disabled={isLoading}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm border rounded-md transition-colors ${
+                    selectedDemo?.id === customer.id
+                      ? 'border-accent bg-accent/5 text-accent'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-accent to-accent/80 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                      {customer.firstName[0]}{customer.lastName[0]}
+                    </div>
+                    <div className="text-left">
+                      <div className="font-medium">{customer.firstName} {customer.lastName}</div>
+                      <div className="text-xs text-gray-500">{customer.email}</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400">Demo</div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Divider */}
           <div className="relative my-6">
@@ -149,6 +413,13 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
               <span className="px-2 bg-white text-gray-500">Or continue with email</span>
             </div>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
@@ -294,6 +565,28 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             </button>
           </div>
           </form>
+
+          {/* Demo Account Credentials */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Demo Account Credentials</h4>
+            <div className="space-y-2 text-xs text-gray-600">
+              <div className="flex justify-between">
+                <span className="font-medium">John Customer:</span>
+                <span>{envConfig.getDemoAccounts().customer}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Jane Smith:</span>
+                <span>{envConfig.getDemoAccounts().jane}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-medium">Mike Johnson:</span>
+                <span>{envConfig.getDemoAccounts().mike}</span>
+              </div>
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <span className="text-gray-500">Password for all demo accounts: SecureCustomer2024!</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

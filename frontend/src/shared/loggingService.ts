@@ -91,7 +91,7 @@ class LoggingService {
     }
   }
 
-  private getLocalLogs(): LogEntry[] {
+  public getLocalLogs(): LogEntry[] {
     try {
       const logs = localStorage.getItem('system_logs')
       return logs ? JSON.parse(logs) : []
@@ -212,10 +212,6 @@ class LoggingService {
   }
 
   // Utility methods
-  public getLocalLogs(): LogEntry[] {
-    return this.getLocalLogs()
-  }
-
   public clearLocalLogs(): void {
     localStorage.removeItem('system_logs')
   }
@@ -236,6 +232,3 @@ class LoggingService {
 
 // Export singleton instance
 export const loggingService = new LoggingService()
-
-// Export types for use in other files
-export type { LogEntry, LoggingConfig }

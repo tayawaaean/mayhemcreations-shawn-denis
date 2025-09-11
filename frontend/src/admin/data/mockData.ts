@@ -3,7 +3,7 @@ import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption
 export const mockAdminUser: AdminUser = {
   id: 'admin-1',
   name: 'John Admin',
-  email: 'admin@mayhemcreations.com',
+  email: 'admin@mayhemcreation.com',
   role: 'admin',
   avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face',
   lastLogin: new Date(),
@@ -15,7 +15,7 @@ export const mockAdminUsers: AdminUser[] = [
   {
     id: 'admin-2',
     name: 'Ava Manager',
-    email: 'ava.manager@mayhemcreations.com',
+    email: 'ava.manager@mayhemcreation.com',
     role: 'manager',
     avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=100&h=100&fit=crop&crop=face',
     lastLogin: new Date('2024-01-24T11:45:00'),
@@ -24,7 +24,7 @@ export const mockAdminUsers: AdminUser[] = [
   {
     id: 'seller-1',
     name: 'Sam Seller',
-    email: 'sam.seller@mayhemcreations.com',
+    email: 'sam.seller@mayhemcreation.com',
     role: 'staff',
     avatar: 'https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=100&h=100&fit=crop&crop=face',
     lastLogin: new Date('2024-01-22T09:10:00'),
@@ -33,7 +33,7 @@ export const mockAdminUsers: AdminUser[] = [
   {
     id: 'seller-2',
     name: 'Nina Seller',
-    email: 'nina.seller@mayhemcreations.com',
+    email: 'nina.seller@mayhemcreation.com',
     role: 'staff',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face',
     lastLogin: new Date('2024-01-10T16:25:00'),

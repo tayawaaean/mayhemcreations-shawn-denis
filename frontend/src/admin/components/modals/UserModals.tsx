@@ -180,10 +180,7 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onS
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     const { password, ...rest } = formData
-    try {
-      const key = `password:${rest.email}`
-      localStorage.setItem(key, password)
-    } catch {}
+    // Note: Passwords are never stored in localStorage for security
     onSave({ ...rest })
     onClose()
   }

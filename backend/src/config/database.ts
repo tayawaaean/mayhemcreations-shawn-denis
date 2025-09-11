@@ -2,7 +2,7 @@ import { Sequelize } from 'sequelize';
 
 // Database configuration with connection pooling
 const sequelize = new Sequelize({
-  database: process.env.DB_NAME || 'mayhem_creations',
+  database: process.env.DB_NAME || 'mayhem_creation',
   username: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   host: process.env.DB_HOST || 'localhost',

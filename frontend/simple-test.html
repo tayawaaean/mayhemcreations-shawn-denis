@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Environment Test</title>
+</head>
+<body>
+    <h1>Simple Environment Test</h1>
+    <div id="output"></div>
+    
+    <script>
+        // Test environment variables
+        const output = document.getElementById('output');
+        
+        // Try different ways to access environment variables
+        let html = '<h2>Environment Variables Test:</h2>';
+        
+        // Method 1: Direct import.meta.env
+        html += '<h3>Method 1 - import.meta.env:</h3>';
+        try {
+            html += `<p>VITE_GOOGLE_CLIENT_ID: ${import.meta.env.VITE_GOOGLE_CLIENT_ID || 'NOT SET'}</p>`;
+            html += `<p>VITE_API_BASE_URL: ${import.meta.env.VITE_API_BASE_URL || 'NOT SET'}</p>`;
+        } catch (e) {
+            html += `<p>Error: ${e.message}</p>`;
+        }
+        
+        // Method 2: Check if import.meta exists
+        html += '<h3>Method 2 - import.meta check:</h3>';
+        html += `<p>import.meta exists: ${typeof import.meta !== 'undefined' ? 'YES' : 'NO'}</p>`;
+        if (typeof import.meta !== 'undefined') {
+            html += `<p>import.meta.env exists: ${typeof import.meta.env !== 'undefined' ? 'YES' : 'NO'}</p>`;
+        }
+        
+        // Method 3: Check all import.meta.env properties
+        html += '<h3>Method 3 - All import.meta.env properties:</h3>';
+        if (typeof import.meta !== 'undefined' && import.meta.env) {
+            const envKeys = Object.keys(import.meta.env);
+            html += `<p>Available keys: ${envKeys.length > 0 ? envKeys.join(', ') : 'NONE'}</p>`;
+            for (const key of envKeys) {
+                html += `<p>${key}: ${import.meta.env[key]}</p>`;
+            }
+        } else {
+            html += '<p>import.meta.env not available</p>';
+        }
+        
+        output.innerHTML = html;
+    </script>
+</body>
+</html>

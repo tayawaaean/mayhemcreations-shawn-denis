@@ -18,7 +18,7 @@ Content-Type: application/json
   "event": "login_success",
   "userId": "user_123",
   "userRole": "admin",
-  "userEmail": "admin@mayhemcreations.com",
+  "userEmail": "admin@mayhemcreation.com",
   "details": {
     "loginMethod": "email_password",
     "ipAddress": "192.168.1.100"

@@ -67,7 +67,9 @@ export const authorize = (permission: string) => {
 };
 
 // Role-based authorization middleware
-export const requireRole = (roleName: string) => {
+export const requireRole = (roleNames: string | string[]) => {
+  const roles = Array.isArray(roleNames) ? roleNames : [roleNames];
+  
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       if (!SessionService.isAuthenticated(req)) {
@@ -79,18 +81,18 @@ export const requireRole = (roleName: string) => {
         return;
       }
 
-      if (!SessionService.hasRole(req, roleName)) {
-        logger.warn(`Access denied for role: ${roleName}`, {
+      if (!SessionService.hasAnyRole(req, roles)) {
+        logger.warn(`Access denied for roles: ${roles.join(', ')}`, {
           userId: SessionService.getSession(req)?.userId,
-          requiredRole: roleName,
-          userRole: SessionService.getSession(req)?.roleName,
+          requiredRoles: roles,
+          userRole: SessionService.getSession(req)?.role,
         });
         
         res.status(403).json({
           success: false,
           message: 'Insufficient role privileges',
           code: 'INSUFFICIENT_ROLE',
-          requiredRole: roleName,
+          requiredRoles: roles,
         });
         return;
       }
@@ -124,7 +126,7 @@ export const requireAnyRole = (roleNames: string[]) => {
         logger.warn(`Access denied for roles: ${roleNames.join(', ')}`, {
           userId: SessionService.getSession(req)?.userId,
           requiredRoles: roleNames,
-          userRole: SessionService.getSession(req)?.roleName,
+          userRole: SessionService.getSession(req)?.role,
         });
         
         res.status(403).json({

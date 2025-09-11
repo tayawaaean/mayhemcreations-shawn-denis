@@ -1,3 +1,10 @@
+/**
+ * @swagger
+ * tags:
+ *   - name: Authentication
+ *     description: User authentication and session management endpoints
+ */
+
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuthController } from '../controllers/authController';
@@ -52,6 +59,39 @@ router.post('/logout', authenticate, AuthController.logout);
 router.get('/profile', authenticate, validateSession, AuthController.getProfile);
 router.post('/refresh', authenticate, validateSession, AuthController.refreshSession);
 
+// OAuth routes
+router.post('/google', authRateLimit, AuthController.googleLogin);
+router.get('/oauth/providers', authenticate, validateSession, AuthController.getOAuthProviders);
+router.post('/oauth/unlink', authenticate, validateSession, AuthController.unlinkOAuthProvider);
+
+/**
+ * @swagger
+ * /api/v1/auth/health:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Auth service health check
+ *     description: Check if the authentication service is running and healthy
+ *     responses:
+ *       200:
+ *         description: Auth service is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Auth service is running
+ *             examples:
+ *               success:
+ *                 summary: Service healthy
+ *                 value:
+ *                   success: true
+ *                   message: Auth service is running
+ *                   timestamp: '2025-09-10T17:30:00.000Z'
+ */
 // Health check for auth service
 router.get('/health', (req, res) => {
   res.json({

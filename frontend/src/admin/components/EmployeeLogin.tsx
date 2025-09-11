@@ -3,45 +3,51 @@ import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle, Building2 } from 'lucide-react'
 import Button from '../../components/Button'
 import { loggingService } from '../../shared/loggingService'
+import { apiService } from '../services/apiService'
+import AuthStorageService from '../../shared/authStorage'
 
 interface EmployeeUser {
   id: string
   email: string
-  password: string
   firstName: string
   lastName: string
   role: 'admin' | 'seller'
   avatar?: string
 }
 
-// Demo accounts
+// Demo accounts with secure passwords
 const demoAccounts: EmployeeUser[] = [
   {
     id: 'admin-1',
-    email: 'admin@mayhemcreations.com',
-    password: 'admin123',
-    firstName: 'Admin',
-    lastName: 'User',
-    role: 'admin',
-    avatar: 'https://ui-avatars.com/api/?name=Admin+User&background=3b82f6&color=ffffff'
-  },
-  {
-    id: 'seller-1',
-    email: 'seller@mayhemcreations.com',
-    password: 'seller123',
+    email: 'admin@mayhemcreation.com',
     firstName: 'John',
-    lastName: 'Seller',
-    role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=John+Seller&background=10b981&color=ffffff'
+    lastName: 'Admin',
+    role: 'admin',
+    avatar: 'https://ui-avatars.com/api/?name=John+Admin&background=3b82f6&color=ffffff'
   },
   {
-    id: 'seller-2',
-    email: 'jane@mayhemcreations.com',
-    password: 'seller123',
-    firstName: 'Jane',
-    lastName: 'Smith',
+    id: 'admin-2',
+    email: 'shawn.denis@mayhemcreation.com',
+    firstName: 'Shawn',
+    lastName: 'Denis',
+    role: 'admin',
+    avatar: 'https://ui-avatars.com/api/?name=Shawn+Denis&background=8b5cf6&color=ffffff'
+  },
+  {
+    id: 'manager-1',
+    email: 'manager@mayhemcreation.com',
+    firstName: 'Sarah',
+    lastName: 'Johnson',
     role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=Jane+Smith&background=8b5cf6&color=ffffff'
+    avatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=10b981&color=ffffff'
+  },
+  {
+    id: 'designer-1',
+    email: 'designer@mayhemcreation.com',
+    firstName: 'Emily',
+    lastName: 'Designer',
+    role: 'seller',
+    avatar: 'https://ui-avatars.com/api/?name=Emily+Designer&background=f59e0b&color=ffffff'
   }
 ]
 
@@ -65,35 +71,73 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
     setIsLoading(true)
     setError('')
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const user = demoAccounts.find(
-        account => account.email === formData.email && account.password === formData.password
-      )
+    try {
+      // Call the real API for authentication with employee role validation
+      const response = await apiService.login(formData.email, formData.password, 'employee')
+      
+      if (response.success && response.data) {
+        const { user: apiUser, sessionId, accessToken, refreshToken } = response.data
+        
+        // Create employee user object
+        const employeeUser: EmployeeUser = {
+          id: apiUser.id.toString(),
+          email: apiUser.email,
+          firstName: apiUser.firstName,
+          lastName: apiUser.lastName,
+          role: apiUser.role === 'admin' ? 'admin' : 'seller',
+          avatar: `https://ui-avatars.com/api/?name=${apiUser.firstName}+${apiUser.lastName}&background=3b82f6&color=ffffff`
+        }
 
-      if (user) {
+        // Store auth data
+        AuthStorageService.storeAuthData({
+          user: {
+            id: apiUser.id,
+            email: apiUser.email,
+            firstName: apiUser.firstName,
+            lastName: apiUser.lastName,
+            role: apiUser.role,
+            permissions: apiUser.permissions,
+            isEmailVerified: apiUser.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          },
+          session: {
+            sessionId,
+            accessToken,
+            refreshToken,
+            lastActivity: new Date().toISOString()
+          }
+        })
+
         // Log successful login attempt
-        loggingService.logLoginAttempt(formData.email, true, user.role)
-        onLogin(user)
+        loggingService.logLoginAttempt(formData.email, true, employeeUser.role)
+        onLogin(employeeUser)
+        
         // Navigate based on role
-        if (user.role === 'admin') {
+        if (employeeUser.role === 'admin') {
           navigate('/admin')
         } else {
           navigate('/seller')
         }
       } else {
         // Log failed login attempt
-        loggingService.logFailedLoginAttempt(formData.email, 'Invalid credentials')
-        setError('Invalid email or password')
+        loggingService.logFailedLoginAttempt(formData.email, response.message || 'Invalid credentials')
+        setError(response.message || 'Login failed')
       }
+    } catch (error: any) {
+      console.error('Login error:', error)
+      // Log failed login attempt
+      loggingService.logFailedLoginAttempt(formData.email, error.message || 'Login error')
+      setError(error.message || 'An error occurred during login')
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleDemoLogin = (user: EmployeeUser) => {
     setFormData({
       email: user.email,
-      password: user.password
+      password: '' // Don't pre-fill password for security
     })
     setSelectedDemo(user)
   }
@@ -173,6 +217,17 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
                 </button>
               ))}
             </div>
+            
+            {/* Password Hints */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">Demo Account Passwords</h4>
+              <div className="text-xs text-blue-700 space-y-1">
+                <div><strong>Admin:</strong> SecureAdmin2024!</div>
+                <div><strong>Shawn Denis:</strong> SecureShawn2024!</div>
+                <div><strong>Manager:</strong> SecureManager2024!</div>
+                <div><strong>Designer:</strong> SecureCustomer2024!</div>
+              </div>
+            </div>
           </div>
 
           {/* Login Form */}
@@ -197,7 +252,7 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
                   onChange={handleInputChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="admin@mayhemcreations.com"
+                  placeholder="admin@mayhemcreation.com"
                 />
               </div>
             </div>
@@ -267,9 +322,10 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
           <h4 className="text-sm font-medium text-indigo-900 mb-2">Demo Account Credentials</h4>
           <div className="text-xs text-indigo-800 space-y-1">
-            <div><strong>Admin:</strong> admin@mayhemcreations.com / admin123</div>
-            <div><strong>Seller:</strong> seller@mayhemcreations.com / seller123</div>
-            <div><strong>Seller 2:</strong> jane@mayhemcreations.com / seller123</div>
+            <div><strong>Admin:</strong> admin@mayhemcreation.com / SecureAdmin2024!</div>
+            <div><strong>Shawn Denis:</strong> shawn.denis@mayhemcreation.com / SecureShawn2024!</div>
+            <div><strong>Manager:</strong> manager@mayhemcreation.com / SecureManager2024!</div>
+            <div><strong>Designer:</strong> designer@mayhemcreation.com / SecureCustomer2024!</div>
           </div>
         </div>
       </div>

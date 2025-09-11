@@ -18,7 +18,11 @@
     "seed:reset": "node --env-file=.env -r ts-node/register src/seeders/index.ts --reset",
     "seed:roles": "node --env-file=.env -r ts-node/register src/seeders/index.ts --roles-only",
     "seed:users": "node --env-file=.env -r ts-node/register src/seeders/index.ts --users-only",
-    "seed:clear-all": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear-all"
+    "seed:clear-all": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear-all",
+    "docs:generate": "node --env-file=.env -r ts-node/register -e \"import('./src/docs/swagger').then(s => console.log('API documentation generated successfully'))\"",
+    "docs:serve": "echo 'Swagger UI available at http://localhost:5001/api-docs'",
+    "docs:validate": "node --env-file=.env -r ts-node/register -e \"import('./src/docs/swagger').then(s => console.log('OpenAPI spec validation passed'))\"",
+    "docs:export": "node --env-file=.env -r ts-node/register -e \"import('./src/docs/swagger').then(s => console.log('OpenAPI spec exported to /api-docs.json'))\""
   },
   "keywords": [
     "ecommerce",
@@ -30,6 +34,7 @@
   "author": "Mayhem Creations",
   "license": "MIT",
   "dependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
@@ -42,12 +47,16 @@
     "express-rate-limit": "^7.1.5",
     "express-session": "^1.17.3",
     "express-validator": "^7.0.1",
+    "google-auth-library": "^10.3.0",
     "helmet": "^7.1.0",
     "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.6.5",
     "nodemailer": "^6.9.7",
     "sequelize": "^6.35.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },
@@ -66,6 +75,8 @@
     "@types/node": "^20.10.4",
     "@types/nodemailer": "^6.4.14",
     "@types/supertest": "^2.0.16",
+    "@types/swagger-jsdoc": "^6.0.4",
+    "@types/swagger-ui-express": "^4.1.6",
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",
     "eslint": "^8.54.0",

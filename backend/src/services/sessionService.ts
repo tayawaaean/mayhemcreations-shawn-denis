@@ -1,54 +1,22 @@
 import { Request, Response } from 'express';
+import { Session, User, Role } from '../models';
+import { logger } from '../utils/logger';
 import crypto from 'crypto';
-import { User } from '../models';
 
-// Session data interface
-export interface SessionData {
+// Session interface
+interface SessionData {
   userId: number;
   email: string;
-  roleId: number;
-  roleName: string;
+  role: string;
   permissions: string[];
   loginTime: Date;
   lastActivity: Date;
-  refreshToken?: string;
+  sessionId: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
-// Session service class for managing MariaDB sessions
 export class SessionService {
-  /**
-   * Create a new session for authenticated user
-   */
-  static createSession(req: Request, user: User, role: any): void {
-    const sessionData: SessionData = {
-      userId: user.id,
-      email: user.email,
-      roleId: role.id,
-      roleName: role.name,
-      permissions: role.permissions || [],
-      loginTime: new Date(),
-      lastActivity: new Date(),
-    };
-
-    // Store user data in session (using type assertion)
-    (req.session as any).user = sessionData;
-    
-    // Generate refresh token and store in session
-    const refreshToken = this.generateRefreshToken();
-    (req.session as any).refreshToken = refreshToken;
-    sessionData.refreshToken = refreshToken;
-
-    // Update last login time
-    user.update({ lastLoginAt: new Date() }).catch(console.error);
-  }
-
-  /**
-   * Get current session data
-   */
-  static getSession(req: Request): SessionData | null {
-    return (req.session as any).user || null;
-  }
-
   /**
    * Check if user is authenticated
    */
@@ -57,119 +25,326 @@ export class SessionService {
   }
 
   /**
-   * Check if user has specific permission
+   * Get session data
    */
-  static hasPermission(req: Request, permission: string): boolean {
-    const session = this.getSession(req);
-    if (!session) return false;
-    
-    return session.permissions.includes(permission) || 
-           session.permissions.includes('*'); // Super admin has all permissions
+  static getSession(req: Request): SessionData | null {
+    return (req.session as any)?.user || null;
   }
 
   /**
-   * Check if user has specific role
+   * Generate secure random token
    */
-  static hasRole(req: Request, roleName: string): boolean {
-    const session = this.getSession(req);
-    if (!session) return false;
-    
-    return session.roleName === roleName;
+  private static generateToken(length: number = 32): string {
+    return crypto.randomBytes(length).toString('hex');
   }
 
   /**
-   * Check if user has any of the specified roles
+   * Generate session ID
    */
-  static hasAnyRole(req: Request, roleNames: string[]): boolean {
-    const session = this.getSession(req);
-    if (!session) return false;
-    
-    return roleNames.includes(session.roleName);
+  private static generateSessionId(): string {
+    return crypto.randomUUID();
   }
 
   /**
-   * Update session activity timestamp
+   * Create new session with database tokens
+   */
+  static async createSession(
+    req: Request, 
+    user: User, 
+    role: Role, 
+    userAgent?: string, 
+    ipAddress?: string
+  ): Promise<SessionData> {
+    try {
+      const sessionId = this.generateSessionId();
+      const accessToken = this.generateToken(32);
+      const refreshToken = this.generateToken(48);
+
+      // Calculate expiration time (7 days for refresh token)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Create session in database
+      logger.info('Creating session in database', {
+        sessionId,
+        userId: user.id,
+        userAgent,
+        ipAddress,
+      });
+      
+      const dbSession = await Session.create({
+        sessionId,
+        userId: user.id,
+        accessToken,
+        refreshToken,
+        userAgent,
+        ipAddress,
+        expiresAt,
+        lastActivity: new Date(),
+      });
+      
+      logger.info('Session created successfully in database', {
+        sessionId: dbSession.sessionId,
+        userId: dbSession.userId,
+      });
+
+      // Create session data for express-session
+      const sessionData: SessionData = {
+        userId: user.id,
+        email: user.email,
+        role: role.name,
+        permissions: role.permissions,
+        loginTime: new Date(),
+        lastActivity: new Date(),
+        sessionId,
+        accessToken,
+        refreshToken,
+      };
+
+      // Store in express-session
+      if (req.session) {
+        (req.session as any).user = sessionData;
+      }
+
+      logger.info(`Session created for user: ${user.email}`, {
+        userId: user.id,
+        sessionId,
+        userAgent,
+        ipAddress,
+      });
+
+      return sessionData;
+    } catch (error) {
+      logger.error('Error creating session:', error);
+      throw new Error('Failed to create session');
+    }
+  }
+
+  /**
+   * Validate session from database
+   */
+  static async validateSession(req: Request): Promise<SessionData | null> {
+    try {
+      const sessionData = this.getSession(req);
+      if (!sessionData) return null;
+
+      // Find session in database
+      const dbSession = await Session.findOne({
+        where: {
+          sessionId: sessionData.sessionId,
+          isActive: true,
+        },
+        include: [
+          {
+            model: User,
+            include: [{ model: Role }],
+          },
+        ],
+      });
+
+      if (!dbSession || !dbSession.isActiveSession()) {
+        logger.warn('Invalid or expired session', {
+          sessionId: sessionData.sessionId,
+          userId: sessionData.userId,
+        });
+        return null;
+      }
+
+      // Verify access token matches
+      if (dbSession.accessToken !== sessionData.accessToken) {
+        logger.warn('Access token mismatch', {
+          sessionId: sessionData.sessionId,
+          userId: sessionData.userId,
+        });
+        return null;
+      }
+
+      // Update last activity
+      await dbSession.updateActivity();
+
+      // Update session data with fresh data
+      const updatedSessionData: SessionData = {
+        ...sessionData,
+        lastActivity: new Date(),
+        permissions: (dbSession as any).user.role.permissions,
+      };
+
+      if (req.session) {
+        (req.session as any).user = updatedSessionData;
+      }
+
+      return updatedSessionData;
+    } catch (error) {
+      logger.error('Error validating session:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Refresh access token
+   */
+  static async refreshAccessToken(req: Request): Promise<string | null> {
+    try {
+      const sessionData = this.getSession(req);
+      if (!sessionData) return null;
+
+      // Find session in database
+      const dbSession = await Session.findOne({
+        where: {
+          sessionId: sessionData.sessionId,
+          isActive: true,
+        },
+        include: [
+          {
+            model: User,
+            include: [{ model: Role }],
+          },
+        ],
+      });
+
+      if (!dbSession || !dbSession.isActiveSession()) {
+        return null;
+      }
+
+      // Verify refresh token matches
+      if (dbSession.refreshToken !== sessionData.refreshToken) {
+        logger.warn('Refresh token mismatch', {
+          sessionId: sessionData.sessionId,
+          userId: sessionData.userId,
+        });
+        return null;
+      }
+
+      // Generate new access token
+      const newAccessToken = this.generateToken(32);
+
+      // Update database session
+      await dbSession.update({
+        accessToken: newAccessToken,
+        lastActivity: new Date(),
+      });
+
+      // Update session data
+      const updatedSessionData: SessionData = {
+        ...sessionData,
+        accessToken: newAccessToken,
+        lastActivity: new Date(),
+        permissions: (dbSession as any).user.role.permissions,
+      };
+
+      if (req.session) {
+        (req.session as any).user = updatedSessionData;
+      }
+
+      logger.info('Access token refreshed', {
+        userId: sessionData.userId,
+        sessionId: sessionData.sessionId,
+      });
+
+      return newAccessToken;
+    } catch (error) {
+      logger.error('Error refreshing access token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Revoke session (logout)
+   */
+  static async revokeSession(req: Request): Promise<boolean> {
+    try {
+      const sessionData = this.getSession(req);
+      if (!sessionData) return true;
+
+      // Find and revoke session in database
+      const dbSession = await Session.findOne({
+        where: {
+          sessionId: sessionData.sessionId,
+        },
+      });
+
+      if (dbSession) {
+        await dbSession.revoke();
+        logger.info('Session revoked', {
+          userId: sessionData.userId,
+          sessionId: sessionData.sessionId,
+        });
+      }
+
+      // Destroy express session
+      this.destroySession(req);
+
+      return true;
+    } catch (error) {
+      logger.error('Error revoking session:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Revoke all sessions for a user
+   */
+  static async revokeAllUserSessions(userId: number): Promise<boolean> {
+    try {
+      await Session.update(
+        { isActive: false },
+        {
+          where: {
+            userId,
+            isActive: true,
+          },
+        }
+      );
+
+      logger.info('All sessions revoked for user', { userId });
+      return true;
+    } catch (error) {
+      logger.error('Error revoking all user sessions:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set session data
+   */
+  static setSession(req: Request, userData: SessionData): void {
+    if (req.session) {
+      (req.session as any).user = userData;
+    }
+  }
+
+  /**
+   * Update session activity
    */
   static updateActivity(req: Request): void {
-    if ((req.session as any).user) {
-      (req.session as any).user.lastActivity = new Date();
+    const session = this.getSession(req);
+    if (session) {
+      session.lastActivity = new Date();
+      this.setSession(req, session);
     }
   }
 
   /**
-   * Refresh session (generate new refresh token)
-   */
-  static refreshSession(req: Request): string | null {
-    if (!this.isAuthenticated(req)) {
-      return null;
-    }
-
-    const newRefreshToken = this.generateRefreshToken();
-    (req.session as any).refreshToken = newRefreshToken;
-    
-    if ((req.session as any).user) {
-      (req.session as any).user.refreshToken = newRefreshToken;
-    }
-
-    return newRefreshToken;
-  }
-
-  /**
-   * Destroy current session
+   * Destroy session
    */
   static destroySession(req: Request, callback?: (err?: any) => void): void {
-    req.session.destroy((err) => {
-      if (callback) {
-        callback(err);
-      }
-    });
-  }
-
-  /**
-   * Regenerate session ID (for security)
-   */
-  static regenerateSession(req: Request): Promise<void> {
-    return new Promise((resolve, reject) => {
-      req.session.regenerate((err) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-
-  /**
-   * Generate a secure refresh token
-   */
-  private static generateRefreshToken(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
-
-  /**
-   * Validate refresh token
-   */
-  static validateRefreshToken(req: Request, token: string): boolean {
-    return (req.session as any).refreshToken === token;
-  }
-
-  /**
-   * Get session info for debugging/monitoring
-   */
-  static getSessionInfo(req: Request): any {
-    if (!this.isAuthenticated(req)) {
-      return null;
+    if (req.session) {
+      req.session.destroy(callback || (() => {}));
+    } else if (callback) {
+      callback();
     }
+  }
 
+  /**
+   * Get session info for logging
+   */
+  static getSessionInfo(req: Request): { userId?: number; email?: string; role?: string; sessionId?: string } {
     const session = this.getSession(req);
     return {
       userId: session?.userId,
       email: session?.email,
-      role: session?.roleName,
-      loginTime: session?.loginTime,
-      lastActivity: session?.lastActivity,
-      sessionId: req.sessionID,
+      role: session?.role,
+      sessionId: session?.sessionId,
     };
   }
 
@@ -177,20 +352,82 @@ export class SessionService {
    * Check if session is expired
    */
   static isSessionExpired(req: Request): boolean {
-    if (!req.session.cookie || !req.session.cookie.expires) return true;
-    
+    const session = this.getSession(req);
+    if (!session) return true;
+
     const now = new Date();
-    const expires = new Date(req.session.cookie.expires);
-    
-    return now > expires;
+    const lastActivity = new Date(session.lastActivity);
+    const sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
+
+    return (now.getTime() - lastActivity.getTime()) > sessionTimeout;
   }
 
   /**
-   * Extend session expiration
+   * Check if user has specific role
    */
-  static extendSession(req: Request, maxAge: number = 24 * 60 * 60 * 1000): void {
-    if (req.session.cookie) {
-      req.session.cookie.maxAge = maxAge;
+  static hasRole(req: Request, roleName: string): boolean {
+    const session = this.getSession(req);
+    return session?.role === roleName;
+  }
+
+  /**
+   * Check if user has any of the specified roles
+   */
+  static hasAnyRole(req: Request, roleNames: string[]): boolean {
+    const session = this.getSession(req);
+    return session ? roleNames.includes(session.role) : false;
+  }
+
+  /**
+   * Check if user has specific permission
+   */
+  static hasPermission(req: Request, permission: string): boolean {
+    const session = this.getSession(req);
+    return session?.permissions?.includes(permission) || false;
+  }
+
+  /**
+   * Get user role
+   */
+  static getUserRole(req: Request): string | null {
+    const session = this.getSession(req);
+    return session?.role || null;
+  }
+
+  /**
+   * Get user permissions
+   */
+  static getUserPermissions(req: Request): string[] {
+    const session = this.getSession(req);
+    return session?.permissions || [];
+  }
+
+  /**
+   * Clean up expired sessions
+   */
+  static async cleanupExpiredSessions(): Promise<number> {
+    try {
+      const result = await Session.update(
+        { isActive: false },
+        {
+          where: {
+            isActive: true,
+            expiresAt: {
+              [require('sequelize').Op.lt]: new Date(),
+            },
+          },
+        }
+      );
+
+      const cleanedCount = result[0];
+      if (cleanedCount > 0) {
+        logger.info(`Cleaned up ${cleanedCount} expired sessions`);
+      }
+
+      return cleanedCount;
+    } catch (error) {
+      logger.error('Error cleaning up expired sessions:', error);
+      return 0;
     }
   }
 }

@@ -5,32 +5,39 @@ import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
 
 // Rate limiting configuration
+// More lenient for development, stricter for production
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 export const authRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs for auth endpoints
+  max: isDevelopment ? 50 : 5, // More lenient in development
   message: {
     error: 'Too many authentication attempts, please try again later.',
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for localhost in development
+  skip: (req) => isDevelopment && req.ip === '127.0.0.1',
 });
 
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: isDevelopment ? 1000 : 100, // Much more lenient in development
   message: {
     error: 'Too many requests, please try again later.',
   },
   standardHeaders: true,
   legacyHeaders: false,
+  // Skip rate limiting for localhost in development
+  skip: (req) => isDevelopment && req.ip === '127.0.0.1',
 });
 
 // Brute force protection for login attempts
 export const bruteForce = new ExpressBrute({
-  freeRetries: 3, // Number of attempts before rate limiting kicks in
-  minWait: 5 * 60 * 1000, // 5 minutes
-  maxWait: 15 * 60 * 1000, // 15 minutes
-  lifetime: 24 * 60 * 60 * 1000, // 24 hours
+  freeRetries: isDevelopment ? 20 : 3, // More attempts in development
+  minWait: isDevelopment ? 30 * 1000 : 5 * 60 * 1000, // 30 seconds in dev, 5 minutes in prod
+  maxWait: isDevelopment ? 2 * 60 * 1000 : 15 * 60 * 1000, // 2 minutes in dev, 15 minutes in prod
+  lifetime: isDevelopment ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000, // 1 hour in dev, 24 hours in prod
   refreshTimeoutOnRequest: false,
   skipFailedRequests: false,
   skipSuccessfulRequests: true,

@@ -1,6 +1,8 @@
 import { sequelize } from '../config/database';
 import { User, UserAttributes, UserCreationAttributes } from './userModel';
 import { Role, RoleAttributes, RoleCreationAttributes, ROLES, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from './roleModel';
+import { Session, SessionAttributes, SessionCreationAttributes } from './sessionModel';
+import { OAuthProvider, OAuthProviderAttributes, OAuthProviderCreationAttributes } from './oauthProviderModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -14,6 +16,30 @@ const setupAssociations = (): void => {
   Role.hasMany(User, {
     foreignKey: 'roleId',
     as: 'users',
+  });
+
+  // User has many Sessions
+  User.hasMany(Session, {
+    foreignKey: 'userId',
+    as: 'sessions',
+  });
+
+  // Session belongs to User
+  Session.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // User has many OAuth Providers
+  User.hasMany(OAuthProvider, {
+    foreignKey: 'userId',
+    as: 'oauthProviders',
+  });
+
+  // OAuth Provider belongs to User
+  OAuthProvider.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
   });
 };
 
@@ -32,12 +58,20 @@ export {
   ROLES,
   PERMISSIONS,
   DEFAULT_ROLE_PERMISSIONS,
+  Session,
+  SessionAttributes,
+  SessionCreationAttributes,
+  OAuthProvider,
+  OAuthProviderAttributes,
+  OAuthProviderCreationAttributes,
 };
 
 // Export all models for easy access
 export const models = {
   User,
   Role,
+  Session,
+  OAuthProvider,
 };
 
 // Database synchronization function

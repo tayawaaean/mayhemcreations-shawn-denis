@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   LayoutDashboard,
   Package,
@@ -94,6 +95,7 @@ const SellerSidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { state } = useAdmin()
+  const { logout } = useAdminAuth()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
   const unreadMessages = state.messages.filter(m => !m.isFromAdmin && !m.isRead).length
 
@@ -109,10 +111,17 @@ const SellerSidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     })
   }
 
-  const handleLogout = () => {
-    // Clear any seller session data if needed
-    // For now, just navigate to the public site
-    navigate('/')
+  const handleLogout = async () => {
+    try {
+      // Use secure logout that calls backend and clears all auth data
+      await logout()
+      // Navigate to the public site after successful logout
+      navigate('/')
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Still navigate even if logout fails
+      navigate('/')
+    }
   }
 
   return (
@@ -234,7 +243,7 @@ const SellerSidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">Seller Account</p>
-                <p className="text-xs text-gray-500">seller@mayhemcreations.com</p>
+                <p className="text-xs text-gray-500">seller@mayhemcreation.com</p>
               </div>
             </div>
 

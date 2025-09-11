@@ -11,9 +11,13 @@ import { securityHeaders, generalRateLimit, sanitizeInput } from './config/secur
 
 // Import routes
 import authRoute from './routes/authRoute';
+import userRoute from './routes/userRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
+
+// Import Swagger documentation
+import { setupSwagger } from './docs/swagger';
 
 // Import logger
 import { logger } from './utils/logger';
@@ -63,6 +67,38 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Server health check
+ *     description: Check if the server is running and healthy
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Server is running
+ *                     environment:
+ *                       type: string
+ *                       example: development
+ *             examples:
+ *               success:
+ *                 summary: Server healthy
+ *                 value:
+ *                   success: true
+ *                   message: Server is running
+ *                   timestamp: '2025-09-10T17:30:00.000Z'
+ *                   environment: development
+ */
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
@@ -73,8 +109,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Setup Swagger documentation
+setupSwagger(app);
+
 // API routes
 app.use('/api/v1/auth', authRoute);
+app.use('/api/v1/users', userRoute);
 
 // 404 handler
 app.use(notFound);
