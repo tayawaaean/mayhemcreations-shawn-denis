@@ -36,44 +36,44 @@ export default function Cart() {
   const total = subtotal + shipping + tax
 
   return (
-    <main className="py-8">
-      <div className="container">
-        <div className="mb-8">
-          <Link to="/products" className="inline-flex items-center text-accent hover:text-accent/80 transition-colors mb-4">
+    <main className="py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6 sm:mb-8">
+          <Link to="/products" className="inline-flex items-center text-accent hover:text-accent/80 transition-colors mb-4 text-sm sm:text-base">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Continue Shopping
           </Link>
-          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900">Shopping Cart</h1>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Shopping Cart</h1>
         </div>
 
         {items.length === 0 ? (
-          <div className="text-center py-16">
-            <ShoppingBag className="w-24 h-24 text-gray-300 mx-auto mb-6" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your cart is empty</h2>
-            <p className="text-gray-600 mb-8">Looks like you haven't added any items to your cart yet.</p>
+          <div className="text-center py-12 sm:py-16">
+            <ShoppingBag className="w-20 h-20 sm:w-24 sm:h-24 text-gray-300 mx-auto mb-4 sm:mb-6" />
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">Your cart is empty</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8 px-4">Looks like you haven't added any items to your cart yet.</p>
             <Link to="/products">
-              <Button size="lg">Start Shopping</Button>
+              <Button size="lg" className="w-full sm:w-auto">Start Shopping</Button>
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {enriched.map((item) => (
-                <div key={item.productId} className="card">
-                  <div className="flex items-center space-x-4 p-4">
+                <div key={item.productId} className="bg-white rounded-2xl shadow-sm border border-gray-200">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 p-4 sm:p-6">
                     <img 
                       src={item.product.image} 
                       alt={item.product.alt} 
-                      className="w-20 h-20 object-cover rounded-md" 
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md flex-shrink-0" 
                     />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{item.product.title}</h3>
-                      <p className="text-sm text-gray-600">{item.product.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{item.product.title}</h3>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">{item.product.description}</p>
                       
                       {item.customization && (
                         <div className="mt-2 space-y-1">
-                          <p className="text-sm font-medium text-accent">Customized Item</p>
+                          <p className="text-xs sm:text-sm font-medium text-accent">Customized Item</p>
                           {item.customization.design && (
                             <p className="text-xs text-gray-600">
                               Design: {item.customization.design.name}
@@ -85,10 +85,10 @@ export default function Cart() {
                         </div>
                       )}
                       
-                      <div className="text-lg font-bold text-gray-900 mt-1">
+                      <div className="text-base sm:text-lg font-bold text-gray-900 mt-2">
                         ${calculateItemPrice(item).toFixed(2)}
                         {item.customization && (
-                          <span className="text-sm font-normal text-gray-500 ml-1">
+                          <span className="text-xs sm:text-sm font-normal text-gray-500 ml-1">
                             (includes customization)
                           </span>
                         )}
@@ -96,22 +96,22 @@ export default function Cart() {
                     </div>
                     
                     {/* Quantity Controls */}
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
                       <div className="flex items-center border border-gray-300 rounded-md">
                         <button
                           onClick={() => update(item.productId, Math.max(1, item.quantity - 1))}
                           className="p-2 hover:bg-gray-50 transition-colors"
                         >
-                          <Minus className="w-4 h-4" />
+                          <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
-                        <span className="px-4 py-2 text-sm font-medium min-w-[3rem] text-center">
+                        <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => update(item.productId, item.quantity + 1)}
                           className="p-2 hover:bg-gray-50 transition-colors"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                       
@@ -149,11 +149,11 @@ export default function Cart() {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <div className="card sticky top-24">
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">Order Summary</h2>
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 sticky top-4 sm:top-24">
+                <div className="p-4 sm:p-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6">Order Summary</h2>
                   
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal</span>
                       <span className="font-medium">${subtotal.toFixed(2)}</span>
@@ -171,15 +171,15 @@ export default function Cart() {
                       <span className="font-medium">${tax.toFixed(2)}</span>
                     </div>
                     
-                    <div className="border-t border-gray-200 pt-4">
-                      <div className="flex justify-between text-lg font-semibold">
+                    <div className="border-t border-gray-200 pt-3 sm:pt-4">
+                      <div className="flex justify-between text-base sm:text-lg font-semibold">
                         <span>Total</span>
                         <span>${total.toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 space-y-3">
+                  <div className="mt-4 sm:mt-6 space-y-3">
                     <Button 
                       size="lg" 
                       className="w-full"
@@ -189,15 +189,15 @@ export default function Cart() {
                     </Button>
                     
                     <div className="text-center">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-xs sm:text-sm text-gray-600">
                         {shipping === 0 ? 'You qualify for free shipping!' : `Add $${(50 - subtotal).toFixed(2)} more for free shipping`}
                       </span>
                     </div>
                   </div>
 
                   {/* Security Badges */}
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="flex items-center justify-center space-x-4 text-xs text-gray-500">
+                  <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+                    <div className="flex items-center justify-center space-x-3 sm:space-x-4 text-xs text-gray-500">
                       <div className="flex items-center space-x-1">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                         <span>Secure Checkout</span>
@@ -217,59 +217,59 @@ export default function Cart() {
 
       {/* Order Details Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                  <CheckCircle className="w-6 h-6 mr-2 text-accent" />
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-accent" />
                   Order Details
                 </h2>
                 <button
                   onClick={() => setSelectedItem(null)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
               </div>
               
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Product Info */}
-                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex flex-col sm:flex-row items-start space-y-3 sm:space-y-0 sm:space-x-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <img
                     src={selectedItem.product.image}
                     alt={selectedItem.product.title}
-                    className="w-20 h-20 object-cover rounded-lg"
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0"
                   />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">{selectedItem.product.title}</h3>
-                    <p className="text-gray-600">{selectedItem.product.description}</p>
-                    <p className="text-sm text-gray-500 mt-1">Quantity: {selectedItem.quantity}</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">{selectedItem.product.title}</h3>
+                    <p className="text-sm text-gray-600 mt-1">{selectedItem.product.description}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">Quantity: {selectedItem.quantity}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-gray-900">
+                  <div className="text-left sm:text-right">
+                    <p className="text-lg sm:text-xl font-bold text-gray-900">
                       ${calculateItemPrice(selectedItem).toFixed(2)}
                     </p>
-                    <p className="text-sm text-gray-500">per item</p>
+                    <p className="text-xs sm:text-sm text-gray-500">per item</p>
                   </div>
                 </div>
 
                 {/* Design Upload */}
                 {selectedItem.customization?.design && (
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <div className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center text-sm sm:text-base">
                       <span className="w-2 h-2 bg-accent rounded-full mr-2"></span>
                       Uploaded Design
                     </h4>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3 sm:space-x-4">
                       <img
                         src={selectedItem.customization.design.preview}
                         alt="Design preview"
-                        className="w-16 h-16 object-contain border border-gray-200 rounded-lg"
+                        className="w-12 h-12 sm:w-16 sm:h-16 object-contain border border-gray-200 rounded-lg flex-shrink-0"
                       />
-                      <div>
-                        <p className="font-medium text-gray-900">{selectedItem.customization.design.name}</p>
-                        <p className="text-sm text-gray-600">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{selectedItem.customization.design.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">
                           {(selectedItem.customization.design.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -279,48 +279,48 @@ export default function Cart() {
 
                 {/* Customization Details */}
                 {selectedItem.customization && (
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-gray-900 flex items-center">
+                  <div className="space-y-3 sm:space-y-4">
+                    <h4 className="font-semibold text-gray-900 flex items-center text-sm sm:text-base">
                       <span className="w-2 h-2 bg-accent rounded-full mr-2"></span>
                       Customization Options
                     </h4>
                     
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       {/* Basic Info */}
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Placement:</span>
                           <span className="font-medium capitalize">{selectedItem.customization.placement.replace('-', ' ')}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Size:</span>
                           <span className="font-medium capitalize">{selectedItem.customization.size}</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Color:</span>
                           <span className="font-medium">{selectedItem.customization.color}</span>
                         </div>
                         {selectedItem.customization.notes && (
-                          <div className="flex justify-between">
+                          <div className="flex justify-between text-sm">
                             <span className="text-gray-600">Notes:</span>
-                            <span className="font-medium text-right max-w-48">{selectedItem.customization.notes}</span>
+                            <span className="font-medium text-right max-w-32 sm:max-w-48 text-xs sm:text-sm">{selectedItem.customization.notes}</span>
                           </div>
                         )}
                       </div>
 
                       {/* Design Position */}
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Design Scale:</span>
                           <span className="font-medium">{Math.round(selectedItem.customization.designScale * 100)}%</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Rotation:</span>
                           <span className="font-medium">{selectedItem.customization.designRotation}°</span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Position:</span>
-                          <span className="font-medium">
+                          <span className="font-medium text-xs sm:text-sm">
                             X: {Math.round(selectedItem.customization.designPosition.x)}, 
                             Y: {Math.round(selectedItem.customization.designPosition.y)}
                           </span>
@@ -329,8 +329,8 @@ export default function Cart() {
                     </div>
 
                     {/* Selected Styles */}
-                    <div className="space-y-4">
-                      <h5 className="font-medium text-gray-900">Selected Styles & Pricing</h5>
+                    <div className="space-y-3 sm:space-y-4">
+                      <h5 className="font-medium text-gray-900 text-sm sm:text-base">Selected Styles & Pricing</h5>
                       
                       <div className="space-y-3">
                         {/* Coverage */}
@@ -466,10 +466,10 @@ export default function Cart() {
                 </div>
               </div>
               
-              <div className="mt-6 flex justify-end">
+              <div className="mt-4 sm:mt-6 flex justify-end">
                 <Button
                   onClick={() => setSelectedItem(null)}
-                  className="px-6"
+                  className="px-4 sm:px-6 w-full sm:w-auto"
                 >
                   Close
                 </Button>

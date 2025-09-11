@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
+import ChatWidget from '../components/ChatWidget'
 
 export default function Customize() {
   const { id } = useParams()
@@ -79,30 +80,39 @@ export default function Customize() {
     }
   }
 
-  const handleDesignMouseDown = (e: React.MouseEvent) => {
+  const handleDesignStart = (e: React.MouseEvent | React.TouchEvent) => {
     // Only allow dragging in manual mode
     if (customizationData.placement !== 'manual') return
     
+    e.preventDefault()
     setIsDragging(true)
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
     setDragStart({
-      x: e.clientX - customizationData.designPosition.x,
-      y: e.clientY - customizationData.designPosition.y
+      x: clientX - customizationData.designPosition.x,
+      y: clientY - customizationData.designPosition.y
     })
     setDragPosition(customizationData.designPosition)
   }
 
-  const handleDesignMouseMove = (e: React.MouseEvent) => {
+  const handleDesignMove = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDragging || !productRef.current) return
 
+    e.preventDefault()
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
     const rect = productRef.current.getBoundingClientRect()
-    const newX = Math.max(0, Math.min(rect.width - 100, e.clientX - dragStart.x))
-    const newY = Math.max(0, Math.min(rect.height - 100, e.clientY - dragStart.y))
+    const newX = Math.max(0, Math.min(rect.width - 100, clientX - dragStart.x))
+    const newY = Math.max(0, Math.min(rect.height - 100, clientY - dragStart.y))
 
     // Update local state for immediate visual feedback
     setDragPosition({ x: newX, y: newY })
   }
 
-  const handleDesignMouseUp = () => {
+  const handleDesignEnd = () => {
     setIsDragging(false)
     // Update the actual customization data when dragging ends
     setCustomizationData({
@@ -157,7 +167,7 @@ export default function Customize() {
         if (product.category !== 'apparel' || product.subcategory === 'cap') {
           return true
         }
-        return customizationData.color !== '' && customizationData.size !== '' && customizationData.size !== 'small'
+        return customizationData.color !== '' && customizationData.size !== '' && customizationData.size !== 's'
       case 2:
         return customizationData.design !== null
       case 3:
@@ -193,6 +203,32 @@ export default function Customize() {
     }
   }, [customizationData.placement])
 
+  // Add global touch event listeners for mobile dragging
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (isDragging) {
+        e.preventDefault()
+        handleDesignMove(e as any)
+      }
+    }
+
+    const handleGlobalTouchEnd = () => {
+      if (isDragging) {
+        handleDesignEnd()
+      }
+    }
+
+    if (isDragging) {
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
+      document.addEventListener('touchend', handleGlobalTouchEnd)
+    }
+
+    return () => {
+      document.removeEventListener('touchmove', handleGlobalTouchMove)
+      document.removeEventListener('touchend', handleGlobalTouchEnd)
+    }
+  }, [isDragging, dragStart, dragPosition])
+
   const handleCheckout = () => {
     if (!product) return
     
@@ -227,64 +263,96 @@ export default function Customize() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">
             <Button
               variant="outline"
               onClick={() => navigate('/products')}
-              className="flex items-center"
+              className="flex items-center text-sm sm:text-base"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Products
+              <span className="hidden sm:inline">Back to Products</span>
+              <span className="sm:hidden">Back</span>
             </Button>
             <div className="flex-1"></div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Customize Your {product.title}</h1>
-          <p className="text-gray-600">Create your perfect embroidered design</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Customize Your {product.title}</h1>
+          <p className="text-sm sm:text-base text-gray-600">Create your perfect embroidered design</p>
         </div>
 
         {/* Progress Steps */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  currentStep >= step.number
-                    ? 'bg-accent text-white'
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
-                </div>
-                <div className="ml-3">
-                  <p className={`text-sm font-medium ${
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
+          {/* Mobile Progress - Horizontal Scroll */}
+          <div className="block sm:hidden">
+            <div className="flex items-center space-x-4 overflow-x-auto pb-2">
+              {steps.map((step, index) => (
+                <div key={step.number} className="flex-shrink-0 text-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold mx-auto mb-2 ${
+                    currentStep >= step.number
+                      ? 'bg-accent text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {currentStep > step.number ? <Check className="w-4 h-4" /> : step.number}
+                  </div>
+                  <p className={`text-xs font-medium ${
                     currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
                   }`}>
                     {step.title}
                   </p>
-                  <p className="text-xs text-gray-500">{step.description}</p>
                 </div>
-                {index < steps.length - 1 && (
-                  <div className={`w-16 h-0.5 mx-4 ${
-                    currentStep > step.number ? 'bg-accent' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
+              <div 
+                className="bg-accent h-2 rounded-full transition-all duration-300"
+                style={{ width: `${getStepProgress()}%` }}
+              />
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-accent h-2 rounded-full transition-all duration-300"
-              style={{ width: `${getStepProgress()}%` }}
-            />
+
+          {/* Desktop Progress - Full Layout */}
+          <div className="hidden sm:block">
+            <div className="flex items-center justify-between mb-4">
+              {steps.map((step, index) => (
+                <div key={step.number} className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    currentStep >= step.number
+                      ? 'bg-accent text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
+                  </div>
+                  <div className="ml-3">
+                    <p className={`text-sm font-medium ${
+                      currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
+                    }`}>
+                      {step.title}
+                    </p>
+                    <p className="text-xs text-gray-500">{step.description}</p>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`w-16 h-0.5 mx-4 ${
+                      currentStep > step.number ? 'bg-accent' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-accent h-2 rounded-full transition-all duration-300"
+                style={{ width: `${getStepProgress()}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Left Side - Product Preview */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Preview</h3>
               
               {/* Product Image with Design Overlay */}
@@ -292,7 +360,7 @@ export default function Customize() {
                 <img
                   src={product.image}
                   alt={product.title}
-                  className="w-full h-96 object-cover rounded-lg"
+                  className="w-full h-64 sm:h-80 lg:h-96 object-cover rounded-lg"
                 />
                  {customizationData.design && (
                    <div
@@ -309,10 +377,13 @@ export default function Customize() {
                        transform: `scale(${customizationData.designScale}) rotate(${customizationData.designRotation}deg)`,
                        transformOrigin: 'center'
                      }}
-                     onMouseDown={handleDesignMouseDown}
-                     onMouseMove={handleDesignMouseMove}
-                     onMouseUp={handleDesignMouseUp}
-                     onMouseLeave={handleDesignMouseUp}
+                     onMouseDown={handleDesignStart}
+                     onMouseMove={handleDesignMove}
+                     onMouseUp={handleDesignEnd}
+                     onMouseLeave={handleDesignEnd}
+                     onTouchStart={handleDesignStart}
+                     onTouchMove={handleDesignMove}
+                     onTouchEnd={handleDesignEnd}
                      onWheel={handleDesignWheel}
                    >
                      {/* Design Image with Enhanced Styling */}
@@ -404,7 +475,7 @@ export default function Customize() {
               {customizationData.design && (
                 <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
                   {customizationData.placement === 'manual' ? (
-                    <div className="flex items-center justify-center space-x-6 text-sm text-gray-600">
+                    <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-gray-600">
                       <div className="flex items-center space-x-1">
                         <Grip className="w-4 h-4 text-accent" />
                         <span>Drag handle to move</span>
@@ -420,6 +491,9 @@ export default function Customize() {
                           <span className="text-white text-xs">↻</span>
                         </div>
                         <span>Ctrl+scroll to rotate</span>
+                      </div>
+                      <div className="block sm:hidden text-xs text-accent font-medium">
+                        💡 Touch and drag on mobile
                       </div>
                     </div>
                   ) : (
@@ -437,7 +511,7 @@ export default function Customize() {
 
               {/* Design Controls */}
               {customizationData.design && currentStep === 3 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Design Controls</h3>
                 <div className="space-y-4">
                   <div>
@@ -451,7 +525,7 @@ export default function Customize() {
                       step="0.1"
                       value={customizationData.designScale}
                       onChange={(e) => setCustomizationData({ designScale: parseFloat(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
                   <div>
@@ -465,10 +539,10 @@ export default function Customize() {
                       step="15"
                       value={customizationData.designRotation}
                       onChange={(e) => setCustomizationData({ designRotation: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -477,6 +551,7 @@ export default function Customize() {
                         designScale: 1,
                         designRotation: 0
                       })}
+                      className="w-full sm:w-auto"
                     >
                       <RotateCcw className="w-4 h-4 mr-1" />
                       Reset Position
@@ -488,23 +563,23 @@ export default function Customize() {
           </div>
 
           {/* Right Side - Customization Options */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
              {/* Step 1: Choose Color & Size */}
              {currentStep === 1 && product.category === 'apparel' && product.subcategory !== 'cap' && (
-               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Choose Color & Size</h3>
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                 <h3 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Choose Color & Size</h3>
                  
-                 <div className="space-y-8">
+                 <div className="space-y-6 sm:space-y-8">
                    {/* Color Selection */}
                    {product.availableColors && product.availableColors.length > 0 && (
                      <div>
                        <h4 className="text-md font-medium text-gray-900 mb-4">Select Color</h4>
-                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                          {product.availableColors.map((color) => (
                            <button
                              key={color}
                              onClick={() => setCustomizationData({ color })}
-                             className={`p-3 rounded-lg border-2 transition-all ${
+                             className={`p-2 sm:p-3 rounded-lg border-2 transition-all ${
                                customizationData.color === color
                                  ? 'border-accent bg-accent/10 text-accent'
                                  : 'border-gray-200 hover:border-gray-300 text-gray-700'
@@ -512,7 +587,7 @@ export default function Customize() {
                            >
                              <div className="flex items-center space-x-2">
                                <div 
-                                 className="w-4 h-4 rounded-full border border-gray-300"
+                                 className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border border-gray-300"
                                  style={{ 
                                    backgroundColor: color.toLowerCase().includes('white') ? '#ffffff' :
                                                    color.toLowerCase().includes('black') ? '#000000' :
@@ -527,7 +602,7 @@ export default function Customize() {
                                                    '#6b7280'
                                  }}
                                ></div>
-                               <span className="text-sm font-medium">{color}</span>
+                               <span className="text-xs sm:text-sm font-medium">{color}</span>
                              </div>
                            </button>
                          ))}
@@ -539,18 +614,18 @@ export default function Customize() {
                    {product.availableSizes && product.availableSizes.length > 0 && (
                      <div>
                        <h4 className="text-md font-medium text-gray-900 mb-4">Select Size</h4>
-                       <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
                          {product.availableSizes.map((size) => (
                            <button
                              key={size}
                              onClick={() => setCustomizationData({ size: size.toLowerCase() as 'small' | 'medium' | 'large' | 'extra-large' })}
-                             className={`p-3 rounded-lg border-2 transition-all text-center ${
+                             className={`p-2 sm:p-3 rounded-lg border-2 transition-all text-center ${
                                customizationData.size === size.toLowerCase()
                                  ? 'border-accent bg-accent text-white'
                                  : 'border-gray-200 hover:border-gray-300 text-gray-700'
                              }`}
                            >
-                             <span className="text-sm font-medium">{size}</span>
+                             <span className="text-xs sm:text-sm font-medium">{size}</span>
                            </button>
                          ))}
                        </div>
@@ -558,9 +633,9 @@ export default function Customize() {
                    )}
 
                    {/* Size Guide */}
-                   <div className="bg-gray-50 rounded-lg p-4">
-                     <h5 className="font-medium text-gray-900 mb-2">Size Guide</h5>
-                     <div className="text-sm text-gray-600 space-y-1">
+                   <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                     <h5 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Size Guide</h5>
+                     <div className="text-xs sm:text-sm text-gray-600 space-y-1">
                        <p><strong>XS:</strong> Chest 32-34" | Length 26"</p>
                        <p><strong>S:</strong> Chest 34-36" | Length 27"</p>
                        <p><strong>M:</strong> Chest 36-38" | Length 28"</p>
@@ -571,11 +646,11 @@ export default function Customize() {
                    </div>
                  </div>
 
-                 <div className="mt-6 flex justify-between">
-                   <Button variant="outline" onClick={prevStep}>
+                 <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                   <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
                    </Button>
-                   <Button onClick={nextStep} disabled={!canProceed()}>
+                   <Button onClick={nextStep} disabled={!canProceed()} className="w-full sm:w-auto">
                      Continue
                      <ArrowRight className="w-4 h-4 ml-2" />
                    </Button>
@@ -585,17 +660,17 @@ export default function Customize() {
 
              {/* Step 1: Skip Color & Size for Caps */}
              {currentStep === 1 && (product.category !== 'apparel' || product.subcategory === 'cap') && (
-               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h3>
-                 <p className="text-gray-600 mb-6">
+                 <p className="text-sm sm:text-base text-gray-600 mb-6">
                    This product doesn't require color or size selection. You can proceed to upload your design.
                  </p>
                  
-                 <div className="mt-6 flex justify-between">
-                   <Button variant="outline" onClick={prevStep}>
+                 <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                   <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
                    </Button>
-                   <Button onClick={nextStep}>
+                   <Button onClick={nextStep} className="w-full sm:w-auto">
                      Continue
                      <ArrowRight className="w-4 h-4 ml-2" />
                    </Button>
@@ -605,14 +680,14 @@ export default function Customize() {
 
              {/* Step 2: Upload Design */}
              {currentStep === 2 && (
-               <div className="space-y-6">
+               <div className="space-y-4 sm:space-y-6">
                  {/* Upload Section */}
-                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                   <div className="flex items-center justify-between mb-4">
+                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
                      <h3 className="text-lg font-semibold text-gray-900">Upload Your Design</h3>
                      <button
                        onClick={() => setShowGuidelines(true)}
-                       className="flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium"
+                       className="flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium self-start sm:self-auto"
                      >
                        <Info className="w-4 h-4 mr-1" />
                        Design Guidelines
@@ -621,7 +696,7 @@ export default function Customize() {
                 
                 {!customizationData.design ? (
                   <div
-                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-colors ${
                       dragActive ? 'border-accent bg-accent/5' : 'border-gray-300'
                     }`}
                     onDragEnter={handleDrag}
@@ -629,11 +704,11 @@ export default function Customize() {
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
                   >
-                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-lg font-medium text-gray-900 mb-2">
+                    <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-base sm:text-lg font-medium text-gray-900 mb-2">
                       Drag and drop your design here
                     </p>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-sm sm:text-base text-gray-600 mb-4">
                       or click to browse files
                     </p>
                     <input
@@ -655,15 +730,15 @@ export default function Customize() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                       <img
                         src={customizationData.design.preview}
                         alt="Design preview"
-                        className="w-16 h-16 object-cover rounded"
+                        className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded"
                       />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{customizationData.design.name}</p>
-                        <p className="text-sm text-gray-600">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{customizationData.design.name}</p>
+                        <p className="text-xs sm:text-sm text-gray-600">
                           {(customizationData.design.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
@@ -671,10 +746,10 @@ export default function Customize() {
                         onClick={removeDesign}
                         className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
-                     <div className="flex space-x-2">
+                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                        <Button
                          variant="outline"
                          onClick={() => {
@@ -684,12 +759,14 @@ export default function Customize() {
                              input.click()
                            }
                          }}
+                         className="w-full sm:w-auto"
                        >
                          Replace Design
                        </Button>
                        <Button
                          onClick={nextStep}
                          disabled={!canProceed()}
+                         className="w-full sm:w-auto"
                        >
                          Continue
                          <ArrowRight className="w-4 h-4 ml-2" />
@@ -703,16 +780,16 @@ export default function Customize() {
 
               {/* Step 3: Customize Position */}
               {currentStep === 3 && (
-               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Customize Your Design</h3>
+               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                 <h3 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Customize Your Design</h3>
                  
-                 <div className="space-y-6">
+                 <div className="space-y-4 sm:space-y-6">
                    {/* Placement Selection */}
                    <div>
                      <h4 className="text-md font-medium text-gray-900 mb-4">Choose Placement</h4>
                      <p className="text-sm text-gray-600 mb-4">Select automatic positioning or choose manual for custom placement</p>
                      
-                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                        {[
                          { value: 'front', label: 'Front Center', description: 'Center of the chest' },
                          { value: 'back', label: 'Back Center', description: 'Center of the back' },
@@ -723,7 +800,7 @@ export default function Customize() {
                        ].map((option) => (
                          <div
                            key={option.value}
-                           className={`border-2 rounded-lg p-4 cursor-pointer transition-all relative ${
+                           className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all relative ${
                              customizationData.placement === option.value
                                ? 'border-accent bg-accent/5'
                                : 'border-gray-200 hover:border-gray-300'
@@ -731,19 +808,19 @@ export default function Customize() {
                            onClick={() => setCustomizationData({ placement: option.value as any })}
                          >
                            <div className="text-center">
-                             <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
                                {option.value === 'manual' ? (
-                                 <Move className="w-8 h-8 text-gray-400" />
+                                 <Move className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                                ) : (
-                                 <div className="w-8 h-8 bg-gray-300 rounded"></div>
+                                 <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-300 rounded"></div>
                                )}
                              </div>
-                             <h4 className="font-semibold text-gray-900 mb-1">{option.label}</h4>
-                             <p className="text-sm text-gray-600">{option.description}</p>
+                             <h4 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">{option.label}</h4>
+                             <p className="text-xs sm:text-sm text-gray-600">{option.description}</p>
                            </div>
                            {customizationData.placement === option.value && (
-                             <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center">
-                               <Check className="w-4 h-4 text-white" />
+                             <div className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 bg-accent rounded-full flex items-center justify-center">
+                               <Check className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                              </div>
                            )}
                          </div>
@@ -752,7 +829,7 @@ export default function Customize() {
                    </div>
 
                    {/* Quantity and Notes */}
-                   <div className="grid md:grid-cols-2 gap-4">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                      <div>
                        <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
                        <input
@@ -778,11 +855,11 @@ export default function Customize() {
                    </div>
                  </div>
 
-                 <div className="mt-6 flex justify-between">
-                   <Button variant="outline" onClick={prevStep}>
+                 <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                   <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
                    </Button>
-                   <Button onClick={nextStep} disabled={!canProceed()}>
+                   <Button onClick={nextStep} disabled={!canProceed()} className="w-full sm:w-auto">
                      Continue
                      <ArrowRight className="w-4 h-4 ml-2" />
                    </Button>
@@ -800,29 +877,29 @@ export default function Customize() {
 
               {/* Step 5: Review */}
              {currentStep === 5 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Your Order</h3>
                 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Base Price</span>
-                    <span className="font-semibold">${customizationData.basePrice.toFixed(2)}</span>
+                    <span className="text-sm sm:text-base text-gray-600">Base Price</span>
+                    <span className="font-semibold text-sm sm:text-base">${customizationData.basePrice.toFixed(2)}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Color</span>
-                    <span className="font-semibold capitalize">{customizationData.color}</span>
+                    <span className="text-sm sm:text-base text-gray-600">Color</span>
+                    <span className="font-semibold text-sm sm:text-base capitalize">{customizationData.color}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Size</span>
-                    <span className="font-semibold uppercase">{customizationData.size}</span>
+                    <span className="text-sm sm:text-base text-gray-600">Size</span>
+                    <span className="font-semibold text-sm sm:text-base uppercase">{customizationData.size}</span>
                   </div>
                   
                   {customizationData.selectedStyles.coverage && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">{customizationData.selectedStyles.coverage.name}</span>
-                      <span className="font-semibold">
+                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.coverage.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">
                         {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.coverage.price.toFixed(2)}`}
                       </span>
                     </div>
@@ -830,8 +907,8 @@ export default function Customize() {
                   
                   {customizationData.selectedStyles.material && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">{customizationData.selectedStyles.material.name}</span>
-                      <span className="font-semibold">
+                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.material.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">
                         {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.material.price.toFixed(2)}`}
                       </span>
                     </div>
@@ -839,31 +916,31 @@ export default function Customize() {
                   
                   {customizationData.selectedStyles.border && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">{customizationData.selectedStyles.border.name}</span>
-                      <span className="font-semibold">
+                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.border.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">
                         {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.border.price.toFixed(2)}`}
                       </span>
                     </div>
                   )}
                   
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Placement</span>
-                    <span className="font-semibold capitalize">
+                    <span className="text-sm sm:text-base text-gray-600">Placement</span>
+                    <span className="font-semibold text-sm sm:text-base capitalize">
                       {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
                     </span>
                   </div>
                   
                   {customizationData.selectedStyles.threads.map((thread) => (
                     <div key={thread.id} className="flex items-center justify-between">
-                      <span className="text-gray-600">{thread.name}</span>
-                      <span className="font-semibold">+${thread.price.toFixed(2)}</span>
+                      <span className="text-sm sm:text-base text-gray-600">{thread.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">+${thread.price.toFixed(2)}</span>
                     </div>
                   ))}
                   
                   {customizationData.selectedStyles.backing && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">{customizationData.selectedStyles.backing.name}</span>
-                      <span className="font-semibold">
+                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.backing.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">
                         {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.backing.price.toFixed(2)}`}
                       </span>
                     </div>
@@ -871,33 +948,33 @@ export default function Customize() {
                   
                   {customizationData.selectedStyles.upgrades.map((upgrade) => (
                     <div key={upgrade.id} className="flex items-center justify-between">
-                      <span className="text-gray-600">{upgrade.name}</span>
-                      <span className="font-semibold">+${upgrade.price.toFixed(2)}</span>
+                      <span className="text-sm sm:text-base text-gray-600">{upgrade.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">+${upgrade.price.toFixed(2)}</span>
                     </div>
                   ))}
                   
                   {customizationData.selectedStyles.cutting && (
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">{customizationData.selectedStyles.cutting.name}</span>
-                      <span className="font-semibold">
+                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.cutting.name}</span>
+                      <span className="font-semibold text-sm sm:text-base">
                         {customizationData.selectedStyles.cutting.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.cutting.price.toFixed(2)}`}
                       </span>
                     </div>
                   )}
                   
                   <div className="border-t pt-4">
-                    <div className="flex items-center justify-between text-lg font-bold">
+                    <div className="flex items-center justify-between text-base sm:text-lg font-bold">
                       <span>Total</span>
                       <span>${calculateTotalPrice().toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 flex justify-between">
-                  <Button variant="outline" onClick={prevStep}>
+                <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                  <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                     Previous
                   </Button>
-                  <Button variant="add-to-cart" onClick={handleCheckout}>
+                  <Button variant="add-to-cart" onClick={handleCheckout} className="w-full sm:w-auto">
                     <ShoppingCart className="w-4 h-4 mr-2" />
                     Proceed to Checkout
                   </Button>
@@ -906,6 +983,11 @@ export default function Customize() {
             )}
 
           </div>
+        </div>
+
+        {/* Chat Widget - Positioned within responsive container */}
+        <div className="fixed bottom-4 right-4 lg:bottom-6 lg:right-6 z-40">
+          <ChatWidget />
         </div>
       </div>
 

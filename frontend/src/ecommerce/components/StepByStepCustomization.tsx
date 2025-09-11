@@ -127,10 +127,11 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
             })}
           </div>
 
-          <div className="mt-8 flex justify-between">
+          <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
             <Button
               variant="outline"
               onClick={() => setShowReview(false)}
+              className="w-full sm:w-auto"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Edit
@@ -138,6 +139,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
             <Button
               variant="add-to-cart"
               onClick={onComplete}
+              className="w-full sm:w-auto"
             >
               Review my Order
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -217,26 +219,29 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
         </div>
 
         {/* Navigation */}
-        <div className="mt-8 flex justify-between">
+        <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
           <Button
             variant="outline"
             onClick={prevStep}
             disabled={currentStep === 0 && !onBackToDesign}
+            className="w-full sm:w-auto"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Previous
           </Button>
 
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
             <Button
               variant="outline"
               onClick={() => setShowReview(true)}
+              className="w-full sm:w-auto"
             >
               Review All
             </Button>
             <Button
               onClick={nextStep}
               disabled={!canProceed()}
+              className="w-full sm:w-auto"
             >
               {currentStep === stepCategories.length - 1 ? 'Review' : 'Next'}
               <ArrowRight className="w-4 h-4 ml-2" />
