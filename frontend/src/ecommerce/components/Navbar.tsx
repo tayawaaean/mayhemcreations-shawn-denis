@@ -4,6 +4,7 @@ import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, 
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from '../../components/AuthModal'
+import { categoryApiService, Category } from '../../shared/categoryApiService'
 
 const NavItem: React.FC<{ to: string; children: React.ReactNode; onClick?: () => void }> = ({ to, children, onClick }) => (
   <NavLink
@@ -38,39 +39,62 @@ const MobileNavItem: React.FC<{ to: string; children: React.ReactNode; onClick?:
 )
 
 const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const categories = [
-    {
-      name: 'All Products',
-      href: '/products',
-      description: 'Browse our complete collection',
-      subcategories: []
-    },
-    {
-      name: 'Apparel',
-      href: '/products?category=apparel',
-      description: 'Tees, hoodies, and clothing',
-      subcategories: [
-        { name: 'T-Shirts', href: '/products?category=apparel&subcategory=tshirt' },
-        { name: 'Polo Shirts', href: '/products?category=apparel&subcategory=poloshirt' },
-        { name: 'Hoodies', href: '/products?category=apparel&subcategory=hoodie' }
-      ]
-    },
-    {
-      name: 'Accessories',
-      href: '/products?category=accessories',
-      description: 'Caps, bags, and more',
-      subcategories: [
-        { name: 'Caps', href: '/products?category=accessories&subcategory=cap' },
-        { name: 'Bags', href: '/products?category=accessories&subcategory=bag' }
-      ]
-    },
-    {
-      name: 'Embroidery',
-      href: '/products?category=embroidery',
-      description: 'Patches and custom work',
-      subcategories: []
+  const [categories, setCategories] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryApiService.getCategories({
+          includeChildren: true,
+          status: 'active',
+          sortBy: 'sortOrder',
+          sortOrder: 'ASC'
+        })
+        
+        // Transform database categories to navbar format
+        const transformedCategories = [
+          {
+            name: 'All Products',
+            href: '/products',
+            description: 'Browse our complete collection',
+            subcategories: []
+          },
+          ...response.data.map((category: Category) => ({
+            name: category.name,
+            href: `/products?category=${category.slug}`,
+            description: category.description || '',
+            subcategories: category.children?.map((child: Category) => ({
+              name: child.name,
+              href: `/products?category=${category.slug}&subcategory=${child.slug}`
+            })) || []
+          }))
+        ]
+        setCategories(transformedCategories)
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        // Fallback to empty array if API fails
+        setCategories([{
+          name: 'All Products',
+          href: '/products',
+          description: 'Browse our complete collection',
+          subcategories: []
+        }])
+      } finally {
+        setLoading(false)
+      }
     }
-  ]
+
+    fetchCategories()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="px-4 py-3 text-gray-500">
+        Loading categories...
+      </div>
+    )
+  }
 
   return (
     <>
@@ -88,7 +112,7 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {/* Subcategories */}
           {category.subcategories.length > 0 && (
             <div className="ml-4 border-l border-gray-200 pl-2">
-              {category.subcategories.map((subcategory) => (
+              {category.subcategories.map((subcategory: any) => (
                 <Link
                   key={subcategory.name}
                   to={subcategory.href}
@@ -106,6 +130,102 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   )
 }
 
+const MobileCategorySection: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [categories, setCategories] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({})
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryApiService.getCategories({
+          includeChildren: true,
+          status: 'active',
+          sortBy: 'sortOrder',
+          sortOrder: 'ASC'
+        })
+        
+        // Transform database categories to mobile navbar format
+        const transformedCategories = response.data.map((category: Category) => ({
+          name: category.name,
+          slug: category.slug,
+          href: `/products?category=${category.slug}`,
+          subcategories: category.children?.map((child: Category) => ({
+            name: child.name,
+            href: `/products?category=${category.slug}&subcategory=${child.slug}`
+          })) || []
+        }))
+        setCategories(transformedCategories)
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        setCategories([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCategories()
+  }, [])
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+
+  if (loading) {
+    return (
+      <div className="px-4 py-3 text-gray-500">
+        Loading categories...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1">
+      <MobileNavItem to="/products" onClick={onClose}>
+        <div className="flex items-center space-x-3">
+          <Package className="w-4 h-4 text-gray-500" />
+          <span>All Products</span>
+        </div>
+      </MobileNavItem>
+
+      {categories.map((category) => (
+        <div key={category.slug} className="space-y-1">
+          <button
+            onClick={() => toggleSection(category.slug)}
+            className="flex items-center justify-between w-full px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+          >
+            <div className="flex items-center space-x-3">
+              <Shirt className="w-4 h-4 text-gray-500" />
+              <span>{category.name}</span>
+            </div>
+            {expandedSections[category.slug] ? (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            )}
+          </button>
+
+          {expandedSections[category.slug] && category.subcategories.length > 0 && (
+            <div className="ml-6 space-y-1 pl-3">
+              {category.subcategories.map((subcategory: any) => (
+                <MobileNavItem key={subcategory.name} to={subcategory.href} onClick={onClose}>
+                  <div className="flex items-center space-x-3">
+                    <Shirt className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm">{subcategory.name}</span>
+                  </div>
+                </MobileNavItem>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Navbar() {
   const { items } = useCart()
   const { user, isLoggedIn, login, logout } = useAuth()
@@ -115,9 +235,7 @@ export default function Navbar() {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    products: false,
-    apparel: false,
-    accessories: false
+    products: false
   })
   const count = items.reduce((s, i) => s + i.quantity, 0)
 
@@ -326,96 +444,7 @@ export default function Navbar() {
 
                   {expandedSections.products && (
                     <div className="ml-6 space-y-1 pl-4">
-                      <MobileNavItem to="/products" onClick={() => setMobileMenuOpen(false)}>
-                        <div className="flex items-center space-x-3">
-                          <Package className="w-4 h-4 text-gray-500" />
-                          <span>All Products</span>
-                        </div>
-                      </MobileNavItem>
-
-                      {/* Apparel Section */}
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => toggleSection('apparel')}
-                          className="flex items-center justify-between w-full px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Shirt className="w-4 h-4 text-gray-500" />
-                            <span>Apparel</span>
-                          </div>
-                          {expandedSections.apparel ? (
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
-                          )}
-                        </button>
-
-                        {expandedSections.apparel && (
-                          <div className="ml-6 space-y-1 pl-3">
-                            <MobileNavItem to="/products?category=apparel&subcategory=tshirt" onClick={() => setMobileMenuOpen(false)}>
-                              <div className="flex items-center space-x-3">
-                                <Shirt className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm">T-Shirts</span>
-                              </div>
-                            </MobileNavItem>
-                            <MobileNavItem to="/products?category=apparel&subcategory=poloshirt" onClick={() => setMobileMenuOpen(false)}>
-                              <div className="flex items-center space-x-3">
-                                <Shirt className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm">Polo Shirts</span>
-                              </div>
-                            </MobileNavItem>
-                            <MobileNavItem to="/products?category=apparel&subcategory=hoodie" onClick={() => setMobileMenuOpen(false)}>
-                              <div className="flex items-center space-x-3">
-                                <Shirt className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm">Hoodies</span>
-                              </div>
-                            </MobileNavItem>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Accessories Section */}
-                      <div className="space-y-1">
-                        <button
-                          onClick={() => toggleSection('accessories')}
-                          className="flex items-center justify-between w-full px-3 py-2 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Crown className="w-4 h-4 text-gray-500" />
-                            <span>Accessories</span>
-                          </div>
-                          {expandedSections.accessories ? (
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
-                          )}
-                        </button>
-
-                        {expandedSections.accessories && (
-                          <div className="ml-6 space-y-1 pl-3">
-                            <MobileNavItem to="/products?category=accessories&subcategory=cap" onClick={() => setMobileMenuOpen(false)}>
-                              <div className="flex items-center space-x-3">
-                                <Crown className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm">Caps</span>
-                              </div>
-                            </MobileNavItem>
-                            <MobileNavItem to="/products?category=accessories&subcategory=bag" onClick={() => setMobileMenuOpen(false)}>
-                              <div className="flex items-center space-x-3">
-                                <Crown className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm">Bags</span>
-                              </div>
-                            </MobileNavItem>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Embroidery */}
-                      <MobileNavItem to="/products?category=embroidery" onClick={() => setMobileMenuOpen(false)}>
-                        <div className="flex items-center space-x-3">
-                          <Palette className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm">Embroidery</span>
-                        </div>
-                      </MobileNavItem>
+                      <MobileCategorySection onClose={() => setMobileMenuOpen(false)} />
                     </div>
                   )}
                 </div>

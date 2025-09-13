@@ -77,8 +77,8 @@ export default function Contact() {
         <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
           <div className="container">
             <div className="max-w-2xl mx-auto text-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
-                <CheckCircle className="w-10 h-10 text-green-600" />
+              <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-8">
+                <CheckCircle className="w-10 h-10 text-purple-600" />
               </div>
               <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
                 Thank You!

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X, Image } from 'lucide-react'
+import { X, Image as ImageIcon, Upload } from 'lucide-react'
 import { Category } from '../../types'
 
 interface AddCategoryModalProps {
@@ -40,22 +40,87 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
     image: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Convert file to base64
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = error => reject(error)
+    })
+  }
+
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors({ ...errors, image: 'Please select a valid image file (PNG, JPG, etc.)' })
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors({ ...errors, image: 'Image size must be less than 5MB' })
+        return
+      }
+
+      setImageFile(file)
+      
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+      
+      // Clear any previous errors
+      setErrors({ ...errors, image: '' })
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onAdd({
-      ...formData,
-      createdAt: new Date()
-    })
-    setFormData({
-      name: '',
-      slug: '',
-      description: '',
-      parentId: '',
-      sortOrder: 1,
-      status: 'active',
-      image: ''
-    })
-    onClose()
+    
+    try {
+      let imageData = formData.image
+      
+      // If new file is selected, convert to base64
+      if (imageFile) {
+        imageData = await convertToBase64(imageFile)
+      }
+      
+      onAdd({
+        ...formData,
+        image: imageData,
+        parentId: formData.parentId ? Number(formData.parentId) : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      
+      // Reset form
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        parentId: '',
+        sortOrder: 1,
+        status: 'active',
+        image: ''
+      })
+      setImageFile(null)
+      setImagePreview('')
+      setErrors({})
+      onClose()
+    } catch (error) {
+      console.error('Error processing image:', error)
+      setErrors({ ...errors, image: 'Error processing image file' })
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -176,18 +241,80 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
             />
           </div>
 
+          {/* Image Upload Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image URL
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category Image (PNG, JPG, etc.)
             </label>
+            <div 
+              className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors cursor-pointer"
+              onClick={() => document.getElementById('category-image-upload')?.click()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.add('border-gray-400', 'bg-gray-50')
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove('border-gray-400', 'bg-gray-50')
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove('border-gray-400', 'bg-gray-50')
+                const files = e.dataTransfer.files
+                if (files.length > 0) {
+                  const file = files[0]
+                  if (file.type.startsWith('image/')) {
+                    handleFileChange({ target: { files: [file] } } as any)
+                  } else {
+                    setErrors({ ...errors, image: 'Please select a valid image file (PNG, JPG, etc.)' })
+                  }
+                }
+              }}
+            >
+              <div className="space-y-1 text-center">
+                {imagePreview ? (
+                  <div className="space-y-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="mx-auto h-24 w-24 object-cover rounded-lg"
+                    />
+                    <p className="text-sm text-gray-600">{imageFile?.name}</p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setImageFile(null)
+                        setImagePreview('')
+                      }}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Remove Image
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
+                    <div className="flex text-sm text-gray-600">
+                      <span className="font-medium text-gray-900 hover:text-gray-700">
+                        Upload a file
+                      </span>
+                      <span className="pl-1">or drag and drop</span>
+                    </div>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
             <input
-              type="url"
-              name="image"
-              value={formData.image}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="https://example.com/image.jpg"
+              id="category-image-upload"
+              name="category-image-upload"
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleFileChange}
             />
+            {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
           </div>
 
           <div className="flex items-center">
@@ -244,29 +371,99 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
     image: ''
   })
 
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Convert file to base64
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = error => reject(error)
+    })
+  }
+
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setErrors({ ...errors, image: 'Please select a valid image file (PNG, JPG, etc.)' })
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setErrors({ ...errors, image: 'Image size must be less than 5MB' })
+        return
+      }
+
+      setImageFile(file)
+      
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+      
+      // Clear any previous errors
+      setErrors({ ...errors, image: '' })
+    }
+  }
+
   useEffect(() => {
     if (category) {
       setFormData({
         name: category.name,
         slug: category.slug,
         description: category.description || '',
-        parentId: category.parentId || '',
+        parentId: category.parentId ? String(category.parentId) : '',
         sortOrder: category.sortOrder,
         status: category.status,
         image: category.image || ''
       })
+      // Set preview if category has existing image
+      if (category.image && category.image.startsWith('data:')) {
+        setImagePreview(category.image)
+      } else {
+        setImagePreview('')
+      }
     }
   }, [category])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
     if (category) {
-      onUpdate({
-        ...category,
-        ...formData
-      })
+      try {
+        let imageData = formData.image
+        
+        // If new file is selected, convert to base64
+        if (imageFile) {
+          imageData = await convertToBase64(imageFile)
+        }
+        
+        onUpdate({
+          ...category,
+          ...formData,
+          image: imageData,
+          parentId: formData.parentId ? Number(formData.parentId) : undefined
+        })
+        
+        // Reset form
+        setImageFile(null)
+        setImagePreview('')
+        setErrors({})
+        onClose()
+      } catch (error) {
+        console.error('Error processing image:', error)
+        setErrors({ ...errors, image: 'Error processing image file' })
+      }
     }
-    onClose()
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -376,29 +573,91 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
             />
           </div>
 
+          {/* Image Upload Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image URL
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category Image (PNG, JPG, etc.)
             </label>
+            <div 
+              className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors cursor-pointer"
+              onClick={() => document.getElementById('category-image-upload-edit')?.click()}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.add('border-gray-400', 'bg-gray-50')
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove('border-gray-400', 'bg-gray-50')
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.currentTarget.classList.remove('border-gray-400', 'bg-gray-50')
+                const files = e.dataTransfer.files
+                if (files.length > 0) {
+                  const file = files[0]
+                  if (file.type.startsWith('image/')) {
+                    handleFileChange({ target: { files: [file] } } as any)
+                  } else {
+                    setErrors({ ...errors, image: 'Please select a valid image file (PNG, JPG, etc.)' })
+                  }
+                }
+              }}
+            >
+              <div className="space-y-1 text-center">
+                {imagePreview ? (
+                  <div className="space-y-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="mx-auto h-24 w-24 object-cover rounded-lg"
+                    />
+                    <p className="text-sm text-gray-600">{imageFile?.name || 'Current image'}</p>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setImageFile(null)
+                        setImagePreview('')
+                      }}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Remove Image
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <ImageIcon className="mx-auto h-8 w-8 text-gray-400" />
+                    <div className="flex text-sm text-gray-600">
+                      <span className="font-medium text-gray-900 hover:text-gray-700">
+                        Upload a file
+                      </span>
+                      <span className="pl-1">or drag and drop</span>
+                    </div>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                  </div>
+                )}
+              </div>
+            </div>
             <input
-              type="url"
-              name="image"
-              value={formData.image}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="https://example.com/image.jpg"
+              id="category-image-upload-edit"
+              name="category-image-upload-edit"
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handleFileChange}
             />
+            {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
           </div>
 
           <div className="flex items-center">
             <input
               type="checkbox"
-              id="status"
+              id="status-edit"
               checked={formData.status === 'active'}
               onChange={handleStatusChange}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
-            <label htmlFor="status" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="status-edit" className="ml-2 block text-sm text-gray-900">
               Active
             </label>
           </div>
@@ -452,7 +711,7 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
           <div className="flex items-start space-x-3">
             <div className="flex-shrink-0">
               <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <Image className="h-5 w-5 text-red-600" />
+                <ImageIcon className="h-5 w-5 text-red-600" />
               </div>
             </div>
             <div className="flex-1">

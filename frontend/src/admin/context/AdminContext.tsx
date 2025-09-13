@@ -4,7 +4,6 @@ import {
   mockProducts, 
   mockOrders, 
   mockCustomers, 
-  mockCategories, 
   mockFAQs, 
   mockMessages, 
   mockEmbroideryOptions, 
@@ -18,7 +17,6 @@ type AdminState = {
   orders: Order[]
   customers: Customer[]
   users: AdminUser[]
-  categories: Category[]
   faqs: FAQ[]
   messages: Message[]
   embroideryOptions: EmbroideryOption[]
@@ -46,10 +44,6 @@ type AdminAction =
   | { type: 'ADD_USER'; payload: AdminUser }
   | { type: 'UPDATE_USER'; payload: AdminUser }
   | { type: 'DELETE_USER'; payload: string }
-  | { type: 'SET_CATEGORIES'; payload: Category[] }
-  | { type: 'ADD_CATEGORY'; payload: Category }
-  | { type: 'UPDATE_CATEGORY'; payload: Category }
-  | { type: 'DELETE_CATEGORY'; payload: string }
   | { type: 'SET_FAQS'; payload: FAQ[] }
   | { type: 'ADD_FAQ'; payload: FAQ }
   | { type: 'UPDATE_FAQ'; payload: FAQ }
@@ -74,7 +68,6 @@ const initialState: AdminState = {
   orders: mockOrders,
   customers: mockCustomers,
   users: mockAdminUsers,
-  categories: mockCategories,
   faqs: mockFAQs,
   messages: mockMessages,
   embroideryOptions: mockEmbroideryOptions,
@@ -130,20 +123,6 @@ const adminReducer = (state: AdminState, action: AdminAction): AdminState => {
       return {
         ...state,
         users: state.users.filter(u => u.id !== action.payload)
-      }
-    case 'SET_CATEGORIES':
-      return { ...state, categories: action.payload }
-    case 'ADD_CATEGORY':
-      return { ...state, categories: [...state.categories, action.payload] }
-    case 'UPDATE_CATEGORY':
-      return {
-        ...state,
-        categories: state.categories.map(c => c.id === action.payload.id ? action.payload : c)
-      }
-    case 'DELETE_CATEGORY':
-      return {
-        ...state,
-        categories: state.categories.filter(c => c.id !== action.payload)
       }
     case 'SET_FAQS':
       return { ...state, faqs: action.payload }

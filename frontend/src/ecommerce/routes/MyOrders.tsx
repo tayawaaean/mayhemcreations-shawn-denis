@@ -230,7 +230,7 @@ const getStatusIcon = (status: Order['status']) => {
     case 'shipped':
       return <Truck className="w-5 h-5 text-purple-500" />
     case 'delivered':
-      return <CheckCircle className="w-5 h-5 text-green-500" />
+      return <CheckCircle className="w-5 h-5 text-purple-500" />
     case 'cancelled':
       return <XCircle className="w-5 h-5 text-red-500" />
     default:
@@ -264,7 +264,7 @@ const getStatusColor = (status: Order['status']) => {
     case 'shipped':
       return 'bg-purple-100 text-purple-800'
     case 'delivered':
-      return 'bg-green-100 text-green-800'
+      return 'bg-purple-100 text-purple-800'
     case 'cancelled':
       return 'bg-red-100 text-red-800'
     default:
@@ -275,7 +275,7 @@ const getStatusColor = (status: Order['status']) => {
 const getPaymentStatusIcon = (status: Order['paymentStatus']) => {
   switch (status) {
     case 'completed':
-      return <CheckCircle className="w-4 h-4 text-green-600" />
+      return <CheckCircle className="w-4 h-4 text-purple-600" />
     case 'failed':
       return <XCircle className="w-4 h-4 text-red-600" />
     case 'pending':
@@ -296,7 +296,7 @@ const getPaymentStatusIcon = (status: Order['paymentStatus']) => {
 const getPaymentStatusColor = (status: Order['paymentStatus']) => {
   switch (status) {
     case 'completed':
-      return 'bg-green-100 text-green-800'
+      return 'bg-purple-100 text-purple-800'
     case 'failed':
       return 'bg-red-100 text-red-800'
     case 'pending':

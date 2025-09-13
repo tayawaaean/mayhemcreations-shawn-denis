@@ -27,8 +27,17 @@ const updateUserValidation = [
     .withMessage('Last name must be between 2 and 100 characters'),
   body('phone')
     .optional()
-    .isMobilePhone('any')
-    .withMessage('Please provide a valid phone number'),
+    .custom((value) => {
+      // Allow empty, null, undefined values
+      if (!value || value === '' || value === null || value === undefined) {
+        return true;
+      }
+      // For now, just check if it's a string with some basic phone-like format
+      // This is more lenient than isMobilePhone validation
+      const phoneRegex = /^[\+]?[\d\s\-\(\)]{7,}$/;
+      return phoneRegex.test(value);
+    })
+    .withMessage('Please provide a valid phone number (at least 7 digits)'),
   body('dateOfBirth')
     .optional()
     .isISO8601()

@@ -28,32 +28,56 @@ interface AuthModalProps {
 }
 
 // Demo customer accounts for testing - using environment configuration
-const demoCustomers = [
-  {
-    id: 1,
-    firstName: 'John',
-    lastName: 'Customer',
-    email: envConfig.getDemoAccounts().customer,
-    password: 'SecureCustomer2024!',
-    role: 'customer'
-  },
-  {
-    id: 2,
-    firstName: 'Jane',
-    lastName: 'Smith',
-    email: envConfig.getDemoAccounts().jane,
-    password: 'SecureJane2024!',
-    role: 'customer'
-  },
-  {
-    id: 3,
-    firstName: 'Mike',
-    lastName: 'Johnson',
-    email: envConfig.getDemoAccounts().mike,
-    password: 'SecureMike2024!',
-    role: 'customer'
-  }
-]
+// Updated to match userSeeder customer data
+const getDemoCustomers = () => {
+  const demoAccounts = envConfig.getDemoAccounts()
+  if (!demoAccounts) return []
+  
+  return [
+    {
+      id: 1,
+      firstName: 'Robert',
+      lastName: 'Wilson',
+      email: demoAccounts.customer1,
+      password: 'SecureCustomer2024!',
+      role: 'customer'
+    },
+    {
+      id: 2,
+      firstName: 'Maria',
+      lastName: 'Garcia',
+      email: demoAccounts.customer2,
+      password: 'SecureCustomer2024!',
+      role: 'customer'
+    },
+    {
+      id: 3,
+      firstName: 'James',
+      lastName: 'Anderson',
+      email: demoAccounts.customer3,
+      password: 'SecureCustomer2024!',
+      role: 'customer'
+    },
+    {
+      id: 4,
+      firstName: 'Sophie',
+      lastName: 'Taylor',
+      email: demoAccounts.customer4,
+      password: 'SecureCustomer2024!',
+      role: 'customer'
+    },
+    {
+      id: 5,
+      firstName: 'Kevin',
+      lastName: 'Martinez',
+      email: demoAccounts.customer5,
+      password: 'SecureCustomer2024!',
+      role: 'customer'
+    }
+  ]
+}
+
+const demoCustomers = getDemoCustomers()
 
 export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSuccess }: AuthModalProps) {
   const [formData, setFormData] = useState({
@@ -91,7 +115,7 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           password: formData.password
         })
 
-        if (response.success) {
+        if (response.success && response.data) {
           // Store auth data using multi-account storage
           MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
@@ -143,7 +167,7 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         // Handle login with customer role validation
         const response = await customerApiService.login(formData.email, formData.password, 'customer')
 
-        if (response.success) {
+        if (response.success && response.data) {
           // Store auth data using multi-account storage
           MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
@@ -232,7 +256,7 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             lastName: result.data.user.lastName,
             isEmailVerified: result.data.user.isEmailVerified,
             lastLoginAt: new Date().toISOString(),
-            createdAt: result.data.user.createdAt || new Date().toISOString(),
+            createdAt: new Date().toISOString(),
             avatar: result.data.user.avatar,
             accountType: 'customer'
           },
@@ -299,44 +323,48 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
 
       if (response.success) {
         // Store auth data using multi-account storage
-        MultiAccountStorageService.storeAccountAuthData('customer', {
-          user: {
-            id: response.data.user.id,
-            email: response.data.user.email,
-            role: response.data.user.role,
-            firstName: response.data.user.firstName,
-            lastName: response.data.user.lastName,
-            isEmailVerified: response.data.user.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: response.data.user.createdAt || new Date().toISOString(),
-            avatar: response.data.user.avatar,
-            accountType: 'customer'
-          },
-          session: {
-            sessionId: response.data.sessionId,
-            accessToken: response.data.accessToken,
-            refreshToken: response.data.refreshToken,
-            lastActivity: new Date().toISOString()
-          }
-        })
-
-        // Convert to User format for context
-        const userData: User = {
-          id: response.data.user.id,
-          firstName: response.data.user.firstName,
-          lastName: response.data.user.lastName,
-          email: response.data.user.email,
-          role: response.data.user.role,
-          isEmailVerified: response.data.user.isEmailVerified,
-          lastLoginAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-          avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+        if (response.data) {
+          MultiAccountStorageService.storeAccountAuthData('customer', {
+            user: {
+              id: response.data.user.id,
+              email: response.data.user.email,
+              role: response.data.user.role,
+              firstName: response.data.user.firstName,
+              lastName: response.data.user.lastName,
+              isEmailVerified: response.data.user.isEmailVerified,
+              lastLoginAt: new Date().toISOString(),
+              createdAt: response.data.user.createdAt || new Date().toISOString(),
+              avatar: response.data.user.avatar,
+              accountType: 'customer'
+            },
+            session: {
+              sessionId: response.data.sessionId,
+              accessToken: response.data.accessToken,
+              refreshToken: response.data.refreshToken,
+              lastActivity: new Date().toISOString()
+            }
+          })
         }
 
-        // Log successful login
-        loggingService.logLoginAttempt(customer.email, true, 'customer')
+        // Convert to User format for context
+        if (response.data) {
+          const userData: User = {
+            id: response.data.user.id,
+            firstName: response.data.user.firstName,
+            lastName: response.data.user.lastName,
+            email: response.data.user.email,
+            role: response.data.user.role,
+            isEmailVerified: response.data.user.isEmailVerified,
+            lastLoginAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+          }
 
-        onSuccess(userData)
+          // Log successful login
+          loggingService.logLoginAttempt(customer.email, true, 'customer')
+
+          onSuccess(userData)
+        }
         onClose()
       } else {
         setError(response.message || 'Demo login failed')
@@ -577,26 +605,45 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           </form>
 
           {/* Demo Account Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-900 mb-2">Demo Account Credentials</h4>
-            <div className="space-y-2 text-xs text-gray-600">
-              <div className="flex justify-between">
-                <span className="font-medium">John Customer:</span>
-                <span>{envConfig.getDemoAccounts().customer}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Jane Smith:</span>
-                <span>{envConfig.getDemoAccounts().jane}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Mike Johnson:</span>
-                <span>{envConfig.getDemoAccounts().mike}</span>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <span className="text-gray-500">Password for all demo accounts: SecureCustomer2024!</span>
+          {envConfig.hasDemoAccounts() && (
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Demo Account Credentials</h4>
+              <div className="space-y-2 text-xs text-gray-600">
+                {(() => {
+                  const demoAccounts = envConfig.getDemoAccounts()
+                  if (!demoAccounts) return null
+                  
+                  return (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Robert Wilson:</span>
+                        <span>{demoAccounts.customer1}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Maria Garcia:</span>
+                        <span>{demoAccounts.customer2}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">James Anderson:</span>
+                        <span>{demoAccounts.customer3}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Sophie Taylor:</span>
+                        <span>{demoAccounts.customer4}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Kevin Martinez:</span>
+                        <span>{demoAccounts.customer5}</span>
+                      </div>
+                    </>
+                  )
+                })()}
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <span className="text-gray-500">Password for all demo accounts: SecureCustomer2024!</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

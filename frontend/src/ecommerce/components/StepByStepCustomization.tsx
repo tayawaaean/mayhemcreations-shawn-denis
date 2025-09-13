@@ -93,7 +93,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
                         <div key={style.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                           <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                              <Check className="w-4 h-4 text-green-600" />
+                              <Check className="w-4 h-4 text-purple-600" />
                             </div>
                             <div>
                               <p className="font-medium text-gray-900">{style.name}</p>
@@ -109,7 +109,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
                       <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
                         <div className="flex items-center space-x-3">
                           <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <Check className="w-4 h-4 text-green-600" />
+                            <Check className="w-4 h-4 text-purple-600" />
                           </div>
                           <div>
                             <p className="font-medium text-gray-900">{selected.name}</p>

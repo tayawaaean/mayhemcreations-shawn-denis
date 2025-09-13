@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { 
   Search, 
   Filter, 
@@ -28,6 +28,17 @@ const Customers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
 
+  // Memoize the params object to prevent infinite re-renders
+  const userParams = useMemo(() => ({
+    page: currentPage,
+    limit: 10,
+    search: searchQuery || undefined,
+    status: selectedStatus,
+    role: 'customer', // Only show users with customer role
+    sortBy: 'createdAt' as const,
+    sortOrder: 'desc' as const
+  }), [currentPage, searchQuery, selectedStatus])
+
   // Use the API hook
   const {
     users: customers,
@@ -38,14 +49,7 @@ const Customers: React.FC = () => {
     refetch,
     updateUser,
     updateUserStatus
-  } = useUsers({
-    page: currentPage,
-    limit: 10,
-    search: searchQuery || undefined,
-    status: selectedStatus,
-    sortBy: 'createdAt',
-    sortOrder: 'desc'
-  })
+  } = useUsers(userParams)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -216,7 +220,7 @@ const Customers: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => setSelectedStatus(e.target.value as 'active' | 'inactive' | 'all')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Status</option>
@@ -599,7 +603,7 @@ const Customers: React.FC = () => {
           setIsDetailModalOpen(false)
           setSelectedCustomer(null)
         }}
-        customer={selectedCustomer}
+        customer={selectedCustomer as any}
       />
 
       <EditCustomerModal

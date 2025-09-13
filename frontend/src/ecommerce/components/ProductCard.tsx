@@ -26,7 +26,7 @@ export default function ProductCard({ product }: { product: Product }) {
         {/* Badges */}
         {product.badges && product.badges.length > 0 && (
           <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {product.badges.map((badge, index) => (
+            {product.badges.map((badge: string, index: number) => (
               <span
                 key={index}
                 className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"

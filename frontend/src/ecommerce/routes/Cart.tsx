@@ -23,8 +23,8 @@ export default function Cart() {
       if (selectedStyles.backing) itemPrice += selectedStyles.backing.price
       if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price
       
-      selectedStyles.threads.forEach(thread => itemPrice += thread.price)
-      selectedStyles.upgrades.forEach(upgrade => itemPrice += upgrade.price)
+      selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => itemPrice += thread.price)
+      selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => itemPrice += upgrade.price)
     }
     
     return itemPrice
@@ -199,11 +199,11 @@ export default function Cart() {
                   <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
                     <div className="flex items-center justify-center space-x-3 sm:space-x-4 text-xs text-gray-500">
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                         <span>Secure Checkout</span>
                       </div>
                       <div className="flex items-center space-x-1">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                         <span>SSL Encrypted</span>
                       </div>
                     </div>
@@ -348,12 +348,12 @@ export default function Cart() {
 
                         {/* Material */}
                         {selectedItem.customization.selectedStyles.material && (
-                          <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                          <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
                             <div>
-                              <p className="font-medium text-green-900">Base Material</p>
-                              <p className="text-sm text-green-700">{selectedItem.customization.selectedStyles.material.name}</p>
+                              <p className="font-medium text-purple-900">Base Material</p>
+                              <p className="text-sm text-purple-700">{selectedItem.customization.selectedStyles.material.name}</p>
                             </div>
-                            <span className="font-semibold text-green-900">
+                            <span className="font-semibold text-purple-900">
                               +${selectedItem.customization.selectedStyles.material.price.toFixed(2)}
                             </span>
                           </div>
@@ -377,7 +377,7 @@ export default function Cart() {
                           <div className="p-3 bg-yellow-50 rounded-lg">
                             <p className="font-medium text-yellow-900 mb-2">Thread Options</p>
                             <div className="space-y-1">
-                              {selectedItem.customization.selectedStyles.threads.map((thread, index) => (
+                              {selectedItem.customization.selectedStyles.threads.map((thread: { id: string; name: string; price: number }, index: number) => (
                                 <div key={index} className="flex justify-between items-center">
                                   <span className="text-sm text-yellow-700">{thread.name}</span>
                                   <span className="text-sm font-semibold text-yellow-900">
@@ -407,7 +407,7 @@ export default function Cart() {
                           <div className="p-3 bg-pink-50 rounded-lg">
                             <p className="font-medium text-pink-900 mb-2">Upgrades</p>
                             <div className="space-y-1">
-                              {selectedItem.customization.selectedStyles.upgrades.map((upgrade, index) => (
+                              {selectedItem.customization.selectedStyles.upgrades.map((upgrade: { id: string; name: string; price: number }, index: number) => (
                                 <div key={index} className="flex justify-between items-center">
                                   <span className="text-sm text-pink-700">{upgrade.name}</span>
                                   <span className="text-sm font-semibold text-pink-900">

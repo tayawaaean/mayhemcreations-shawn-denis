@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import ProductGrid from '../components/ProductGrid'
-import { products } from '../../data/products'
 import { Filter, SortAsc, Grid, List, ShoppingCart, ArrowRight } from 'lucide-react'
 import Button from '../../components/Button'
 import { useSearchParams } from 'react-router-dom'
+import { categoryApiService, Category } from '../../shared/categoryApiService'
+import { productApiService, Product } from '../../shared/productApiService'
 
 export default function Products() {
   const [searchParams] = useSearchParams()
@@ -12,6 +13,43 @@ export default function Products() {
   const [showFilters, setShowFilters] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch categories and products from database
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          categoryApiService.getCategories({
+            includeChildren: true,
+            status: 'active',
+            sortBy: 'sortOrder',
+            sortOrder: 'ASC'
+          }),
+          productApiService.getProducts({
+            status: 'active',
+            limit: 50
+          })
+        ])
+        
+        setCategories(categoriesResponse.data)
+        setProducts(productsResponse.data)
+      } catch (err) {
+        setError('Failed to load data')
+        console.error('Error fetching data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   // Get category and subcategory from URL params
   useEffect(() => {
@@ -49,11 +87,37 @@ export default function Products() {
     window.history.replaceState({}, '', url.toString())
   }
 
+  // Transform database products to frontend Product type
+  const transformedProducts = products.map(product => ({
+    id: product.id.toString(),
+    title: product.title,
+    price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+    description: product.description,
+    image: product.image,
+    alt: product.alt,
+    badges: typeof product.badges === 'string' ? JSON.parse(product.badges) : (product.badges || []),
+    category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
+    subcategory: product.subcategory?.slug,
+    availableColors: typeof product.availableColors === 'string' ? JSON.parse(product.availableColors) : (product.availableColors || []),
+    availableSizes: typeof product.availableSizes === 'string' ? JSON.parse(product.availableSizes) : (product.availableSizes || []),
+    materials: typeof product.materials === 'string' ? JSON.parse(product.materials) : (product.materials || []),
+    averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
+    totalReviews: typeof product.totalReviews === 'string' ? parseInt(product.totalReviews) : product.totalReviews
+  }))
+
   // Filter and sort products
-  const filteredProducts = products
+  const filteredProducts = transformedProducts
     .filter(product => {
-      if (selectedCategory && product.category !== selectedCategory) return false
-      if (selectedSubcategory && product.subcategory !== selectedSubcategory) return false
+      // If a category is selected, filter by category
+      if (selectedCategory && product.category !== selectedCategory) {
+        return false
+      }
+      
+      // If a subcategory is selected, filter by subcategory
+      if (selectedSubcategory && product.subcategory !== selectedSubcategory) {
+        return false
+      }
+      
       return true
     })
     .sort((a, b) => {
@@ -63,17 +127,20 @@ export default function Products() {
         case 'price-high':
           return b.price - a.price
         case 'newest':
-          // Assuming newer products have higher IDs or we could add a date field
-          return b.id.localeCompare(a.id)
+          // Sort by ID (higher ID = newer)
+          return parseInt(b.id) - parseInt(a.id)
         case 'popular':
-          // Assuming products with badges are more popular
-          const aPopularity = (a.badges?.length || 0) + (a.title.includes('Classic') ? 1 : 0)
-          const bPopularity = (b.badges?.length || 0) + (b.title.includes('Classic') ? 1 : 0)
-          return bPopularity - aPopularity
+          // Sort by average rating, then by total reviews
+          const aRating = a.averageRating || 0
+          const bRating = b.averageRating || 0
+          if (aRating !== bRating) {
+            return bRating - aRating
+          }
+          return (b.totalReviews || 0) - (a.totalReviews || 0)
         case 'featured':
         default:
-          // Keep original order for featured
-          return 0
+          // Sort by ID (higher ID = newer) for featured
+          return parseInt(b.id) - parseInt(a.id)
       }
     })
 
@@ -116,6 +183,22 @@ export default function Products() {
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters and Sort */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col lg:flex-row gap-6">
@@ -140,40 +223,40 @@ export default function Products() {
                   value={selectedCategory || ''} 
                   onChange={(e) => handleCategoryChange(e.target.value || null)}
                   className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[140px]"
+                  disabled={loading}
                 >
                   <option value="">All Products</option>
-                  <option value="apparel">Apparel</option>
-                  <option value="accessories">Accessories</option>
-                  <option value="embroidery">Embroidery</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               
               {/* Subcategory Filter */}
-              {selectedCategory && (
-                <div className="flex items-center space-x-3">
-                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Type:</label>
-                  <select 
-                    value={selectedSubcategory || ''} 
-                    onChange={(e) => handleSubcategoryChange(e.target.value || null)}
-                    className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[140px]"
-                  >
-                    <option value="">All {selectedCategory}</option>
-                    {selectedCategory === 'apparel' && (
-                      <>
-                        <option value="tshirt">T-Shirts</option>
-                        <option value="poloshirt">Polo Shirts</option>
-                        <option value="hoodie">Hoodies</option>
-                      </>
-                    )}
-                    {selectedCategory === 'accessories' && (
-                      <>
-                        <option value="cap">Caps</option>
-                        <option value="bag">Bags</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-              )}
+              {selectedCategory && (() => {
+                const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
+                const subcategories = selectedCategoryData?.children || []
+                
+                return subcategories.length > 0 && (
+                  <div className="flex items-center space-x-3">
+                    <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Type:</label>
+                    <select 
+                      value={selectedSubcategory || ''} 
+                      onChange={(e) => handleSubcategoryChange(e.target.value || null)}
+                      className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[140px]"
+                    >
+                      <option value="">All {selectedCategoryData?.name}</option>
+                      {subcategories.map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.slug}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })()}
               
               <div className="flex items-center space-x-3">
                 <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Sort by:</label>
@@ -234,40 +317,40 @@ export default function Products() {
                   value={selectedCategory || ''} 
                   onChange={(e) => handleCategoryChange(e.target.value || null)}
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                  disabled={loading}
                 >
                   <option value="">All Products</option>
-                  <option value="apparel">Apparel</option>
-                  <option value="accessories">Accessories</option>
-                  <option value="embroidery">Embroidery</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.slug}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               
               {/* Mobile Subcategory Filter */}
-              {selectedCategory && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">Type</label>
-                  <select 
-                    value={selectedSubcategory || ''} 
-                    onChange={(e) => handleSubcategoryChange(e.target.value || null)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                  >
-                    <option value="">All {selectedCategory}</option>
-                    {selectedCategory === 'apparel' && (
-                      <>
-                        <option value="tshirt">T-Shirts</option>
-                        <option value="poloshirt">Polo Shirts</option>
-                        <option value="hoodie">Hoodies</option>
-                      </>
-                    )}
-                    {selectedCategory === 'accessories' && (
-                      <>
-                        <option value="cap">Caps</option>
-                        <option value="bag">Bags</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-              )}
+              {selectedCategory && (() => {
+                const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
+                const subcategories = selectedCategoryData?.children || []
+                
+                return subcategories.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">Type</label>
+                    <select 
+                      value={selectedSubcategory || ''} 
+                      onChange={(e) => handleSubcategoryChange(e.target.value || null)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
+                    >
+                      <option value="">All {selectedCategoryData?.name}</option>
+                      {subcategories.map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.slug}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })()}
               
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Sort by</label>
@@ -326,7 +409,7 @@ export default function Products() {
                             <div className="text-2xl font-bold text-gray-900">${product.price.toFixed(2)}</div>
                             {product.badges && product.badges.length > 0 && (
                               <div className="flex space-x-2">
-                                {product.badges.slice(0, 2).map((badge, index) => (
+                                {product.badges.slice(0, 2).map((badge: string, index: number) => (
                                   <span 
                                     key={index}
                                     className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"

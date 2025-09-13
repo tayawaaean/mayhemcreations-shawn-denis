@@ -1,18 +1,51 @@
 import { logger } from '../utils/logger';
-import { syncDatabase } from '../config/database';
+import { syncDatabase, sequelize } from '../config/database';
 import { seedRoles, clearRoles } from './roleSeeder';
 import { seedUsers, clearUsers, clearNonSystemUsers } from './userSeeder';
+import { seedCategories, clearCategories } from './categorySeeder';
+import { seedProducts, clearProducts } from './productSeeder';
+import { Op } from 'sequelize';
 
 /**
  * Main Seeder Runner
  * This script manages database seeding for development and testing
  */
 
+/**
+ * Update database schema
+ */
+async function updateSchema(): Promise<void> {
+  try {
+    logger.info('🔄 Updating database schema...');
+    
+    // Import models to ensure they're loaded
+    await import('../models/categoryModel');
+    
+    // Force sync the Category table to update the schema
+    await sequelize.sync({ alter: true, force: false });
+    
+    // Also run the direct ALTER command as backup
+    await sequelize.query(`
+      ALTER TABLE Categories 
+      MODIFY COLUMN image TEXT
+    `);
+    
+    logger.info('✅ Database schema updated successfully!');
+    logger.info('📝 Image column changed from VARCHAR(500) to TEXT');
+    logger.info('🔄 Models synced with alter: true');
+  } catch (error) {
+    logger.error('❌ Error updating schema:', error);
+    throw error;
+  }
+}
+
 export interface SeederOptions {
   force?: boolean;
   clear?: boolean;
   rolesOnly?: boolean;
   usersOnly?: boolean;
+  categoriesOnly?: boolean;
+  productsOnly?: boolean;
 }
 
 export async function runSeeders(options: SeederOptions = {}): Promise<void> {
@@ -33,22 +66,40 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
       } else if (options.rolesOnly) {
         // Don't clear roles if we're only seeding roles
         logger.info('⚠️ Skipping role clearing for roles-only seeding');
+      } else if (options.categoriesOnly) {
+        await clearCategories();
+      } else if (options.productsOnly) {
+        await clearProducts();
       } else {
         await clearUsers();
         await clearRoles();
+        await clearCategories();
+        await clearProducts();
       }
     }
 
     // Seed roles
-    if (!options.usersOnly) {
+    if (!options.usersOnly && !options.categoriesOnly && !options.productsOnly) {
       logger.info('🌱 Seeding roles...');
       await seedRoles();
     }
 
     // Seed users
-    if (!options.rolesOnly) {
+    if (!options.rolesOnly && !options.categoriesOnly && !options.productsOnly) {
       logger.info('🌱 Seeding users...');
       await seedUsers();
+    }
+
+    // Seed categories
+    if (!options.rolesOnly && !options.usersOnly && !options.productsOnly) {
+      logger.info('🌱 Seeding categories...');
+      await seedCategories();
+    }
+
+    // Seed products
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly) {
+      logger.info('🌱 Seeding products...');
+      await seedProducts();
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -67,6 +118,7 @@ export async function clearAllData(): Promise<void> {
     logger.info('🧹 Clearing all database data...');
     await clearUsers();
     await clearRoles();
+    await clearCategories();
     logger.info('✅ All data cleared successfully!');
   } catch (error) {
     logger.error('❌ Error clearing data:', error);
@@ -90,17 +142,22 @@ async function displaySeedingSummary(): Promise<void> {
   try {
     const { Role } = await import('../models/roleModel');
     const { User } = await import('../models/userModel');
+    const { Category } = await import('../models/categoryModel');
 
     const roleCount = await Role.count();
     const userCount = await User.count();
     const activeUserCount = await User.count({ where: { isActive: true } });
     const verifiedUserCount = await User.count({ where: { isEmailVerified: true } });
+    const categoryCount = await Category.count();
+    const activeCategoryCount = await Category.count({ where: { status: 'active' } });
 
     logger.info('📊 Seeding Summary:');
     logger.info(`   • Roles created: ${roleCount}`);
     logger.info(`   • Total users: ${userCount}`);
     logger.info(`   • Active users: ${activeUserCount}`);
     logger.info(`   • Verified users: ${verifiedUserCount}`);
+    logger.info(`   • Total categories: ${categoryCount}`);
+    logger.info(`   • Active categories: ${activeCategoryCount}`);
     
     // Display role breakdown
     const roles = await Role.findAll({
@@ -111,6 +168,18 @@ async function displaySeedingSummary(): Promise<void> {
     for (const role of roles) {
       const displayName = role.displayName || role.name;
       logger.info(`   • ${displayName} (${role.name})`);
+    }
+
+    // Display category breakdown
+    const rootCategories = await Category.findAll({
+      where: { parentId: { [Op.is]: null } } as any,
+      attributes: ['name', 'slug'],
+      order: [['sortOrder', 'ASC']]
+    });
+
+    logger.info('📁 Categories Created:');
+    for (const category of rootCategories) {
+      logger.info(`   • ${category.name} (${category.slug})`);
     }
 
   } catch (error) {
@@ -137,6 +206,39 @@ if (require.main === module) {
         break;
       case '--users-only':
         options.usersOnly = true;
+        break;
+      case '--categories-only':
+        options.categoriesOnly = true;
+        break;
+      case '--products-only':
+        options.productsOnly = true;
+        break;
+      case '--clear-products':
+        clearProducts().then(() => {
+          logger.info('✅ Products cleared successfully!');
+          process.exit(0);
+        }).catch(error => {
+          logger.error('❌ Clear products failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--clear-data':
+        Promise.all([clearProducts(), clearCategories()]).then(() => {
+          logger.info('✅ All data cleared successfully! (Users retained)');
+          process.exit(0);
+        }).catch(error => {
+          logger.error('❌ Clear data failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--update-schema':
+        updateSchema().then(() => {
+          logger.info('✅ Schema updated successfully!');
+          process.exit(0);
+        }).catch(error => {
+          logger.error('❌ Schema update failed:', error);
+          process.exit(1);
+        });
         break;
       case '--reset':
         resetDatabase().then(() => process.exit(0)).catch(error => {

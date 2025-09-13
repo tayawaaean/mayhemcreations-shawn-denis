@@ -32,9 +32,11 @@ export interface EnvConfig {
   demoShawnEmail: string
   demoManagerEmail: string
   demoDesignerEmail: string
-  demoCustomerEmail: string
-  demoJaneEmail: string
-  demoMikeEmail: string
+  demoCustomer1Email: string
+  demoCustomer2Email: string
+  demoCustomer3Email: string
+  demoCustomer4Email: string
+  demoCustomer5Email: string
   
   // External Services
   uiAvatarsBaseUrl: string
@@ -86,14 +88,16 @@ class EnvConfigService {
       businessHoursSaturday: getEnvVar('VITE_REACT_APP_BUSINESS_HOURS_SATURDAY', 'Sat: 9AM-4PM'),
       businessHoursSunday: getEnvVar('VITE_REACT_APP_BUSINESS_HOURS_SUNDAY', 'Sun: Closed'),
       
-      // Demo Accounts
+      // Demo Accounts - Updated to match userSeeder data
       demoAdminEmail: getEnvVar('VITE_REACT_APP_DEMO_ADMIN_EMAIL', 'admin@mayhemcreation.com'),
       demoShawnEmail: getEnvVar('VITE_REACT_APP_DEMO_SHAWN_EMAIL', 'shawn.denis@mayhemcreation.com'),
       demoManagerEmail: getEnvVar('VITE_REACT_APP_DEMO_MANAGER_EMAIL', 'manager@mayhemcreation.com'),
       demoDesignerEmail: getEnvVar('VITE_REACT_APP_DEMO_DESIGNER_EMAIL', 'designer@mayhemcreation.com'),
-      demoCustomerEmail: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER_EMAIL', 'customer@mayhemcreation.com'),
-      demoJaneEmail: getEnvVar('VITE_REACT_APP_DEMO_JANE_EMAIL', 'jane.smith@mayhemcreation.com'),
-      demoMikeEmail: getEnvVar('VITE_REACT_APP_DEMO_MIKE_EMAIL', 'mike.johnson@mayhemcreation.com'),
+      demoCustomer1Email: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER1_EMAIL', 'customer1@example.com'),
+      demoCustomer2Email: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER2_EMAIL', 'customer2@example.com'),
+      demoCustomer3Email: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER3_EMAIL', 'customer3@example.com'),
+      demoCustomer4Email: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER4_EMAIL', 'customer4@example.com'),
+      demoCustomer5Email: getEnvVar('VITE_REACT_APP_DEMO_CUSTOMER5_EMAIL', 'customer5@example.com'),
       
       // External Services
       uiAvatarsBaseUrl: getEnvVar('VITE_REACT_APP_UI_AVATARS_BASE_URL', 'https://ui-avatars.com/api'),
@@ -164,9 +168,11 @@ class EnvConfigService {
     shawn: string
     manager: string
     designer: string
-    customer: string
-    jane: string
-    mike: string
+    customer1: string
+    customer2: string
+    customer3: string
+    customer4: string
+    customer5: string
   } | null {
     // Only return demo accounts in development mode
     if (this.config.appEnv !== 'development') {
@@ -178,9 +184,11 @@ class EnvConfigService {
       shawn: this.config.demoShawnEmail,
       manager: this.config.demoManagerEmail,
       designer: this.config.demoDesignerEmail,
-      customer: this.config.demoCustomerEmail,
-      jane: this.config.demoJaneEmail,
-      mike: this.config.demoMikeEmail
+      customer1: this.config.demoCustomer1Email,
+      customer2: this.config.demoCustomer2Email,
+      customer3: this.config.demoCustomer3Email,
+      customer4: this.config.demoCustomer4Email,
+      customer5: this.config.demoCustomer5Email
     }
   }
 

@@ -11,19 +11,20 @@ interface EmployeeUser {
   email: string
   firstName: string
   lastName: string
-  role: 'admin' | 'seller'
+  role: 'admin' | 'manager' | 'designer' | 'support' | 'moderator'
   avatar?: string
 }
 
-// Demo accounts with secure passwords
+// Demo accounts with secure passwords - Updated to match userSeeder data
 const demoAccounts: EmployeeUser[] = [
+  // Admin Users
   {
     id: 'admin-1',
     email: 'admin@mayhemcreation.com',
     firstName: 'John',
     lastName: 'Admin',
     role: 'admin',
-    avatar: 'https://ui-avatars.com/api/?name=John+Admin&background=3b82f6&color=ffffff'
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
   },
   {
     id: 'admin-2',
@@ -31,23 +32,67 @@ const demoAccounts: EmployeeUser[] = [
     firstName: 'Shawn',
     lastName: 'Denis',
     role: 'admin',
-    avatar: 'https://ui-avatars.com/api/?name=Shawn+Denis&background=8b5cf6&color=ffffff'
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shawn'
   },
+  // Manager Users
   {
     id: 'manager-1',
     email: 'manager@mayhemcreation.com',
     firstName: 'Sarah',
     lastName: 'Johnson',
-    role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=Sarah+Johnson&background=10b981&color=ffffff'
+    role: 'manager',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=manager'
   },
+  {
+    id: 'manager-2',
+    email: 'operations@mayhemcreation.com',
+    firstName: 'Michael',
+    lastName: 'Chen',
+    role: 'manager',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=operations'
+  },
+  // Designer Users
   {
     id: 'designer-1',
     email: 'designer@mayhemcreation.com',
-    firstName: 'Emily',
-    lastName: 'Designer',
-    role: 'seller',
-    avatar: 'https://ui-avatars.com/api/?name=Emily+Designer&background=f59e0b&color=ffffff'
+    firstName: 'Emma',
+    lastName: 'Rodriguez',
+    role: 'designer',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=designer'
+  },
+  {
+    id: 'designer-2',
+    email: 'creative@mayhemcreation.com',
+    firstName: 'Alex',
+    lastName: 'Thompson',
+    role: 'designer',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=creative'
+  },
+  // Support Users
+  {
+    id: 'support-1',
+    email: 'support@mayhemcreation.com',
+    firstName: 'Lisa',
+    lastName: 'Williams',
+    role: 'support',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=support'
+  },
+  {
+    id: 'support-2',
+    email: 'help@mayhemcreation.com',
+    firstName: 'David',
+    lastName: 'Brown',
+    role: 'support',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=help'
+  },
+  // Moderator Users
+  {
+    id: 'moderator-1',
+    email: 'moderator@mayhemcreation.com',
+    firstName: 'Jennifer',
+    lastName: 'Davis',
+    role: 'moderator',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=moderator'
   }
 ]
 
@@ -84,8 +129,8 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
           email: apiUser.email,
           firstName: apiUser.firstName,
           lastName: apiUser.lastName,
-          role: apiUser.role === 'admin' ? 'admin' : 'seller',
-          avatar: `https://ui-avatars.com/api/?name=${apiUser.firstName}+${apiUser.lastName}&background=3b82f6&color=ffffff`
+          role: apiUser.role as 'admin' | 'manager' | 'designer' | 'support' | 'moderator',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${apiUser.firstName.toLowerCase()}`
         }
 
         // Store auth data using multi-account storage
@@ -110,7 +155,8 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
         })
 
         // Log successful login attempt
-        loggingService.logLoginAttempt(formData.email, true, employeeUser.role)
+        const logRole = employeeUser.role === 'admin' ? 'admin' : 'seller'
+        loggingService.logLoginAttempt(formData.email, true, logRole)
         onLogin(employeeUser)
         
         // Navigate based on role
@@ -322,10 +368,15 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
           <h4 className="text-sm font-medium text-indigo-900 mb-2">Demo Account Credentials</h4>
           <div className="text-xs text-indigo-800 space-y-1">
-            <div><strong>Admin:</strong> admin@mayhemcreation.com / SecureAdmin2024!</div>
+            <div><strong>John Admin:</strong> admin@mayhemcreation.com / SecureAdmin2024!</div>
             <div><strong>Shawn Denis:</strong> shawn.denis@mayhemcreation.com / SecureShawn2024!</div>
-            <div><strong>Manager:</strong> manager@mayhemcreation.com / SecureManager2024!</div>
-            <div><strong>Designer:</strong> designer@mayhemcreation.com / SecureCustomer2024!</div>
+            <div><strong>Sarah Johnson (Manager):</strong> manager@mayhemcreation.com / SecureManager2024!</div>
+            <div><strong>Michael Chen (Manager):</strong> operations@mayhemcreation.com / OpsPass123!</div>
+            <div><strong>Emma Rodriguez (Designer):</strong> designer@mayhemcreation.com / DesignerPass123!</div>
+            <div><strong>Alex Thompson (Designer):</strong> creative@mayhemcreation.com / CreativePass123!</div>
+            <div><strong>Lisa Williams (Support):</strong> support@mayhemcreation.com / SupportPass123!</div>
+            <div><strong>David Brown (Support):</strong> help@mayhemcreation.com / HelpPass123!</div>
+            <div><strong>Jennifer Davis (Moderator):</strong> moderator@mayhemcreation.com / ModeratorPass123!</div>
           </div>
         </div>
       </div>

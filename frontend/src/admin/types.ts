@@ -91,16 +91,17 @@ export type Address = {
 }
 
 export type Category = {
-  id: string
+  id: number
   name: string
   slug: string
   description?: string
   image?: string
-  parentId?: string
+  parentId?: number
   children?: Category[]
   status: 'active' | 'inactive'
   sortOrder: number
-  createdAt: Date
+  createdAt: string
+  updatedAt: string
 }
 
 export type FAQ = {

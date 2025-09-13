@@ -22,14 +22,14 @@ export const authRateLimit = rateLimit({
 
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? 1000 : 100, // Much more lenient in development
+  max: isDevelopment ? 5000 : 100, // Much more lenient in development
   message: {
     error: 'Too many requests, please try again later.',
   },
   standardHeaders: true,
   legacyHeaders: false,
   // Skip rate limiting for localhost in development
-  skip: (req) => isDevelopment && req.ip === '127.0.0.1',
+  skip: (req) => isDevelopment && (req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1'),
 });
 
 // Brute force protection for login attempts

@@ -303,12 +303,15 @@ export class UserController {
       let roleWhere = {};
       if (role) {
         roleWhere = { name: role };
+      } else {
+        // If no specific role is requested, exclude customers by default
+        roleWhere = { name: { [Op.ne]: 'customer' } };
       }
 
       // Get total count
       const total = await User.count({
         where: whereConditions,
-        include: role ? [{ model: Role, where: roleWhere }] : [{ model: Role }]
+        include: [{ model: Role, as: 'role', where: roleWhere }]
       });
 
       // Get users with pagination
@@ -317,8 +320,9 @@ export class UserController {
         include: [
           {
             model: Role,
+            as: 'role',
             where: roleWhere,
-            required: !!role
+            required: true
           }
         ],
         order: [[sortBy as string, sortOrder as string]],
@@ -411,7 +415,7 @@ export class UserController {
       }
 
       const user = await User.findByPk(userId, {
-        include: [{ model: Role }],
+        include: [{ model: Role, as: 'role' }],
         attributes: { exclude: ['password'] }
       });
 
@@ -499,6 +503,11 @@ export class UserController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        logger.error('Validation failed for user update:', {
+          errors: errors.array(),
+          body: req.body,
+          params: req.params
+        });
         res.status(400).json({
           success: false,
           message: 'Validation failed',
@@ -552,7 +561,7 @@ export class UserController {
 
       // Fetch updated user with role
       const updatedUser = await User.findByPk(userId, {
-        include: [{ model: Role }],
+        include: [{ model: Role, as: 'role' }],
         attributes: { exclude: ['password'] }
       });
 
@@ -674,7 +683,7 @@ export class UserController {
       await user.update({ isActive });
 
       const updatedUser = await User.findByPk(userId, {
-        include: [{ model: Role }],
+        include: [{ model: Role, as: 'role' }],
         attributes: { exclude: ['password'] }
       });
 
@@ -787,6 +796,7 @@ export class UserController {
         include: [
           {
             model: Role,
+            as: 'role',
             attributes: ['name', 'displayName']
           }
         ],

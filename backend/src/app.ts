@@ -12,6 +12,8 @@ import { securityHeaders, generalRateLimit, sanitizeInput } from './config/secur
 // Import routes
 import authRoute from './routes/authRoute';
 import userRoute from './routes/userRoute';
+import categoryRoute from './routes/categoryRoute';
+import productRoute from './routes/productRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -115,6 +117,8 @@ setupSwagger(app);
 // API routes
 app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/users', userRoute);
+app.use('/api/v1/categories', categoryRoute);
+app.use('/api/v1/products', productRoute);
 
 // 404 handler
 app.use(notFound);

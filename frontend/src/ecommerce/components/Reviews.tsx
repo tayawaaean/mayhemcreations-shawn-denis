@@ -159,7 +159,7 @@ const Reviews: React.FC<ReviewsProps> = ({
                   <div className="flex items-center space-x-2">
                     <h4 className="font-medium text-gray-900">{review.customerName}</h4>
                     {review.isVerified && (
-                      <CheckCircle className="h-4 w-4 text-green-500" title="Verified Purchase" />
+                      <CheckCircle className="h-4 w-4 text-purple-500" title="Verified Purchase" />
                     )}
                   </div>
                   <div className="flex items-center space-x-2 mt-1">

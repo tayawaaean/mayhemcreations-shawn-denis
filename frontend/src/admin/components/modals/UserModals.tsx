@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { X, Mail, User as UserIcon, Shield } from 'lucide-react'
-import { AdminUser } from '../../types'
+import { User as ApiUser } from '../../services/apiService'
 
 interface UserDetailModalProps {
   isOpen: boolean
   onClose: () => void
-  user: AdminUser | null
+  user: ApiUser | null
 }
 
 interface EditUserModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (user: AdminUser) => void
-  user: AdminUser | null
+  onSave: (user: Partial<ApiUser>) => void
+  user: ApiUser | null
 }
 
 export const UserDetailModal: React.FC<UserDetailModalProps> = ({ isOpen, onClose, user }) => {
@@ -31,18 +31,16 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({ isOpen, onClos
           </div>
           <div className="p-4 sm:p-6 space-y-4">
             <div className="flex items-center space-x-4">
-              {user.avatar ? (
-                <img src={user.avatar} alt={user.name} className="h-16 w-16 rounded-full object-cover" />
-              ) : (
-                <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-600 font-semibold text-lg">{user.name.charAt(0)}</span>
-                </div>
-              )}
+              <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-600 font-semibold text-lg">
+                  {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                </span>
+              </div>
               <div>
-                <p className="text-xl font-bold text-gray-900">{user.name}</p>
-                <p className="text-sm text-gray-500 capitalize">Role: {user.role}</p>
-                <span className={`inline-flex mt-1 px-2 py-1 text-xs font-semibold rounded-full ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                  {user.status}
+                <p className="text-xl font-bold text-gray-900">{user.firstName} {user.lastName}</p>
+                <p className="text-sm text-gray-500 capitalize">Role: {user.role.displayName}</p>
+                <span className={`inline-flex mt-1 px-2 py-1 text-xs font-semibold rounded-full ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                  {user.isActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
             </div>
@@ -68,16 +66,28 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({ isOpen, onClos
 
 export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, onSave, user }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
-    role: 'admin' as AdminUser['role'],
-    status: 'active' as AdminUser['status'],
-    password: ''
+    phone: '',
+    isEmailVerified: false,
+    isPhoneVerified: false,
+    isActive: true,
+    roleId: 0
   })
 
   useEffect(() => {
     if (user) {
-      setFormData({ name: user.name, email: user.email, role: user.role, status: user.status })
+      setFormData({
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone || '',
+        isEmailVerified: user.isEmailVerified,
+        isPhoneVerified: user.isPhoneVerified,
+        isActive: user.isActive,
+        roleId: user.role.id
+      })
     }
   }, [user])
 
@@ -85,7 +95,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ ...user, ...formData })
+    // Remove empty phone field to avoid validation errors
+    const dataToSave = { ...formData }
+    if (!dataToSave.phone || dataToSave.phone.trim() === '') {
+      delete dataToSave.phone
+    }
+    // Ensure roleId is an integer
+    dataToSave.roleId = parseInt(dataToSave.roleId.toString(), 10)
+    onSave(dataToSave)
     onClose()
   }
 
@@ -101,15 +118,23 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -125,29 +150,56 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as AdminUser['role'] })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="staff">Staff</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as AdminUser['status'] })}
+                  value={formData.isActive ? 'active' : 'inactive'}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'active' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <div className="px-3 py-2 bg-gray-100 rounded-md text-sm text-gray-600">
+                  {user.role.displayName}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isEmailVerified}
+                    onChange={(e) => setFormData({ ...formData, isEmailVerified: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Email Verified</span>
+                </label>
+              </div>
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isPhoneVerified}
+                    onChange={(e) => setFormData({ ...formData, isPhoneVerified: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Phone Verified</span>
+                </label>
               </div>
             </div>
             <div className="flex justify-end space-x-3 pt-2">

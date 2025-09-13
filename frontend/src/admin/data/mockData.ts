@@ -41,87 +41,9 @@ export const mockAdminUsers: AdminUser[] = [
   }
 ]
 
-export const mockCategories: Category[] = [
-  {
-    id: 'cat-1',
-    name: 'Apparel',
-    slug: 'apparel',
-    description: 'Clothing and apparel items',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&h=200&fit=crop',
-    status: 'active',
-    sortOrder: 1,
-    createdAt: new Date('2024-01-01'),
-    children: [
-      {
-        id: 'cat-1-1',
-        name: 'T-Shirts',
-        slug: 'tshirts',
-        parentId: 'cat-1',
-        status: 'active',
-        sortOrder: 1,
-        createdAt: new Date('2024-01-01')
-      },
-      {
-        id: 'cat-1-2',
-        name: 'Hoodies',
-        slug: 'hoodies',
-        parentId: 'cat-1',
-        status: 'active',
-        sortOrder: 2,
-        createdAt: new Date('2024-01-01')
-      },
-      {
-        id: 'cat-1-3',
-        name: 'Polo Shirts',
-        slug: 'polo-shirts',
-        parentId: 'cat-1',
-        status: 'active',
-        sortOrder: 3,
-        createdAt: new Date('2024-01-01')
-      }
-    ]
-  },
-  {
-    id: 'cat-2',
-    name: 'Accessories',
-    slug: 'accessories',
-    description: 'Bags, caps, and other accessories',
-    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=300&h=200&fit=crop',
-    status: 'active',
-    sortOrder: 2,
-    createdAt: new Date('2024-01-01'),
-    children: [
-      {
-        id: 'cat-2-1',
-        name: 'Caps',
-        slug: 'caps',
-        parentId: 'cat-2',
-        status: 'active',
-        sortOrder: 1,
-        createdAt: new Date('2024-01-01')
-      },
-      {
-        id: 'cat-2-2',
-        name: 'Bags',
-        slug: 'bags',
-        parentId: 'cat-2',
-        status: 'active',
-        sortOrder: 2,
-        createdAt: new Date('2024-01-01')
-      }
-    ]
-  },
-  {
-    id: 'cat-3',
-    name: 'Embroidery',
-    slug: 'embroidery',
-    description: 'Custom embroidery patches and services',
-    image: 'https://images.unsplash.com/photo-1583744946564-b52ac1c389c8?w=300&h=200&fit=crop',
-    status: 'active',
-    sortOrder: 3,
-    createdAt: new Date('2024-01-01')
-  }
-]
+// Categories are now fetched from the database via API
+// This mock data is no longer used - categories come from the seeded database
+export const mockCategories: Category[] = []
 
 export const mockProducts: AdminProduct[] = [
   {

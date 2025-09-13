@@ -194,8 +194,8 @@ export default function Checkout() {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8 text-purple-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h1>
           <p className="text-gray-600 mb-6">
@@ -636,12 +636,12 @@ export default function Checkout() {
                   )}
 
                   {/* Security Notice */}
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                     <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-green-600 mt-0.5 mr-3" />
+                      <Shield className="w-5 h-5 text-purple-600 mt-0.5 mr-3" />
                       <div>
-                        <h4 className="font-medium text-green-900">Secure Payment</h4>
-                        <p className="text-sm text-green-700 mt-1">
+                        <h4 className="font-medium text-purple-900">Secure Payment</h4>
+                        <p className="text-sm text-purple-700 mt-1">
                           Your payment information is encrypted and secure. We never store your card details.
                         </p>
                       </div>

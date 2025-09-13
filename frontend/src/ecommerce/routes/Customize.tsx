@@ -499,7 +499,7 @@ export default function Customize() {
                   ) : (
                     <div className="text-center text-sm text-gray-600">
                       <div className="flex items-center justify-center space-x-2">
-                        <Check className="w-4 h-4 text-green-500" />
+                        <Check className="w-4 h-4 text-purple-500" />
                         <span>Design automatically positioned at {customizationData.placement.replace('-', ' ')}</span>
                       </div>
                       <p className="mt-1 text-xs text-gray-500">Select "Manual" placement to drag and position freely</p>
@@ -594,7 +594,7 @@ export default function Customize() {
                                                    color.toLowerCase().includes('navy') ? '#1e3a8a' :
                                                    color.toLowerCase().includes('gray') ? '#6b7280' :
                                                    color.toLowerCase().includes('red') ? '#dc2626' :
-                                                   color.toLowerCase().includes('green') ? '#16a34a' :
+                                                   color.toLowerCase().includes('green') ? '#7c3aed' :
                                                    color.toLowerCase().includes('blue') ? '#2563eb' :
                                                    color.toLowerCase().includes('maroon') ? '#7c2d12' :
                                                    color.toLowerCase().includes('burgundy') ? '#7c2d12' :
@@ -1035,22 +1035,22 @@ export default function Customize() {
                   </ul>
                 </div>
                 
-                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                  <h3 className="font-semibold text-green-900 mb-3 flex items-center">
+                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                  <h3 className="font-semibold text-purple-900 mb-3 flex items-center">
                     <span className="text-lg mr-2">📏</span>
                     Size Guidelines
                   </h3>
-                  <ul className="text-sm text-green-800 space-y-2">
+                  <ul className="text-sm text-purple-800 space-y-2">
                     <li className="flex items-start">
-                      <span className="text-green-500 mr-2">•</span>
+                      <span className="text-purple-500 mr-2">•</span>
                       <span><strong>Minimum Size:</strong> At least 2 inches (5cm) in width or height</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-green-500 mr-2">•</span>
+                      <span className="text-purple-500 mr-2">•</span>
                       <span><strong>Maximum Size:</strong> Up to 8 inches (20cm) for most garments</span>
                     </li>
                     <li className="flex items-start">
-                      <span className="text-green-500 mr-2">•</span>
+                      <span className="text-purple-500 mr-2">•</span>
                       <span><strong>File Size:</strong> Keep under 10MB for best performance</span>
                     </li>
                   </ul>

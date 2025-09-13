@@ -119,6 +119,21 @@ All seeded users use secure passwords following the pattern: `Secure{Role}2024!`
 - **System Users**: 9 users (@mayhemcreation.com)
 - **Customer Users**: 5 users (@example.com)
 
+## 📁 Categories Data
+
+### **Categories Structure**:
+- **17 categories total** with hierarchical organization
+- **3 main categories**: Apparel, Accessories, Patches
+- **14 subcategories** with proper parent relationships
+
+### **Category Breakdown**:
+- **Apparel** (6 subcategories):
+  - T-Shirts, Hoodies, Polo Shirts, Long Sleeve Tees, Zip Hoodies, Vintage Tees
+- **Accessories** (5 subcategories):
+  - Caps, Trucker Caps, Tote Bags, Crossbody Bags, Drawstring Bags
+- **Patches** (3 subcategories):
+  - Iron-On Patches, Sew-On Patches, Patch Packs
+
 ## 🛠️ Seeder Commands
 
 | Command | Description | Use Case |
@@ -129,6 +144,7 @@ All seeded users use secure passwords following the pattern: `Secure{Role}2024!`
 | `npm run seed:reset` | Full database reset | Complete reset |
 | `npm run seed:roles` | Roles only | Role management |
 | `npm run seed:users` | Users only | User management |
+| `npm run seed:categories` | Categories only | Category management |
 | `npm run seed:clear-all` | Clear all data | Clean slate |
 
 ## 🔧 Customization
@@ -142,6 +158,11 @@ All seeded users use secure passwords following the pattern: `Secure{Role}2024!`
 1. Edit `src/seeders/userSeeder.ts`
 2. Add user data to `userData` array
 3. Run `npm run seed:users`
+
+### Adding New Categories
+1. Edit `src/seeders/categorySeeder.ts`
+2. Add category data to `categorySeedData` array
+3. Run `npm run seed:categories`
 
 ### Modifying Permissions
 1. Edit `src/seeders/roleSeeder.ts`

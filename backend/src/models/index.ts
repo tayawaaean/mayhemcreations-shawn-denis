@@ -3,6 +3,8 @@ import { User, UserAttributes, UserCreationAttributes } from './userModel';
 import { Role, RoleAttributes, RoleCreationAttributes, ROLES, PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from './roleModel';
 import { Session, SessionAttributes, SessionCreationAttributes } from './sessionModel';
 import { OAuthProvider, OAuthProviderAttributes, OAuthProviderCreationAttributes } from './oauthProviderModel';
+import { Category, CategoryAttributes, CategoryCreationAttributes } from './categoryModel';
+import Product, { ProductAttributes, ProductCreateAttributes } from './productModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -41,6 +43,32 @@ const setupAssociations = (): void => {
     foreignKey: 'userId',
     as: 'user',
   });
+
+  // Category self-referencing associations are defined in the model file
+
+  // Product belongs to Category (parent category)
+  Product.belongsTo(Category, {
+    foreignKey: 'categoryId',
+    as: 'category',
+  });
+
+  // Category has many Products
+  Category.hasMany(Product, {
+    foreignKey: 'categoryId',
+    as: 'products',
+  });
+
+  // Product belongs to Category (subcategory)
+  Product.belongsTo(Category, {
+    foreignKey: 'subcategoryId',
+    as: 'subcategory',
+  });
+
+  // Category has many Products as subcategory
+  Category.hasMany(Product, {
+    foreignKey: 'subcategoryId',
+    as: 'subcategoryProducts',
+  });
 };
 
 // Initialize associations
@@ -64,6 +92,12 @@ export {
   OAuthProvider,
   OAuthProviderAttributes,
   OAuthProviderCreationAttributes,
+  Category,
+  CategoryAttributes,
+  CategoryCreationAttributes,
+  Product,
+  ProductAttributes,
+  ProductCreateAttributes,
 };
 
 // Export all models for easy access
@@ -72,6 +106,8 @@ export const models = {
   Role,
   Session,
   OAuthProvider,
+  Category,
+  Product,
 };
 
 // Database synchronization function

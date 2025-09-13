@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useAdmin } from '../context/AdminContext'
 import { 
   Plus, 
   Search, 
@@ -12,11 +11,10 @@ import {
 } from 'lucide-react'
 import { AddProductModal, EditProductModal, DeleteProductModal } from '../components/modals/ProductModals'
 import HelpModal from '../components/modals/HelpModal'
-import { AdminProduct } from '../types'
+import { useProducts, AdminProduct } from '../hooks/useProducts'
 
 const Products: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const { products } = state
+  const { products, loading, error, createProduct, updateProduct, deleteProduct } = useProducts()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
@@ -31,8 +29,8 @@ const Products: React.FC = () => {
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+                         (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesCategory = selectedCategory === 'all' || product.category?.slug === selectedCategory
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus
     return matchesSearch && matchesCategory && matchesStatus
   })
@@ -74,34 +72,78 @@ const Products: React.FC = () => {
     setIsEditModalOpen(true)
   }
 
-  const handleAddProduct = (productData: Omit<AdminProduct, 'id'>) => {
-    const newProduct: AdminProduct = {
-      ...productData,
-      id: `product-${Date.now()}`,
-      variants: productData.variants || []
+  const handleViewProduct = (product: AdminProduct) => {
+    // TODO: Implement view product functionality
+    console.log('View product:', product)
+  }
+
+  const handleAddProduct = async (productData: Omit<AdminProduct, 'id'>) => {
+    try {
+      await createProduct(productData as AdminProduct)
+      setIsAddModalOpen(false)
+    } catch (error) {
+      console.error('Error creating product:', error)
     }
-    dispatch({ type: 'ADD_PRODUCT', payload: newProduct })
   }
 
-  const handleUpdateProduct = (product: AdminProduct) => {
-    dispatch({ type: 'UPDATE_PRODUCT', payload: product })
+  const handleUpdateProduct = async (product: AdminProduct) => {
+    try {
+      await updateProduct(product.id, product)
+      setIsEditModalOpen(false)
+    } catch (error) {
+      console.error('Error updating product:', error)
+    }
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (selectedProduct) {
-      dispatch({ type: 'DELETE_PRODUCT', payload: selectedProduct.id })
+      try {
+        await deleteProduct(selectedProduct.id)
+        setIsDeleteModalOpen(false)
+        setSelectedProduct(null)
+      } catch (error) {
+        console.error('Error deleting product:', error)
+      }
     }
   }
 
-  const getTotalStock = (product: any) => {
-    return product.variants.reduce((total: number, variant: any) => total + variant.stock, 0)
+  const getTotalStock = (product: AdminProduct) => {
+    return product.stock || 0
   }
 
-  const getLowStockVariants = (product: any) => {
-    return product.variants.filter((v: any) => v.stock < 10).length
+  const getLowStockVariants = (product: AdminProduct) => {
+    return (product.stock || 0) < 10 ? 1 : 0
   }
 
-  const categories = Array.from(new Set(products.map(p => p.category)))
+  const categories = Array.from(new Set(products.map(p => p.category?.slug).filter(Boolean)))
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading products...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">Error loading products: {error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -253,13 +295,13 @@ const Products: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={product.primaryImage}
-                        alt={product.title}
+                        src={product.image}
+                        alt={product.alt}
                         className="h-12 w-12 rounded-lg object-cover"
                       />
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{product.title}</div>
-                        <div className="text-sm text-gray-500">{product.subcategory}</div>
+                        <div className="text-sm text-gray-500">{product.subcategory?.name || 'N/A'}</div>
                         {getLowStockVariants(product) > 0 && (
                           <div className="flex items-center text-xs text-yellow-600 mt-1">
                             <AlertTriangle className="h-3 w-3 mr-1" />
@@ -273,7 +315,7 @@ const Products: React.FC = () => {
                     {product.sku}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {product.category}
+                    {product.category?.name || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div>
@@ -286,7 +328,7 @@ const Products: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <div className="flex items-center">
                       <Package className="h-4 w-4 text-gray-400 mr-1" />
-                      {product.variants.length} variant{product.variants.length > 1 ? 's' : ''}
+                      {getTotalStock(product)} units
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -334,15 +376,15 @@ const Products: React.FC = () => {
                     className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <img
-                    src={product.primaryImage}
-                    alt={product.title}
+                    src={product.image}
+                    alt={product.alt}
                     className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-medium text-gray-900 truncate">{product.title}</h3>
-                        <p className="text-sm text-gray-500 truncate">{product.subcategory}</p>
+                        <p className="text-sm text-gray-500 truncate">{product.subcategory?.name || 'N/A'}</p>
                         <p className="text-xs text-gray-400 mt-1">SKU: {product.sku}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
@@ -370,7 +412,7 @@ const Products: React.FC = () => {
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500">Category</p>
-                        <p className="text-sm text-gray-900">{product.category}</p>
+                        <p className="text-sm text-gray-900">{product.category?.name || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Price</p>

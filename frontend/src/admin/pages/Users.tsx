@@ -1,59 +1,66 @@
 import React, { useMemo, useState } from 'react'
-import { useAdmin } from '../context/AdminContext'
-import { Search, Filter, Eye, Edit, Users, Shield } from 'lucide-react'
+import { useUsers } from '../hooks/useUsers'
+import { Search, Filter, Eye, Edit, Users, Shield, Plus } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { UserDetailModal, EditUserModal, AddUserModal } from '../components/modals/UserModals'
-import { AdminUser, Customer } from '../types'
+import { User as ApiUser } from '../services/apiService'
 
 const UsersPage: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const [roleFilter, setRoleFilter] = useState<'admins' | 'sellers' | 'customers'>('admins')
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'designer' | 'support' | 'moderator'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive' | 'all'>('all')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const [selectedUser, setSelectedUser] = useState<ApiUser | null>(null)
   const [isUserDetailOpen, setIsUserDetailOpen] = useState(false)
   const [isUserEditOpen, setIsUserEditOpen] = useState(false)
   const [isUserAddOpen, setIsUserAddOpen] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const adminUsers = state.users
-  const admins = useMemo(() => adminUsers.filter(u => u.role === 'admin' || u.role === 'manager'), [adminUsers])
-  const sellers = useMemo(() => adminUsers.filter(u => u.role === 'staff'), [adminUsers])
-  const customers = state.customers
+  // Memoize the params object to prevent infinite re-renders
+  // Exclude customers by filtering for non-customer roles
+  const userParams = useMemo(() => ({
+    page: currentPage,
+    limit: 10,
+    search: searchQuery || undefined,
+    status: selectedStatus,
+    role: roleFilter === 'all' ? undefined : roleFilter, // Filter by specific role or show all non-customers
+    sortBy: 'createdAt' as const,
+    sortOrder: 'desc' as const
+  }), [currentPage, searchQuery, selectedStatus, roleFilter])
 
-  const list = useMemo(() => {
-    if (roleFilter === 'admins') return admins
-    if (roleFilter === 'sellers') return sellers
-    return customers
-  }, [roleFilter, admins, sellers, customers])
+  // Use the API hook
+  const {
+    users,
+    pagination,
+    stats,
+    loading,
+    error,
+    refetch,
+    updateUser,
+    updateUserStatus
+  } = useUsers(userParams)
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase()
-    if (roleFilter === 'customers') {
-      return (list as Customer[]).filter(c => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
-    }
-    return (list as AdminUser[]).filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
-  }, [list, searchQuery, roleFilter])
+  // Users are already filtered by backend to exclude customers
+  const filteredUsers = users
 
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-  }
-
-  const handleSelectAll = () => {
-    if (roleFilter === 'customers') return
-    const items = filtered as AdminUser[]
-    if (selectedIds.length === items.length) setSelectedIds([])
-    else setSelectedIds(items.map(u => u.id))
-  }
-
-  const handleEditUser = (user: AdminUser) => {
+  const handleEditUser = (user: ApiUser) => {
     setSelectedUser(user)
     setIsUserEditOpen(true)
   }
 
-  const handleViewUser = (user: AdminUser) => {
+  const handleViewUser = (user: ApiUser) => {
     setSelectedUser(user)
     setIsUserDetailOpen(true)
+  }
+
+  const handleUpdateUser = async (updatedUser: Partial<ApiUser>) => {
+    if (!selectedUser) return
+    
+    const success = await updateUser(selectedUser.id, updatedUser)
+    if (success) {
+      setIsUserEditOpen(false)
+      setSelectedUser(null)
+    }
   }
 
   const handleSaveUser = (updated: AdminUser) => {
@@ -95,7 +102,7 @@ const UsersPage: React.FC = () => {
       {/* Role/Search Filters */}
 
       <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
@@ -113,11 +120,27 @@ const UsersPage: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
+              onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'manager' | 'designer' | 'support' | 'moderator')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="admins">Admins & Managers</option>
-              <option value="customers">Customers</option>
+              <option value="all">All Staff</option>
+              <option value="admin">Administrators</option>
+              <option value="manager">Managers</option>
+              <option value="designer">Designers</option>
+              <option value="support">Support</option>
+              <option value="moderator">Moderators</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as 'active' | 'inactive' | 'all')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </select>
           </div>
           <div className="flex items-end">
@@ -135,59 +158,79 @@ const UsersPage: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
             <thead className="bg-gray-50">
               <tr>
-                {roleFilter !== 'customers' && (
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.length > 0 && selectedIds.length === (filtered as AdminUser[]).length}
-                      onChange={handleSelectAll}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </th>
-                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verified</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {roleFilter !== 'customers' && (filtered as AdminUser[]).map(user => (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    Loading users...
+                  </td>
+                </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-red-500">
+                    Error loading users: {error}
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    No users found
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map(user => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(user.id)}
-                      onChange={() => handleToggleSelect(user.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="h-12 w-12 rounded-lg object-cover" />
-                      ) : (
-                        <div className="h-12 w-12 bg-gray-300 rounded-lg flex items-center justify-center">
-                          <span className="text-gray-600 font-medium text-sm">{user.name.charAt(0)}</span>
-                        </div>
-                      )}
+                      <div className="h-12 w-12 bg-gray-300 rounded-lg flex items-center justify-center">
+                        <span className="text-gray-600 font-medium text-sm">
+                          {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                        </span>
+                      </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">Last login: {user.lastLogin.toLocaleDateString()}</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {user.lastLoginAt ? `Last login: ${new Date(user.lastLoginAt).toLocaleDateString()}` : 'Never logged in'}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 capitalize">
-                      <Shield className="w-3 h-3 mr-1" /> {user.role}
+                      <Shield className="w-3 h-3 mr-1" /> {user.role.displayName}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {user.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.isActive ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex space-x-2">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.isEmailVerified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.isEmailVerified ? '✓ Email' : '✗ Email'}
+                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.isPhoneVerified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.isPhoneVerified ? '✓ Phone' : '✗ Phone'}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
@@ -200,42 +243,63 @@ const UsersPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
-              {roleFilter === 'customers' && (filtered as Customer[]).map(c => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {c.avatar ? (
-                        <img src={c.avatar} alt={c.name} className="h-12 w-12 rounded-lg object-cover" />
-                      ) : (
-                        <div className="h-12 w-12 bg-gray-300 rounded-lg flex items-center justify-center">
-                          <span className="text-gray-600 font-medium text-sm">{c.name.charAt(0)}</span>
-                        </div>
-                      )}
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{c.name}</div>
-                        <div className="text-xs text-gray-500">{c.address.city}, {c.address.state}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${c.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button className="text-gray-400" disabled>
-                        <Users className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                {pagination.total} results
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                  .filter(page => 
+                    page === 1 || 
+                    page === pagination.totalPages || 
+                    Math.abs(page - currentPage) <= 2
+                  )
+                  .map((page, index, array) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && array[index - 1] !== page - 1 && (
+                        <span className="px-3 py-1 text-sm text-gray-500">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 text-sm border rounded-md ${
+                          currentPage === page
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                <button
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: User Management">

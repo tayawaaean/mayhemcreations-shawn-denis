@@ -1,5 +1,4 @@
-import React, { useState } from 'react'
-import { useAdmin } from '../context/AdminContext'
+import React, { useState, useEffect } from 'react'
 import { 
   Plus, 
   Edit, 
@@ -8,36 +7,66 @@ import {
   Image,
   GripVertical,
   Eye,
-  EyeOff
+  EyeOff,
+  Search,
+  Filter
 } from 'lucide-react'
 import { AddCategoryModal, EditCategoryModal, DeleteCategoryModal } from '../components/modals/CategoryModals'
 import HelpModal from '../components/modals/HelpModal'
- import { Category } from '../types'
+import { useCategories } from '../hooks/useCategories'
+import { Category } from '../types'
 
 const Categories: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const { categories } = state
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const {
+    categories,
+    loading,
+    error,
+    stats,
+    fetchCategories,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    searchCategories
+  } = useCategories({
+    includeChildren: true,
+    sortBy: 'sortOrder',
+    sortOrder: 'ASC'
+  })
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const itemsPerPage = 10
 
+  // Filter categories based on search and status
+  const filteredCategories = categories.filter(category => {
+    const matchesSearch = searchQuery === '' || 
+      category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      category.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (category.description && category.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    
+    const matchesStatus = statusFilter === 'all' || category.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
+
   // Pagination logic
-  const totalItems = categories.length
+  const totalItems = filteredCategories.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedCategories = categories.slice(startIndex, endIndex)
+  const paginatedCategories = filteredCategories.slice(startIndex, endIndex)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
-  const handleSelectCategory = (categoryId: string) => {
+  const handleSelectCategory = (categoryId: number) => {
     setSelectedCategories(prev => 
       prev.includes(categoryId) 
         ? prev.filter(id => id !== categoryId)
@@ -53,22 +82,58 @@ const Categories: React.FC = () => {
     }
   }
 
-  const handleAddCategory = (categoryData: Omit<Category, 'id'>) => {
-    const newCategory: Category = {
-      ...categoryData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      children: []
+  const handleAddCategory = async (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newCategory = await createCategory({
+        name: categoryData.name,
+        slug: categoryData.slug,
+        description: categoryData.description,
+        image: categoryData.image,
+        parentId: categoryData.parentId,
+        status: categoryData.status,
+        sortOrder: categoryData.sortOrder
+      })
+      
+      if (newCategory) {
+        setIsAddModalOpen(false)
+      }
+    } catch (error) {
+      console.error('Error adding category:', error)
     }
-    dispatch({ type: 'ADD_CATEGORY', payload: newCategory })
   }
 
-  const handleUpdateCategory = (category: Category) => {
-    dispatch({ type: 'UPDATE_CATEGORY', payload: category })
+  const handleUpdateCategory = async (category: Category) => {
+    try {
+      const updatedCategory = await updateCategory(category.id, {
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        image: category.image,
+        parentId: category.parentId,
+        status: category.status,
+        sortOrder: category.sortOrder
+      })
+      
+      if (updatedCategory) {
+        setIsEditModalOpen(false)
+        setSelectedCategory(null)
+      }
+    } catch (error) {
+      console.error('Error updating category:', error)
+    }
   }
 
-  const handleDeleteCategory = (categoryId: string) => {
-    dispatch({ type: 'DELETE_CATEGORY', payload: categoryId })
+  const handleDeleteCategory = async (categoryId: number) => {
+    try {
+      const success = await deleteCategory(categoryId)
+      
+      if (success) {
+        setIsDeleteModalOpen(false)
+        setSelectedCategory(null)
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error)
+    }
   }
 
   const handleEditCategory = (category: Category) => {
@@ -76,22 +141,20 @@ const Categories: React.FC = () => {
     setIsEditModalOpen(true)
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (selectedCategory) {
-      handleDeleteCategory(selectedCategory.id)
-      setIsDeleteModalOpen(false)
-      setSelectedCategory(null)
+      await handleDeleteCategory(selectedCategory.id)
     }
   }
 
-  const handleToggleStatus = (categoryId: string) => {
+  const handleToggleStatus = async (categoryId: number) => {
     const category = categories.find(c => c.id === categoryId)
     if (category) {
       const updatedCategory = {
         ...category,
         status: category.status === 'active' ? 'inactive' as const : 'active' as const
       }
-      dispatch({ type: 'UPDATE_CATEGORY', payload: updatedCategory })
+      await updateCategory(categoryId, { status: updatedCategory.status })
     }
   }
 
@@ -153,7 +216,7 @@ const Categories: React.FC = () => {
             </span>
           </td>
           <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-            {category.createdAt.toLocaleDateString()}
+            {new Date(category.createdAt).toLocaleDateString()}
           </td>
           <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
             <div className="flex items-center justify-end space-x-1">
@@ -220,6 +283,67 @@ const Categories: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Search and Filter Controls */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          {/* Status Filter */}
+          <div className="sm:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {/* Stats Display */}
+          {stats && (
+            <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <span>Total: {stats.total}</span>
+              <span>Active: {stats.active}</span>
+              <span>Inactive: {stats.inactive}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Loading and Error States */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <p className="mt-2 text-gray-600">Loading categories...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-700">Error: {error}</p>
+          <button
+            onClick={() => fetchCategories()}
+            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Bulk actions */}
       {selectedCategories.length > 0 && (
@@ -327,7 +451,7 @@ const Categories: React.FC = () => {
                           <span className="text-xs text-gray-500">Sub-category</span>
                         )}
                         <span className="text-xs text-gray-500">
-                          {category.createdAt.toLocaleDateString()}
+                          {new Date(category.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>

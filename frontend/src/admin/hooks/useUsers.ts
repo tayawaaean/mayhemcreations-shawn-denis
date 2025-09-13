@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService, User, UserListResponse, UserStats } from '../services/apiService';
 
 interface UseUsersParams {
@@ -40,8 +40,12 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   const fetchUsers = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    
+    isFetchingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -58,6 +62,7 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
       setError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [params]);
 
@@ -74,6 +79,7 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
   }, []);
 
   const refetch = useCallback(async () => {
+    isFetchingRef.current = false; // Reset the ref to allow refetch
     await Promise.all([fetchUsers(), fetchStats()]);
   }, [fetchUsers, fetchStats]);
 
