@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react'
 import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, Review, AdminUser } from '../types'
 import { 
   mockProducts, 
@@ -6,11 +6,11 @@ import {
   mockCustomers, 
   mockFAQs, 
   mockMessages, 
-  mockEmbroideryOptions, 
   mockAnalytics,
   mockReviews,
   mockAdminUsers
 } from '../data/mockData'
+import { embroideryOptionApiService } from '../../shared/embroideryOptionApiService'
 
 type AdminState = {
   products: AdminProduct[]
@@ -53,7 +53,7 @@ type AdminAction =
   | { type: 'SET_EMBROIDERY_OPTIONS'; payload: EmbroideryOption[] }
   | { type: 'ADD_EMBROIDERY_OPTION'; payload: EmbroideryOption }
   | { type: 'UPDATE_EMBROIDERY_OPTION'; payload: EmbroideryOption }
-  | { type: 'DELETE_EMBROIDERY_OPTION'; payload: string }
+  | { type: 'DELETE_EMBROIDERY_OPTION'; payload: number }
   | { type: 'SET_REVIEWS'; payload: Review[] }
   | { type: 'ADD_REVIEW'; payload: Review }
   | { type: 'UPDATE_REVIEW'; payload: Review }
@@ -70,7 +70,7 @@ const initialState: AdminState = {
   users: mockAdminUsers,
   faqs: mockFAQs,
   messages: mockMessages,
-  embroideryOptions: mockEmbroideryOptions,
+  embroideryOptions: [],
   reviews: mockReviews,
   analytics: mockAnalytics,
   selectedProduct: null,
@@ -190,6 +190,26 @@ const AdminContext = createContext<{
 
 export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(adminReducer, initialState)
+
+  // Fetch embroidery options from API on mount
+  useEffect(() => {
+    const fetchEmbroideryOptions = async () => {
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true })
+        const response = await embroideryOptionApiService.getEmbroideryOptions()
+        if (response.success) {
+          dispatch({ type: 'SET_EMBROIDERY_OPTIONS', payload: response.data })
+        }
+      } catch (error) {
+        console.error('Failed to fetch embroidery options:', error)
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to load embroidery options' })
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false })
+      }
+    }
+
+    fetchEmbroideryOptions()
+  }, [])
 
   return (
     <AdminContext.Provider value={{ state, dispatch }}>

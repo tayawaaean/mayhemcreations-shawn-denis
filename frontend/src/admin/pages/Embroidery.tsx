@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAdmin } from '../context/AdminContext'
 import {
   Plus,
@@ -12,16 +12,19 @@ import {
   Circle,
   ArrowUp,
   Layers,
-  Square
+  Square,
+  Loader2
 } from 'lucide-react'
 import { AddEmbroideryModal, EditEmbroideryModal, DeleteEmbroideryModal } from '../components/modals/EmbroideryModals'
 import HelpModal from '../components/modals/HelpModal'
 import { EmbroideryOption } from '../types'
+import { embroideryOptionApiService } from '../../shared/embroideryOptionApiService'
 
 const Embroidery: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const { embroideryOptions } = state
-  const [selectedOptions, setSelectedOptions] = useState<string[]>([])
+  const [embroideryOptions, setEmbroideryOptions] = useState<EmbroideryOption[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedOptions, setSelectedOptions] = useState<number[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -30,23 +33,44 @@ const Embroidery: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
-  const filteredOptions = embroideryOptions.filter(option => 
-    selectedType === 'all' || option.type === selectedType
-  )
+  // Fetch embroidery options
+  useEffect(() => {
+    const fetchEmbroideryOptions = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await embroideryOptionApiService.getEmbroideryOptions({
+          category: selectedType === 'all' ? undefined : selectedType,
+          page: currentPage,
+          limit: itemsPerPage
+        })
+        
+        setEmbroideryOptions(response.data)
+        setTotalPages(response.pagination?.pages || 1)
+        setTotalItems(response.pagination?.total || 0)
+      } catch (err) {
+        setError('Failed to fetch embroidery options')
+        console.error('Error fetching embroidery options:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  // Pagination logic
-  const totalItems = filteredOptions.length
-  const totalPages = Math.ceil(totalItems / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedOptions = filteredOptions.slice(startIndex, endIndex)
+    fetchEmbroideryOptions()
+  }, [selectedType, currentPage])
+
+  // No need for client-side filtering or pagination since API handles it
+  const paginatedOptions = embroideryOptions
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
-  const handleSelectOption = (optionId: string) => {
+  const handleSelectOption = (optionId: number) => {
     setSelectedOptions(prev => 
       prev.includes(optionId) 
         ? prev.filter(id => id !== optionId)
@@ -55,27 +79,51 @@ const Embroidery: React.FC = () => {
   }
 
   const handleSelectAll = () => {
-    if (selectedOptions.length === filteredOptions.length) {
+    if (selectedOptions.length === paginatedOptions.length) {
       setSelectedOptions([])
     } else {
-      setSelectedOptions(filteredOptions.map(o => o.id))
+      setSelectedOptions(paginatedOptions.map(o => o.id))
     }
   }
 
-  const handleAddOption = (optionData: Omit<EmbroideryOption, 'id'>) => {
-    const newOption: EmbroideryOption = {
-      ...optionData,
-      id: Date.now().toString()
+  const handleAddOption = async (optionData: Omit<EmbroideryOption, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const createData = {
+        ...optionData,
+        isIncompatible: optionData.isIncompatible ? JSON.parse(optionData.isIncompatible) : undefined
+      }
+      const response = await embroideryOptionApiService.createEmbroideryOption(createData)
+      setEmbroideryOptions(prev => [...prev, response.data])
+    } catch (err) {
+      console.error('Error creating embroidery option:', err)
+      setError('Failed to create embroidery option')
     }
-    dispatch({ type: 'ADD_EMBROIDERY_OPTION', payload: newOption })
   }
 
-  const handleUpdateOption = (option: EmbroideryOption) => {
-    dispatch({ type: 'UPDATE_EMBROIDERY_OPTION', payload: option })
+  const handleUpdateOption = async (option: EmbroideryOption) => {
+    try {
+      const updateData = {
+        ...option,
+        isIncompatible: option.isIncompatible ? JSON.parse(option.isIncompatible) : undefined
+      }
+      const response = await embroideryOptionApiService.updateEmbroideryOption(option.id, updateData)
+      setEmbroideryOptions(prev => 
+        prev.map(o => o.id === option.id ? response.data : o)
+      )
+    } catch (err) {
+      console.error('Error updating embroidery option:', err)
+      setError('Failed to update embroidery option')
+    }
   }
 
-  const handleDeleteOption = (optionId: string) => {
-    dispatch({ type: 'DELETE_EMBROIDERY_OPTION', payload: optionId })
+  const handleDeleteOption = async (optionId: number) => {
+    try {
+      await embroideryOptionApiService.deleteEmbroideryOption(optionId)
+      setEmbroideryOptions(prev => prev.filter(o => o.id !== optionId))
+    } catch (err) {
+      console.error('Error deleting embroidery option:', err)
+      setError('Failed to delete embroidery option')
+    }
   }
 
   const handleEditOption = (option: EmbroideryOption) => {
@@ -91,50 +139,58 @@ const Embroidery: React.FC = () => {
     }
   }
 
-  const handleToggleStatus = (optionId: string) => {
-    const option = embroideryOptions.find(o => o.id === optionId)
-    if (option) {
-      const updatedOption = {
-        ...option,
-        status: option.status === 'active' ? 'inactive' as const : 'active' as const
+  const handleToggleStatus = async (optionId: number) => {
+    try {
+      const option = embroideryOptions.find(o => o.id === optionId)
+      if (option) {
+        const response = await embroideryOptionApiService.toggleEmbroideryOptionStatus(optionId, !option.isActive)
+        setEmbroideryOptions(prev => 
+          prev.map(o => o.id === optionId ? response.data : o)
+        )
       }
-      dispatch({ type: 'UPDATE_EMBROIDERY_OPTION', payload: updatedOption })
+    } catch (err) {
+      console.error('Error toggling embroidery option status:', err)
+      setError('Failed to toggle embroidery option status')
     }
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
+  const getTypeIcon = (category: string) => {
+    switch (category) {
       case 'coverage':
         return <Palette className="h-4 w-4" />
       case 'material':
         return <Layers className="h-4 w-4" />
-      case 'thread':
+      case 'threads':
         return <Circle className="h-4 w-4" />
       case 'border':
         return <Square className="h-4 w-4" />
-      case 'upgrade':
+      case 'upgrades':
         return <ArrowUp className="h-4 w-4" />
       case 'cutting':
         return <Scissors className="h-4 w-4" />
+      case 'backing':
+        return <Layers className="h-4 w-4" />
       default:
         return <Palette className="h-4 w-4" />
     }
   }
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
+  const getTypeColor = (category: string) => {
+    switch (category) {
       case 'coverage':
         return 'bg-blue-100 text-blue-800'
       case 'material':
         return 'bg-green-100 text-green-800'
-      case 'thread':
+      case 'threads':
         return 'bg-purple-100 text-purple-800'
       case 'border':
         return 'bg-yellow-100 text-yellow-800'
-      case 'upgrade':
+      case 'upgrades':
         return 'bg-red-100 text-red-800'
       case 'cutting':
         return 'bg-gray-100 text-gray-800'
+      case 'backing':
+        return 'bg-indigo-100 text-indigo-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -144,11 +200,39 @@ const Embroidery: React.FC = () => {
     { value: 'all', label: 'All Types' },
     { value: 'coverage', label: 'Coverage' },
     { value: 'material', label: 'Material' },
-    { value: 'thread', label: 'Thread' },
+    { value: 'threads', label: 'Threads' },
     { value: 'border', label: 'Border' },
-    { value: 'upgrade', label: 'Upgrade' },
-    { value: 'cutting', label: 'Cutting' }
+    { value: 'upgrades', label: 'Upgrades' },
+    { value: 'cutting', label: 'Cutting' },
+    { value: 'backing', label: 'Backing' }
   ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading embroidery options...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -224,7 +308,7 @@ const Embroidery: React.FC = () => {
                 <th className="px-3 py-3 text-left w-12">
                   <input
                     type="checkbox"
-                    checked={selectedOptions.length === filteredOptions.length && filteredOptions.length > 0}
+                    checked={selectedOptions.length === paginatedOptions.length && paginatedOptions.length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -242,7 +326,7 @@ const Embroidery: React.FC = () => {
                   Description
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                  Sort Order
+                  Level
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Status
@@ -273,7 +357,7 @@ const Embroidery: React.FC = () => {
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          getTypeIcon(option.type)
+                          getTypeIcon(option.category)
                         )}
                       </div>
                       <div className="ml-3">
@@ -282,12 +366,12 @@ const Embroidery: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(option.type)}`}>
-                      {option.type}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(option.category)}`}>
+                      {option.category}
                     </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
-                    ${option.price.toFixed(2)}
+                    {Number(option.price) === 0 ? 'Free' : `$${Number(option.price).toFixed(2)}`}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
                     <div className="truncate max-w-xs" title={option.description || 'No description'}>
@@ -295,16 +379,23 @@ const Embroidery: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                    {option.sortOrder}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      option.level === 'basic' ? 'bg-gray-100 text-gray-800' :
+                      option.level === 'standard' ? 'bg-blue-100 text-blue-800' :
+                      option.level === 'premium' ? 'bg-purple-100 text-purple-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {option.level}
+                    </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
-                      option.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      option.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                     }`}>
                       <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                        option.status === 'active' ? 'bg-green-500' : 'bg-gray-500'
+                        option.isActive ? 'bg-green-500' : 'bg-gray-500'
                       }`}></div>
-                      {option.status}
+                      {option.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
@@ -312,9 +403,9 @@ const Embroidery: React.FC = () => {
                       <button
                         onClick={() => handleToggleStatus(option.id)}
                         className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                        title={option.status === 'active' ? 'Deactivate' : 'Activate'}
+                        title={option.isActive ? 'Deactivate' : 'Activate'}
                       >
-                        {option.status === 'active' ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        {option.isActive ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </button>
                        <button
                          onClick={() => handleEditOption(option)}
@@ -363,22 +454,21 @@ const Embroidery: React.FC = () => {
                               />
                             ) : (
                               <span className="text-gray-500 text-xs">
-                                {getTypeIcon(option.type)}
+                                {getTypeIcon(option.category)}
                               </span>
                             )}
                           </div>
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(option.type)}`}>
-                            {option.type}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(option.category)}`}>
+                            {option.category}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
-                        <button
-                          onClick={() => handleToggleStatus(option.id)}
-                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"
-                        >
-                          Active
-                        </button>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          option.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {option.isActive ? 'Active' : 'Inactive'}
+                        </span>
                         <button
                           onClick={() => handleEditOption(option)}
                           className="text-blue-600 hover:text-blue-900"
@@ -398,12 +488,12 @@ const Embroidery: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500">Price</p>
                         <p className="text-sm font-medium text-gray-900">
-                          {option.price === 0 ? 'Free' : `$${option.price.toFixed(2)}`}
+                          {Number(option.price) === 0 ? 'Free' : `$${Number(option.price).toFixed(2)}`}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Sort Order</p>
-                        <p className="text-sm text-gray-900">{option.sortOrder}</p>
+                        <p className="text-xs text-gray-500">Level</p>
+                        <p className="text-sm text-gray-900 capitalize">{option.level}</p>
                       </div>
                     </div>
 
@@ -441,7 +531,7 @@ const Embroidery: React.FC = () => {
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalItems)}</span> of{' '}
+                Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-medium">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of{' '}
                 <span className="font-medium">{totalItems}</span> results
               </p>
             </div>

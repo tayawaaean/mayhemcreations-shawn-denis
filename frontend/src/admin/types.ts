@@ -127,15 +127,20 @@ export type Message = {
 }
 
 export type EmbroideryOption = {
-  id: string
+  id: number
   name: string
-  type: 'coverage' | 'material' | 'thread' | 'border' | 'upgrade' | 'cutting'
+  description: string
   price: number
-  description?: string
-  status: 'active' | 'inactive'
-  sortOrder: number
-  createdAt: Date
-  image?: string
+  image: string // Base64 encoded image
+  stitches: number
+  estimatedTime: string
+  category: 'coverage' | 'threads' | 'material' | 'border' | 'backing' | 'upgrades' | 'cutting'
+  level: 'basic' | 'standard' | 'premium' | 'luxury'
+  isPopular: boolean
+  isActive: boolean
+  isIncompatible?: string // JSON string of incompatible option IDs
+  createdAt: string
+  updatedAt: string
 }
 
 export type Analytics = {

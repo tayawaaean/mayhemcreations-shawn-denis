@@ -15,6 +15,7 @@ import userRoute from './routes/userRoute';
 import categoryRoute from './routes/categoryRoute';
 import productRoute from './routes/productRoute';
 import variantRoute from './routes/variantRoute';
+import embroideryOptionRoute from './routes/embroideryOptionRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -121,6 +122,7 @@ app.use('/api/v1/users', userRoute);
 app.use('/api/v1/categories', categoryRoute);
 app.use('/api/v1/products', productRoute);
 app.use('/api/v1/variants', variantRoute);
+app.use('/api/v1/embroidery-options', embroideryOptionRoute);
 
 // 404 handler
 app.use(notFound);

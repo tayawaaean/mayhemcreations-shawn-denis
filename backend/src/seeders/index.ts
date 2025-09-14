@@ -5,6 +5,7 @@ import { seedUsers, clearUsers, clearNonSystemUsers } from './userSeeder';
 import { seedCategories, clearCategories } from './categorySeeder';
 import { seedProducts, clearProducts } from './productSeeder';
 import { seedVariants, clearVariants } from './variantSeeder';
+import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
 import { Op } from 'sequelize';
 
 /**
@@ -48,6 +49,7 @@ export interface SeederOptions {
   categoriesOnly?: boolean;
   productsOnly?: boolean;
   variantsOnly?: boolean;
+  embroideryOnly?: boolean;
 }
 
 export async function runSeeders(options: SeederOptions = {}): Promise<void> {
@@ -75,12 +77,15 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
         await clearProducts();
       } else if (options.variantsOnly) {
         await clearVariants();
+      } else if (options.embroideryOnly) {
+        await clearEmbroideryOptions();
       } else {
         await clearUsers();
         await clearRoles();
         await clearVariants(); // Clear variants first to avoid foreign key constraint
         await clearProducts(); // Clear products second to avoid foreign key constraint
         await clearCategories();
+        await clearEmbroideryOptions();
       }
     }
 
@@ -109,9 +114,15 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     }
 
     // Seed variants
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly) {
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.embroideryOnly) {
       logger.info('🌱 Seeding variants...');
       await seedVariants();
+    }
+
+    // Seed embroidery options
+    if (options.embroideryOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly)) {
+      logger.info('🌱 Seeding embroidery options...');
+      await seedEmbroideryOptions(options.clear || false);
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -239,6 +250,9 @@ if (require.main === module) {
         break;
       case '--variants-only':
         options.variantsOnly = true;
+        break;
+      case '--embroidery-only':
+        options.embroideryOnly = true;
         break;
       case '--clear-products':
         clearProducts().then(() => {

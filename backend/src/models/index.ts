@@ -6,6 +6,7 @@ import { OAuthProvider, OAuthProviderAttributes, OAuthProviderCreationAttributes
 import { Category, CategoryAttributes, CategoryCreationAttributes } from './categoryModel';
 import Product, { ProductAttributes, ProductCreateAttributes } from './productModel';
 import Variant, { VariantAttributes, VariantCreationAttributes } from './variantModel';
+import { EmbroideryOption, EmbroideryOptionAttributes, EmbroideryOptionCreationAttributes } from './embroideryOptionModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -114,6 +115,9 @@ export {
   Variant,
   VariantAttributes,
   VariantCreationAttributes,
+  EmbroideryOption,
+  EmbroideryOptionAttributes,
+  EmbroideryOptionCreationAttributes,
 };
 
 // Export all models for easy access
@@ -125,6 +129,7 @@ export const models = {
   Category,
   Product,
   Variant,
+  EmbroideryOption,
 };
 
 // Database synchronization function

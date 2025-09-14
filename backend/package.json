@@ -22,6 +22,8 @@
     "seed:clear-all": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear-all",
     "seed:new-workflow": "node --env-file=.env -r ts-node/register src/seeders/newWorkflowSeeder.ts",
     "seed:products-only": "node --env-file=.env -r ts-node/register src/seeders/productsOnlySeeder.ts",
+    "seed:comprehensive": "node --env-file=.env -r ts-node/register src/seeders/comprehensiveSeeder.ts",
+    "seed:comprehensive:clear": "node --env-file=.env -r ts-node/register src/seeders/comprehensiveSeeder.ts --clear",
     "docs:generate": "node --env-file=.env -r ts-node/register -e \"import('./src/docs/swagger').then(s => console.log('API documentation generated successfully'))\"",
     "docs:serve": "echo 'Swagger UI available at http://localhost:5001/api-docs'",
     "docs:validate": "node --env-file=.env -r ts-node/register -e \"import('./src/docs/swagger').then(s => console.log('OpenAPI spec validation passed'))\"",

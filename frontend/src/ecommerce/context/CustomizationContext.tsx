@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { embroideryOptionApiService, EmbroideryOption as ApiEmbroideryOption } from '../../shared/embroideryOptionApiService'
 
 export interface DesignUpload {
   file: File
@@ -59,11 +60,30 @@ interface CustomizationContextType {
   selectStyle: (category: keyof CustomizationData['selectedStyles'], style: EmbroideryStyle) => void
   toggleStyle: (category: 'threads' | 'upgrades', style: EmbroideryStyle) => void
   calculateTotalPrice: () => number
+  embroideryStyles: EmbroideryStyle[]
+  loading: boolean
 }
 
 const CustomizationContext = createContext<CustomizationContextType | undefined>(undefined)
 
-const embroideryStyles: EmbroideryStyle[] = [
+// Convert API embroidery option to context format
+const convertApiToContext = (apiOption: ApiEmbroideryOption): EmbroideryStyle => ({
+  id: apiOption.id.toString(),
+  name: apiOption.name,
+  description: apiOption.description,
+  price: Number(apiOption.price),
+  image: apiOption.image,
+  stitches: apiOption.stitches,
+  estimatedTime: apiOption.estimatedTime,
+  category: apiOption.category,
+  level: apiOption.level,
+  isPopular: apiOption.isPopular,
+  isSelected: false,
+  isIncompatible: apiOption.isIncompatible ? JSON.parse(apiOption.isIncompatible) : []
+})
+
+// Default embroidery styles (fallback)
+const defaultEmbroideryStyles: EmbroideryStyle[] = [
   // COVERAGE LEVELS
   {
     id: 'coverage-50',
@@ -461,7 +481,28 @@ const defaultCustomizationData: CustomizationData = {
 }
 
 export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [embroideryStyles, setEmbroideryStyles] = useState<EmbroideryStyle[]>(defaultEmbroideryStyles)
+  const [loading, setLoading] = useState(true)
   const [customizationData, setCustomizationDataState] = useState<CustomizationData>(defaultCustomizationData)
+
+  // Fetch embroidery options from API
+  useEffect(() => {
+    const fetchEmbroideryOptions = async () => {
+      try {
+        setLoading(true)
+        const response = await embroideryOptionApiService.getActiveEmbroideryOptions()
+        const convertedOptions = response.data.map(convertApiToContext)
+        setEmbroideryStyles(convertedOptions)
+      } catch (error) {
+        console.error('Failed to fetch embroidery options, using defaults:', error)
+        // Keep using default styles if API fails
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchEmbroideryOptions()
+  }, [])
 
   const setCustomizationData = (data: Partial<CustomizationData>) => {
     setCustomizationDataState(prev => ({ ...prev, ...data }))
@@ -550,7 +591,9 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       removeDesign,
       selectStyle,
       toggleStyle,
-      calculateTotalPrice
+      calculateTotalPrice,
+      embroideryStyles,
+      loading
     }}>
       {children}
     </CustomizationContext.Provider>
@@ -565,4 +608,3 @@ export const useCustomization = () => {
   return context
 }
 
-export { embroideryStyles }

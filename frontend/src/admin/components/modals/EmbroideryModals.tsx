@@ -163,19 +163,15 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<{
     name: string
-    type: EmbroideryOption['type']
+    category: EmbroideryOption['category']
     price: number
     description: string
-    sortOrder: number
-    status: 'active' | 'inactive'
     image?: string
   }>({
     name: '',
-    type: 'coverage',
+    category: 'coverage',
     price: 0,
     description: '',
-    sortOrder: 0,
-    status: 'active',
     image: ''
   })
 
@@ -183,15 +179,21 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
     e.preventDefault()
     onAdd({
       ...formData,
-      createdAt: new Date()
+      image: formData.image || '',
+      stitches: 0,
+      estimatedTime: '',
+      level: 'basic',
+      isPopular: false,
+      isActive: true,
+      isIncompatible: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     })
     setFormData({
       name: '',
-      type: 'coverage',
+      category: 'coverage',
       price: 0,
       description: '',
-      sortOrder: 0,
-      status: 'active',
       image: ''
     })
     onClose()
@@ -205,12 +207,6 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
     }))
   }
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      status: e.target.checked ? 'active' : 'inactive'
-    }))
-  }
 
   if (!isOpen) return null
 
@@ -245,9 +241,9 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
           <div>
           <TypeSelect
-            value={formData.type}
-            onChange={(value) => setFormData(prev => ({ ...prev, type: value as EmbroideryOption['type'] }))}
-            name="type"
+            value={formData.category}
+            onChange={(value) => setFormData(prev => ({ ...prev, category: value as EmbroideryOption['category'] }))}
+            name="category"
           />
           </div>
 
@@ -297,33 +293,6 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort Order
-            </label>
-            <input
-              type="number"
-              name="sortOrder"
-              value={formData.sortOrder}
-              onChange={handleChange}
-              min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="status"
-              checked={formData.status === 'active'}
-              onChange={handleStatusChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="status" className="ml-2 block text-sm text-gray-900">
-              Active
-            </label>
-          </div>
         </form>
 
         {/* Footer */}
@@ -356,19 +325,15 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<{
     name: string
-    type: EmbroideryOption['type']
+    category: EmbroideryOption['category']
     price: number
     description: string
-    sortOrder: number
-    status: 'active' | 'inactive'
     image?: string
   }>({
     name: '',
-    type: 'coverage',
+    category: 'coverage',
     price: 0,
     description: '',
-    sortOrder: 0,
-    status: 'active',
     image: ''
   })
 
@@ -376,11 +341,9 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
     if (option) {
       setFormData({
         name: option.name,
-        type: option.type,
+        category: option.category,
         price: option.price,
         description: option.description || '',
-        sortOrder: option.sortOrder,
-        status: option.status,
         image: option.image || ''
       })
     }
@@ -405,12 +368,6 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
     }))
   }
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      status: e.target.checked ? 'active' : 'inactive'
-    }))
-  }
 
   if (!isOpen || !option) return null
 
@@ -445,9 +402,9 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 
           <div>
           <TypeSelect
-            value={formData.type}
-            onChange={(value) => setFormData(prev => ({ ...prev, type: value as EmbroideryOption['type'] }))}
-            name="type"
+            value={formData.category}
+            onChange={(value) => setFormData(prev => ({ ...prev, category: value as EmbroideryOption['category'] }))}
+            name="category"
           />
           </div>
 
@@ -497,33 +454,6 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort Order
-            </label>
-            <input
-              type="number"
-              name="sortOrder"
-              value={formData.sortOrder}
-              onChange={handleChange}
-              min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="status"
-              checked={formData.status === 'active'}
-              onChange={handleStatusChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="status" className="ml-2 block text-sm text-gray-900">
-              Active
-            </label>
-          </div>
         </form>
 
         {/* Footer */}

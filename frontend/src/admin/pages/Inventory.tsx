@@ -73,6 +73,11 @@ const Inventory: React.FC = () => {
     loadCategories()
   }, [])
 
+  // Debug effect to log when variantData changes
+  useEffect(() => {
+    console.log('Variant data changed:', variantData)
+  }, [variantData])
+
   const loadCategories = async () => {
     try {
       const response = await fetch('http://localhost:5001/api/v1/categories')
@@ -173,6 +178,11 @@ const Inventory: React.FC = () => {
     size: variant.size || 'One Size',
     type: 'variant' as const
   })) || [])
+
+  // Debug logging (uncomment for debugging)
+  // console.log('Variant data:', variantData)
+  // console.log('All items:', allItems)
+  // console.log('First item type:', allItems[0]?.type)
 
   const filteredItems = allItems.filter(item => {
     const matchesSearch = item.productTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -497,8 +507,28 @@ const Inventory: React.FC = () => {
 
       {/* Inventory table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
+        {paginatedItems.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No inventory items</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {loading ? 'Loading inventory data...' : 'No variants found. Add some variants to get started.'}
+            </p>
+            {!loading && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setIsAddVariantOpen(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Variant
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -538,7 +568,7 @@ const Inventory: React.FC = () => {
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{item.productTitle}</div>
                           <div className="text-sm text-gray-500">{item.category} • {item.subcategory}</div>
-                          {item.type === 'variant' && (
+                          {(item.type === 'variant' || !item.type) && (
                             <div className="text-xs text-blue-600 mt-1">
                               Variant: {item.color} • {item.size}
                             </div>
@@ -690,6 +720,7 @@ const Inventory: React.FC = () => {
             })}
           </div>
         </div>
+        )}
       </div>
 
       {/* Pagination */}

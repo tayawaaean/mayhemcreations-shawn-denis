@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useCustomization, embroideryStyles } from '../context/CustomizationContext'
+import { useCustomization } from '../context/CustomizationContext'
 import Button from '../../components/Button'
 import { ArrowRight, ArrowLeft, Check, X, Star, Info } from 'lucide-react'
 
@@ -19,12 +19,23 @@ const stepCategories = [
 ] as const
 
 export default function StepByStepCustomization({ onComplete, onBackToDesign }: StepByStepCustomizationProps) {
-  const { customizationData, selectStyle, toggleStyle } = useCustomization()
+  const { customizationData, selectStyle, toggleStyle, embroideryStyles, loading } = useCustomization()
   const [currentStep, setCurrentStep] = useState(0)
   const [showReview, setShowReview] = useState(false)
 
   const currentCategory = stepCategories[currentStep]
   const categoryStyles = embroideryStyles.filter(style => style.category === currentCategory.key)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center space-x-2">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+          <span>Loading embroidery options...</span>
+        </div>
+      </div>
+    )
+  }
 
   const handleStyleSelect = (style: typeof embroideryStyles[0]) => {
     if (currentCategory.key === 'threads' || currentCategory.key === 'upgrades') {
@@ -202,7 +213,7 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
 
               <div className="text-center">
                 <p className="text-sm font-bold text-accent">
-                  {style.price === 0 ? 'Free' : `+$${style.price.toFixed(2)}`}
+                  {Number(style.price) === 0 ? 'Free' : `+$${Number(style.price).toFixed(2)}`}
                 </p>
                 {style.estimatedTime !== '0 days' && (
                   <p className="text-xs text-gray-500">{style.estimatedTime}</p>
