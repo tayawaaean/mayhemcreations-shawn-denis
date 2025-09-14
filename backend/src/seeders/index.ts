@@ -4,6 +4,7 @@ import { seedRoles, clearRoles } from './roleSeeder';
 import { seedUsers, clearUsers, clearNonSystemUsers } from './userSeeder';
 import { seedCategories, clearCategories } from './categorySeeder';
 import { seedProducts, clearProducts } from './productSeeder';
+import { seedVariants, clearVariants } from './variantSeeder';
 import { Op } from 'sequelize';
 
 /**
@@ -46,6 +47,7 @@ export interface SeederOptions {
   usersOnly?: boolean;
   categoriesOnly?: boolean;
   productsOnly?: boolean;
+  variantsOnly?: boolean;
 }
 
 export async function runSeeders(options: SeederOptions = {}): Promise<void> {
@@ -67,39 +69,49 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
         // Don't clear roles if we're only seeding roles
         logger.info('⚠️ Skipping role clearing for roles-only seeding');
       } else if (options.categoriesOnly) {
+        await clearProducts(); // Clear products first to avoid foreign key constraint
         await clearCategories();
       } else if (options.productsOnly) {
         await clearProducts();
+      } else if (options.variantsOnly) {
+        await clearVariants();
       } else {
         await clearUsers();
         await clearRoles();
+        await clearVariants(); // Clear variants first to avoid foreign key constraint
+        await clearProducts(); // Clear products second to avoid foreign key constraint
         await clearCategories();
-        await clearProducts();
       }
     }
 
     // Seed roles
-    if (!options.usersOnly && !options.categoriesOnly && !options.productsOnly) {
+    if (!options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding roles...');
       await seedRoles();
     }
 
     // Seed users
-    if (!options.rolesOnly && !options.categoriesOnly && !options.productsOnly) {
+    if (!options.rolesOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding users...');
       await seedUsers();
     }
 
     // Seed categories
-    if (!options.rolesOnly && !options.usersOnly && !options.productsOnly) {
+    if (!options.rolesOnly && !options.usersOnly && !options.productsOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding categories...');
       await seedCategories();
     }
 
     // Seed products
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly) {
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding products...');
       await seedProducts();
+    }
+
+    // Seed variants
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly) {
+      logger.info('🌱 Seeding variants...');
+      await seedVariants();
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -118,6 +130,8 @@ export async function clearAllData(): Promise<void> {
     logger.info('🧹 Clearing all database data...');
     await clearUsers();
     await clearRoles();
+    await clearVariants(); // Clear variants first to avoid foreign key constraint
+    await clearProducts(); // Clear products second to avoid foreign key constraint
     await clearCategories();
     logger.info('✅ All data cleared successfully!');
   } catch (error) {
@@ -143,6 +157,8 @@ async function displaySeedingSummary(): Promise<void> {
     const { Role } = await import('../models/roleModel');
     const { User } = await import('../models/userModel');
     const { Category } = await import('../models/categoryModel');
+    const Product = (await import('../models/productModel')).default;
+    const { Variant } = await import('../models/variantModel');
 
     const roleCount = await Role.count();
     const userCount = await User.count();
@@ -150,6 +166,10 @@ async function displaySeedingSummary(): Promise<void> {
     const verifiedUserCount = await User.count({ where: { isEmailVerified: true } });
     const categoryCount = await Category.count();
     const activeCategoryCount = await Category.count({ where: { status: 'active' } });
+    const productCount = await Product.count();
+    const activeProductCount = await Product.count({ where: { status: 'active' } });
+    const variantCount = await Variant.count();
+    const activeVariantCount = await Variant.count({ where: { isActive: true } });
 
     logger.info('📊 Seeding Summary:');
     logger.info(`   • Roles created: ${roleCount}`);
@@ -158,6 +178,10 @@ async function displaySeedingSummary(): Promise<void> {
     logger.info(`   • Verified users: ${verifiedUserCount}`);
     logger.info(`   • Total categories: ${categoryCount}`);
     logger.info(`   • Active categories: ${activeCategoryCount}`);
+    logger.info(`   • Total products: ${productCount}`);
+    logger.info(`   • Active products: ${activeProductCount}`);
+    logger.info(`   • Total variants: ${variantCount}`);
+    logger.info(`   • Active variants: ${activeVariantCount}`);
     
     // Display role breakdown
     const roles = await Role.findAll({
@@ -213,6 +237,9 @@ if (require.main === module) {
       case '--products-only':
         options.productsOnly = true;
         break;
+      case '--variants-only':
+        options.variantsOnly = true;
+        break;
       case '--clear-products':
         clearProducts().then(() => {
           logger.info('✅ Products cleared successfully!');
@@ -223,7 +250,7 @@ if (require.main === module) {
         });
         break;
       case '--clear-data':
-        Promise.all([clearProducts(), clearCategories()]).then(() => {
+        Promise.all([clearProducts(), clearCategories(), clearVariants()]).then(() => {
           logger.info('✅ All data cleared successfully! (Users retained)');
           process.exit(0);
         }).catch(error => {

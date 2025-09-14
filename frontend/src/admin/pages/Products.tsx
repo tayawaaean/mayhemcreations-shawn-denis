@@ -5,7 +5,6 @@ import {
   Filter, 
   Edit, 
   Trash2, 
-  Eye, 
   Package,
   AlertTriangle
 } from 'lucide-react'
@@ -18,7 +17,6 @@ const Products: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -46,21 +44,6 @@ const Products: React.FC = () => {
     setCurrentPage(page)
   }
 
-  const handleSelectProduct = (productId: string) => {
-    setSelectedProducts(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    )
-  }
-
-  const handleSelectAll = () => {
-    if (selectedProducts.length === filteredProducts.length) {
-      setSelectedProducts([])
-    } else {
-      setSelectedProducts(filteredProducts.map(p => p.id))
-    }
-  }
 
   const handleDeleteProduct = (product: AdminProduct) => {
     setSelectedProduct(product)
@@ -72,12 +55,8 @@ const Products: React.FC = () => {
     setIsEditModalOpen(true)
   }
 
-  const handleViewProduct = (product: AdminProduct) => {
-    // TODO: Implement view product functionality
-    console.log('View product:', product)
-  }
 
-  const handleAddProduct = async (productData: Omit<AdminProduct, 'id'>) => {
+  const handleAddProduct = async (productData: any) => {
     try {
       await createProduct(productData as AdminProduct)
       setIsAddModalOpen(false)
@@ -107,13 +86,6 @@ const Products: React.FC = () => {
     }
   }
 
-  const getTotalStock = (product: AdminProduct) => {
-    return product.stock || 0
-  }
-
-  const getLowStockVariants = (product: AdminProduct) => {
-    return (product.stock || 0) < 10 ? 1 : 0
-  }
 
   const categories = Array.from(new Set(products.map(p => p.category?.slug).filter(Boolean)))
 
@@ -152,7 +124,10 @@ const Products: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
           <p className="mt-2 text-gray-600">
-            Manage your product catalog and inventory
+            Manage your product catalog. Create and edit products here, then use the Inventory section to manage stock and variants.
+          </p>
+          <p className="mt-1 text-sm text-gray-500">
+            {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -228,21 +203,6 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      {/* Bulk actions */}
-      {selectedProducts.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700">
-              {selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''} selected
-            </span>
-            <div className="flex space-x-2">
-              <button className="text-sm text-blue-700 hover:text-blue-800">Bulk Edit</button>
-              <button className="text-sm text-blue-700 hover:text-blue-800">Change Status</button>
-              <button className="text-sm text-red-700 hover:text-red-800">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Products table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -250,14 +210,6 @@ const Products: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Product
                 </th>
@@ -271,9 +223,6 @@ const Products: React.FC = () => {
                   Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -285,14 +234,6 @@ const Products: React.FC = () => {
               {paginatedProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.includes(product.id)}
-                      onChange={() => handleSelectProduct(product.id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
                         src={product.image}
@@ -302,12 +243,6 @@ const Products: React.FC = () => {
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{product.title}</div>
                         <div className="text-sm text-gray-500">{product.subcategory?.name || 'N/A'}</div>
-                        {getLowStockVariants(product) > 0 && (
-                          <div className="flex items-center text-xs text-yellow-600 mt-1">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            {getLowStockVariants(product)} variant{getLowStockVariants(product) > 1 ? 's' : ''} low stock
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>
@@ -325,12 +260,6 @@ const Products: React.FC = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Package className="h-4 w-4 text-gray-400 mr-1" />
-                      {getTotalStock(product)} units
-                    </div>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       product.status === 'active' ? 'bg-green-100 text-green-800' :
@@ -342,18 +271,17 @@ const Products: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      <button className="text-blue-600 hover:text-blue-900">
-                        <Eye className="h-4 w-4" />
-                      </button>
                       <button 
                         onClick={() => handleEditProduct(product)}
                         className="text-gray-600 hover:text-gray-900"
+                        title="Edit Product"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteProduct(product)}
                         className="text-red-600 hover:text-red-900"
+                        title="Delete Product"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -369,12 +297,6 @@ const Products: React.FC = () => {
             {paginatedProducts.map((product) => (
               <div key={product.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
                 <div className="flex items-start space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.includes(product.id)}
-                    onChange={() => handleSelectProduct(product.id)}
-                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
                   <img
                     src={product.image}
                     alt={product.alt}
@@ -389,20 +311,16 @@ const Products: React.FC = () => {
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
                         <button
-                          onClick={() => handleViewProduct(product)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        <button
                           onClick={() => handleEditProduct(product)}
                           className="text-indigo-600 hover:text-indigo-900"
+                          title="Edit Product"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteProduct(product)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete Product"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -424,10 +342,6 @@ const Products: React.FC = () => {
                         </div>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Stock</p>
-                        <p className="text-sm text-gray-900">{getTotalStock(product)} units</p>
-                      </div>
-                      <div>
                         <p className="text-xs text-gray-500">Status</p>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           product.status === 'active'
@@ -441,12 +355,6 @@ const Products: React.FC = () => {
                       </div>
                     </div>
 
-                    {getLowStockVariants(product) > 0 && (
-                      <div className="mt-3 flex items-center text-xs text-yellow-600">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        {getLowStockVariants(product)} variant{getLowStockVariants(product) > 1 ? 's' : ''} low stock
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -458,11 +366,12 @@ const Products: React.FC = () => {
       {/* Help Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Products">
         <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
-          <li>Use the filters to search by name or category.</li>
-          <li>Click Add Product to create a new product with images and variants.</li>
-          <li>Use the Edit action to update product info, price, or images.</li>
-          <li>Use the Delete action to remove a product from the catalog.</li>
-          <li>Pagination shows 10 items per page; use controls at the bottom to navigate.</li>
+          <li>Use the search and filters to find products by name, category, or status.</li>
+          <li>Click "Add Product" to create a new product with basic information and images.</li>
+          <li>Use the Edit button to update product details, pricing, or images.</li>
+          <li>Use the Delete button to remove a product from the catalog.</li>
+          <li>Go to the Inventory section to manage stock levels and create product variants.</li>
+          <li>Products are paginated with 10 items per page for easy navigation.</li>
         </ol>
       </HelpModal>
 

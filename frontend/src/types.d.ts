@@ -13,6 +13,23 @@ export type Product = {
   reviews?: ProductReview[]
   averageRating?: number
   totalReviews?: number
+  stock?: number
+  sku?: string
+  status?: 'active' | 'inactive' | 'draft'
+  hasSizing?: boolean
+  variants?: ProductVariant[]
+}
+
+export type ProductVariant = {
+  id: number
+  name: string
+  color?: string
+  colorHex?: string
+  size?: string
+  sku: string
+  stock: number
+  price?: number
+  isActive: boolean
 }
 
 export type ProductReview = {

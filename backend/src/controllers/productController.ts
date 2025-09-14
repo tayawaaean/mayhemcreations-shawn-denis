@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Product, Category } from '../models';
+import { Product, Category, Variant } from '../models';
 import { logger } from '../utils/logger';
 import { Op } from 'sequelize';
 
@@ -128,6 +128,13 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
           model: Category,
           as: 'subcategory',
           attributes: ['id', 'name', 'slug']
+        },
+        {
+          model: Variant,
+          as: 'variants',
+          attributes: ['id', 'name', 'color', 'colorHex', 'size', 'sku', 'stock', 'price', 'isActive'],
+          where: { isActive: true },
+          required: false
         }
       ],
       order: orderClause,
@@ -175,6 +182,13 @@ export const getProductById = async (req: Request, res: Response): Promise<void>
           model: Category,
           as: 'subcategory',
           attributes: ['id', 'name', 'slug', 'description']
+        },
+        {
+          model: Variant,
+          as: 'variants',
+          attributes: ['id', 'name', 'color', 'colorHex', 'size', 'sku', 'stock', 'price', 'isActive'],
+          where: { isActive: true },
+          required: false
         }
       ]
     });
@@ -220,6 +234,13 @@ export const getProductBySlug = async (req: Request, res: Response): Promise<voi
           model: Category,
           as: 'subcategory',
           attributes: ['id', 'name', 'slug', 'description']
+        },
+        {
+          model: Variant,
+          as: 'variants',
+          attributes: ['id', 'name', 'color', 'colorHex', 'size', 'sku', 'stock', 'price', 'isActive'],
+          where: { isActive: true },
+          required: false
         }
       ]
     });
@@ -486,6 +507,260 @@ export const getProductStats = async (req: Request, res: Response): Promise<void
     res.status(500).json({
       success: false,
       message: 'Failed to fetch product statistics',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+};
+
+/**
+ * Update product inventory (add or subtract stock)
+ */
+export const updateInventory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { quantity, operation, reason } = req.body;
+
+    // Validate input
+    if (!quantity || typeof quantity !== 'number') {
+      res.status(400).json({
+        success: false,
+        message: 'Quantity must be a valid number'
+      });
+      return;
+    }
+
+    if (!operation || !['add', 'subtract', 'set'].includes(operation)) {
+      res.status(400).json({
+        success: false,
+        message: 'Operation must be "add", "subtract", or "set"'
+      });
+      return;
+    }
+
+    // Find the product
+    const product = await Product.findByPk(parseInt(id));
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+      return;
+    }
+
+    const currentStock = product.stock || 0;
+    let newStock: number;
+
+    switch (operation) {
+      case 'add':
+        newStock = currentStock + quantity;
+        break;
+      case 'subtract':
+        newStock = Math.max(0, currentStock - quantity); // Prevent negative stock
+        break;
+      case 'set':
+        newStock = Math.max(0, quantity); // Prevent negative stock
+        break;
+      default:
+        newStock = currentStock;
+    }
+
+    // Update the product stock
+    await product.update({ stock: newStock });
+
+    logger.info(`Updated inventory for product ${product.title} (ID: ${product.id}): ${currentStock} → ${newStock} (${operation} ${quantity})${reason ? ` - ${reason}` : ''}`);
+
+    res.json({
+      success: true,
+      data: {
+        productId: product.id,
+        title: product.title,
+        previousStock: currentStock,
+        newStock: newStock,
+        operation: operation,
+        quantity: quantity,
+        reason: reason || null
+      },
+      message: 'Inventory updated successfully'
+    });
+
+  } catch (error) {
+    logger.error('Error updating inventory:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update inventory',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+};
+
+/**
+ * Get inventory status for all products or specific products
+ */
+export const getInventoryStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { lowStockThreshold, outOfStock = 'false' } = req.query;
+    const threshold = lowStockThreshold ? parseInt(lowStockThreshold as string) : null;
+
+    let whereClause: any = {};
+    
+    if (outOfStock === 'true') {
+      whereClause.stock = { [Op.lte]: 0 };
+    } else if (threshold !== null && threshold > 0) {
+      whereClause.stock = { [Op.lte]: threshold };
+    }
+    // If no threshold is provided, return all products
+
+    const products = await Product.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name', 'slug']
+        }
+      ],
+      attributes: ['id', 'title', 'slug', 'sku', 'stock', 'status', 'price', 'image', 'alt'],
+      order: [['stock', 'ASC'], ['title', 'ASC']]
+    });
+
+    // Get inventory statistics
+    const totalProducts = await Product.count();
+    const outOfStockCount = await Product.count({ where: { stock: { [Op.lte]: 0 } } });
+    const lowStockCount = threshold !== null ? await Product.count({ 
+      where: { 
+        stock: { 
+          [Op.gt]: 0,
+          [Op.lte]: threshold 
+        } 
+      } 
+    }) : 0;
+
+    logger.info(`Retrieved inventory status: ${products.length} products`);
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        statistics: {
+          total: totalProducts,
+          outOfStock: outOfStockCount,
+          lowStock: lowStockCount,
+          lowStockThreshold: threshold
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error fetching inventory status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch inventory status',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+};
+
+/**
+ * Bulk update inventory for multiple products
+ */
+export const bulkUpdateInventory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { updates } = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Updates array is required and must not be empty'
+      });
+      return;
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const update of updates) {
+      try {
+        const { productId, quantity, operation, reason } = update;
+
+        if (!productId || !quantity || !operation) {
+          errors.push({
+            productId,
+            error: 'Missing required fields: productId, quantity, operation'
+          });
+          continue;
+        }
+
+        const product = await Product.findByPk(productId);
+        if (!product) {
+          errors.push({
+            productId,
+            error: 'Product not found'
+          });
+          continue;
+        }
+
+        const currentStock = product.stock || 0;
+        let newStock: number;
+
+        switch (operation) {
+          case 'add':
+            newStock = currentStock + quantity;
+            break;
+          case 'subtract':
+            newStock = Math.max(0, currentStock - quantity);
+            break;
+          case 'set':
+            newStock = Math.max(0, quantity);
+            break;
+          default:
+            errors.push({
+              productId,
+              error: 'Invalid operation. Must be "add", "subtract", or "set"'
+            });
+            continue;
+        }
+
+        await product.update({ stock: newStock });
+
+        results.push({
+          productId,
+          title: product.title,
+          previousStock: currentStock,
+          newStock: newStock,
+          operation: operation,
+          quantity: quantity,
+          reason: reason || null
+        });
+
+        logger.info(`Bulk updated inventory for product ${product.title} (ID: ${product.id}): ${currentStock} → ${newStock} (${operation} ${quantity})`);
+
+      } catch (error) {
+        errors.push({
+          productId: update.productId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        successful: results,
+        failed: errors,
+        summary: {
+          total: updates.length,
+          successful: results.length,
+          failed: errors.length
+        }
+      },
+      message: `Bulk inventory update completed. ${results.length} successful, ${errors.length} failed.`
+    });
+
+  } catch (error) {
+    logger.error('Error in bulk inventory update:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to perform bulk inventory update',
       error: process.env.NODE_ENV === 'development' ? error : undefined
     });
   }

@@ -1,229 +1,273 @@
-import React, { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { products } from '../../data/products'
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Heart, Share2, Star, ShoppingCart, ArrowRight } from 'lucide-react'
 import Button from '../../components/Button'
-import Reviews from '../components/Reviews'
-import ReviewForm from '../components/ReviewForm'
-import { ArrowRight, Truck, Star, ThumbsUp } from 'lucide-react'
+import { productApiService, Product } from '../../shared/productApiService'
 
 export default function ProductPage() {
   const { id } = useParams()
-  const product = products.find((p) => p.id === id)
-  const [showReviewForm, setShowReviewForm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'description' | 'reviews'>('description')
+  const navigate = useNavigate()
+  const [product, setProduct] = useState<Product | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState(0)
 
-  if (!product) return <div className="p-6">Product not found</div>
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!id) return
+      
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await productApiService.getProductById(parseInt(id))
+        setProduct(response.data)
+      } catch (err) {
+        setError('Product not found')
+        console.error('Error fetching product:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-  const handleHelpfulVote = (reviewId: string, isHelpful: boolean) => {
-    // In a real app, this would make an API call
-    console.log('Helpful vote:', { reviewId, isHelpful })
+    fetchProduct()
+  }, [id])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading product...</p>
+        </div>
+      </main>
+    )
   }
 
-  const handleReviewSubmit = async (reviewData: {
-    rating: number
-    title: string
-    comment: string
-    images?: File[]
-  }) => {
-    // In a real app, this would make an API call
-    console.log('Review submitted:', reviewData)
-    setShowReviewForm(false)
-    alert('Thank you for your review! It will be published after moderation.')
+  if (error || !product) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Product not found</h1>
+          <p className="text-gray-600 mb-6">The product you're looking for doesn't exist.</p>
+          <Button onClick={() => navigate('/products')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Products
+          </Button>
+        </div>
+      </main>
+    )
   }
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${
-          i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
-        }`}
-      />
-    ))
-  }
+  const images = [product.image] // Single image for now, can be expanded later
   
+  // Calculate total stock from variants
+  const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
+
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <div>
-          <img src={product.image} alt={product.alt} className="w-full h-96 lg:h-[500px] object-cover rounded-lg shadow-lg" />
-        </div>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">{product.title}</h1>
-            <p className="text-lg text-gray-600 leading-relaxed">{product.description}</p>
-          </div>
-          
-          {/* Rating and Reviews Summary */}
-          {product.reviews && product.reviews.length > 0 && (
-            <div className="flex items-center space-x-4 py-2">
-              <div className="flex items-center space-x-1">
-                {renderStars(Math.round(product.averageRating || 0))}
-              </div>
-              <span className="text-sm text-gray-600">
-                {product.averageRating?.toFixed(1)} ({product.totalReviews} review{product.totalReviews !== 1 ? 's' : ''})
-              </span>
-            </div>
-          )}
-          
-          <div className="flex items-baseline justify-between">
-            <div className="text-3xl font-bold text-gray-900">${product.price.toFixed(2)}</div>
-            <div className="flex items-center text-sm text-gray-500">
-              <Truck className="w-4 h-4 mr-1" />
-              Free shipping
-            </div>
-          </div>
-
-          <div className="pt-4 space-y-3">
-            <Button
-              variant="add-to-cart"
-              size="lg"
-              className="w-full"
-              onClick={() => window.location.href = `/customize/${product.id}`}
-            >
-              Start Customizing
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              icon={<ArrowRight className="w-4 h-4" />}
-              iconPosition="right"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="w-full"
-            >
-              Contact us
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Product Details Tabs */}
-      <div className="mt-16">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('description')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'description'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Description
-            </button>
-            <button
-              onClick={() => setActiveTab('reviews')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'reviews'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Reviews ({product.totalReviews || 0})
-            </button>
-          </nav>
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/products')}
+            className="flex items-center"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Products
+          </Button>
         </div>
 
-        <div className="py-8">
-          {activeTab === 'description' && (
-            <div className="prose max-w-none">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h3>
-              <p className="text-gray-700 leading-relaxed">{product.description}</p>
-              
-              {product.availableColors && (
-                <div className="mt-6">
-                  <h4 className="text-md font-semibold text-gray-900 mb-2">Available Colors</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {product.availableColors.map((color) => (
-                      <span
-                        key={color}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                      >
-                        {color}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {product.availableSizes && (
-                <div className="mt-4">
-                  <h4 className="text-md font-semibold text-gray-900 mb-2">Available Sizes</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {product.availableSizes.map((size) => (
-                      <span
-                        key={size}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                      >
-                        {size}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Product Images */}
+          <div className="space-y-4">
+            {/* Main Image */}
+            <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-200">
+              <img
+                src={images[selectedImage]}
+                alt={product.alt}
+                className="w-full h-full object-cover"
+              />
             </div>
-          )}
 
-          {activeTab === 'reviews' && (
-            <div>
-              {product.reviews && product.reviews.length > 0 ? (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold text-gray-900">Customer Reviews</h3>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowReviewForm(!showReviewForm)}
-                    >
-                      Write a Review
-                    </Button>
-                  </div>
-                  
-                  {showReviewForm && (
-                    <ReviewForm
-                      productId={product.id}
-                      productTitle={product.title}
-                      onSubmit={handleReviewSubmit}
-                      onCancel={() => setShowReviewForm(false)}
+            {/* Thumbnail Images */}
+            {images.length > 1 && (
+              <div className="flex space-x-2 overflow-x-auto">
+                {images.map((image, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedImage(index)}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                      selectedImage === index
+                        ? 'border-gray-900'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={image}
+                      alt={`${product.title} view ${index + 1}`}
+                      className="w-full h-full object-cover"
                     />
-                  )}
-                  
-                  <Reviews
-                    reviews={product.reviews}
-                    averageRating={product.averageRating || 0}
-                    totalReviews={product.totalReviews || 0}
-                    onHelpfulVote={handleHelpfulVote}
-                  />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Product Details */}
+          <div className="space-y-6">
+            {/* Header */}
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+                {product.title}
+              </h1>
+              <p className="text-lg text-gray-600 mb-4">
+                {product.category?.name} {product.subcategory?.name && `• ${product.subcategory.name}`}
+              </p>
+              
+              {/* Price and Stock */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <span className="text-3xl font-bold text-gray-900">
+                    ${typeof product.price === 'string' ? parseFloat(product.price).toFixed(2) : product.price.toFixed(2)}
+                  </span>
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Star className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No reviews yet</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Be the first to review this product!
-                  </p>
-                  <div className="mt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowReviewForm(!showReviewForm)}
-                    >
-                      Write a Review
-                    </Button>
+                
+                {/* Stock Status */}
+                {totalStock !== undefined && (
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      totalStock === 0 
+                        ? 'bg-red-500' 
+                        : totalStock <= 5 
+                          ? 'bg-yellow-500' 
+                          : 'bg-green-500'
+                    }`}></div>
+                    <span className={`text-sm font-medium ${
+                      totalStock === 0 
+                        ? 'text-red-600' 
+                        : totalStock <= 5 
+                          ? 'text-yellow-600' 
+                          : 'text-green-600'
+                    }`}>
+                      {totalStock === 0 ? 'Out of Stock' : `${totalStock} in stock`}
+                    </span>
                   </div>
-                  
-                  {showReviewForm && (
-                    <div className="mt-6">
-                      <ReviewForm
-                        productId={product.id}
-                        productTitle={product.title}
-                        onSubmit={handleReviewSubmit}
-                        onCancel={() => setShowReviewForm(false)}
-                      />
-                    </div>
-                  )}
+                )}
+              </div>
+
+              {/* Rating */}
+              <div className="flex items-center space-x-2 mb-6">
+                <div className="flex items-center">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star
+                      key={i}
+                      className="h-5 w-5 text-yellow-400 fill-current"
+                    />
+                  ))}
                 </div>
-              )}
+                <span className="text-sm text-gray-600">(4.8) • 24 reviews</span>
+              </div>
             </div>
-          )}
+
+            {/* Description */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+              <p className="text-gray-600 leading-relaxed">
+                {product.description}
+              </p>
+            </div>
+
+            {/* Features */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Features</h3>
+              <ul className="space-y-2 text-gray-600">
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
+                  High-quality embroidery
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
+                  Custom design placement
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
+                  Durable materials
+                </li>
+                <li className="flex items-center">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
+                  Free shipping on orders over $50
+                </li>
+              </ul>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-4">
+              <div className="flex space-x-4">
+                <Button
+                  variant={totalStock === 0 ? "outline" : "add-to-cart"}
+                  size="lg"
+                  className="flex-1"
+                  disabled={totalStock === 0}
+                  onClick={() => totalStock !== 0 && navigate(`/customize/${product.id}`)}
+                >
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  {totalStock === 0 ? 'Out of Stock' : 'Start Customizing'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="px-4"
+                >
+                  <Heart className="w-5 h-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="px-4"
+                >
+                  <Share2 className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                disabled={totalStock === 0}
+                onClick={() => totalStock !== 0 && navigate(`/customize/${product.id}`)}
+              >
+                {totalStock === 0 ? 'Not Available' : 'View Customization Options'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+
+            {/* Additional Info */}
+            <div className="border-t pt-6">
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                <div>
+                  <span className="font-medium">SKU:</span> {product.sku}
+                </div>
+                <div>
+                  <span className="font-medium">Category:</span> {product.category?.name}
+                </div>
+                <div>
+                  <span className="font-medium">Status:</span> 
+                  <span className={`ml-1 px-2 py-1 rounded-full text-xs ${
+                    product.status === 'active' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {product.status}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium">Shipping:</span> Free on orders over $50
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>

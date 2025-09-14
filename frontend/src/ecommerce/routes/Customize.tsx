@@ -4,6 +4,7 @@ import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, 
 import { useCustomization } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
+import { productApiService } from '../../shared/productApiService'
 import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
 import ChatWidget from '../components/ChatWidget'
@@ -19,15 +20,38 @@ export default function Customize() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
   const [showGuidelines, setShowGuidelines] = useState(false)
+  const [product, setProduct] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const productRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
 
-  const product = products.find(p => p.id === id)
+  // Fetch product data from API
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!id) return
+      
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await productApiService.getProductById(parseInt(id))
+        setProduct(response.data)
+      } catch (err) {
+        setError('Product not found')
+        console.error('Error fetching product:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProduct()
+  }, [id])
 
   const initializeProduct = useCallback(() => {
     if (product && !initializedRef.current) {
       setCustomizationData({
-        productId: product.id,
+        productId: product.id.toString(),
         productName: product.title,
         productImage: product.image,
         basePrice: product.price
@@ -40,7 +64,115 @@ export default function Customize() {
     initializeProduct()
   }, [initializeProduct])
 
-  if (!product) {
+  // Get available colors from variants
+  const getAvailableColors = () => {
+    if (!product?.variants) return []
+    
+    const colors = product.variants
+      .filter((variant: any) => variant.stock > 0 && variant.isActive)
+      .map((variant: any) => variant.color)
+      .filter((color: string, index: number, arr: string[]) => arr.indexOf(color) === index)
+    
+    return colors
+  }
+
+  // Get available sizes from variants
+  const getAvailableSizes = () => {
+    if (!product?.variants) return []
+    
+    const sizes = product.variants
+      .filter((variant: any) => variant.stock > 0 && variant.isActive)
+      .map((variant: any) => variant.size)
+      .filter((size: string, index: number, arr: string[]) => arr.indexOf(size) === index)
+    
+    return sizes
+  }
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        // For non-sizing products, skip color/size validation
+        if (!product?.hasSizing) {
+          return true
+        }
+        return customizationData.color !== '' && customizationData.size !== ''
+      case 2:
+        return customizationData.design !== null
+      case 3:
+        return true // Customize position step
+      case 4:
+        // Step 4 is handled by StepByStepCustomization component
+        return true
+      case 5:
+        return true // Review step
+      default:
+        return false
+    }
+  }
+
+  // Function to get automatic positioning based on placement
+  const getAutomaticPosition = (placement: string) => {
+    const basePositions = {
+      'front': { x: 150, y: 120 }, // Center of chest
+      'back': { x: 150, y: 120 }, // Center of back
+      'left-chest': { x: 100, y: 120 }, // Left side of chest
+      'right-chest': { x: 200, y: 120 }, // Right side of chest
+      'sleeve': { x: 50, y: 200 }, // On the sleeve
+      'manual': customizationData.designPosition // Keep current position for manual
+    }
+    return basePositions[placement as keyof typeof basePositions] || { x: 150, y: 120 }
+  }
+
+  // Auto-position design when placement changes (except for manual)
+  useEffect(() => {
+    if (customizationData.placement && customizationData.placement !== 'manual' && customizationData.design) {
+      const newPosition = getAutomaticPosition(customizationData.placement)
+      setCustomizationData({ designPosition: newPosition })
+    }
+  }, [customizationData.placement])
+
+  // Add global touch event listeners for mobile dragging
+  useEffect(() => {
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (isDragging) {
+        e.preventDefault()
+        const touch = e.touches[0]
+        const newX = touch.clientX - dragStart.x
+        const newY = touch.clientY - dragStart.y
+        setDragPosition({ x: newX, y: newY })
+      }
+    }
+
+    const handleGlobalTouchEnd = () => {
+      if (isDragging) {
+        setIsDragging(false)
+        setDragActive(false)
+      }
+    }
+
+    if (isDragging) {
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
+      document.addEventListener('touchend', handleGlobalTouchEnd)
+    }
+
+    return () => {
+      document.removeEventListener('touchmove', handleGlobalTouchMove)
+      document.removeEventListener('touchend', handleGlobalTouchEnd)
+    }
+  }, [isDragging, dragStart])
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading product...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (error || !product) {
     return (
       <main className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -160,80 +292,12 @@ export default function Customize() {
     }
   }
 
-  const canProceed = () => {
-    switch (currentStep) {
-      case 1:
-        // For caps and non-apparel, skip color/size validation
-        if (product.category !== 'apparel' || product.subcategory === 'cap') {
-          return true
-        }
-        return customizationData.color !== '' && customizationData.size !== '' && customizationData.size !== 's'
-      case 2:
-        return customizationData.design !== null
-      case 3:
-        return true // Customize position step
-      case 4:
-        // Step 4 is handled by StepByStepCustomization component
-        return true
-      case 5:
-        return true // Review step
-      default:
-        return false
-    }
-  }
 
-  // Function to get automatic positioning based on placement
-  const getAutomaticPosition = (placement: string) => {
-    const basePositions = {
-      'front': { x: 150, y: 120 }, // Center of chest
-      'back': { x: 150, y: 120 }, // Center of back
-      'left-chest': { x: 100, y: 120 }, // Left side of chest
-      'right-chest': { x: 200, y: 120 }, // Right side of chest
-      'sleeve': { x: 50, y: 200 }, // On the sleeve
-      'manual': customizationData.designPosition // Keep current position for manual
-    }
-    return basePositions[placement as keyof typeof basePositions] || { x: 150, y: 120 }
-  }
-
-  // Auto-position design when placement changes (except for manual)
-  useEffect(() => {
-    if (customizationData.placement && customizationData.placement !== 'manual' && customizationData.design) {
-      const newPosition = getAutomaticPosition(customizationData.placement)
-      setCustomizationData({ designPosition: newPosition })
-    }
-  }, [customizationData.placement])
-
-  // Add global touch event listeners for mobile dragging
-  useEffect(() => {
-    const handleGlobalTouchMove = (e: TouchEvent) => {
-      if (isDragging) {
-        e.preventDefault()
-        handleDesignMove(e as any)
-      }
-    }
-
-    const handleGlobalTouchEnd = () => {
-      if (isDragging) {
-        handleDesignEnd()
-      }
-    }
-
-    if (isDragging) {
-      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
-      document.addEventListener('touchend', handleGlobalTouchEnd)
-    }
-
-    return () => {
-      document.removeEventListener('touchmove', handleGlobalTouchMove)
-      document.removeEventListener('touchend', handleGlobalTouchEnd)
-    }
-  }, [isDragging, dragStart, dragPosition])
-
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!product) return
     
-    // Add customized item to cart
-    addToCart(product.id, customizationData.quantity, {
+    // Add customized item to cart with stock validation
+    const success = await addToCart(product.id.toString(), customizationData.quantity, {
       design: customizationData.design ? {
         name: customizationData.design.name,
         size: customizationData.design.size,
@@ -257,8 +321,10 @@ export default function Customize() {
       designRotation: customizationData.designRotation
     })
     
-    console.log('Added customized item to cart:', customizationData)
-    navigate('/checkout')
+    if (success) {
+      console.log('Added customized item to cart:', customizationData)
+      navigate('/checkout')
+    }
   }
 
   return (
@@ -565,17 +631,17 @@ export default function Customize() {
           {/* Right Side - Customization Options */}
           <div className="space-y-4 sm:space-y-6">
              {/* Step 1: Choose Color & Size */}
-             {currentStep === 1 && product.category === 'apparel' && product.subcategory !== 'cap' && (
+             {currentStep === 1 && product?.hasSizing && (
                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                  <h3 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Choose Color & Size</h3>
                  
                  <div className="space-y-6 sm:space-y-8">
                    {/* Color Selection */}
-                   {product.availableColors && product.availableColors.length > 0 && (
+                   {getAvailableColors().length > 0 && (
                      <div>
                        <h4 className="text-md font-medium text-gray-900 mb-4">Select Color</h4>
                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-                         {product.availableColors.map((color) => (
+                         {getAvailableColors().map((color: string) => (
                            <button
                              key={color}
                              onClick={() => setCustomizationData({ color })}
@@ -611,11 +677,11 @@ export default function Customize() {
                    )}
 
                    {/* Size Selection */}
-                   {product.availableSizes && product.availableSizes.length > 0 && (
+                   {getAvailableSizes().length > 0 && (
                      <div>
                        <h4 className="text-md font-medium text-gray-900 mb-4">Select Size</h4>
                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 sm:gap-3">
-                         {product.availableSizes.map((size) => (
+                         {getAvailableSizes().map((size: string) => (
                            <button
                              key={size}
                              onClick={() => setCustomizationData({ size: size.toLowerCase() as 'small' | 'medium' | 'large' | 'extra-large' })}
@@ -632,18 +698,20 @@ export default function Customize() {
                      </div>
                    )}
 
-                   {/* Size Guide */}
-                   <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
-                     <h5 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Size Guide</h5>
-                     <div className="text-xs sm:text-sm text-gray-600 space-y-1">
-                       <p><strong>XS:</strong> Chest 32-34" | Length 26"</p>
-                       <p><strong>S:</strong> Chest 34-36" | Length 27"</p>
-                       <p><strong>M:</strong> Chest 36-38" | Length 28"</p>
-                       <p><strong>L:</strong> Chest 38-40" | Length 29"</p>
-                       <p><strong>XL:</strong> Chest 40-42" | Length 30"</p>
-                       <p><strong>XXL:</strong> Chest 42-44" | Length 31"</p>
+                   {/* Size Guide - Only show if there are multiple sizes */}
+                   {getAvailableSizes().length > 1 && (
+                     <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                       <h5 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Size Guide</h5>
+                       <div className="text-xs sm:text-sm text-gray-600 space-y-1">
+                         <p><strong>XS:</strong> Chest 32-34" | Length 26"</p>
+                         <p><strong>S:</strong> Chest 34-36" | Length 27"</p>
+                         <p><strong>M:</strong> Chest 36-38" | Length 28"</p>
+                         <p><strong>L:</strong> Chest 38-40" | Length 29"</p>
+                         <p><strong>XL:</strong> Chest 40-42" | Length 30"</p>
+                         <p><strong>XXL:</strong> Chest 42-44" | Length 31"</p>
+                       </div>
                      </div>
-                   </div>
+                   )}
                  </div>
 
                  <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
@@ -658,8 +726,8 @@ export default function Customize() {
                </div>
              )}
 
-             {/* Step 1: Skip Color & Size for Caps */}
-             {currentStep === 1 && (product.category !== 'apparel' || product.subcategory === 'cap') && (
+             {/* Step 1: Skip Color & Size for Non-Sizing Products */}
+             {currentStep === 1 && !product?.hasSizing && (
                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h3>
                  <p className="text-sm sm:text-base text-gray-600 mb-6">

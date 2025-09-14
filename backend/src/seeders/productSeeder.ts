@@ -23,6 +23,7 @@ export interface ProductSeedData {
   dimensions?: string;
   materials?: string[];
   careInstructions?: string;
+  hasSizing?: boolean;
 }
 
 export const productSeedData: ProductSeedData[] = [
@@ -424,6 +425,9 @@ export const seedProducts = async (): Promise<void> => {
           }
         }
 
+        // Determine if product has sizing based on category
+        const hasSizing = productData.categorySlug === 'apparel';
+
         // Create product
         const product = await Product.create({
           title: productData.title,
@@ -447,6 +451,7 @@ export const seedProducts = async (): Promise<void> => {
           dimensions: productData.dimensions,
           materials: productData.materials,
           careInstructions: productData.careInstructions,
+          hasSizing: hasSizing,
           createdAt: new Date(),
           updatedAt: new Date(),
         });

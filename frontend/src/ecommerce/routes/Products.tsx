@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import ProductGrid from '../components/ProductGrid'
-import { Filter, SortAsc, Grid, List, ShoppingCart, ArrowRight } from 'lucide-react'
+import { Filter, Grid, List } from 'lucide-react'
 import Button from '../../components/Button'
 import { useSearchParams } from 'react-router-dom'
 import { categoryApiService, Category } from '../../shared/categoryApiService'
@@ -62,8 +62,7 @@ export default function Products() {
   // Update URL when category changes
   const handleCategoryChange = (category: string | null) => {
     setSelectedCategory(category)
-    setSelectedSubcategory(null) // Reset subcategory when category changes
-    // Update URL without page reload
+    setSelectedSubcategory(null)
     const url = new URL(window.location.href)
     if (category) {
       url.searchParams.set('category', category)
@@ -77,7 +76,6 @@ export default function Products() {
   // Update URL when subcategory changes
   const handleSubcategoryChange = (subcategory: string | null) => {
     setSelectedSubcategory(subcategory)
-    // Update URL without page reload
     const url = new URL(window.location.href)
     if (subcategory) {
       url.searchParams.set('subcategory', subcategory)
@@ -88,61 +86,82 @@ export default function Products() {
   }
 
   // Transform database products to frontend Product type
-  const transformedProducts = products.map(product => ({
-    id: product.id.toString(),
-    title: product.title,
-    price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
-    description: product.description,
-    image: product.image,
-    alt: product.alt,
-    badges: typeof product.badges === 'string' ? JSON.parse(product.badges) : (product.badges || []),
-    category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
-    subcategory: product.subcategory?.slug,
-    availableColors: typeof product.availableColors === 'string' ? JSON.parse(product.availableColors) : (product.availableColors || []),
-    availableSizes: typeof product.availableSizes === 'string' ? JSON.parse(product.availableSizes) : (product.availableSizes || []),
-    materials: typeof product.materials === 'string' ? JSON.parse(product.materials) : (product.materials || []),
-    averageRating: typeof product.averageRating === 'string' ? parseFloat(product.averageRating) : product.averageRating,
-    totalReviews: typeof product.totalReviews === 'string' ? parseInt(product.totalReviews) : product.totalReviews
-  }))
+  const transformedProducts = products.map(product => {
+    // Calculate total stock from variants
+    const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
+    
+    return {
+      id: product.id.toString(),
+      title: product.title,
+      price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+      description: product.description,
+      image: product.image,
+      alt: product.alt,
+      badges: [],
+      category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
+      subcategory: product.subcategory?.slug,
+      availableColors: [],
+      availableSizes: [],
+      materials: [],
+      averageRating: 0,
+      totalReviews: 0,
+      stock: totalStock, // Use calculated stock from variants
+      sku: product.sku,
+      status: product.status,
+      hasSizing: product.hasSizing,
+      variants: product.variants || [] // Include variants for detailed stock info
+    }
+  })
 
   // Filter and sort products
   const filteredProducts = transformedProducts
     .filter(product => {
-      // If a category is selected, filter by category
       if (selectedCategory && product.category !== selectedCategory) {
         return false
       }
-      
-      // If a subcategory is selected, filter by subcategory
       if (selectedSubcategory && product.subcategory !== selectedSubcategory) {
         return false
       }
-      
       return true
     })
     .sort((a, b) => {
+      // Always prioritize products with stock first
+      const aHasStock = (a.stock || 0) > 0
+      const bHasStock = (b.stock || 0) > 0
+      
+      if (aHasStock && !bHasStock) return -1
+      if (!aHasStock && bHasStock) return 1
+      
+      // If both have same stock status, apply normal sorting
       switch (sortBy) {
         case 'price-low':
           return a.price - b.price
         case 'price-high':
           return b.price - a.price
         case 'newest':
-          // Sort by ID (higher ID = newer)
           return parseInt(b.id) - parseInt(a.id)
         case 'popular':
-          // Sort by average rating, then by total reviews
-          const aRating = a.averageRating || 0
-          const bRating = b.averageRating || 0
-          if (aRating !== bRating) {
-            return bRating - aRating
-          }
           return (b.totalReviews || 0) - (a.totalReviews || 0)
+        case 'stock-high':
+          return (b.stock || 0) - (a.stock || 0)
         case 'featured':
         default:
-          // Sort by ID (higher ID = newer) for featured
           return parseInt(b.id) - parseInt(a.id)
       }
     })
+
+  if (loading) {
+    return (
+      <main className="py-8">
+        <div className="container">
+          <div className="text-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading products...</p>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="py-8">
@@ -153,7 +172,7 @@ export default function Products() {
             <div>
               <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
                 {selectedSubcategory 
-                  ? selectedSubcategory.charAt(0).toUpperCase() + selectedSubcategory.slice(1).replace(/([A-Z])/g, ' $1')
+                  ? selectedSubcategory.charAt(0).toUpperCase() + selectedSubcategory.slice(1)
                   : selectedCategory 
                     ? selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)
                     : 'All Products'
@@ -208,9 +227,8 @@ export default function Products() {
                 variant="outline" 
                 onClick={() => setShowFilters(!showFilters)}
                 className="w-full"
-                icon={<Filter className="w-4 h-4" />}
-                iconPosition="left"
               >
+                <Filter className="w-4 h-4 mr-2" />
                 Filters {showFilters ? '(Hide)' : ''}
               </Button>
             </div>
@@ -266,6 +284,7 @@ export default function Products() {
                   className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[160px]"
                 >
                   <option value="featured">Featured</option>
+                  <option value="stock-high">Stock: High to Low</option>
                   <option value="price-low">Price: Low to High</option>
                   <option value="price-high">Price: High to Low</option>
                   <option value="newest">Newest</option>
@@ -360,6 +379,7 @@ export default function Products() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
                 >
                   <option value="featured">Featured</option>
+                  <option value="stock-high">Stock: High to Low</option>
                   <option value="price-low">Price: Low to High</option>
                   <option value="price-high">Price: High to Low</option>
                   <option value="newest">Newest</option>
@@ -405,30 +425,39 @@ export default function Products() {
                             {product.title}
                           </h3>
                           <p className="text-gray-600 mb-3 line-clamp-2">{product.description}</p>
-                          <div className="flex items-center space-x-4">
+                          <div className="flex items-center justify-between">
                             <div className="text-2xl font-bold text-gray-900">${product.price.toFixed(2)}</div>
-                            {product.badges && product.badges.length > 0 && (
-                              <div className="flex space-x-2">
-                                {product.badges.slice(0, 2).map((badge: string, index: number) => (
-                                  <span 
-                                    key={index}
-                                    className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
-                                  >
-                                    {badge}
-                                  </span>
-                                ))}
+                            {product.stock !== undefined && (
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  product.stock === 0 
+                                    ? 'bg-red-500' 
+                                    : product.stock <= 5 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-green-500'
+                                }`}></div>
+                                <span className={`text-sm font-medium ${
+                                  product.stock === 0 
+                                    ? 'text-red-600' 
+                                    : product.stock <= 5 
+                                      ? 'text-yellow-600' 
+                                      : 'text-green-600'
+                                }`}>
+                                  {product.stock === 0 ? 'Out of Stock' : `${product.stock} in stock`}
+                                </span>
                               </div>
                             )}
                           </div>
                         </div>
                         <div className="flex-shrink-0 ml-6">
                           <Button
-                            variant="add-to-cart"
+                            variant={product.stock === 0 ? "outline" : "add-to-cart"}
                             size="md"
                             className="group"
-                            onClick={() => window.location.href = `/customize/${product.id}`}
+                            disabled={product.stock === 0}
+                            onClick={() => product.stock !== 0 && (window.location.href = `/customize/${product.id}`)}
                           >
-                            Start Customizing
+                            {product.stock === 0 ? 'Out of Stock' : 'Start Customizing'}
                           </Button>
                         </div>
                       </div>

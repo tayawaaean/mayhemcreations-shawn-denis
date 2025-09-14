@@ -5,6 +5,7 @@ import { Session, SessionAttributes, SessionCreationAttributes } from './session
 import { OAuthProvider, OAuthProviderAttributes, OAuthProviderCreationAttributes } from './oauthProviderModel';
 import { Category, CategoryAttributes, CategoryCreationAttributes } from './categoryModel';
 import Product, { ProductAttributes, ProductCreateAttributes } from './productModel';
+import Variant, { VariantAttributes, VariantCreationAttributes } from './variantModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -69,6 +70,18 @@ const setupAssociations = (): void => {
     foreignKey: 'subcategoryId',
     as: 'subcategoryProducts',
   });
+
+  // Variant belongs to Product
+  Variant.belongsTo(Product, {
+    foreignKey: 'productId',
+    as: 'product',
+  });
+
+  // Product has many Variants
+  Product.hasMany(Variant, {
+    foreignKey: 'productId',
+    as: 'variants',
+  });
 };
 
 // Initialize associations
@@ -98,6 +111,9 @@ export {
   Product,
   ProductAttributes,
   ProductCreateAttributes,
+  Variant,
+  VariantAttributes,
+  VariantCreationAttributes,
 };
 
 // Export all models for easy access
@@ -108,6 +124,7 @@ export const models = {
   OAuthProvider,
   Category,
   Product,
+  Variant,
 };
 
 // Database synchronization function

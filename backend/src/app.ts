@@ -14,6 +14,7 @@ import authRoute from './routes/authRoute';
 import userRoute from './routes/userRoute';
 import categoryRoute from './routes/categoryRoute';
 import productRoute from './routes/productRoute';
+import variantRoute from './routes/variantRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -119,6 +120,7 @@ app.use('/api/v1/auth', authRoute);
 app.use('/api/v1/users', userRoute);
 app.use('/api/v1/categories', categoryRoute);
 app.use('/api/v1/products', productRoute);
+app.use('/api/v1/variants', variantRoute);
 
 // 404 handler
 app.use(notFound);

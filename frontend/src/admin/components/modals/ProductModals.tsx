@@ -39,15 +39,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     subcategoryId: 0,
     status: 'draft' as 'active' | 'inactive' | 'draft',
     featured: false,
-    badges: [] as string[],
-    availableColors: [] as string[],
-    availableSizes: [] as string[],
-    stock: '',
     sku: '',
     weight: '',
     dimensions: '',
-    materials: [] as string[],
-    careInstructions: ''
+    hasSizing: false
   })
 
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -143,7 +138,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           image: base64Image, // Store as base64
           categoryId: formData.categoryId,
           subcategoryId: formData.subcategoryId || undefined,
-          stock: formData.stock ? parseInt(formData.stock) : undefined,
           weight: formData.weight ? parseFloat(formData.weight) : undefined
           // createdAt and updatedAt will be handled by the database
         })
@@ -160,15 +154,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           subcategoryId: 0,
           status: 'draft',
           featured: false,
-          badges: [],
-          availableColors: [],
-          availableSizes: [],
-          stock: '',
           sku: '',
           weight: '',
           dimensions: '',
-          materials: [],
-          careInstructions: ''
+          hasSizing: false
         })
         setImageFile(null)
         setImagePreview('')
@@ -304,18 +293,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                 {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stock
-                </label>
-                <input
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
-                  placeholder="0"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -342,6 +319,19 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                 />
                 <label htmlFor="featured" className="ml-2 block text-sm text-gray-700">
                   Featured Product
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="hasSizing"
+                  checked={formData.hasSizing}
+                  onChange={(e) => setFormData({ ...formData, hasSizing: e.target.checked })}
+                  className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
+                />
+                <label htmlFor="hasSizing" className="ml-2 block text-sm text-gray-700">
+                  Has Sizing (Apparel products with multiple sizes)
                 </label>
               </div>
 
@@ -493,15 +483,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
     subcategoryId: 0,
     status: 'draft' as 'active' | 'inactive' | 'draft',
     featured: false,
-    badges: [] as string[],
-    availableColors: [] as string[],
-    availableSizes: [] as string[],
-    stock: '',
     sku: '',
     weight: '',
     dimensions: '',
-    materials: [] as string[],
-    careInstructions: ''
+    hasSizing: false
   })
 
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -522,15 +507,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
         subcategoryId: product.subcategoryId || 0,
         status: product.status || 'draft',
         featured: product.featured || false,
-        badges: product.badges || [],
-        availableColors: product.availableColors || [],
-        availableSizes: product.availableSizes || [],
-        stock: product.stock?.toString() || '',
         sku: product.sku || '',
         weight: product.weight?.toString() || '',
         dimensions: product.dimensions || '',
-        materials: product.materials || [],
-        careInstructions: product.careInstructions || ''
+        hasSizing: product.hasSizing || false
       })
       
       // Set preview for existing image
@@ -634,7 +614,6 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
           image: imageData,
           categoryId: formData.categoryId,
           subcategoryId: formData.subcategoryId || undefined,
-          stock: formData.stock ? parseInt(formData.stock) : undefined,
           weight: formData.weight ? parseFloat(formData.weight) : undefined
           // updatedAt will be handled by the database automatically
         })
@@ -770,18 +749,6 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
                 {errors.price && <p className="mt-1 text-sm text-red-600">{errors.price}</p>}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Stock
-                </label>
-                <input
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
-                  placeholder="0"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -808,6 +775,19 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
                 />
                 <label htmlFor="featured-edit" className="ml-2 block text-sm text-gray-700">
                   Featured Product
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="hasSizing-edit"
+                  checked={formData.hasSizing}
+                  onChange={(e) => setFormData({ ...formData, hasSizing: e.target.checked })}
+                  className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
+                />
+                <label htmlFor="hasSizing-edit" className="ml-2 block text-sm text-gray-700">
+                  Has Sizing (Apparel products with multiple sizes)
                 </label>
               </div>
 

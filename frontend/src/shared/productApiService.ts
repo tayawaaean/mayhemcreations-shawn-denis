@@ -1,5 +1,17 @@
 import { envConfig } from './envConfig';
 
+export interface ProductVariant {
+  id: number;
+  name: string;
+  color?: string;
+  colorHex?: string;
+  size?: string;
+  sku: string;
+  stock: number;
+  price?: number;
+  isActive: boolean;
+}
+
 export interface Product {
   id: number;
   title: string;
@@ -23,8 +35,10 @@ export interface Product {
   dimensions?: string;
   materials?: string[];
   careInstructions?: string;
+  hasSizing?: boolean;
   createdAt: string;
   updatedAt: string;
+  variants?: ProductVariant[];
   category?: {
     id: number;
     name: string;

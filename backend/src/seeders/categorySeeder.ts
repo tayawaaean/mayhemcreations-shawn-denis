@@ -156,7 +156,9 @@ export async function seedCategories(): Promise<void> {
   try {
     logger.info('🌱 Starting category seeding...');
 
-    // Clear existing categories first
+    // Clear existing data first (products then categories to avoid foreign key constraint)
+    const { clearProducts } = await import('./productSeeder');
+    await clearProducts();
     await clearCategories();
 
     // Create categories with hierarchy

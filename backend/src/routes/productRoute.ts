@@ -6,7 +6,10 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  getProductStats
+  getProductStats,
+  updateInventory,
+  getInventoryStatus,
+  bulkUpdateInventory
 } from '../controllers/productController';
 
 const router = Router();
@@ -59,5 +62,26 @@ router.put('/:id', updateProduct);
  * @access Public (no auth required)
  */
 router.delete('/:id', deleteProduct);
+
+/**
+ * @route PUT /api/v1/products/:id/inventory
+ * @desc Update product inventory (add, subtract, or set stock)
+ * @access Public (no auth required)
+ */
+router.put('/:id/inventory', updateInventory);
+
+/**
+ * @route GET /api/v1/products/inventory/status
+ * @desc Get inventory status for products (low stock, out of stock, etc.)
+ * @access Public
+ */
+router.get('/inventory/status', getInventoryStatus);
+
+/**
+ * @route PUT /api/v1/products/inventory/bulk
+ * @desc Bulk update inventory for multiple products
+ * @access Public (no auth required)
+ */
+router.put('/inventory/bulk', bulkUpdateInventory);
 
 export default router;

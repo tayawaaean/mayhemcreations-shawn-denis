@@ -180,14 +180,7 @@ export async function seedRoles(): Promise<void> {
   try {
     logger.info('🌱 Starting role seeding...');
 
-    // Clear existing roles (except system roles)
-    await Role.destroy({
-      where: {
-        isSystem: false
-      }
-    });
-
-    // Create or update roles
+    // Create or update roles (don't clear existing ones to avoid foreign key issues)
     for (const roleDataItem of roleData) {
       const [role, created] = await Role.findOrCreate({
         where: { name: roleDataItem.name },
@@ -212,12 +205,16 @@ export async function seedRoles(): Promise<void> {
 
 export async function clearRoles(): Promise<void> {
   try {
-    logger.info('🧹 Clearing all roles...');
+    logger.info('🧹 Clearing non-system roles...');
+    
+    // First, try to clear only non-system roles
     await Role.destroy({
-      where: {},
-      force: true
+      where: {
+        isSystem: false
+      }
     });
-    logger.info('✅ All roles cleared successfully!');
+    
+    logger.info('✅ Non-system roles cleared successfully!');
   } catch (error) {
     logger.error('❌ Error clearing roles:', error);
     throw error;

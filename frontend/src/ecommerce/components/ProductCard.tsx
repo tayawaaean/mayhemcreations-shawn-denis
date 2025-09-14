@@ -24,18 +24,34 @@ export default function ProductCard({ product }: { product: Product }) {
         </Link>
 
         {/* Badges */}
-        {product.badges && product.badges.length > 0 && (
-          <div className="absolute top-3 left-3 flex flex-col gap-2">
-            {product.badges.map((badge: string, index: number) => (
-              <span
-                key={index}
-                className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
-              >
-                {badge}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {/* Stock Badge */}
+          {product.stock !== undefined && (
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+              product.stock === 0 
+                ? 'bg-red-500 text-white' 
+                : product.stock <= 5 
+                  ? 'bg-yellow-500 text-white' 
+                  : 'bg-green-500 text-white'
+            }`}>
+              {product.stock === 0 ? 'Out of Stock' : `${product.stock} in stock`}
+            </span>
+          )}
+          
+          {/* Other Badges */}
+          {product.badges && product.badges.length > 0 && (
+            <>
+              {product.badges.map((badge: string, index: number) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
+                >
+                  {badge}
+                </span>
+              ))}
+            </>
+          )}
+        </div>
 
         {/* Quick Actions */}
         <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-opacity duration-200 ${
@@ -54,12 +70,13 @@ export default function ProductCard({ product }: { product: Product }) {
           isHovered ? 'translate-y-0' : 'translate-y-full'
         }`}>
           <Button
-            variant="add-to-cart"
+            variant={product.stock === 0 ? "outline" : "add-to-cart"}
             size="sm"
             className="w-full"
-            onClick={() => window.location.href = `/customize/${product.id}`}
+            disabled={product.stock === 0}
+            onClick={() => product.stock !== 0 && (window.location.href = `/customize/${product.id}`)}
           >
-            Start Customizing
+            {product.stock === 0 ? 'Out of Stock' : 'Start Customizing'}
           </Button>
         </div>
       </div>

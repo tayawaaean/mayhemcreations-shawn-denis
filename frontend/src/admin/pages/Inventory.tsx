@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAdmin } from '../context/AdminContext'
 import { 
   Search, 
@@ -10,13 +10,19 @@ import {
   Package,
   TrendingUp,
   TrendingDown,
-  X
+  X,
+  RefreshCw,
+  Download,
+  Upload
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
+import { variantApiService, Variant, VariantInventoryStatus } from '../../shared/variantApiService'
+import { useProducts } from '../hooks/useProducts'
 
 const Inventory: React.FC = () => {
   const { state, dispatch } = useAdmin()
-  const { products } = state
+  const { products: mockProducts } = state
+  const { products, loading: productsLoading, error: productsError, fetchProducts } = useProducts()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [lowStockThreshold, setLowStockThreshold] = useState(10)
@@ -26,112 +32,251 @@ const Inventory: React.FC = () => {
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  
+  // New state for inventory management
+  const [variantData, setVariantData] = useState<VariantInventoryStatus | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [newVariant, setNewVariant] = useState({
     productId: '',
+    categoryId: '',
+    subcategoryId: '',
     color: '',
     colorHex: '#000000',
     size: '',
     sku: '',
-    stock: 0,
-    costPrice: 0
+    stock: 0
   })
   const [editVariant, setEditVariant] = useState({
     id: '',
     productId: '',
+    categoryId: '',
+    subcategoryId: '',
     color: '',
     colorHex: '#000000',
     size: '',
     sku: '',
-    stock: 0,
-    costPrice: 0
+    stock: 0
   })
+  const [categories, setCategories] = useState<any[]>([])
+  const [subcategories, setSubcategories] = useState<any[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<any[]>([])
+  
+  // Size options for apparel
+  const apparelSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+  const accessorySizes = ['One Size', 'Small', 'Medium', 'Large']
 
-  // Flatten all variants for inventory view
-  const allVariants = products.flatMap(product => 
-    product.variants.map(variant => ({
-      ...variant,
-      productId: product.id,
-      productTitle: product.title,
-      productImage: product.primaryImage,
-      productSku: product.sku,
-      category: product.category,
-      subcategory: product.subcategory
+  // Load products and inventory data on component mount
+  useEffect(() => {
+    fetchProducts()
+    loadInventoryData()
+    loadCategories()
+  }, [])
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/v1/categories')
+      const data = await response.json()
+      if (data.success) {
+        setCategories(data.data)
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
+  const handleCategoryChange = (categoryId: string) => {
+    const selectedCategory = categories.find(cat => cat.id.toString() === categoryId)
+    const categorySubcategories = selectedCategory?.children || []
+    
+    setNewVariant(prev => ({
+      ...prev,
+      categoryId,
+      subcategoryId: '',
+      productId: ''
     }))
-  )
+    
+    setSubcategories(categorySubcategories)
+    setFilteredProducts([])
+  }
 
-  const filteredVariants = allVariants.filter(variant => {
-    const matchesSearch = variant.productTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         variant.sku.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || variant.category === selectedCategory
+  const handleSubcategoryChange = (subcategoryId: string) => {
+    setNewVariant(prev => ({
+      ...prev,
+      subcategoryId,
+      productId: ''
+    }))
+    
+    // Filter products based on category and subcategory
+    const filtered = products.filter(product => {
+      const matchesCategory = product.categoryId?.toString() === newVariant.categoryId
+      const matchesSubcategory = subcategoryId === '' || product.subcategoryId?.toString() === subcategoryId
+      return matchesCategory && matchesSubcategory
+    })
+    
+    setFilteredProducts(filtered)
+  }
+
+  const handleProductChange = (productId: string) => {
+    setNewVariant(prev => ({ ...prev, productId, size: '' }))
+  }
+
+  // Get size options based on selected product
+  const getSizeOptions = () => {
+    if (!newVariant.productId) return []
+    
+    const selectedProduct = products.find(p => p.id.toString() === newVariant.productId)
+    if (!selectedProduct) return []
+    
+    // Check if product has sizing (apparel)
+    if (selectedProduct.hasSizing) {
+      return apparelSizes
+    } else {
+      return accessorySizes
+    }
+  }
+
+  // Refresh data when low stock threshold changes (for filtering display)
+  useEffect(() => {
+    // Data is already loaded, just trigger a re-render for filtering
+    // The filtering happens in the frontend, so no need to reload data
+  }, [lowStockThreshold])
+
+  const loadInventoryData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      // Load only variant inventory data
+      const variantData = await variantApiService.getVariantInventoryStatus()
+      setVariantData(variantData)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load inventory data')
+      console.error('Error loading inventory data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Only show variants in inventory
+  const allItems = (variantData?.variants?.map(variant => ({
+    id: variant.id.toString(),
+    productId: variant.productId,
+    productTitle: variant.product?.title || 'Unknown Product',
+    productImage: variant.image || variant.product?.image || '/placeholder-image.jpg',
+    productSku: variant.sku,
+    category: variant.product?.category?.name || 'Uncategorized',
+    subcategory: '',
+    price: variant.price || variant.product?.price || 0,
+    stock: variant.stock || 0,
+    color: variant.color || 'Default',
+    colorHex: variant.colorHex || '#000000',
+    size: variant.size || 'One Size',
+    type: 'variant' as const
+  })) || [])
+
+  const filteredItems = allItems.filter(item => {
+    const matchesSearch = item.productTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         item.productSku.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
-  const lowStockVariants = filteredVariants.filter(variant => variant.stock < lowStockThreshold)
-  const outOfStockVariants = filteredVariants.filter(variant => variant.stock === 0)
+  const lowStockItems = filteredItems.filter(item => item.stock < lowStockThreshold)
+  const outOfStockItems = filteredItems.filter(item => item.stock === 0)
 
   // Pagination logic
-  const totalItems = filteredVariants.length
+  const totalItems = filteredItems.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedVariants = filteredVariants.slice(startIndex, endIndex)
+  const paginatedItems = filteredItems.slice(startIndex, endIndex)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
   }
 
 
-  const handleStockAdjustment = (variantId: string, adjustment: number) => {
-    const product = products.find(p => p.variants.some(v => v.id === variantId))
-    if (product) {
-      const updatedProduct = {
-        ...product,
-        variants: product.variants.map(v => 
-          v.id === variantId 
-            ? { ...v, stock: Math.max(0, v.stock + adjustment) }
-            : v
-        ),
-        updatedAt: new Date()
-      }
-      dispatch({ type: 'UPDATE_PRODUCT', payload: updatedProduct })
+  const handleStockAdjustment = async (itemId: string, adjustment: number) => {
+    try {
+      const item = filteredItems.find(i => i.id === itemId)
+      if (!item) return
+
+      // Adjust variant stock
+      await variantApiService.adjustVariantStock(Number(itemId), adjustment, `Manual adjustment via inventory management`)
+      
+      // Reload inventory data to get updated stock levels
+      await loadInventoryData()
+    } catch (error) {
+      console.error('Error adjusting stock:', error)
+      setError(error instanceof Error ? error.message : 'Failed to adjust stock')
     }
   }
 
+  // Bulk inventory management functions
 
-  const handleAddVariant = () => {
-    if (!newVariant.productId || !newVariant.color || !newVariant.size || !newVariant.sku) return
 
-    const product = products.find(p => p.id === newVariant.productId)
-    if (product) {
-      const variant = {
-        id: Date.now().toString(),
+  const handleAddVariant = async () => {
+    console.log('handleAddVariant called with:', newVariant)
+    
+    if (!newVariant.productId || !newVariant.color || !newVariant.size || !newVariant.sku) {
+      console.log('Validation failed:', {
+        productId: newVariant.productId,
+        color: newVariant.color,
+        size: newVariant.size,
+        sku: newVariant.sku
+      })
+      setError('Please fill in all required fields')
+      return
+    }
+
+    try {
+      console.log('Creating variant with data:', {
+        productId: Number(newVariant.productId),
+        name: `${newVariant.color} - ${newVariant.size}`,
         color: newVariant.color,
         colorHex: newVariant.colorHex,
         size: newVariant.size,
         sku: newVariant.sku,
         stock: newVariant.stock,
-        costPrice: newVariant.costPrice,
-        price: product.price
-      }
+        isActive: true
+      })
 
-      const updatedProduct = {
-        ...product,
-        variants: [...product.variants, variant],
-        updatedAt: new Date()
-      }
-      dispatch({ type: 'UPDATE_PRODUCT', payload: updatedProduct })
+      // Create variant via API
+      const result = await variantApiService.createVariant({
+        productId: Number(newVariant.productId),
+        name: `${newVariant.color} - ${newVariant.size}`,
+        color: newVariant.color,
+        colorHex: newVariant.colorHex,
+        size: newVariant.size,
+        sku: newVariant.sku,
+        stock: newVariant.stock,
+        isActive: true
+      })
+
+      console.log('Variant created successfully:', result)
+
+      // Reload data to get updated variants
+      await loadInventoryData()
+
+      // Reset form and close modal
+      setNewVariant({
+        productId: '',
+        categoryId: '',
+        subcategoryId: '',
+        color: '',
+        colorHex: '#000000',
+        size: '',
+        sku: '',
+        stock: 0
+      })
+      setSubcategories([])
+      setFilteredProducts([])
+      setIsAddVariantOpen(false)
+      setError(null) // Clear any previous errors
+    } catch (error) {
+      console.error('Error creating variant:', error)
+      setError(`Failed to create variant: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-
-    setNewVariant({
-      productId: '',
-      color: '',
-      colorHex: '#000000',
-      size: '',
-      sku: '',
-      stock: 0,
-      costPrice: 0
-    })
-    setIsAddVariantOpen(false)
   }
 
   const handleEditVariantClick = (variant: any) => {
@@ -139,53 +284,37 @@ const Inventory: React.FC = () => {
     setEditVariant({
       id: variant.id,
       productId: variant.productId,
+      categoryId: variant.product?.categoryId?.toString() || '',
+      subcategoryId: variant.product?.subcategoryId?.toString() || '',
       color: variant.color,
       colorHex: variant.colorHex,
       size: variant.size,
       sku: variant.sku,
-      stock: variant.stock,
-      costPrice: variant.costPrice || 0
+      stock: variant.stock
     })
     setIsEditVariantOpen(true)
   }
 
-  const handleUpdateVariant = () => {
+  const handleUpdateVariant = async () => {
     if (!editVariant.productId || !editVariant.color || !editVariant.size || !editVariant.sku) return
 
-    const product = products.find(p => p.id === editVariant.productId)
+    const product = products.find(p => p.id.toString() === editVariant.productId)
     if (product) {
-      const updatedProduct = {
-        ...product,
-        variants: product.variants.map(v =>
-          v.id === editVariant.id
-            ? {
-                ...v,
-                color: editVariant.color,
-                colorHex: editVariant.colorHex,
-                size: editVariant.size,
-                sku: editVariant.sku,
-                stock: editVariant.stock,
-                costPrice: editVariant.costPrice
-              }
-            : v
-        ),
-        updatedAt: new Date()
-      }
-      dispatch({ type: 'UPDATE_PRODUCT', payload: updatedProduct })
+      // Reload data to get updated variants
+      await loadInventoryData()
     }
 
     setIsEditVariantOpen(false)
     setSelectedVariant(null)
   }
 
-  const categories = Array.from(new Set(products.map(p => p.category)))
+  const productCategories = Array.from(new Set(products.map(p => p.category?.name || 'Uncategorized')))
 
-  const totalValue = allVariants.reduce((sum, variant) => {
-    const product = products.find(p => p.id === variant.productId)
-    return sum + (variant.stock * (product?.costPrice || product?.price || 0))
-  }, 0)
+  const totalValue = variantData?.variants?.reduce((sum, variant) => {
+    return sum + (variant.stock * (variant.price || variant.product?.price || 0))
+  }, 0) || 0
 
-  const totalUnits = allVariants.reduce((sum, variant) => sum + variant.stock, 0)
+  const totalUnits = variantData?.variants?.reduce((sum, variant) => sum + variant.stock, 0) || 0
 
   return (
     <div className="space-y-6">
@@ -194,10 +323,18 @@ const Inventory: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage stock levels and track inventory across all products
+            Manage stock levels and track inventory for product variants
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={loadInventoryData}
+            disabled={loading}
+            className="text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+            title="Refresh inventory data"
+          >
+            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
           <button
             onClick={() => setIsHelpOpen(true)}
             className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
@@ -215,6 +352,26 @@ const Inventory: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="ml-auto text-red-400 hover:text-red-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Inventory Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -259,7 +416,9 @@ const Inventory: React.FC = () => {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Low Stock</dt>
-                  <dd className="text-2xl font-semibold text-gray-900">{lowStockVariants.length}</dd>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {variantData?.statistics?.lowStock || lowStockItems.length}
+                  </dd>
                 </dl>
               </div>
             </div>
@@ -275,7 +434,9 @@ const Inventory: React.FC = () => {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Out of Stock</dt>
-                  <dd className="text-2xl font-semibold text-gray-900">{outOfStockVariants.length}</dd>
+                  <dd className="text-2xl font-semibold text-gray-900">
+                    {variantData?.statistics?.outOfStock || outOfStockItems.length}
+                  </dd>
                 </dl>
               </div>
             </div>
@@ -308,7 +469,7 @@ const Inventory: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Categories</option>
-              {categories.map(category => (
+              {productCategories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
@@ -361,37 +522,39 @@ const Inventory: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedVariants.map((variant) => {
-                const product = products.find(p => p.id === variant.productId)
-                const isLowStock = variant.stock < lowStockThreshold
-                const isOutOfStock = variant.stock === 0
+              {paginatedItems.map((item) => {
+                const isLowStock = item.stock < lowStockThreshold
+                const isOutOfStock = item.stock === 0
                 
                 return (
-                  <tr key={variant.id} className="hover:bg-gray-50">
+                  <tr key={item.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                          src={variant.productImage}
-                          alt={variant.productTitle}
+                          src={item.productImage}
+                          alt={item.productTitle}
                           className="h-12 w-12 rounded-lg object-cover"
                         />
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{variant.productTitle}</div>
-                          <div className="text-sm text-gray-500">{variant.category} • {variant.subcategory}</div>
+                          <div className="text-sm font-medium text-gray-900">{item.productTitle}</div>
+                          <div className="text-sm text-gray-500">{item.category} • {item.subcategory}</div>
+                          {item.type === 'variant' && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Variant: {item.color} • {item.size}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div 
-                          className="h-4 w-4 rounded-full border border-gray-300 mr-2"
-                          style={{ backgroundColor: variant.colorHex }}
-                        ></div>
-                        <span className="text-sm text-gray-900">{variant.color} • {variant.size}</span>
+                        <div className="text-sm text-gray-900">
+                          {item.color} • {item.size}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {variant.sku}
+                      {item.productSku}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -400,7 +563,7 @@ const Inventory: React.FC = () => {
                           isLowStock ? 'text-yellow-600' : 
                           'text-gray-900'
                         }`}>
-                          {variant.stock}
+                          {item.stock}
                         </span>
                         {isLowStock && (
                           <AlertTriangle className="h-4 w-4 text-yellow-500 ml-2" />
@@ -421,21 +584,21 @@ const Inventory: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
                         <button
-                          onClick={() => handleStockAdjustment(variant.id, -1)}
+                          onClick={() => handleStockAdjustment(item.id, -1)}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleStockAdjustment(variant.id, 1)}
+                          onClick={() => handleStockAdjustment(item.id, 1)}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleEditVariantClick(variant)}
+                          onClick={() => handleEditVariantClick(item)}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                          title="Edit Variant"
+                          title="Edit Item"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
@@ -449,36 +612,41 @@ const Inventory: React.FC = () => {
 
           {/* Mobile Card Layout */}
           <div className="lg:hidden">
-            {paginatedVariants.map((variant) => (
-              <div key={variant.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
-                <div className="flex items-start space-x-3">
-                  <img
-                    src={variant.productImage}
-                    alt={variant.productTitle}
-                    className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">{variant.productTitle}</h3>
-                        <p className="text-sm text-gray-500 truncate">{variant.color} • {variant.size}</p>
-                        <p className="text-xs text-gray-400 mt-1">SKU: {variant.sku}</p>
+            {paginatedItems.map((item) => {
+              const isLowStock = item.stock < lowStockThreshold
+              const isOutOfStock = item.stock === 0
+              
+              return (
+                <div key={item.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
+                  <div className="flex items-start space-x-3">
+                    <img
+                      src={item.productImage}
+                      alt={item.productTitle}
+                      className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</h3>
+                          <p className="text-sm text-gray-500 truncate">{item.color} • {item.size}</p>
+                          <p className="text-xs text-blue-600 mt-1">Variant</p>
+                          <p className="text-xs text-gray-400 mt-1">SKU: {item.productSku}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
                         <button
-                          onClick={() => handleStockAdjustment(variant.id, -1)}
+                          onClick={() => handleStockAdjustment(item.id, -1)}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleStockAdjustment(variant.id, 1)}
+                          onClick={() => handleStockAdjustment(item.id, 1)}
                           className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleEditVariantClick(variant)}
+                          onClick={() => handleEditVariantClick(item)}
                           className="text-gray-400 hover:text-gray-600"
                         >
                           <Edit className="h-4 w-4" />
@@ -489,36 +657,37 @@ const Inventory: React.FC = () => {
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500">Current Stock</p>
-                        <p className="text-sm text-gray-900">{variant.stock} units</p>
+                        <p className="text-sm text-gray-900">{item.stock} units</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Status</p>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          variant.stock === 0
+                          item.stock === 0
                             ? 'bg-red-100 text-red-800'
-                            : variant.stock <= lowStockThreshold
+                            : item.stock <= lowStockThreshold
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {variant.stock === 0 ? 'Out of Stock' :
-                           variant.stock <= lowStockThreshold ? 'Low Stock' : 'In Stock'}
+                          {item.stock === 0 ? 'Out of Stock' :
+                           item.stock <= lowStockThreshold ? 'Low Stock' : 'In Stock'}
                         </span>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Cost Price</p>
-                        <p className="text-sm text-gray-900">${variant.price?.toFixed(2) || '0.00'}</p>
+                        <p className="text-xs text-gray-500">Price</p>
+                        <p className="text-sm text-gray-900">${typeof item.price === 'number' ? item.price.toFixed(2) : parseFloat(item.price || '0').toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Value</p>
                         <p className="text-sm font-medium text-gray-900">
-                          ${(variant.stock * (variant.price || 0)).toFixed(2)}
+                          ${(item.stock * (typeof item.price === 'number' ? item.price : parseFloat(item.price || '0'))).toFixed(2)}
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>
@@ -614,16 +783,54 @@ const Inventory: React.FC = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={newVariant.categoryId}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {subcategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Subcategory
+                  </label>
+                  <select
+                    value={newVariant.subcategoryId}
+                    onChange={(e) => handleSubcategoryChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All subcategories</option>
+                    {subcategories.map(subcategory => (
+                      <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Product *
                 </label>
                 <select
                   value={newVariant.productId}
-                  onChange={(e) => setNewVariant(prev => ({ ...prev, productId: e.target.value }))}
+                  onChange={(e) => handleProductChange(e.target.value)}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={!newVariant.categoryId}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select a product</option>
-                  {products.map(product => (
+                  <option value="">
+                    {!newVariant.categoryId ? 'Select a category first' : 'Select a product'}
+                  </option>
+                  {(filteredProducts.length > 0 ? filteredProducts : products).map(product => (
                     <option key={product.id} value={product.id}>{product.title}</option>
                   ))}
                 </select>
@@ -661,14 +868,20 @@ const Inventory: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Size *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={newVariant.size}
                     onChange={(e) => setNewVariant(prev => ({ ...prev, size: e.target.value }))}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., S, M, L, XL"
-                  />
+                    disabled={!newVariant.productId}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!newVariant.productId ? 'Select a product first' : 'Select a size'}
+                    </option>
+                    {getSizeOptions().map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -685,34 +898,18 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Initial Stock
-                  </label>
-                  <input
-                    type="number"
-                    value={newVariant.stock}
-                    onChange={(e) => setNewVariant(prev => ({ ...prev, stock: Number(e.target.value) }))}
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cost Price
-                  </label>
-                  <input
-                    type="number"
-                    value={newVariant.costPrice}
-                    onChange={(e) => setNewVariant(prev => ({ ...prev, costPrice: Number(e.target.value) }))}
-                    min="0"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="0.00"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Initial Stock
+                </label>
+                <input
+                  type="number"
+                  value={newVariant.stock}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
@@ -754,16 +951,76 @@ const Inventory: React.FC = () => {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={editVariant.categoryId}
+                  onChange={(e) => {
+                    const selectedCategory = categories.find(cat => cat.id.toString() === e.target.value)
+                    const categorySubcategories = selectedCategory?.children || []
+                    
+                    setEditVariant(prev => ({
+                      ...prev,
+                      categoryId: e.target.value,
+                      subcategoryId: '',
+                      productId: ''
+                    }))
+                    
+                    setSubcategories(categorySubcategories)
+                  }}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a category</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {subcategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Subcategory
+                  </label>
+                  <select
+                    value={editVariant.subcategoryId}
+                    onChange={(e) => {
+                      setEditVariant(prev => ({
+                        ...prev,
+                        subcategoryId: e.target.value,
+                        productId: ''
+                      }))
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All subcategories</option>
+                    {subcategories.map(subcategory => (
+                      <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Product *
                 </label>
                 <select
                   value={editVariant.productId}
                   onChange={(e) => setEditVariant(prev => ({ ...prev, productId: e.target.value }))}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={!editVariant.categoryId}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select a product</option>
-                  {products.map(product => (
+                  <option value="">
+                    {!editVariant.categoryId ? 'Select a category first' : 'Select a product'}
+                  </option>
+                  {products.filter(product => {
+                    const matchesCategory = product.categoryId?.toString() === editVariant.categoryId
+                    const matchesSubcategory = editVariant.subcategoryId === '' || product.subcategoryId?.toString() === editVariant.subcategoryId
+                    return matchesCategory && matchesSubcategory
+                  }).map(product => (
                     <option key={product.id} value={product.id}>{product.title}</option>
                   ))}
                 </select>
@@ -825,34 +1082,18 @@ const Inventory: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Stock
-                  </label>
-                  <input
-                    type="number"
-                    value={editVariant.stock}
-                    onChange={(e) => setEditVariant(prev => ({ ...prev, stock: Number(e.target.value) }))}
-                    min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cost Price
-                  </label>
-                  <input
-                    type="number"
-                    value={editVariant.costPrice}
-                    onChange={(e) => setEditVariant(prev => ({ ...prev, costPrice: Number(e.target.value) }))}
-                    min="0"
-                    step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="0.00"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Stock
+                </label>
+                <input
+                  type="number"
+                  value={editVariant.stock}
+                  onChange={(e) => setEditVariant(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

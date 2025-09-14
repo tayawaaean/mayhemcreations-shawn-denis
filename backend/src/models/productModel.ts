@@ -24,6 +24,7 @@ export interface ProductAttributes {
   dimensions?: string;
   materials?: string[];
   careInstructions?: string;
+  hasSizing?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -53,6 +54,7 @@ class Product extends Model<ProductAttributes, ProductCreateAttributes> implemen
   public dimensions?: string;
   public materials?: string[];
   public careInstructions?: string;
+  public hasSizing?: boolean;
   public readonly createdAt?: Date;
   public readonly updatedAt?: Date;
 
@@ -185,6 +187,12 @@ Product.init(
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'care_instructions',
+    },
+    hasSizing: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+      field: 'has_sizing',
     },
   },
   {
