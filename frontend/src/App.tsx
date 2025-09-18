@@ -21,6 +21,7 @@ import Contact from './ecommerce/routes/Contact'
 import Cart from './ecommerce/routes/Cart'
 import Checkout from './ecommerce/routes/Checkout'
 import MyOrders from './ecommerce/routes/MyOrders'
+import VerifyEmail from './pages/VerifyEmail'
 
 export default function App() {
   return (
@@ -139,6 +140,7 @@ export default function App() {
                 <ChatWidget />
               </div>
             } />
+            <Route path="/verify-email" element={<VerifyEmail />} />
           </Routes>
         </CustomizationProvider>
       </ChatProvider>

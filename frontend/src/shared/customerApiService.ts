@@ -154,6 +154,32 @@ class CustomerApiService {
   }
 
   /**
+   * Verify email with token
+   * @param token - The verification token received via email
+   * @returns Promise<ApiResponse> - Response containing verification status
+   * @throws {Error} When verification fails or token is invalid
+   */
+  async verifyEmail(token: string): Promise<ApiResponse> {
+    return this.request('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    })
+  }
+
+  /**
+   * Resend verification email
+   * @param email - The email address to resend verification to
+   * @returns Promise<ApiResponse> - Response containing resend status
+   * @throws {Error} When resend fails or email is not found
+   */
+  async resendVerificationEmail(email: string): Promise<ApiResponse> {
+    return this.request('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  }
+
+  /**
    * Logout user
    */
   async logout(): Promise<ApiResponse> {

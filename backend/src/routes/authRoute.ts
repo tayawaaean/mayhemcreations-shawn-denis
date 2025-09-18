@@ -55,6 +55,8 @@ const loginValidation = [
 // Auth routes
 router.post('/register', registerValidation, AuthController.register);
 router.post('/login', authRateLimit, loginValidation, AuthController.login);
+router.post('/resend-verification', AuthController.resendVerificationEmail);
+router.post('/verify-email', AuthController.verifyEmail);
 router.post('/logout', hybridAuthenticate, AuthController.logout);
 router.get('/profile', authenticate, validateSession, AuthController.getProfile);
 router.post('/refresh', authenticate, validateSession, AuthController.refreshSession);

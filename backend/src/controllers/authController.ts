@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { User, Role, Session, ROLES, DEFAULT_ROLE_PERMISSIONS } from '../models';
 import { SessionService } from '../services/sessionService';
 import { OAuthService } from '../services/oauthService';
+import { EmailService } from '../services/emailService';
 import { logger } from '../utils/logger';
 
 // Session types are now defined in types/session.d.ts
@@ -168,6 +169,22 @@ export class AuthController {
         emailVerificationToken,
         emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       });
+
+      // Send verification email
+      try {
+        const emailSent = await EmailService.sendVerificationEmail(
+          email,
+          firstName,
+          emailVerificationToken
+        );
+        
+        if (!emailSent) {
+          logger.warn(`Failed to send verification email to ${email}`);
+        }
+      } catch (emailError) {
+        logger.error('Error sending verification email:', emailError);
+        // Don't fail registration if email sending fails
+      }
 
       // Get user with role for session creation
       const userWithRole = await User.findByPk(user.id, {
@@ -411,6 +428,23 @@ export class AuthController {
         res.status(401).json({
           success: false,
           message: 'Invalid email or password',
+        });
+        return;
+      }
+
+      // Check email verification for customer role
+      if (expectedRole === 'customer' && !user.isEmailVerified) {
+        logger.warn('Unverified email login attempt', { 
+          email, 
+          userId: user.id, 
+          isEmailVerified: user.isEmailVerified 
+        });
+        
+        res.status(403).json({
+          success: false,
+          message: 'Please verify your email address before logging in. Check your inbox for the verification email.',
+          requiresEmailVerification: true,
+          email: user.email
         });
         return;
       }
@@ -1058,6 +1092,281 @@ export class AuthController {
     } catch (error) {
       logger.error('Unlink OAuth provider error:', error);
       next(error);
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/v1/auth/verify-email:
+   *   post:
+   *     tags: [Authentication]
+   *     summary: Verify user email address
+   *     description: Verify user email address using the verification token sent via email
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - token
+   *             properties:
+   *               token:
+   *                 type: string
+   *                 description: Email verification token from email
+   *                 example: "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+   *     responses:
+   *       200:
+   *         description: Email verified successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Email verified successfully
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     user:
+   *                       type: object
+   *                       properties:
+   *                         id:
+   *                           type: integer
+   *                           example: 1
+   *                         email:
+   *                           type: string
+   *                           example: user@example.com
+   *                         firstName:
+   *                           type: string
+   *                           example: John
+   *                         lastName:
+   *                           type: string
+   *                           example: Doe
+   *                         isEmailVerified:
+   *                           type: boolean
+   *                           example: true
+   *                 timestamp:
+   *                   type: string
+   *                   format: date-time
+   *                   example: '2025-09-10T17:30:00.000Z'
+   *       400:
+   *         description: Invalid or expired token
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *             examples:
+   *               invalidToken:
+   *                 summary: Invalid or expired token
+   *                 value:
+   *                   success: false
+   *                   message: Invalid or expired verification token
+   *                   timestamp: '2025-09-10T17:30:00.000Z'
+   *       500:
+   *         description: Internal server error
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *             examples:
+   *               serverError:
+   *                 summary: Server error
+   *                 value:
+   *                   success: false
+   *                   message: Internal server error
+   *                   timestamp: '2025-09-10T17:30:00.000Z'
+   */
+  static async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        res.status(400).json({
+          success: false,
+          message: 'Verification token is required',
+        });
+        return;
+      }
+
+      // Find user with valid verification token
+      const user = await User.findOne({
+        where: {
+          emailVerificationToken: token,
+          emailVerificationExpires: {
+            [require('sequelize').Op.gt]: new Date(), // Token not expired
+          },
+        },
+        include: [{ model: Role, as: 'role' }],
+      });
+
+      if (!user) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid or expired verification token',
+        });
+        return;
+      }
+
+      // Update user as verified
+      await user.update({
+        isEmailVerified: true,
+        emailVerificationToken: undefined,
+        emailVerificationExpires: undefined,
+      });
+
+      // Send welcome email
+      try {
+        await EmailService.sendWelcomeEmail(user.email, user.firstName);
+      } catch (emailError) {
+        logger.error('Error sending welcome email:', emailError);
+        // Don't fail verification if welcome email fails
+      }
+
+      // Log email verification
+      logger.info(`Email verified for user: ${user.email}`, {
+        userId: user.id,
+        email: user.email,
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Email verified successfully',
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isEmailVerified: user.isEmailVerified,
+            role: (user as any).role?.name || 'customer',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Email verification error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/v1/auth/resend-verification:
+   *   post:
+   *     tags: [Authentication]
+   *     summary: Resend email verification
+   *     description: Resends verification email to user
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               email:
+   *                 type: string
+   *                 format: email
+   *                 description: User email address
+   *             required:
+   *               - email
+   *     responses:
+   *       200:
+   *         description: Verification email sent successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 message:
+   *                   type: string
+   *                 timestamp:
+   *                   type: string
+   *       400:
+   *         description: Invalid email or user not found
+   *       500:
+   *         description: Internal server error
+   */
+  static async resendVerificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        res.status(400).json({
+          success: false,
+          message: 'Email is required',
+        });
+        return;
+      }
+
+      // Find user
+      const user = await User.findOne({
+        where: { email },
+        include: [{ model: Role, as: 'role' }],
+      });
+
+      if (!user) {
+        res.status(400).json({
+          success: false,
+          message: 'User not found',
+        });
+        return;
+      }
+
+      // Check if already verified
+      if (user.isEmailVerified) {
+        res.status(400).json({
+          success: false,
+          message: 'Email is already verified',
+        });
+        return;
+      }
+
+      // Generate new verification token
+      const verificationToken = crypto.randomBytes(32).toString('hex');
+      const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      // Update user with new token
+      await user.update({
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: verificationExpires,
+      });
+
+      // Send verification email
+      try {
+        await EmailService.sendVerificationEmail(user.email, user.firstName, verificationToken);
+        logger.info(`Verification email resent to: ${user.email}`);
+      } catch (emailError) {
+        logger.error('Error sending verification email:', emailError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to send verification email',
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Verification email sent successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      logger.error('Resend verification email error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 }

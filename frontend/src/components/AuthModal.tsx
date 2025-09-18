@@ -91,12 +91,45 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [selectedDemo, setSelectedDemo] = useState<typeof demoCustomers[0] | null>(null)
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false)
+  const [isResendingVerification, setIsResendingVerification] = useState(false)
+  const [isSuccessMessage, setIsSuccessMessage] = useState(false)
+
+  // Helper function to get field error
+  const getFieldError = (fieldName: string) => {
+    return validationErrors[fieldName] || ''
+  }
+
+  /**
+   * Handles resending verification email for unverified users
+   * Called when user clicks "Resend Verification Email" button
+   */
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true)
+    try {
+      const response = await customerApiService.resendVerificationEmail(formData.email)
+      if (response.success) {
+        setError('Verification email sent! Please check your inbox.')
+        setRequiresEmailVerification(false)
+      } else {
+        setError(response.message || 'Failed to resend verification email')
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to resend verification email')
+    } finally {
+      setIsResendingVerification(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    setValidationErrors({})
+    setRequiresEmailVerification(false)
+    setIsSuccessMessage(false)
 
     try {
       if (mode === 'register') {
@@ -116,52 +149,75 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         })
 
         if (response.success && response.data) {
-          // Store auth data using multi-account storage
-          MultiAccountStorageService.storeAccountAuthData('customer', {
-            user: {
+          // Check if email is verified
+          if (response.data.user.isEmailVerified) {
+            // Only authenticate if email is verified
+            MultiAccountStorageService.storeAccountAuthData('customer', {
+              user: {
+                id: response.data.user.id,
+                email: response.data.user.email,
+                role: response.data.user.role,
+                firstName: response.data.user.firstName,
+                lastName: response.data.user.lastName,
+                isEmailVerified: response.data.user.isEmailVerified,
+                lastLoginAt: new Date().toISOString(),
+                createdAt: response.data.user.createdAt || new Date().toISOString(),
+                avatar: response.data.user.avatar,
+                accountType: 'customer'
+              },
+              session: {
+                sessionId: response.data.sessionId,
+                accessToken: response.data.accessToken,
+                refreshToken: response.data.refreshToken,
+                lastActivity: new Date().toISOString()
+              }
+            })
+
+            // Convert to User format for context
+            const userData: User = {
               id: response.data.user.id,
-              email: response.data.user.email,
-              role: response.data.user.role,
               firstName: response.data.user.firstName,
               lastName: response.data.user.lastName,
+              email: response.data.user.email,
+              role: response.data.user.role,
               isEmailVerified: response.data.user.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
-              createdAt: response.data.user.createdAt || new Date().toISOString(),
-              avatar: response.data.user.avatar,
-              accountType: 'customer'
-            },
-            session: {
-              sessionId: response.data.sessionId,
-              accessToken: response.data.accessToken,
-              refreshToken: response.data.refreshToken,
-              lastActivity: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
             }
-          })
 
-          // Convert to User format for context
-          const userData: User = {
-            id: response.data.user.id,
-            firstName: response.data.user.firstName,
-            lastName: response.data.user.lastName,
-            email: response.data.user.email,
-            role: response.data.user.role,
-            isEmailVerified: response.data.user.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+            // Log successful registration
+            loggingService.logUserAction('customer_registration', {
+              email: formData.email,
+              firstName: formData.firstName,
+              lastName: formData.lastName
+            }, { userId: userData.id.toString(), userEmail: userData.email, userRole: 'customer' })
+
+            onSuccess(userData)
+            onClose()
+          } else {
+            // Email not verified - show message and keep modal open
+            setError('Registration successful! Please check your email and click the verification link to complete your account setup.')
+            setIsSuccessMessage(true)
+            setIsLoading(false)
+            // Don't close modal or authenticate user
           }
-
-          // Log successful registration
-          loggingService.logUserAction('customer_registration', {
-            email: formData.email,
-            firstName: formData.firstName,
-            lastName: formData.lastName
-          }, { userId: userData.id.toString(), userEmail: userData.email, userRole: 'customer' })
-
-          onSuccess(userData)
-          onClose()
         } else {
-          setError(response.message || 'Registration failed')
+          // Handle validation errors
+          if (response.errors && Array.isArray(response.errors)) {
+            const fieldErrors: Record<string, string> = {}
+            response.errors.forEach((error: any) => {
+              // Use 'path' instead of 'param' as that's what the backend returns
+              const fieldName = error.path || error.param
+              if (fieldName) {
+                fieldErrors[fieldName] = error.msg
+              }
+            })
+            setValidationErrors(fieldErrors)
+            setError('Please fix the errors below')
+          } else {
+            setError(response.message || 'Registration failed')
+          }
         }
       } else {
         // Handle login with customer role validation
@@ -209,7 +265,14 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           onSuccess(userData)
           onClose()
         } else {
-          setError(response.message || 'Login failed')
+          // Handle specific error types
+          if (response.requiresEmailVerification) {
+            setRequiresEmailVerification(true)
+            setError('Please verify your email address before logging in. Check your inbox for the verification email.')
+          } else {
+            setRequiresEmailVerification(false)
+            setError(response.message || 'Login failed')
+          }
         }
       }
     } catch (error: any) {
@@ -305,11 +368,19 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [name]: value
     }))
     setError('') // Clear error when user types
+    setRequiresEmailVerification(false) // Clear email verification flag
+    setIsSuccessMessage(false) // Clear success message flag
+    
+    // Clear validation error for this field when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({ ...prev, [name]: '' }))
+    }
   }
 
   const handleDemoLogin = async (customer: typeof demoCustomers[0]) => {
@@ -452,10 +523,28 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             </div>
           </div>
 
-          {/* Error Message */}
+          {/* Error/Success Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className={`mb-4 p-3 rounded-md border ${
+              isSuccessMessage 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <p className={`text-sm ${
+                isSuccessMessage ? 'text-green-600' : 'text-red-600'
+              }`}>{error}</p>
+              {requiresEmailVerification && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={isResendingVerification}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResendingVerification ? 'Sending...' : 'Resend Verification Email'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -474,10 +563,15 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                     value={formData.firstName}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                    className={`w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 focus:ring-accent focus:border-accent ${
+                      getFieldError('firstName') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="John"
                   />
                 </div>
+                {getFieldError('firstName') && (
+                  <p className="mt-1 text-sm text-red-600">{getFieldError('firstName')}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -491,10 +585,15 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                     value={formData.lastName}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                    className={`w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 focus:ring-accent focus:border-accent ${
+                      getFieldError('lastName') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                    }`}
                     placeholder="Doe"
                   />
                 </div>
+                {getFieldError('lastName') && (
+                  <p className="mt-1 text-sm text-red-600">{getFieldError('lastName')}</p>
+                )}
               </div>
             </div>
           )}
@@ -511,10 +610,15 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                className={`w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 focus:ring-accent focus:border-accent ${
+                  getFieldError('email') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                }`}
                 placeholder="john@example.com"
               />
             </div>
+            {getFieldError('email') && (
+              <p className="mt-1 text-sm text-red-600">{getFieldError('email')}</p>
+            )}
           </div>
 
           <div>
@@ -529,7 +633,9 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                 value={formData.password}
                 onChange={handleInputChange}
                 required
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                className={`w-full pl-10 pr-10 py-2 border rounded-md focus:ring-2 focus:ring-accent focus:border-accent ${
+                  getFieldError('password') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                }`}
                 placeholder="••••••••"
               />
               <button
@@ -540,6 +646,9 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {getFieldError('password') && (
+              <p className="mt-1 text-sm text-red-600">{getFieldError('password')}</p>
+            )}
           </div>
 
           {mode === 'register' && (
@@ -555,7 +664,9 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
                   required
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                  className={`w-full pl-10 pr-10 py-2 border rounded-md focus:ring-2 focus:ring-accent focus:border-accent ${
+                    getFieldError('confirmPassword') ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="••••••••"
                 />
                 <button
@@ -566,6 +677,9 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {getFieldError('confirmPassword') && (
+                <p className="mt-1 text-sm text-red-600">{getFieldError('confirmPassword')}</p>
+              )}
             </div>
           )}
 
