@@ -1,4 +1,6 @@
 import { envConfig } from './envConfig';
+import AuthStorageService from './authStorage';
+import MultiAccountStorageService from './multiAccountStorage';
 
 export interface EmbroideryOption {
   id: number;
@@ -53,13 +55,26 @@ class EmbroideryOptionApiService {
     options: RequestInit = {},
     requireAuth: boolean = true
   ): Promise<T> {
-    const token = localStorage.getItem('authToken');
+    let authHeader = null;
+    
+    if (requireAuth) {
+      // First try to get auth from regular customer auth
+      authHeader = AuthStorageService.getAuthHeader();
+      
+      // If no customer auth, try employee auth (for admin operations)
+      if (!authHeader) {
+        const employeeAuth = MultiAccountStorageService.getAccountAuthData('employee');
+        if (employeeAuth && MultiAccountStorageService.isAccountAuthenticated('employee')) {
+          authHeader = `Bearer ${employeeAuth.session.accessToken}`;
+        }
+      }
+    }
     
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(requireAuth && token && { Authorization: `Bearer ${token}` }),
+        ...(authHeader && { Authorization: authHeader }),
         ...options.headers,
       },
     });

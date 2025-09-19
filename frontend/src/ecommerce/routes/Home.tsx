@@ -36,6 +36,58 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Custom Embroidery Services Section */}
+      <section className="py-16 bg-white">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Custom Embroidery Services
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              From custom logos to personal monograms, we bring your vision to life with professional embroidery services.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="text-center p-6 bg-gray-50 rounded-lg">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-accent text-xl">🎨</span>
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Custom Design</h3>
+              <p className="text-sm text-gray-600">Unique designs from your ideas</p>
+            </div>
+            <div className="text-center p-6 bg-gray-50 rounded-lg">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-accent text-xl">🏆</span>
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Logo Embroidery</h3>
+              <p className="text-sm text-gray-600">Professional logo work</p>
+            </div>
+            <div className="text-center p-6 bg-gray-50 rounded-lg">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-accent text-xl">✂️</span>
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Text & Monograms</h3>
+              <p className="text-sm text-gray-600">Personalized text embroidery</p>
+            </div>
+            <div className="text-center p-6 bg-gray-50 rounded-lg">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-accent text-xl">⚡</span>
+              </div>
+              <h3 className="font-semibold text-gray-900 mb-2">Rush Service</h3>
+              <p className="text-sm text-gray-600">Fast-track orders available</p>
+            </div>
+          </div>
+          <div className="text-center">
+            <Link to="/customized-embroidery">
+              <Button variant="outline" size="lg" className="group">
+                Explore All Services
+                <ArrowRight className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-16 bg-gray-50">
         <div className="container">
@@ -76,9 +128,9 @@ export default function Home() {
             We're here to bring your vision to life.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/contact">
+            <Link to="/customized-embroidery">
               <Button variant="secondary" size="lg" className="group">
-                Get Custom Quote
+                Custom Embroidery Services
                 <ArrowRight className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Button>
             </Link>

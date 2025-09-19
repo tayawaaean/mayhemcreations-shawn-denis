@@ -15,6 +15,7 @@ import Home from './ecommerce/routes/Home'
 import Products from './ecommerce/routes/Products'
 import ProductPage from './ecommerce/routes/ProductPage'
 import Customize from './ecommerce/routes/Customize'
+import CustomizedEmbroidery from './ecommerce/routes/CustomizedEmbroidery'
 import About from './ecommerce/routes/About'
 import FAQ from './ecommerce/routes/FAQ'
 import Contact from './ecommerce/routes/Contact'
@@ -78,6 +79,16 @@ export default function App() {
                   <Customize />
                 </div>
                 <Footer />
+              </div>
+            } />
+            <Route path="/customized-embroidery" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <CustomizedEmbroidery />
+                </div>
+                <Footer />
+                <ChatWidget />
               </div>
             } />
             <Route path="/about" element={
