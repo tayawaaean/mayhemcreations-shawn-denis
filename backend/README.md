@@ -72,6 +72,35 @@ npm run dev
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint issues automatically
 
+## 🌱 Database Seeding
+
+The backend includes a comprehensive seeding system with **authentication-based seeding** for production-like behavior:
+
+### **Quick Start**
+```bash
+# Complete database setup with authentication
+npm run seed:comprehensive:clear -- --use-api
+```
+
+### **Available Seeders**
+- **Roles & Users**: Complete user management system
+- **Categories**: Product category hierarchy (17 categories)
+- **Products**: Full product catalog (12 products)
+- **Variants**: Product variants with inventory (62 variants)
+- **Embroidery Options**: Service options (25 options)
+
+### **Seeding Approaches**
+- **Authentication-Based** (`--use-api`): Production-like with full validation
+- **Direct Model Access**: Faster development seeding
+
+### **Documentation**
+- **[Complete Seeding Guide](SEEDERS_README.md)** - Detailed documentation
+- **[Quick Reference](SEEDING_QUICK_REFERENCE.md)** - Common commands and troubleshooting
+
+### **Default Credentials**
+- **Admin**: `admin@mayhemcreation.com` / `SecureAdmin2024!`
+- **Customer**: `customer1@example.com` / `SecureCustomer2024!`
+
 ## Project Structure
 
 ```

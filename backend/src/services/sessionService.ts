@@ -430,4 +430,76 @@ export class SessionService {
       return 0;
     }
   }
+
+  /**
+   * Create session for seeder operations (bypasses express-session)
+   */
+  static async createSeederSession(
+    userId: number,
+    req: any,
+    userAgent?: string
+  ): Promise<{ sessionId: string; accessToken: string; refreshToken: string } | null> {
+    try {
+      const sessionId = this.generateSessionId();
+      const accessToken = this.generateToken(32);
+      const refreshToken = this.generateToken(48);
+
+      // Calculate expiration time (7 days for refresh token)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      // Create session in database
+      const dbSession = await Session.create({
+        sessionId,
+        userId,
+        accessToken,
+        refreshToken,
+        userAgent: userAgent || 'SeederService/1.0',
+        ipAddress: req.ip || '127.0.0.1',
+        expiresAt,
+        lastActivity: new Date(),
+      });
+
+      logger.info('Seeder session created', {
+        sessionId: dbSession.sessionId,
+        userId: dbSession.userId,
+      });
+
+      return {
+        sessionId: dbSession.sessionId,
+        accessToken: dbSession.accessToken,
+        refreshToken: dbSession.refreshToken,
+      };
+    } catch (error) {
+      logger.error('Error creating seeder session:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Destroy session by session ID
+   */
+  static async destroySessionBySessionId(sessionId: string): Promise<boolean> {
+    try {
+      const result = await Session.update(
+        { isActive: false },
+        {
+          where: {
+            sessionId,
+            isActive: true,
+          },
+        }
+      );
+
+      const destroyedCount = result[0];
+      if (destroyedCount > 0) {
+        logger.info('Session destroyed by session ID', { sessionId });
+      }
+
+      return destroyedCount > 0;
+    } catch (error) {
+      logger.error('Error destroying session by session ID:', error);
+      return false;
+    }
+  }
 }

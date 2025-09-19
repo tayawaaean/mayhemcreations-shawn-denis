@@ -11,6 +11,7 @@ import {
   getInventoryStatus,
   bulkUpdateInventory
 } from '../controllers/productController';
+import { authenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
@@ -45,30 +46,30 @@ router.get('/slug/:slug', getProductBySlug);
 /**
  * @route POST /api/v1/products
  * @desc Create a new product
- * @access Public (no auth required)
+ * @access Private (Admin/Seller only)
  */
-router.post('/', createProduct);
+router.post('/', authenticate, requireRole(['admin', 'seller']), createProduct);
 
 /**
  * @route PUT /api/v1/products/:id
  * @desc Update a product
- * @access Public (no auth required)
+ * @access Private (Admin/Seller only)
  */
-router.put('/:id', updateProduct);
+router.put('/:id', authenticate, requireRole(['admin', 'seller']), updateProduct);
 
 /**
  * @route DELETE /api/v1/products/:id
  * @desc Delete a product
- * @access Public (no auth required)
+ * @access Private (Admin/Seller only)
  */
-router.delete('/:id', deleteProduct);
+router.delete('/:id', authenticate, requireRole(['admin', 'seller']), deleteProduct);
 
 /**
  * @route PUT /api/v1/products/:id/inventory
  * @desc Update product inventory (add, subtract, or set stock)
- * @access Public (no auth required)
+ * @access Private (Admin/Seller only)
  */
-router.put('/:id/inventory', updateInventory);
+router.put('/:id/inventory', authenticate, requireRole(['admin', 'seller']), updateInventory);
 
 /**
  * @route GET /api/v1/products/inventory/status
@@ -80,8 +81,8 @@ router.get('/inventory/status', getInventoryStatus);
 /**
  * @route PUT /api/v1/products/inventory/bulk
  * @desc Bulk update inventory for multiple products
- * @access Public (no auth required)
+ * @access Private (Admin/Seller only)
  */
-router.put('/inventory/bulk', bulkUpdateInventory);
+router.put('/inventory/bulk', authenticate, requireRole(['admin', 'seller']), bulkUpdateInventory);
 
 export default router;

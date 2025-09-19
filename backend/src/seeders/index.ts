@@ -6,6 +6,12 @@ import { seedCategories, clearCategories } from './categorySeeder';
 import { seedProducts, clearProducts } from './productSeeder';
 import { seedVariants, clearVariants } from './variantSeeder';
 import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
+import { 
+  seedCategoriesViaAPI, 
+  seedProductsViaAPI, 
+  seedVariantsViaAPI, 
+  seedEmbroideryOptionsViaAPI 
+} from './apiSeederService';
 import { Op } from 'sequelize';
 
 /**
@@ -50,6 +56,7 @@ export interface SeederOptions {
   productsOnly?: boolean;
   variantsOnly?: boolean;
   embroideryOnly?: boolean;
+  useApi?: boolean; // Use API-based seeding with authentication
 }
 
 export async function runSeeders(options: SeederOptions = {}): Promise<void> {
@@ -104,25 +111,41 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     // Seed categories
     if (!options.rolesOnly && !options.usersOnly && !options.productsOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding categories...');
-      await seedCategories();
+      if (options.useApi) {
+        await seedCategoriesViaAPI({ skipAuth: false });
+      } else {
+        await seedCategories();
+      }
     }
 
     // Seed products
     if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.variantsOnly) {
       logger.info('🌱 Seeding products...');
-      await seedProducts();
+      if (options.useApi) {
+        await seedProductsViaAPI({ skipAuth: false });
+      } else {
+        await seedProducts();
+      }
     }
 
     // Seed variants
     if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.embroideryOnly) {
       logger.info('🌱 Seeding variants...');
-      await seedVariants();
+      if (options.useApi) {
+        await seedVariantsViaAPI({ skipAuth: false });
+      } else {
+        await seedVariants();
+      }
     }
 
     // Seed embroidery options
     if (options.embroideryOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly)) {
       logger.info('🌱 Seeding embroidery options...');
-      await seedEmbroideryOptions(options.clear || false);
+      if (options.useApi) {
+        await seedEmbroideryOptionsViaAPI({ skipAuth: false });
+      } else {
+        await seedEmbroideryOptions(options.clear || false);
+      }
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -253,6 +276,9 @@ if (require.main === module) {
         break;
       case '--embroidery-only':
         options.embroideryOnly = true;
+        break;
+      case '--use-api':
+        options.useApi = true;
         break;
       case '--clear-products':
         clearProducts().then(() => {

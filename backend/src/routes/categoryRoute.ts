@@ -7,30 +7,55 @@ import {
   deleteCategory,
   getCategoryStats
 } from '../controllers/categoryController';
+import { authenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
 /**
  * Category Routes
- * All operations are public (no authentication required)
+ * Read operations are public, write operations require admin authentication
  */
 
-// GET /api/categories - Get all categories with optional filtering (PUBLIC)
+/**
+ * @route GET /api/v1/categories
+ * @desc Get all categories with optional filtering and pagination
+ * @access Public
+ */
 router.get('/', getCategories);
 
-// GET /api/categories/stats - Get category statistics (PUBLIC)
+/**
+ * @route GET /api/v1/categories/stats
+ * @desc Get category statistics
+ * @access Public
+ */
 router.get('/stats', getCategoryStats);
 
-// GET /api/categories/:id - Get a single category by ID (PUBLIC)
+/**
+ * @route GET /api/v1/categories/:id
+ * @desc Get a single category by ID
+ * @access Public
+ */
 router.get('/:id', getCategoryById);
 
-// POST /api/categories - Create a new category (PUBLIC)
-router.post('/', createCategory);
+/**
+ * @route POST /api/v1/categories
+ * @desc Create a new category
+ * @access Private (Admin only)
+ */
+router.post('/', authenticate, requireRole(['admin']), createCategory);
 
-// PUT /api/categories/:id - Update a category (PUBLIC)
-router.put('/:id', updateCategory);
+/**
+ * @route PUT /api/v1/categories/:id
+ * @desc Update a category
+ * @access Private (Admin only)
+ */
+router.put('/:id', authenticate, requireRole(['admin']), updateCategory);
 
-// DELETE /api/categories/:id - Delete a category (PUBLIC)
-router.delete('/:id', deleteCategory);
+/**
+ * @route DELETE /api/v1/categories/:id
+ * @desc Delete a category
+ * @access Private (Admin only)
+ */
+router.delete('/:id', authenticate, requireRole(['admin']), deleteCategory);
 
 export default router;
