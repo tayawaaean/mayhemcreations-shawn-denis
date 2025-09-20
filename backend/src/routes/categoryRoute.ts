@@ -7,7 +7,7 @@ import {
   deleteCategory,
   getCategoryStats
 } from '../controllers/categoryController';
-import { authenticate, requireRole } from '../middlewares/auth';
+import { hybridAuthenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
@@ -42,20 +42,20 @@ router.get('/:id', getCategoryById);
  * @desc Create a new category
  * @access Private (Admin only)
  */
-router.post('/', authenticate, requireRole(['admin']), createCategory);
+router.post('/', hybridAuthenticate, requireRole(['admin']), createCategory);
 
 /**
  * @route PUT /api/v1/categories/:id
  * @desc Update a category
  * @access Private (Admin only)
  */
-router.put('/:id', authenticate, requireRole(['admin']), updateCategory);
+router.put('/:id', hybridAuthenticate, requireRole(['admin']), updateCategory);
 
 /**
  * @route DELETE /api/v1/categories/:id
  * @desc Delete a category
  * @access Private (Admin only)
  */
-router.delete('/:id', authenticate, requireRole(['admin']), deleteCategory);
+router.delete('/:id', hybridAuthenticate, requireRole(['admin']), deleteCategory);
 
 export default router;
