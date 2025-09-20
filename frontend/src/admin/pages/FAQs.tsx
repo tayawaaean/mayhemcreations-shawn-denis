@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useAdmin } from '../context/AdminContext'
 import { 
   Plus, 
   Edit, 
@@ -12,13 +11,13 @@ import {
   Search
 } from 'lucide-react'
 import { AddFAQModal, EditFAQModal, DeleteFAQModal } from '../components/modals/FAQModals'
-import { FAQ } from '../types'
+import { useFAQs } from '../hooks/useFAQs'
+import { FAQ } from '../../shared/faqApiService'
 import HelpModal from '../components/modals/HelpModal'
 
 const FAQs: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const { faqs } = state
-  const [selectedFAQs, setSelectedFAQs] = useState<string[]>([])
+  const { faqs, categories, loading, error, createFAQ, updateFAQ, deleteFAQ, toggleFAQStatus, updateFAQOrder } = useFAQs()
+  const [selectedFAQs, setSelectedFAQs] = useState<number[]>([])
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -47,9 +46,7 @@ const FAQs: React.FC = () => {
     setCurrentPage(page)
   }
 
-  const categories = Array.from(new Set(faqs.map(f => f.category)))
-
-  const handleSelectFAQ = (faqId: string) => {
+  const handleSelectFAQ = (faqId: number) => {
     setSelectedFAQs(prev => 
       prev.includes(faqId) 
         ? prev.filter(id => id !== faqId)
@@ -65,21 +62,41 @@ const FAQs: React.FC = () => {
     }
   }
 
-  const handleAddFAQ = (faqData: Omit<FAQ, 'id'>) => {
-    const newFAQ: FAQ = {
-      ...faqData,
-      id: Date.now().toString(),
-      createdAt: new Date()
+  const handleAddFAQ = async (faqData: Omit<FAQ, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const result = await createFAQ({
+      question: faqData.question,
+      answer: faqData.answer,
+      category: faqData.category,
+      sortOrder: faqData.sortOrder,
+      status: faqData.status
+    })
+    
+    if (result) {
+      setIsAddModalOpen(false)
     }
-    dispatch({ type: 'ADD_FAQ', payload: newFAQ })
   }
 
-  const handleUpdateFAQ = (faq: FAQ) => {
-    dispatch({ type: 'UPDATE_FAQ', payload: faq })
+  const handleUpdateFAQ = async (faq: FAQ) => {
+    const result = await updateFAQ(faq.id, {
+      question: faq.question,
+      answer: faq.answer,
+      category: faq.category,
+      sortOrder: faq.sortOrder,
+      status: faq.status
+    })
+    
+    if (result) {
+      setIsEditModalOpen(false)
+      setSelectedFAQ(null)
+    }
   }
 
-  const handleDeleteFAQ = (faqId: string) => {
-    dispatch({ type: 'DELETE_FAQ', payload: faqId })
+  const handleDeleteFAQ = async (faqId: number) => {
+    const result = await deleteFAQ(faqId)
+    if (result) {
+      setIsDeleteModalOpen(false)
+      setSelectedFAQ(null)
+    }
   }
 
   const handleEditFAQ = (faq: FAQ) => {
@@ -90,42 +107,59 @@ const FAQs: React.FC = () => {
   const handleConfirmDelete = () => {
     if (selectedFAQ) {
       handleDeleteFAQ(selectedFAQ.id)
-      setIsDeleteModalOpen(false)
-      setSelectedFAQ(null)
     }
   }
 
-  const handleToggleStatus = (faqId: string) => {
-    const faq = faqs.find(f => f.id === faqId)
-    if (faq) {
-      const updatedFAQ = {
-        ...faq,
-        status: faq.status === 'active' ? 'inactive' as const : 'active' as const
-      }
-      dispatch({ type: 'UPDATE_FAQ', payload: updatedFAQ })
-    }
+  const handleToggleStatus = async (faqId: number) => {
+    await toggleFAQStatus(faqId)
   }
 
-  const handleMoveUp = (faqId: string) => {
+  const handleMoveUp = async (faqId: number) => {
     const faq = faqs.find(f => f.id === faqId)
     if (faq && faq.sortOrder > 1) {
-      const updatedFAQ = {
-        ...faq,
-        sortOrder: faq.sortOrder - 1
+      const prevFaq = faqs.find(f => f.category === faq.category && f.sortOrder === faq.sortOrder - 1)
+      if (prevFaq) {
+        await updateFAQOrder([
+          { id: faqId, sortOrder: faq.sortOrder - 1 },
+          { id: prevFaq.id, sortOrder: prevFaq.sortOrder + 1 }
+        ])
       }
-      dispatch({ type: 'UPDATE_FAQ', payload: updatedFAQ })
     }
   }
 
-  const handleMoveDown = (faqId: string) => {
+  const handleMoveDown = async (faqId: number) => {
     const faq = faqs.find(f => f.id === faqId)
     if (faq) {
-      const updatedFAQ = {
-        ...faq,
-        sortOrder: faq.sortOrder + 1
+      const nextFaq = faqs.find(f => f.category === faq.category && f.sortOrder === faq.sortOrder + 1)
+      if (nextFaq) {
+        await updateFAQOrder([
+          { id: faqId, sortOrder: faq.sortOrder + 1 },
+          { id: nextFaq.id, sortOrder: nextFaq.sortOrder - 1 }
+        ])
       }
-      dispatch({ type: 'UPDATE_FAQ', payload: updatedFAQ })
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading FAQs...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-500 text-lg font-medium mb-2">Error loading FAQs</div>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -302,7 +336,7 @@ const FAQs: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {faq.createdAt.toLocaleDateString()}
+                    {new Date(faq.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-1">
@@ -359,10 +393,10 @@ const FAQs: React.FC = () => {
                         <button
                           onClick={() => handleToggleStatus(faq.id)}
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            faq.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            faq.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {faq.isActive ? 'Active' : 'Inactive'}
+                          {faq.status === 'active' ? 'Active' : 'Inactive'}
                         </button>
                         <button
                           onClick={() => handleEditFAQ(faq)}

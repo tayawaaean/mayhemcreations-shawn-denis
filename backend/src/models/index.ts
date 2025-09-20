@@ -8,6 +8,7 @@ import Product, { ProductAttributes, ProductCreateAttributes } from './productMo
 import Variant, { VariantAttributes, VariantCreationAttributes } from './variantModel';
 import { EmbroideryOption, EmbroideryOptionAttributes, EmbroideryOptionCreationAttributes } from './embroideryOptionModel';
 import { Cart, CartAttributes, CartCreationAttributes } from './cartModel';
+import { FAQ, FAQAttributes, FAQCreationAttributes } from './faqModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -146,6 +147,9 @@ export {
   Cart,
   CartAttributes,
   CartCreationAttributes,
+  FAQ,
+  FAQAttributes,
+  FAQCreationAttributes,
 };
 
 // Export all models for easy access
@@ -159,6 +163,7 @@ export const models = {
   Variant,
   EmbroideryOption,
   Cart,
+  FAQ,
 };
 
 // Database synchronization function

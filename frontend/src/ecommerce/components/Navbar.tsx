@@ -85,6 +85,7 @@ const SupportDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -102,16 +103,18 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             name: 'All Products',
             href: '/products',
             description: 'Browse our complete collection',
-            subcategories: []
+            subcategories: [],
+            isMainCategory: false
           },
-          ...response.data.map((category: Category) => ({
+          ...(response.data || []).map((category: Category) => ({
             name: category.name,
             href: `/products?category=${category.slug}`,
             description: category.description || '',
             subcategories: category.children?.map((child: Category) => ({
               name: child.name,
               href: `/products?category=${category.slug}&subcategory=${child.slug}`
-            })) || []
+            })) || [],
+            isMainCategory: true
           }))
         ]
         setCategories(transformedCategories)
@@ -122,7 +125,8 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           name: 'All Products',
           href: '/products',
           description: 'Browse our complete collection',
-          subcategories: []
+          subcategories: [],
+          isMainCategory: false
         }])
       } finally {
         setLoading(false)
@@ -131,6 +135,18 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     fetchCategories()
   }, [])
+
+  const toggleCategory = (categoryName: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryName)) {
+        newSet.delete(categoryName)
+      } else {
+        newSet.add(categoryName)
+      }
+      return newSet
+    })
+  }
 
   if (loading) {
     return (
@@ -144,17 +160,38 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     <>
       {categories.map((category) => (
         <div key={category.name} className="group">
-          <Link
-            to={category.href}
-            onClick={onClose}
-            className="block px-4 py-3 hover:bg-gray-50 transition-colors"
-          >
-            <div className="font-medium text-gray-900">{category.name}</div>
-            <div className="text-sm text-gray-500">{category.description}</div>
-          </Link>
+          {/* Main Category */}
+          <div className="flex items-center">
+            <Link
+              to={category.href}
+              onClick={onClose}
+              className="flex-1 px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <div className="font-medium text-gray-900">{category.name}</div>
+              <div className="text-sm text-gray-500">{category.description}</div>
+            </Link>
+            
+            {/* Expand/Collapse Button for categories with subcategories */}
+            {category.isMainCategory && category.subcategories.length > 0 && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  toggleCategory(category.name)
+                }}
+                className="px-2 py-3 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {expandedCategories.has(category.name) ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            )}
+          </div>
 
-          {/* Subcategories */}
-          {category.subcategories.length > 0 && (
+          {/* Subcategories - Only visible when expanded */}
+          {category.isMainCategory && category.subcategories.length > 0 && expandedCategories.has(category.name) && (
             <div className="ml-4 border-l border-gray-200 pl-2">
               {category.subcategories.map((subcategory: any) => (
                 <Link
@@ -190,7 +227,7 @@ const MobileCategorySection: React.FC<{ onClose: () => void }> = ({ onClose }) =
         })
         
         // Transform database categories to mobile navbar format
-        const transformedCategories = response.data.map((category: Category) => ({
+        const transformedCategories = (response.data || []).map((category: Category) => ({
           name: category.name,
           slug: category.slug,
           href: `/products?category=${category.slug}`,
@@ -370,7 +407,9 @@ export default function Navbar() {
               )}
             </div>
 
-            <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+            {isLoggedIn && (
+              <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+            )}
 
             {/* Support Dropdown */}
             <div
@@ -400,7 +439,9 @@ export default function Navbar() {
           <nav className="hidden md:flex lg:hidden items-center space-x-4">
             <NavItem to="/">Home</NavItem>
             <NavItem to="/products">Products</NavItem>
-            <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+            {isLoggedIn && (
+              <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+            )}
             <NavItem to="/about">Support</NavItem>
             {isLoggedIn && (
               <NavItem to="/my-orders">Orders</NavItem>
@@ -530,12 +571,14 @@ export default function Navbar() {
                 </div>
 
                 {/* Customized Embroidery */}
-                <MobileNavItem to="/customized-embroidery" onClick={() => setMobileMenuOpen(false)}>
-                  <div className="flex items-center space-x-3">
-                    <Sparkles className="w-5 h-5 text-gray-600" />
-                    <span>Customized Embroidery</span>
-                  </div>
-                </MobileNavItem>
+                {isLoggedIn && (
+                  <MobileNavItem to="/customized-embroidery" onClick={() => setMobileMenuOpen(false)}>
+                    <div className="flex items-center space-x-3">
+                      <Sparkles className="w-5 h-5 text-gray-600" />
+                      <span>Customized Embroidery</span>
+                    </div>
+                  </MobileNavItem>
+                )}
 
                 {/* Support Section */}
                 <div className="space-y-1">

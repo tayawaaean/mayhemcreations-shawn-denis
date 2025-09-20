@@ -1,10 +1,5 @@
 import { envConfig } from './envConfig';
-<<<<<<< HEAD
 import { apiAuthService, ApiResponse } from './apiAuthService';
-=======
-import AuthStorageService from './authStorage';
-import MultiAccountStorageService from './multiAccountStorage';
->>>>>>> b077f2f8f611f60b089563063bab35560156112e
 
 export interface EmbroideryOption {
   id: number;
@@ -53,47 +48,6 @@ class EmbroideryOptionApiService {
   constructor() {
     this.baseUrl = `${envConfig.getApiBaseUrl()}/embroidery-options`;
   }
-
-<<<<<<< HEAD
-=======
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    requireAuth: boolean = true
-  ): Promise<T> {
-    let authHeader = null;
-    
-    if (requireAuth) {
-      // First try to get auth from regular customer auth
-      authHeader = AuthStorageService.getAuthHeader();
-      
-      // If no customer auth, try employee auth (for admin operations)
-      if (!authHeader) {
-        const employeeAuth = MultiAccountStorageService.getAccountAuthData('employee');
-        if (employeeAuth && MultiAccountStorageService.isAccountAuthenticated('employee')) {
-          authHeader = `Bearer ${employeeAuth.session.accessToken}`;
-        }
-      }
-    }
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader && { Authorization: authHeader }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
->>>>>>> b077f2f8f611f60b089563063bab35560156112e
   /**
    * Get all embroidery options with optional filtering
    */

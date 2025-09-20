@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft } from 'lucide-react'
+import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator } from 'lucide-react'
 import { useCustomization } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
+import { MaterialPricingService, InputParameters, CostBreakdown } from '../../shared/materialPricingService'
 import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
 import ChatWidget from '../components/ChatWidget'
@@ -27,6 +28,12 @@ export default function Customize() {
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
+  
+  // Embroidery pricing state
+  const [embroideryWidth, setEmbroideryWidth] = useState<number>(0)
+  const [embroideryHeight, setEmbroideryHeight] = useState<number>(0)
+  const [embroideryPricing, setEmbroideryPricing] = useState<CostBreakdown | null>(null)
+  const [pricingLoading, setPricingLoading] = useState(false)
 
   // Fetch product data from API
   useEffect(() => {
@@ -65,6 +72,30 @@ export default function Customize() {
   useEffect(() => {
     initializeProduct()
   }, [initializeProduct])
+
+  // Calculate embroidery pricing when dimensions change
+  useEffect(() => {
+    const calculateEmbroideryPricing = async () => {
+      if (embroideryWidth > 0 && embroideryHeight > 0) {
+        setPricingLoading(true)
+        try {
+          const pricing = MaterialPricingService.calculateMaterialCosts({
+            patchWidth: embroideryWidth,
+            patchHeight: embroideryHeight
+          })
+          setEmbroideryPricing(pricing)
+        } catch (error) {
+          console.error('Error calculating embroidery pricing:', error)
+        } finally {
+          setPricingLoading(false)
+        }
+      } else {
+        setEmbroideryPricing(null)
+      }
+    }
+
+    calculateEmbroideryPricing()
+  }, [embroideryWidth, embroideryHeight])
 
   // Get available colors from variants
   const getAvailableColors = () => {
@@ -862,6 +893,120 @@ export default function Customize() {
                    </div>
                 )}
                  </div>
+
+                 {/* Embroidery Dimensions & Pricing */}
+                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                   <div className="flex items-center mb-4">
+                     <Ruler className="w-5 h-5 text-gray-600 mr-2" />
+                     <h3 className="text-lg font-semibold text-gray-900">Embroidery Dimensions</h3>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Width (inches)
+                       </label>
+                       <input
+                         type="number"
+                         min="0.5"
+                         max="12"
+                         step="0.1"
+                         value={embroideryWidth || ''}
+                         onChange={(e) => setEmbroideryWidth(parseFloat(e.target.value) || 0)}
+                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                         placeholder="Enter width"
+                       />
+                     </div>
+                     
+                     <div>
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Height (inches)
+                       </label>
+                       <input
+                         type="number"
+                         min="0.5"
+                         max="12"
+                         step="0.1"
+                         value={embroideryHeight || ''}
+                         onChange={(e) => setEmbroideryHeight(parseFloat(e.target.value) || 0)}
+                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
+                         placeholder="Enter height"
+                       />
+                     </div>
+                   </div>
+
+                   {/* Real-time Pricing Display */}
+                   {embroideryWidth > 0 && embroideryHeight > 0 && (
+                     <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                       <div className="flex items-center justify-between mb-3">
+                         <div className="flex items-center">
+                           <Calculator className="w-5 h-5 text-gray-600 mr-2" />
+                           <h4 className="font-semibold text-gray-900">Embroidery Base Price</h4>
+                         </div>
+                         {pricingLoading && (
+                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
+                         )}
+                       </div>
+                       
+                       {pricingLoading ? (
+                         <div className="text-center py-4">
+                           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto mb-2"></div>
+                           <p className="text-sm text-gray-600">Calculating pricing...</p>
+                         </div>
+                       ) : embroideryPricing ? (
+                         <div className="space-y-2">
+                           <div className="flex items-center justify-between">
+                             <span className="text-sm text-gray-600">Total Area:</span>
+                             <span className="font-medium text-gray-900">
+                               {(embroideryWidth * embroideryHeight).toFixed(2)} sq in
+                             </span>
+                           </div>
+                           
+                           <div className="border-t pt-2">
+                             <div className="flex items-center justify-between text-lg font-bold">
+                               <span>Base Material Cost:</span>
+                               <span className="text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
+                             </div>
+                           </div>
+                           
+                           {/* Collapsible Material Breakdown */}
+                           <details className="mt-3">
+                             <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 flex items-center">
+                               <span>View Material Breakdown</span>
+                               <ArrowRight className="w-3 h-3 ml-1 transform transition-transform" />
+                             </summary>
+                             <div className="mt-2 space-y-1 text-xs text-gray-600">
+                               <div className="flex justify-between">
+                                 <span>Fabric</span>
+                                 <span>${embroideryPricing.fabricCost.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Patch Attach</span>
+                                 <span>${embroideryPricing.patchAttachCost.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Thread</span>
+                                 <span>${embroideryPricing.threadCost.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Bobbin</span>
+                                 <span>${embroideryPricing.bobbinCost.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Cut-Away Stabilizer</span>
+                                 <span>${embroideryPricing.cutAwayStabilizerCost.toFixed(2)}</span>
+                               </div>
+                               <div className="flex justify-between">
+                                 <span>Wash-Away Stabilizer</span>
+                                 <span>${embroideryPricing.washAwayStabilizerCost.toFixed(2)}</span>
+                               </div>
+                             </div>
+                           </details>
+                         </div>
+                       ) : null}
+                     </div>
+                   )}
+                 </div>
                </div>
              )}
 
@@ -969,9 +1114,16 @@ export default function Customize() {
                 
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm sm:text-base text-gray-600">Base Price</span>
+                    <span className="text-sm sm:text-base text-gray-600">Product Base Price</span>
                     <span className="font-semibold text-sm sm:text-base">${(Number(customizationData.basePrice) || 0).toFixed(2)}</span>
                   </div>
+                  
+                  {embroideryPricing && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth}" × {embroideryHeight}")</span>
+                      <span className="font-semibold text-sm sm:text-base text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
+                    </div>
+                  )}
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Color</span>
@@ -1052,7 +1204,7 @@ export default function Customize() {
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between text-base sm:text-lg font-bold">
                       <span>Total</span>
-                      <span>${calculateTotalPrice().toFixed(2)}</span>
+                      <span>${(calculateTotalPrice() + (embroideryPricing?.totalCost || 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

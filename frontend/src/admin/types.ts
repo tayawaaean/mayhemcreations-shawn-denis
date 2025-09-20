@@ -183,3 +183,15 @@ export type Review = {
   updatedAt: Date
   images?: string[]
 }
+
+export type MaterialCost = {
+  id: number
+  name: string
+  cost: string | number  // Can be string from DB or number from form
+  width: string | number
+  length: string | number
+  wasteFactor: string | number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}

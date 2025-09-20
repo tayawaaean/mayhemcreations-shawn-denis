@@ -19,6 +19,8 @@
     "seed:roles": "node --env-file=.env -r ts-node/register src/seeders/index.ts --roles-only",
     "seed:users": "node --env-file=.env -r ts-node/register src/seeders/index.ts --users-only",
     "seed:variants": "node --env-file=.env -r ts-node/register src/seeders/index.ts --variants-only",
+    "seed:faqs": "node --env-file=.env -r ts-node/register src/seeders/index.ts --faqs-only",
+    "seed:material-costs": "node --env-file=.env -r ts-node/register src/seeders/index.ts --material-costs-only",
     "seed:clear-all": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear-all",
     "seed:new-workflow": "node --env-file=.env -r ts-node/register src/seeders/newWorkflowSeeder.ts",
     "seed:products-only": "node --env-file=.env -r ts-node/register src/seeders/productsOnlySeeder.ts",

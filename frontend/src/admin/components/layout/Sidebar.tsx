@@ -103,6 +103,7 @@ const navigationSections = [
     icon: Cog,
     items: [
       { name: 'My Profile', href: '/admin/profile', icon: Users, adminOnly: false },
+      { name: 'Material Costs', href: '/admin/material-costs', icon: DollarSign, adminOnly: true },
       { name: 'Chat Settings', href: '/admin/chat-settings', icon: Settings, adminOnly: true }
     ]
   }

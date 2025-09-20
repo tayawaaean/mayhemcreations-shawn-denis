@@ -6,6 +6,8 @@ import { seedCategories } from './categorySeeder';
 import { seedProducts } from './productSeeder';
 import { seedVariants } from './variantSeeder';
 import { seedEmbroideryOptions } from './embroideryOptionSeeder';
+import { seedFAQs } from './faqSeeder';
+import { seedMaterialCosts } from './materialCostSeeder';
 
 export interface ComprehensiveSeederOptions {
   force?: boolean;
@@ -16,6 +18,8 @@ export interface ComprehensiveSeederOptions {
   skipProducts?: boolean;
   skipVariants?: boolean;
   skipEmbroidery?: boolean;
+  skipFAQs?: boolean;
+  skipMaterialCosts?: boolean;
 }
 
 export async function runComprehensiveSeeder(options: ComprehensiveSeederOptions = {}): Promise<void> {
@@ -37,7 +41,9 @@ export async function runComprehensiveSeeder(options: ComprehensiveSeederOptions
       const { clearCategories } = await import('./categorySeeder');
       const { clearUsers } = await import('./userSeeder');
       const { clearRoles } = await import('./roleSeeder');
+      const { clearFAQs } = await import('./faqSeeder');
       
+      await clearFAQs();
       await clearVariants();
       await clearProducts();
       await clearCategories();
@@ -80,6 +86,18 @@ export async function runComprehensiveSeeder(options: ComprehensiveSeederOptions
     if (!options.skipEmbroidery) {
       logger.info('🌱 Seeding embroidery options...');
       await seedEmbroideryOptions();
+    }
+
+    // Seed FAQs
+    if (!options.skipFAQs) {
+      logger.info('🌱 Seeding FAQs...');
+      await seedFAQs();
+    }
+
+    // Seed material costs
+    if (!options.skipMaterialCosts) {
+      logger.info('🌱 Seeding material costs...');
+      await seedMaterialCosts();
     }
 
     logger.info('🎉 Comprehensive seeding completed successfully!');

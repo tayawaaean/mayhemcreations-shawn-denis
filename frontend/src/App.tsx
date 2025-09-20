@@ -16,6 +16,7 @@ import Products from './ecommerce/routes/Products'
 import ProductPage from './ecommerce/routes/ProductPage'
 import Customize from './ecommerce/routes/Customize'
 import CustomizedEmbroidery from './ecommerce/routes/CustomizedEmbroidery'
+import ProtectedRoute from './ecommerce/components/ProtectedRoute'
 import About from './ecommerce/routes/About'
 import FAQ from './ecommerce/routes/FAQ'
 import Contact from './ecommerce/routes/Contact'
@@ -82,14 +83,16 @@ export default function App() {
               </div>
             } />
             <Route path="/customized-embroidery" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <CustomizedEmbroidery />
+              <ProtectedRoute fallbackPath="/contact">
+                <div className="min-h-screen flex flex-col">
+                  <Navbar />
+                  <div className="flex-1">
+                    <CustomizedEmbroidery />
+                  </div>
+                  <Footer />
+                  <ChatWidget />
                 </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              </ProtectedRoute>
             } />
             <Route path="/about" element={
               <div className="min-h-screen flex flex-col">

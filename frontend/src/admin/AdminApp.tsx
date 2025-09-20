@@ -17,6 +17,8 @@ import Inventory from './pages/Inventory'
 import Categories from './pages/Categories'
 import Embroidery from './pages/Embroidery'
 import FAQs from './pages/FAQs'
+import MaterialCosts from './pages/MaterialCosts'
+import MaterialCostsTest from './pages/MaterialCostsTest'
 import Analytics from './pages/Analytics'
 import ChatSettings from './pages/ChatSettings'
 import PaymentLogs from './pages/PaymentLogs'
@@ -46,6 +48,8 @@ const AdminApp: React.FC = () => {
                     <Route path="categories" element={<Categories />} />
                     <Route path="embroidery" element={<Embroidery />} />
                     <Route path="faqs" element={<FAQs />} />
+                    <Route path="material-costs" element={<MaterialCosts />} />
+                    <Route path="material-costs-test" element={<MaterialCostsTest />} />
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="chat-settings" element={<ChatSettings />} />
                     <Route path="payment-logs" element={<PaymentLogs />} />

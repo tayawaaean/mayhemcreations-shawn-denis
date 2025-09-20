@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import ProductGrid from '../components/ProductGrid'
 import { Filter, Grid, List } from 'lucide-react'
 import Button from '../../components/Button'
+import CollapsibleDropdown, { DropdownItem } from '../../components/CollapsibleDropdown'
 import { useSearchParams } from 'react-router-dom'
 import { categoryApiService, Category } from '../../shared/categoryApiService'
 import { productApiService, Product } from '../../shared/productApiService'
@@ -17,6 +18,54 @@ export default function Products() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [categoryDropdownItems, setCategoryDropdownItems] = useState<DropdownItem[]>([])
+  const [subcategoryDropdownItems, setSubcategoryDropdownItems] = useState<DropdownItem[]>([])
+
+  // Transform categories to dropdown format
+  const transformCategoriesToDropdown = (categories: Category[]): DropdownItem[] => {
+    return [
+      {
+        id: 'all',
+        label: 'All Products',
+        value: ''
+      },
+      ...categories.map(category => ({
+        id: category.id.toString(),
+        label: category.name,
+        value: category.slug,
+        children: category.children?.map(child => ({
+          id: child.id.toString(),
+          label: child.name,
+          value: child.slug
+        })) || []
+      }))
+    ]
+  }
+
+  // Update subcategory dropdown when category changes
+  useEffect(() => {
+    if (selectedCategory) {
+      const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
+      if (selectedCategoryData?.children) {
+        setSubcategoryDropdownItems([
+          {
+            id: 'all',
+            label: `All ${selectedCategoryData.name}`,
+            value: ''
+          },
+          ...selectedCategoryData.children.map(child => ({
+            id: child.id.toString(),
+            label: child.name,
+            value: child.slug
+          }))
+        ])
+      } else {
+        setSubcategoryDropdownItems([])
+      }
+    } else {
+      setSubcategoryDropdownItems([])
+    }
+  }, [selectedCategory, categories])
 
   // Fetch categories and products from database
   useEffect(() => {
@@ -40,6 +89,7 @@ export default function Products() {
         
         setCategories(categoriesResponse.data)
         setProducts(productsResponse.data)
+        setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data))
       } catch (err) {
         setError('Failed to load data')
         console.error('Error fetching data:', err)
@@ -237,44 +287,34 @@ export default function Products() {
             <div className="hidden lg:flex items-center space-x-6 flex-1">
               <div className="flex items-center space-x-3">
                 <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Category:</label>
-                <select 
-                  value={selectedCategory || ''} 
-                  onChange={(e) => handleCategoryChange(e.target.value || null)}
-                  className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[140px]"
-                  disabled={loading}
-                >
-                  <option value="">All Products</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <CollapsibleDropdown
+                  items={categoryDropdownItems}
+                  selectedValue={selectedCategory || ''}
+                  onSelect={(value) => handleCategoryChange(value || null)}
+                  placeholder="All Products"
+                  className="min-w-[160px]"
+                  maxHeight="250px"
+                  showSearch={true}
+                  searchPlaceholder="Search categories..."
+                />
               </div>
               
               {/* Subcategory Filter */}
-              {selectedCategory && (() => {
-                const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
-                const subcategories = selectedCategoryData?.children || []
-                
-                return subcategories.length > 0 && (
-                  <div className="flex items-center space-x-3">
-                    <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Type:</label>
-                    <select 
-                      value={selectedSubcategory || ''} 
-                      onChange={(e) => handleSubcategoryChange(e.target.value || null)}
-                      className="border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white min-w-[140px]"
-                    >
-                      <option value="">All {selectedCategoryData?.name}</option>
-                      {subcategories.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.slug}>
-                          {subcategory.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              })()}
+              {selectedCategory && subcategoryDropdownItems.length > 0 && (
+                <div className="flex items-center space-x-3">
+                  <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Type:</label>
+                  <CollapsibleDropdown
+                    items={subcategoryDropdownItems}
+                    selectedValue={selectedSubcategory || ''}
+                    onSelect={(value) => handleSubcategoryChange(value || null)}
+                    placeholder={`All ${categories.find(cat => cat.slug === selectedCategory)?.name || 'Products'}`}
+                    className="min-w-[160px]"
+                    maxHeight="200px"
+                    showSearch={true}
+                    searchPlaceholder="Search types..."
+                  />
+                </div>
+              )}
               
               <div className="flex items-center space-x-3">
                 <label className="text-sm font-semibold text-gray-700 whitespace-nowrap">Sort by:</label>
@@ -332,44 +372,34 @@ export default function Products() {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Category</label>
-                <select 
-                  value={selectedCategory || ''} 
-                  onChange={(e) => handleCategoryChange(e.target.value || null)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                  disabled={loading}
-                >
-                  <option value="">All Products</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                <CollapsibleDropdown
+                  items={categoryDropdownItems}
+                  selectedValue={selectedCategory || ''}
+                  onSelect={(value) => handleCategoryChange(value || null)}
+                  placeholder="All Products"
+                  className="w-full"
+                  maxHeight="200px"
+                  showSearch={true}
+                  searchPlaceholder="Search categories..."
+                />
               </div>
               
               {/* Mobile Subcategory Filter */}
-              {selectedCategory && (() => {
-                const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
-                const subcategories = selectedCategoryData?.children || []
-                
-                return subcategories.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-3">Type</label>
-                    <select 
-                      value={selectedSubcategory || ''} 
-                      onChange={(e) => handleSubcategoryChange(e.target.value || null)}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent bg-white"
-                    >
-                      <option value="">All {selectedCategoryData?.name}</option>
-                      {subcategories.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.slug}>
-                          {subcategory.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              })()}
+              {selectedCategory && subcategoryDropdownItems.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">Type</label>
+                  <CollapsibleDropdown
+                    items={subcategoryDropdownItems}
+                    selectedValue={selectedSubcategory || ''}
+                    onSelect={(value) => handleSubcategoryChange(value || null)}
+                    placeholder={`All ${categories.find(cat => cat.slug === selectedCategory)?.name || 'Products'}`}
+                    className="w-full"
+                    maxHeight="200px"
+                    showSearch={true}
+                    searchPlaceholder="Search types..."
+                  />
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-3">Sort by</label>

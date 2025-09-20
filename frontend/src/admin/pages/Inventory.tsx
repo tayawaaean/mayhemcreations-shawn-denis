@@ -152,8 +152,14 @@ const Inventory: React.FC = () => {
     setError(null)
     try {
       // Load only variant inventory data
-      const variantData = await variantApiService.getVariantInventoryStatus()
-      setVariantData(variantData)
+      const response = await variantApiService.getVariantInventoryStatus()
+      console.log('Variant inventory response:', response)
+      
+      if (response.success && response.data) {
+        setVariantData(response.data)
+      } else {
+        throw new Error(response.message || 'Failed to load inventory data')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load inventory data')
       console.error('Error loading inventory data:', err)

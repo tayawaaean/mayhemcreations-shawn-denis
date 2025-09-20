@@ -76,8 +76,12 @@ class ApiAuthService {
     };
 
     try {
+      console.log('Making API request to:', url);
+      console.log('Request config:', config);
       const response = await fetch(url, config);
       const data = await response.json();
+      console.log('API response status:', response.status);
+      console.log('API response data:', data);
 
       // Handle 401 Unauthorized - session might be expired
       if (response.status === 401 && requireAuth) {

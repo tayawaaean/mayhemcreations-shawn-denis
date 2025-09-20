@@ -6,6 +6,8 @@ import { seedCategories, clearCategories } from './categorySeeder';
 import { seedProducts, clearProducts } from './productSeeder';
 import { seedVariants, clearVariants } from './variantSeeder';
 import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
+import { seedFAQs, clearFAQs } from './faqSeeder';
+import { seedMaterialCosts, clearMaterialCosts } from './materialCostSeeder';
 import { 
   seedCategoriesViaAPI, 
   seedProductsViaAPI, 
@@ -56,6 +58,8 @@ export interface SeederOptions {
   productsOnly?: boolean;
   variantsOnly?: boolean;
   embroideryOnly?: boolean;
+  faqsOnly?: boolean;
+  materialCostsOnly?: boolean;
   useApi?: boolean; // Use API-based seeding with authentication
 }
 
@@ -146,6 +150,18 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
       } else {
         await seedEmbroideryOptions(options.clear || false);
       }
+    }
+
+    // Seed FAQs
+    if (options.faqsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.materialCostsOnly)) {
+      logger.info('🌱 Seeding FAQs...');
+      await seedFAQs();
+    }
+
+    // Seed Material Costs
+    if (options.materialCostsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly)) {
+      logger.info('🌱 Seeding material costs...');
+      await seedMaterialCosts();
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -276,6 +292,12 @@ if (require.main === module) {
         break;
       case '--embroidery-only':
         options.embroideryOnly = true;
+        break;
+      case '--faqs-only':
+        options.faqsOnly = true;
+        break;
+      case '--material-costs-only':
+        options.materialCostsOnly = true;
         break;
       case '--use-api':
         options.useApi = true;

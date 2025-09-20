@@ -47,24 +47,29 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load embroidery options on component mount
+  // Load embroidery options and material costs on component mount
   React.useEffect(() => {
-    const loadEmbroideryOptions = async () => {
+    const loadData = async () => {
       try {
         setLoading(true)
-        const response = await embroideryOptionApiService.getEmbroideryOptions({
+        
+        // Load embroidery options
+        const embroideryResponse = await embroideryOptionApiService.getEmbroideryOptions({
           isActive: true,
           limit: 50
         })
-        setEmbroideryOptions(response.data)
+        setEmbroideryOptions(embroideryResponse.data)
+        
+        // Load dynamic material costs from API
+        await MaterialPricingService.loadMaterialsFromAPI()
       } catch (error) {
-        console.error('Error loading embroidery options:', error)
+        console.error('Error loading data:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    loadEmbroideryOptions()
+    loadData()
   }, [])
 
   // Calculate pricing when size or options change
@@ -73,6 +78,18 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
       calculatePricing()
     }
   }, [size, selectedStyles, embroideryOptions])
+
+  // Calculate base material costs immediately when dimensions are entered
+  React.useEffect(() => {
+    if (size.width > 0 && size.height > 0) {
+      // Calculate just the material costs without embroidery options
+      const materialCosts = MaterialPricingService.calculateMaterialCosts({
+        patchWidth: size.width,
+        patchHeight: size.height
+      })
+      setMaterialCosts(materialCosts)
+    }
+  }, [size])
 
   const calculatePricing = () => {
     // Collect all selected options
@@ -289,305 +306,341 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
 
   return (
     <div className="space-y-6">
-      {/* Design Upload and Size Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center">
-            <Palette className="w-5 h-5 mr-2 text-accent" />
-            Upload Your Design
-          </h3>
-          <p className="text-gray-600">Upload your design file and specify the embroidery size to get a quote.</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* File Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Design File
-            </label>
-            {!uploadedFile ? (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer"
-              >
-                <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">Upload your design</p>
-                <p className="text-sm text-gray-500 mb-4">
-                  PNG, JPG, SVG, or PDF files up to 10MB
-                </p>
-                <Button variant="outline" size="sm">
-                  Choose File
-                </Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <ImageIcon className="w-8 h-8 text-accent" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {uploadedFile.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                    <button
-                      onClick={removeFile}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-                {preview && (
-                  <div className="mt-4">
-                    <img
-                      src={preview}
-                      alt="Design preview"
-                      className="w-full h-48 object-contain border border-gray-200 rounded-lg"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.pdf,.svg"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
-
-          {/* Size Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              <Ruler className="w-4 h-4 inline mr-1" />
-              Embroidery Size (Inches)
-            </label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Width (inches)</label>
-                <input
-                  type="number"
-                  value={size.width || ''}
-                  onChange={(e) => handleSizeChange('width', e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Height (inches)</label>
-                <input
-                  type="number"
-                  value={size.height || ''}
-                  onChange={(e) => handleSizeChange('height', e.target.value)}
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-                />
-              </div>
-            </div>
-            <div className="mt-3 text-xs text-gray-500">
-              <p>Size: {size.width > 0 && size.height > 0 ? `${size.width}" × ${size.height}"` : 'Enter dimensions'}</p>
-              <p>Area: {size.width > 0 && size.height > 0 ? `${(size.width * size.height).toFixed(2)} sq in` : '0 sq in'}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Step-by-Step Embroidery Options */}
-      {uploadedFile && size.width > 0 && size.height > 0 && (
-        <div className="space-y-6">
-          {/* Progress Bar */}
+      {/* Main Content with Sidebar Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - Design Upload and Options */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Design Upload and Size Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Step {currentStep + 1} of {stepCategories.length}: {currentCategory.title}
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2 flex items-center">
+                <Palette className="w-5 h-5 mr-2 text-accent" />
+                Upload Your Design
               </h3>
-              <span className="text-sm text-gray-500">{currentCategory.description}</span>
+              <p className="text-gray-600">Upload your design file and specify the embroidery size to get a quote.</p>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-accent h-2 rounded-full transition-all duration-300"
-                style={{ width: `${getStepProgress()}%` }}
-              />
-            </div>
-          </div>
 
-          {/* Style Selection */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="mb-4 text-sm text-gray-600 text-center">
-              {currentCategory.key === 'threads' || currentCategory.key === 'upgrades' 
-                ? 'Click to select/deselect multiple options' 
-                : 'Click to select, click again to deselect'
-              }
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categoryStyles.map((style) => (
-                <div
-                  key={style.id}
-                  className={`border-2 rounded-lg p-4 cursor-pointer transition-all relative group ${
-                    isStyleSelected(style)
-                      ? 'border-accent bg-accent/5 hover:bg-accent/10'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => handleStyleSelect(style)}
-                >
-                  {style.isPopular && (
-                    <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                      <Star className="w-3 h-3 mr-1" />
-                      Most Popular
-                    </div>
-                  )}
-
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                    <div className="w-8 h-8 bg-gray-300 rounded"></div>
-                  </div>
-
-                  <h4 className="font-semibold text-gray-900 text-center mb-2 text-sm">
-                    {style.name}
-                  </h4>
-
-                  <p className="text-xs text-gray-600 text-center mb-3">
-                    {style.description}
-                  </p>
-
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-accent">
-                      {Number(style.price) === 0 ? 'Free' : `+${formatPrice(style.price)}`}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Design File
+                </label>
+                {!uploadedFile ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-accent hover:bg-accent/5 transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-gray-900 mb-2">Upload your design</p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      PNG, JPG, SVG, or PDF files up to 10MB
                     </p>
-                    {style.estimatedTime !== '0 days' && (
-                      <p className="text-xs text-gray-500">{style.estimatedTime}</p>
-                    )}
+                    <Button variant="outline" size="sm">
+                      Choose File
+                    </Button>
                   </div>
-
-                  {isStyleSelected(style) && (
-                    <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center group-hover:bg-red-500 transition-colors" title="Click to deselect">
-                      <CheckCircle className="w-4 h-4 text-white" />
+                ) : (
+                  <div className="relative">
+                    <div className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <ImageIcon className="w-8 h-8 text-accent" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {uploadedFile.name}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                        <button
+                          onClick={removeFile}
+                          className="text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Navigation */}
-            <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
-              <Button
-                variant="outline"
-                onClick={prevStep}
-                disabled={currentStep === 0}
-                className="w-full sm:w-auto"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Previous
-              </Button>
-
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowReview(true)}
-                  className="w-full sm:w-auto"
-                >
-                  Review All
-                </Button>
-                <Button
-                  onClick={nextStep}
-                  disabled={!canProceed()}
-                  className="w-full sm:w-auto"
-                >
-                  {currentStep === stepCategories.length - 1 ? 'Review' : 'Next'}
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Real-time Pricing Card */}
-          {materialCosts && (
-            <div className="bg-gradient-to-br from-accent/5 to-accent/10 rounded-xl shadow-sm border border-accent/20 p-6">
-              <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
-                <DollarSign className="w-5 h-5 mr-2 text-accent" />
-                Real-time Pricing
-              </h4>
-              
-              {/* Material Cost Breakdown */}
-              <div className="space-y-3 mb-4">
-                <h5 className="text-sm font-medium text-gray-700 mb-2">Material Costs</h5>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Fabric</span>
-                    <span className="font-medium">{formatPrice(materialCosts.fabricCost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Patch Attach</span>
-                    <span className="font-medium">{formatPrice(materialCosts.patchAttachCost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Thread</span>
-                    <span className="font-medium">{formatPrice(materialCosts.threadCost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Bobbin</span>
-                    <span className="font-medium">{formatPrice(materialCosts.bobbinCost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Cut-Away Stabilizer</span>
-                    <span className="font-medium">{formatPrice(materialCosts.cutAwayStabilizerCost)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Wash-Away Stabilizer</span>
-                    <span className="font-medium">{formatPrice(materialCosts.washAwayStabilizerCost)}</span>
-                  </div>
-                </div>
-                <div className="border-t border-gray-300 pt-2 flex justify-between">
-                  <span className="font-semibold text-gray-900">Base Material Cost</span>
-                  <span className="font-bold text-accent">{formatPrice(materialCosts.totalCost)}</span>
-                </div>
-              </div>
-
-              {/* Options Cost */}
-              {(() => {
-                const allSelectedOptions = [
-                  selectedStyles.coverage,
-                  selectedStyles.material,
-                  selectedStyles.border,
-                  selectedStyles.backing,
-                  selectedStyles.cutting,
-                  ...selectedStyles.threads,
-                  ...selectedStyles.upgrades
-                ].filter(Boolean) as EmbroideryOption[]
-
-                const optionsPrice = allSelectedOptions.reduce((sum, option) => {
-                  const price = typeof option.price === 'string' ? parseFloat(option.price) || 0 : option.price
-                  return sum + price
-                }, 0)
-
-                const totalPrice = materialCosts.totalCost + optionsPrice
-
-                return (
-                  <div className="space-y-2">
-                    {optionsPrice > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Embroidery Options</span>
-                        <span className="font-medium">+{formatPrice(optionsPrice)}</span>
+                    {preview && (
+                      <div className="mt-4">
+                        <img
+                          src={preview}
+                          alt="Design preview"
+                          className="w-full h-48 object-contain border border-gray-200 rounded-lg"
+                        />
                       </div>
                     )}
-                    <div className="border-t border-gray-300 pt-2 flex justify-between">
-                      <span className="font-bold text-lg text-gray-900">Total Price</span>
-                      <span className="font-bold text-xl text-accent">{formatPrice(totalPrice)}</span>
-                    </div>
                   </div>
-                )
-              })()}
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf,.svg"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Size Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <Ruler className="w-4 h-4 inline mr-1" />
+                  Embroidery Size (Inches)
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Width (inches)</label>
+                    <input
+                      type="number"
+                      value={size.width || ''}
+                      onChange={(e) => handleSizeChange('width', e.target.value)}
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Height (inches)</label>
+                    <input
+                      type="number"
+                      value={size.height || ''}
+                      onChange={(e) => handleSizeChange('height', e.target.value)}
+                      placeholder="0"
+                      min="0"
+                      step="0.1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  <p>Size: {size.width > 0 && size.height > 0 ? `${size.width}" × ${size.height}"` : 'Enter dimensions'}</p>
+                  <p>Area: {size.width > 0 && size.height > 0 ? `${(size.width * size.height).toFixed(2)} sq in` : '0 sq in'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step-by-Step Embroidery Options */}
+          {uploadedFile && size.width > 0 && size.height > 0 && (
+            <div className="space-y-6">
+              {/* Progress Bar */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Step {currentStep + 1} of {stepCategories.length}: {currentCategory.title}
+                  </h3>
+                  <span className="text-sm text-gray-500">{currentCategory.description}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-accent h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${getStepProgress()}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Style Selection */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="mb-4 text-sm text-gray-600 text-center">
+                  {currentCategory.key === 'threads' || currentCategory.key === 'upgrades' 
+                    ? 'Click to select/deselect multiple options' 
+                    : 'Click to select, click again to deselect'
+                  }
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categoryStyles.map((style) => (
+                    <div
+                      key={style.id}
+                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all relative group ${
+                        isStyleSelected(style)
+                          ? 'border-accent bg-accent/5 hover:bg-accent/10'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => handleStyleSelect(style)}
+                    >
+                      {style.isPopular && (
+                        <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
+                          <Star className="w-3 h-3 mr-1" />
+                          Most Popular
+                        </div>
+                      )}
+
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                        <div className="w-8 h-8 bg-gray-300 rounded"></div>
+                      </div>
+
+                      <h4 className="font-semibold text-gray-900 text-center mb-2 text-sm">
+                        {style.name}
+                      </h4>
+
+                      <p className="text-xs text-gray-600 text-center mb-3">
+                        {style.description}
+                      </p>
+
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-accent">
+                          {Number(style.price) === 0 ? 'Free' : `+${formatPrice(style.price)}`}
+                        </p>
+                        {style.estimatedTime !== '0 days' && (
+                          <p className="text-xs text-gray-500">{style.estimatedTime}</p>
+                        )}
+                      </div>
+
+                      {isStyleSelected(style) && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center group-hover:bg-red-500 transition-colors" title="Click to deselect">
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Navigation */}
+                <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                  <Button
+                    variant="outline"
+                    onClick={prevStep}
+                    disabled={currentStep === 0}
+                    className="w-full sm:w-auto"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Previous
+                  </Button>
+
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowReview(true)}
+                      className="w-full sm:w-auto"
+                    >
+                      Review All
+                    </Button>
+                    <Button
+                      onClick={nextStep}
+                      disabled={!canProceed()}
+                      className="w-full sm:w-auto"
+                    >
+                      {currentStep === stepCategories.length - 1 ? 'Review' : 'Next'}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
-      )}
+
+        {/* Right Column - Pricing Card */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-4">
+            {/* Real-time Pricing Card */}
+            {size.width > 0 && size.height > 0 && materialCosts ? (
+              <div className="bg-gradient-to-br from-accent/5 to-accent/10 rounded-xl shadow-sm border border-accent/20 p-6">
+                <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2 text-accent" />
+                  Real-time Pricing
+                </h4>
+                
+                {/* Base Material Cost - Prominent Display */}
+                <div className="bg-white rounded-lg p-4 mb-4 border border-accent/20">
+                  <div className="text-center">
+                    <div className="text-sm text-gray-600 mb-1">Base Material Cost</div>
+                    <div className="text-3xl font-bold text-accent">{formatPrice(materialCosts.totalCost)}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {size.width}" × {size.height}" = {(size.width * size.height).toFixed(2)} sq in
+                    </div>
+                  </div>
+                </div>
+
+                {/* Material Cost Breakdown - Collapsible */}
+                <details className="mb-4">
+                  <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-accent">
+                    View Material Breakdown
+                  </summary>
+                  <div className="mt-3 space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Fabric</span>
+                      <span className="font-medium">{formatPrice(materialCosts.fabricCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Patch Attach</span>
+                      <span className="font-medium">{formatPrice(materialCosts.patchAttachCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Thread</span>
+                      <span className="font-medium">{formatPrice(materialCosts.threadCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Bobbin</span>
+                      <span className="font-medium">{formatPrice(materialCosts.bobbinCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Cut-Away Stabilizer</span>
+                      <span className="font-medium">{formatPrice(materialCosts.cutAwayStabilizerCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Wash-Away Stabilizer</span>
+                      <span className="font-medium">{formatPrice(materialCosts.washAwayStabilizerCost)}</span>
+                    </div>
+                  </div>
+                </details>
+
+                {/* Options Cost */}
+                {(() => {
+                  const allSelectedOptions = [
+                    selectedStyles.coverage,
+                    selectedStyles.material,
+                    selectedStyles.border,
+                    selectedStyles.backing,
+                    selectedStyles.cutting,
+                    ...selectedStyles.threads,
+                    ...selectedStyles.upgrades
+                  ].filter(Boolean) as EmbroideryOption[]
+
+                  const optionsPrice = allSelectedOptions.reduce((sum, option) => {
+                    const price = typeof option.price === 'string' ? parseFloat(option.price) || 0 : option.price
+                    return sum + price
+                  }, 0)
+
+                  const totalPrice = materialCosts.totalCost + optionsPrice
+
+                  return (
+                    <div className="space-y-3">
+                      {optionsPrice > 0 ? (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Embroidery Options</span>
+                            <span className="font-medium text-green-600">+{formatPrice(optionsPrice)}</span>
+                          </div>
+                          <div className="border-t border-gray-300 pt-3">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-lg text-gray-900">Total Price</span>
+                              <span className="font-bold text-2xl text-accent">{formatPrice(totalPrice)}</span>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center text-sm text-gray-500 py-2">
+                          Select embroidery options to see total price
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
+                <Calculator className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h4 className="font-semibold text-gray-700 mb-2">Enter Dimensions</h4>
+                <p className="text-sm text-gray-500">
+                  Enter width and height to see real-time pricing
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

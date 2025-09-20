@@ -1,7 +1,8 @@
-﻿Material,Cost,Width (in),Length (in),Waste Factor
-Fabric,17,30,36,1.5
-Patch Attach,50,9,360,1.5
-Thread,2,0,5000,1.2
-Bobbin,25,0,35000,1.2
-Cut-Away Stabilizer,90,18,3600,1.5
-Wash-Away Stabilizer,29,15,900,1.5
+﻿Cost Component,Cost
+Fabric Cost,=ROUND((Input!B2 * Input!B3 / (Material!C2 * Material!D2)) * Material!B2 * Material!E2, 2)
+Patch Attach Cost,=ROUND((Input!B2 * Input!B3 / (Material!C3 * Material!D3)) * Material!B3 * Material!E3, 2)
+Thread Cost,=ROUND((Input!B2 * Input!B3 / (Material!C2 * Material!D2)) * Material!B4 * Material!E4, 2)
+Bobbin Cost,=ROUND((Input!B2 * Input!B3 / 144) * (Material!B5 / Material!D5) * Material!E5, 2)
+Cut-Away Stabilizer Cost,=ROUND((Input!B2 * Input!B3 / (Material!C6 * Material!D6)) * Material!B6 * Material!E6, 2)
+Wash-Away Stabilizer Cost,=ROUND((Input!B2 * Input!B3 / (Material!C7 * Material!D7)) * Material!B7 * Material!E7, 2)
+Total Cost,=SUM(B2:B7)

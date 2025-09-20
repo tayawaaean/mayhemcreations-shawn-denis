@@ -124,17 +124,19 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
       
       const response = await categoryApiService.createCategory(categoryData);
       
-      if (response.success) {
+      if (response.success && response.data) {
         const newCategory = response.data;
         setCategories(prev => [...prev, newCategory]);
         return newCategory;
       } else {
-        throw new Error('Failed to create category');
+        const errorMessage = response.message || 'Failed to create category';
+        throw new Error(errorMessage);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create category';
       setError(errorMessage);
       console.error('Error creating category:', err);
+      console.error('Category data that failed:', categoryData);
       return null;
     } finally {
       setLoading(false);

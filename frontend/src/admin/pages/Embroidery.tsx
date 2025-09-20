@@ -49,9 +49,11 @@ const Embroidery: React.FC = () => {
           limit: itemsPerPage
         })
         
-        setEmbroideryOptions(response.data)
-        setTotalPages(response.pagination?.pages || 1)
-        setTotalItems(response.pagination?.total || 0)
+        // Ensure we have valid data array
+        const options = response.data || []
+        setEmbroideryOptions(Array.isArray(options) ? options : [])
+        setTotalPages(1) // Default to 1 page since pagination is not in ApiResponse
+        setTotalItems(options.length)
       } catch (err) {
         setError('Failed to fetch embroidery options')
         console.error('Error fetching embroidery options:', err)
@@ -79,10 +81,11 @@ const Embroidery: React.FC = () => {
   }
 
   const handleSelectAll = () => {
-    if (selectedOptions.length === paginatedOptions.length) {
+    const validOptions = paginatedOptions.filter(option => option && option.id)
+    if (selectedOptions.length === validOptions.length) {
       setSelectedOptions([])
     } else {
-      setSelectedOptions(paginatedOptions.map(o => o.id))
+      setSelectedOptions(validOptions.map(o => o.id))
     }
   }
 
@@ -93,7 +96,7 @@ const Embroidery: React.FC = () => {
         isIncompatible: optionData.isIncompatible ? JSON.parse(optionData.isIncompatible) : undefined
       }
       const response = await embroideryOptionApiService.createEmbroideryOption(createData)
-      setEmbroideryOptions(prev => [...prev, response.data])
+      setEmbroideryOptions(prev => response.data ? [...prev, response.data] : prev)
     } catch (err) {
       console.error('Error creating embroidery option:', err)
       setError('Failed to create embroidery option')
@@ -108,7 +111,7 @@ const Embroidery: React.FC = () => {
       }
       const response = await embroideryOptionApiService.updateEmbroideryOption(option.id, updateData)
       setEmbroideryOptions(prev => 
-        prev.map(o => o.id === option.id ? response.data : o)
+        prev.map(o => o.id === option.id ? (response.data || o) : o)
       )
     } catch (err) {
       console.error('Error updating embroidery option:', err)
@@ -145,7 +148,7 @@ const Embroidery: React.FC = () => {
       if (option) {
         const response = await embroideryOptionApiService.toggleEmbroideryOptionStatus(optionId, !option.isActive)
         setEmbroideryOptions(prev => 
-          prev.map(o => o.id === optionId ? response.data : o)
+          prev.map(o => o.id === optionId ? (response.data || o) : o)
         )
       }
     } catch (err) {
@@ -308,7 +311,7 @@ const Embroidery: React.FC = () => {
                 <th className="px-3 py-3 text-left w-12">
                   <input
                     type="checkbox"
-                    checked={selectedOptions.length === paginatedOptions.length && paginatedOptions.length > 0}
+                    checked={selectedOptions.length === paginatedOptions.filter(option => option && option.id).length && paginatedOptions.filter(option => option && option.id).length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -337,7 +340,7 @@ const Embroidery: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedOptions.map((option) => (
+              {paginatedOptions.filter(option => option && option.id).map((option) => (
                 <tr key={option.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 whitespace-nowrap">
                     <input
@@ -431,7 +434,7 @@ const Embroidery: React.FC = () => {
 
           {/* Mobile Card Layout */}
           <div className="lg:hidden">
-            {paginatedOptions.map((option) => (
+            {paginatedOptions.filter(option => option && option.id).map((option) => (
               <div key={option.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
                 <div className="flex items-start space-x-3">
                   <input
