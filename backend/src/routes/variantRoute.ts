@@ -8,7 +8,7 @@ import {
   updateVariantInventory,
   getVariantInventoryStatus
 } from '../controllers/variantController';
-import { authenticate, requireRole } from '../middlewares/auth';
+import { hybridAuthenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
@@ -38,27 +38,27 @@ router.get('/:id', getVariantById);
  * @desc Create a new variant
  * @access Private (Admin/Seller only)
  */
-router.post('/', authenticate, requireRole(['admin', 'seller']), createVariant);
+router.post('/', hybridAuthenticate, requireRole(['admin', 'seller']), createVariant);
 
 /**
  * @route PUT /api/v1/variants/:id
  * @desc Update a variant
  * @access Private (Admin/Seller only)
  */
-router.put('/:id', authenticate, requireRole(['admin', 'seller']), updateVariant);
+router.put('/:id', hybridAuthenticate, requireRole(['admin', 'seller']), updateVariant);
 
 /**
  * @route DELETE /api/v1/variants/:id
  * @desc Delete a variant
  * @access Private (Admin/Seller only)
  */
-router.delete('/:id', authenticate, requireRole(['admin', 'seller']), deleteVariant);
+router.delete('/:id', hybridAuthenticate, requireRole(['admin', 'seller']), deleteVariant);
 
 /**
  * @route PUT /api/v1/variants/:id/inventory
  * @desc Update variant inventory (add, subtract, or set stock)
  * @access Private (Admin/Seller only)
  */
-router.put('/:id/inventory', authenticate, requireRole(['admin', 'seller']), updateVariantInventory);
+router.put('/:id/inventory', hybridAuthenticate, requireRole(['admin', 'seller']), updateVariantInventory);
 
 export default router;

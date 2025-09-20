@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, Package, Home, Info, HelpCircle, Mail, Shirt, Crown, Palette } from 'lucide-react'
+import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, Package, Home, Info, HelpCircle, Mail, Shirt, Crown, Palette, Sparkles, LifeBuoy } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from '../../components/AuthModal'
@@ -37,6 +37,50 @@ const MobileNavItem: React.FC<{ to: string; children: React.ReactNode; onClick?:
     {children}
   </NavLink>
 )
+
+const SupportDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const supportItems = [
+    {
+      name: 'About Us',
+      href: '/about',
+      description: 'Learn about our company and mission',
+      icon: <Info className="w-4 h-4" />
+    },
+    {
+      name: 'FAQ',
+      href: '/faq',
+      description: 'Frequently asked questions',
+      icon: <HelpCircle className="w-4 h-4" />
+    },
+    {
+      name: 'Contact',
+      href: '/contact',
+      description: 'Get in touch with us',
+      icon: <Mail className="w-4 h-4" />
+    }
+  ]
+
+  return (
+    <>
+      {supportItems.map((item) => (
+        <Link
+          key={item.name}
+          to={item.href}
+          onClick={onClose}
+          className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="text-gray-500">{item.icon}</div>
+            <div>
+              <div className="font-medium text-gray-900">{item.name}</div>
+              <div className="text-sm text-gray-500">{item.description}</div>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </>
+  )
+}
 
 const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [categories, setCategories] = useState<any[]>([])
@@ -231,11 +275,13 @@ export default function Navbar() {
   const { user, isLoggedIn, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false)
+  const [supportDropdownOpen, setSupportDropdownOpen] = useState(false)
   const [dropdownTimeout, setDropdownTimeout] = useState<number | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    products: false
+    products: false,
+    support: false
   })
   const count = items.reduce((s, i) => s + i.quantity, 0)
 
@@ -246,7 +292,7 @@ export default function Navbar() {
     }))
   }
 
-  const handleMouseEnter = () => {
+  const handleProductsMouseEnter = () => {
     if (dropdownTimeout) {
       clearTimeout(dropdownTimeout)
       setDropdownTimeout(null)
@@ -254,9 +300,24 @@ export default function Navbar() {
     setProductsDropdownOpen(true)
   }
 
-  const handleMouseLeave = () => {
+  const handleProductsMouseLeave = () => {
     const timeout = setTimeout(() => {
       setProductsDropdownOpen(false)
+    }, 150) // Small delay to prevent flickering
+    setDropdownTimeout(timeout)
+  }
+
+  const handleSupportMouseEnter = () => {
+    if (dropdownTimeout) {
+      clearTimeout(dropdownTimeout)
+      setDropdownTimeout(null)
+    }
+    setSupportDropdownOpen(true)
+  }
+
+  const handleSupportMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setSupportDropdownOpen(false)
     }, 150) // Small delay to prevent flickering
     setDropdownTimeout(timeout)
   }
@@ -292,8 +353,8 @@ export default function Navbar() {
             {/* Products Dropdown */}
             <div
               className="relative group"
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
+              onMouseEnter={handleProductsMouseEnter}
+              onMouseLeave={handleProductsMouseLeave}
             >
               <button
                 className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
@@ -309,9 +370,27 @@ export default function Navbar() {
               )}
             </div>
 
-            <NavItem to="/about">About</NavItem>
-            <NavItem to="/faq">FAQ</NavItem>
-            <NavItem to="/contact">Contact</NavItem>
+            <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+
+            {/* Support Dropdown */}
+            <div
+              className="relative group"
+              onMouseEnter={handleSupportMouseEnter}
+              onMouseLeave={handleSupportMouseLeave}
+            >
+              <button
+                className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
+                onClick={() => setSupportDropdownOpen(!supportDropdownOpen)}
+              >
+                <span>Support</span>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${supportDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {supportDropdownOpen && (
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <SupportDropdown onClose={() => setSupportDropdownOpen(false)} />
+                </div>
+              )}
+            </div>
             {isLoggedIn && (
               <NavItem to="/my-orders">Orders</NavItem>
             )}
@@ -321,7 +400,8 @@ export default function Navbar() {
           <nav className="hidden md:flex lg:hidden items-center space-x-4">
             <NavItem to="/">Home</NavItem>
             <NavItem to="/products">Products</NavItem>
-            <NavItem to="/about">About</NavItem>
+            <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+            <NavItem to="/about">Support</NavItem>
             {isLoggedIn && (
               <NavItem to="/my-orders">Orders</NavItem>
             )}
@@ -449,27 +529,56 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* Other Menu Items */}
-                <MobileNavItem to="/about" onClick={() => setMobileMenuOpen(false)}>
+                {/* Customized Embroidery */}
+                <MobileNavItem to="/customized-embroidery" onClick={() => setMobileMenuOpen(false)}>
                   <div className="flex items-center space-x-3">
-                    <Info className="w-5 h-5 text-gray-600" />
-                    <span>About</span>
+                    <Sparkles className="w-5 h-5 text-gray-600" />
+                    <span>Customized Embroidery</span>
                   </div>
                 </MobileNavItem>
-                
-                <MobileNavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>
-                  <div className="flex items-center space-x-3">
-                    <HelpCircle className="w-5 h-5 text-gray-600" />
-                    <span>FAQ</span>
-                  </div>
-                </MobileNavItem>
-                
-                <MobileNavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>
-                  <div className="flex items-center space-x-3">
-                    <Mail className="w-5 h-5 text-gray-600" />
-                    <span>Contact</span>
-                  </div>
-                </MobileNavItem>
+
+                {/* Support Section */}
+                <div className="space-y-1">
+                  <button
+                    onClick={() => toggleSection('support')}
+                    className="flex items-center justify-between w-full px-4 py-3 text-left text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <LifeBuoy className="w-5 h-5 text-gray-600" />
+                      <span>Support</span>
+                    </div>
+                    {expandedSections.support ? (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
+
+                  {expandedSections.support && (
+                    <div className="ml-6 space-y-1 pl-4">
+                      <MobileNavItem to="/about" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="flex items-center space-x-3">
+                          <Info className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm">About Us</span>
+                        </div>
+                      </MobileNavItem>
+                      
+                      <MobileNavItem to="/faq" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="flex items-center space-x-3">
+                          <HelpCircle className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm">FAQ</span>
+                        </div>
+                      </MobileNavItem>
+                      
+                      <MobileNavItem to="/contact" onClick={() => setMobileMenuOpen(false)}>
+                        <div className="flex items-center space-x-3">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm">Contact</span>
+                        </div>
+                      </MobileNavItem>
+                    </div>
+                  )}
+                </div>
 
                 {/* Orders (if logged in) */}
                 {isLoggedIn && (
