@@ -1,0 +1,474 @@
+/**
+ * Cart Controller
+ * Handles cart operations for authenticated users
+ */
+
+import { Request, Response, NextFunction } from 'express';
+import { Cart, Product } from '../models';
+import { logger } from '../utils/logger';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    email: string;
+    role: string;
+  };
+}
+
+/**
+ * Get user's cart items
+ * @route GET /api/v1/cart
+ * @access Private (Customer only)
+ */
+export const getCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    const cartItems = await Cart.findAll({
+      where: { userId },
+      include: [
+        {
+          model: Product,
+          as: 'product',
+          attributes: [
+            'id', 'title', 'slug', 'description', 'price', 'image', 'alt',
+            'status', 'featured', 'badges', 'availableColors', 'availableSizes',
+            'averageRating', 'totalReviews', 'stock', 'sku', 'weight', 'dimensions',
+            'materials', 'careInstructions', 'hasSizing'
+          ],
+        },
+      ],
+      order: [['createdAt', 'ASC']],
+    });
+
+    // Transform cart items to match frontend format
+    const transformedItems = cartItems.map(item => ({
+      id: item.id,
+      productId: item.productId.toString(),
+      quantity: item.quantity,
+      customization: item.customization ? item.getCustomizationData() : undefined,
+      product: (item as any).product, // Type assertion for the included product
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: transformedItems,
+      message: 'Cart retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(`Cart retrieved for user ${userId}`, {
+      userId,
+      itemCount: cartItems.length,
+    });
+  } catch (error: any) {
+    logger.error('Get cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Add item to cart
+ * @route POST /api/v1/cart
+ * @access Private (Customer only)
+ */
+export const addToCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { productId, quantity = 1, customization } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    if (!productId) {
+      res.status(400).json({
+        success: false,
+        message: 'Product ID is required',
+        code: 'MISSING_PRODUCT_ID',
+      });
+      return;
+    }
+
+    // Validate product exists and is active
+    const product = await Product.findOne({
+      where: { 
+        id: productId,
+        status: 'active'
+      },
+    });
+
+    if (!product) {
+      res.status(404).json({
+        success: false,
+        message: 'Product not found or inactive',
+        code: 'PRODUCT_NOT_FOUND',
+      });
+      return;
+    }
+
+    // Check if item already exists in cart
+    const existingItem = await Cart.findOne({
+      where: { 
+        userId,
+        productId: parseInt(productId),
+      },
+    });
+
+    if (existingItem) {
+      // Update quantity if item exists
+      const newQuantity = existingItem.quantity + quantity;
+      
+      // Validate stock
+      if (product.stock && newQuantity > product.stock) {
+        res.status(400).json({
+          success: false,
+          message: `Only ${product.stock} items available in stock`,
+          code: 'INSUFFICIENT_STOCK',
+        });
+        return;
+      }
+
+      await existingItem.update({ 
+        quantity: newQuantity,
+        customization: customization ? JSON.stringify(customization) : existingItem.customization,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          id: existingItem.id,
+          productId: existingItem.productId.toString(),
+          quantity: existingItem.quantity,
+          customization: existingItem.customization ? existingItem.getCustomizationData() : undefined,
+        },
+        message: 'Cart item updated successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      // Create new cart item
+      const now = new Date();
+      const cartItem = await Cart.create({
+        userId,
+        productId: parseInt(productId),
+        quantity,
+        customization: customization ? JSON.stringify(customization) : undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id: cartItem.id,
+          productId: cartItem.productId.toString(),
+          quantity: cartItem.quantity,
+          customization: cartItem.customization ? cartItem.getCustomizationData() : undefined,
+        },
+        message: 'Item added to cart successfully',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    logger.info(`Cart item added/updated for user ${userId}`, {
+      userId,
+      productId,
+      quantity,
+      hasCustomization: !!customization,
+    });
+  } catch (error: any) {
+    logger.error('Add to cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Update cart item quantity
+ * @route PUT /api/v1/cart/:itemId
+ * @access Private (Customer only)
+ */
+export const updateCartItem = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { itemId } = req.params;
+    const { quantity, customization } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    if (!quantity || quantity < 1) {
+      res.status(400).json({
+        success: false,
+        message: 'Valid quantity is required',
+        code: 'INVALID_QUANTITY',
+      });
+      return;
+    }
+
+    const cartItem = await Cart.findOne({
+      where: { 
+        id: itemId,
+        userId,
+      },
+      include: [
+        {
+          model: Product,
+          as: 'product',
+        },
+      ],
+    });
+
+    if (!cartItem) {
+      res.status(404).json({
+        success: false,
+        message: 'Cart item not found',
+        code: 'CART_ITEM_NOT_FOUND',
+      });
+      return;
+    }
+
+    // Validate stock
+    const product = (cartItem as any).product;
+    if (product && product.stock && quantity > product.stock) {
+      res.status(400).json({
+        success: false,
+        message: `Only ${product.stock} items available in stock`,
+        code: 'INSUFFICIENT_STOCK',
+      });
+      return;
+    }
+
+    await cartItem.update({
+      quantity,
+      customization: customization ? JSON.stringify(customization) : cartItem.customization,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        id: cartItem.id,
+        productId: cartItem.productId.toString(),
+        quantity: cartItem.quantity,
+        customization: cartItem.customization ? cartItem.getCustomizationData() : undefined,
+      },
+      message: 'Cart item updated successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(`Cart item updated for user ${userId}`, {
+      userId,
+      itemId,
+      quantity,
+      hasCustomization: !!customization,
+    });
+  } catch (error: any) {
+    logger.error('Update cart item error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Remove item from cart
+ * @route DELETE /api/v1/cart/:itemId
+ * @access Private (Customer only)
+ */
+export const removeFromCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { itemId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    const cartItem = await Cart.findOne({
+      where: { 
+        id: itemId,
+        userId,
+      },
+    });
+
+    if (!cartItem) {
+      res.status(404).json({
+        success: false,
+        message: 'Cart item not found',
+        code: 'CART_ITEM_NOT_FOUND',
+      });
+      return;
+    }
+
+    await cartItem.destroy();
+
+    res.status(200).json({
+      success: true,
+      message: 'Item removed from cart successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(`Cart item removed for user ${userId}`, {
+      userId,
+      itemId,
+    });
+  } catch (error: any) {
+    logger.error('Remove from cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Clear user's cart
+ * @route DELETE /api/v1/cart
+ * @access Private (Customer only)
+ */
+export const clearCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    const deletedCount = await Cart.destroy({
+      where: { userId },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { deletedCount },
+      message: 'Cart cleared successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(`Cart cleared for user ${userId}`, {
+      userId,
+      deletedCount,
+    });
+  } catch (error: any) {
+    logger.error('Clear cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Sync cart from localStorage to database
+ * @route POST /api/v1/cart/sync
+ * @access Private (Customer only)
+ */
+export const syncCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { items } = req.body; // Array of cart items from localStorage
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    if (!Array.isArray(items)) {
+      res.status(400).json({
+        success: false,
+        message: 'Items array is required',
+        code: 'INVALID_ITEMS',
+      });
+      return;
+    }
+
+    // Clear existing cart
+    await Cart.destroy({ where: { userId } });
+
+    // Add new items
+    const cartItems = [];
+    for (const item of items) {
+      if (item.productId && item.quantity > 0) {
+        const now = new Date();
+        const cartItem = await Cart.create({
+          userId,
+          productId: parseInt(item.productId),
+          quantity: item.quantity,
+          customization: item.customization ? JSON.stringify(item.customization) : undefined,
+          createdAt: now,
+          updatedAt: now,
+        });
+        cartItems.push(cartItem);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: cartItems.map(item => ({
+        id: item.id,
+        productId: item.productId.toString(),
+        quantity: item.quantity,
+        customization: item.customization ? item.getCustomizationData() : undefined,
+      })),
+      message: 'Cart synced successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info(`Cart synced for user ${userId}`, {
+      userId,
+      itemCount: cartItems.length,
+    });
+  } catch (error: any) {
+    logger.error('Sync cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString(),
+    });
+  }
+};

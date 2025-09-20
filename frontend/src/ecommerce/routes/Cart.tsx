@@ -9,22 +9,34 @@ export default function Cart() {
   const navigate = useNavigate()
   const { items, update, remove, clear } = useCart()
   const [selectedItem, setSelectedItem] = useState<typeof enriched[0] | null>(null)
-  const enriched = items.map((it) => ({ ...it, product: products.find((p) => p.id === it.productId)! }))
+  const enriched = items.map((it) => ({ 
+    ...it, 
+    product: it.product || products.find((p) => p.id === it.productId) 
+  })).filter(item => item.product) // Filter out items without product data
   
   const calculateItemPrice = (item: typeof enriched[0]) => {
-    let itemPrice = item.product.price
+    // Ensure we have a valid number for the base price
+    let itemPrice = Number(item.product.price) || 0
     
     // Add customization costs if present
     if (item.customization) {
       const { selectedStyles } = item.customization
-      if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price
-      if (selectedStyles.material) itemPrice += selectedStyles.material.price
-      if (selectedStyles.border) itemPrice += selectedStyles.border.price
-      if (selectedStyles.backing) itemPrice += selectedStyles.backing.price
-      if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price
+      if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0
+      if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0
+      if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0
+      if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0
+      if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0
       
-      selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => itemPrice += thread.price)
-      selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => itemPrice += upgrade.price)
+      if (selectedStyles.threads) {
+        selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => {
+          itemPrice += Number(thread.price) || 0
+        })
+      }
+      if (selectedStyles.upgrades) {
+        selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => {
+          itemPrice += Number(upgrade.price) || 0
+        })
+      }
     }
     
     return itemPrice
@@ -34,6 +46,12 @@ export default function Cart() {
   const shipping = subtotal > 50 ? 0 : 9.99
   const tax = subtotal * 0.08
   const total = subtotal + shipping + tax
+
+  // Helper function to safely format prices
+  const formatPrice = (price: number | undefined | null): string => {
+    const numPrice = Number(price) || 0
+    return numPrice.toFixed(2)
+  }
 
   return (
     <main className="py-4 sm:py-8">
@@ -86,7 +104,7 @@ export default function Cart() {
                       )}
                       
                       <div className="text-base sm:text-lg font-bold text-gray-900 mt-2">
-                        ${calculateItemPrice(item).toFixed(2)}
+                        ${formatPrice(calculateItemPrice(item))}
                         {item.customization && (
                           <span className="text-xs sm:text-sm font-normal text-gray-500 ml-1">
                             (includes customization)
@@ -156,25 +174,25 @@ export default function Cart() {
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Subtotal</span>
-                      <span className="font-medium">${subtotal.toFixed(2)}</span>
+                      <span className="font-medium">${formatPrice(subtotal)}</span>
                     </div>
                     
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-medium">
-                        {shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? 'Free' : `$${formatPrice(shipping)}`}
                       </span>
                     </div>
                     
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Tax</span>
-                      <span className="font-medium">${tax.toFixed(2)}</span>
+                      <span className="font-medium">${formatPrice(tax)}</span>
                     </div>
                     
                     <div className="border-t border-gray-200 pt-3 sm:pt-4">
                       <div className="flex justify-between text-base sm:text-lg font-semibold">
                         <span>Total</span>
-                        <span>${total.toFixed(2)}</span>
+                        <span>${formatPrice(total)}</span>
                       </div>
                     </div>
                   </div>
@@ -190,7 +208,7 @@ export default function Cart() {
                     
                     <div className="text-center">
                       <span className="text-xs sm:text-sm text-gray-600">
-                        {shipping === 0 ? 'You qualify for free shipping!' : `Add $${(50 - subtotal).toFixed(2)} more for free shipping`}
+                        {shipping === 0 ? 'You qualify for free shipping!' : `Add $${formatPrice(50 - subtotal)} more for free shipping`}
                       </span>
                     </div>
                   </div>
@@ -248,7 +266,7 @@ export default function Cart() {
                   </div>
                   <div className="text-left sm:text-right">
                     <p className="text-lg sm:text-xl font-bold text-gray-900">
-                      ${calculateItemPrice(selectedItem).toFixed(2)}
+                      ${formatPrice(calculateItemPrice(selectedItem))}
                     </p>
                     <p className="text-xs sm:text-sm text-gray-500">per item</p>
                   </div>
@@ -341,7 +359,7 @@ export default function Cart() {
                               <p className="text-sm text-blue-700">{selectedItem.customization.selectedStyles.coverage.name}</p>
                             </div>
                             <span className="font-semibold text-blue-900">
-                              +${selectedItem.customization.selectedStyles.coverage.price.toFixed(2)}
+                              +${formatPrice(selectedItem.customization.selectedStyles.coverage.price)}
                             </span>
                           </div>
                         )}
@@ -354,7 +372,7 @@ export default function Cart() {
                               <p className="text-sm text-purple-700">{selectedItem.customization.selectedStyles.material.name}</p>
                             </div>
                             <span className="font-semibold text-purple-900">
-                              +${selectedItem.customization.selectedStyles.material.price.toFixed(2)}
+                              +${formatPrice(selectedItem.customization.selectedStyles.material.price)}
                             </span>
                           </div>
                         )}
@@ -367,7 +385,7 @@ export default function Cart() {
                               <p className="text-sm text-purple-700">{selectedItem.customization.selectedStyles.border.name}</p>
                             </div>
                             <span className="font-semibold text-purple-900">
-                              +${selectedItem.customization.selectedStyles.border.price.toFixed(2)}
+                              +${formatPrice(selectedItem.customization.selectedStyles.border.price)}
                             </span>
                           </div>
                         )}
@@ -381,7 +399,7 @@ export default function Cart() {
                                 <div key={index} className="flex justify-between items-center">
                                   <span className="text-sm text-yellow-700">{thread.name}</span>
                                   <span className="text-sm font-semibold text-yellow-900">
-                                    +${thread.price.toFixed(2)}
+                                    +${formatPrice(thread.price)}
                                   </span>
                                 </div>
                               ))}
@@ -397,7 +415,7 @@ export default function Cart() {
                               <p className="text-sm text-indigo-700">{selectedItem.customization.selectedStyles.backing.name}</p>
                             </div>
                             <span className="font-semibold text-indigo-900">
-                              +${selectedItem.customization.selectedStyles.backing.price.toFixed(2)}
+                              +${formatPrice(selectedItem.customization.selectedStyles.backing.price)}
                             </span>
                           </div>
                         )}
@@ -411,7 +429,7 @@ export default function Cart() {
                                 <div key={index} className="flex justify-between items-center">
                                   <span className="text-sm text-pink-700">{upgrade.name}</span>
                                   <span className="text-sm font-semibold text-pink-900">
-                                    +${upgrade.price.toFixed(2)}
+                                    +${formatPrice(upgrade.price)}
                                   </span>
                                 </div>
                               ))}
@@ -427,7 +445,7 @@ export default function Cart() {
                               <p className="text-sm text-gray-700">{selectedItem.customization.selectedStyles.cutting.name}</p>
                             </div>
                             <span className="font-semibold text-gray-900">
-                              +${selectedItem.customization.selectedStyles.cutting.price.toFixed(2)}
+                              +${formatPrice(selectedItem.customization.selectedStyles.cutting.price)}
                             </span>
                           </div>
                         )}
@@ -442,23 +460,23 @@ export default function Cart() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Base Product Price:</span>
-                      <span className="font-medium">${selectedItem.product.price.toFixed(2)}</span>
+                      <span className="font-medium">${formatPrice(selectedItem.product.price)}</span>
                     </div>
                     {selectedItem.customization && (
                       <>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Customization Total:</span>
                           <span className="font-medium">
-                            +${(calculateItemPrice(selectedItem) - selectedItem.product.price).toFixed(2)}
+                            +${formatPrice(calculateItemPrice(selectedItem) - Number(selectedItem.product.price))}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Per Item Total:</span>
-                          <span className="font-medium">${calculateItemPrice(selectedItem).toFixed(2)}</span>
+                          <span className="font-medium">${formatPrice(calculateItemPrice(selectedItem))}</span>
                         </div>
                         <div className="flex justify-between text-lg font-semibold border-t pt-2">
                           <span>Total ({selectedItem.quantity} items):</span>
-                          <span>${(calculateItemPrice(selectedItem) * selectedItem.quantity).toFixed(2)}</span>
+                          <span>${formatPrice(calculateItemPrice(selectedItem) * selectedItem.quantity)}</span>
                         </div>
                       </>
                     )}

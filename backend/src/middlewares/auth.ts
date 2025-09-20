@@ -32,6 +32,16 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
   try {
     // First try session-based authentication
     if (SessionService.isAuthenticated(req)) {
+      const sessionData = SessionService.getSession(req);
+      if (sessionData) {
+        // Set user data in request object for controllers
+        (req as any).user = {
+          id: sessionData.userId,
+          email: sessionData.email,
+          role: sessionData.role,
+          permissions: sessionData.permissions
+        };
+      }
       SessionService.updateActivity(req);
       next();
       return;
@@ -39,6 +49,7 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
 
     // If no session, try token-based authentication
     const authHeader = req.headers.authorization;
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
       
@@ -65,7 +76,8 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
 
           // Attach user info to request for compatibility
           (req as any).user = {
-            userId: session.user.id,
+            id: session.user.id, // Use 'id' for compatibility with existing code
+            userId: session.user.id, // Keep both for backward compatibility
             email: session.user.email,
             role: session.user.role?.name || 'customer',
             permissions: session.user.role?.permissions || [],

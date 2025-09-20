@@ -1,4 +1,5 @@
 import { envConfig } from './envConfig';
+import { apiAuthService, ApiResponse } from './apiAuthService';
 
 export interface ProductVariant {
   id: number;
@@ -129,43 +130,10 @@ class ProductApiService {
     this.baseUrl = `${envConfig.getApiBaseUrl()}/products`;
   }
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    requireAuth: boolean = false
-  ): Promise<T> {
-    const token = localStorage.getItem('authToken');
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(requireAuth && token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   /**
    * Get all products with optional filtering and pagination
    */
-  async getProducts(filters: ProductFilters = {}): Promise<{
-    success: boolean;
-    data: Product[];
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }> {
+  async getProducts(filters: ProductFilters = {}): Promise<ApiResponse<Product[]>> {
     const params = new URLSearchParams();
     
     if (filters.categoryId) params.append('categoryId', filters.categoryId.toString());
@@ -181,132 +149,70 @@ class ProductApiService {
     if (filters.limit) params.append('limit', filters.limit.toString());
 
     const queryString = params.toString();
-    const endpoint = queryString ? `?${queryString}` : '';
+    const endpoint = `/products${queryString ? `?${queryString}` : ''}`;
 
-    return this.makeRequest<{
-      success: boolean;
-      data: Product[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint, {}, false); // No auth required
+    return apiAuthService.get<Product[]>(endpoint, false); // No auth required for public read
   }
 
   /**
    * Get a single product by ID
    */
-  async getProductById(id: number): Promise<{
-    success: boolean;
-    data: Product;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Product;
-    }>(`/${id}`, {}, false); // No auth required
+  async getProductById(id: number): Promise<ApiResponse<Product>> {
+    return apiAuthService.get<Product>(`/products/${id}`, false); // No auth required for public read
   }
 
   /**
    * Get a single product by slug
    */
-  async getProductBySlug(slug: string): Promise<{
-    success: boolean;
-    data: Product;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Product;
-    }>(`/slug/${slug}`, {}, false); // No auth required
+  async getProductBySlug(slug: string): Promise<ApiResponse<Product>> {
+    return apiAuthService.get<Product>(`/products/slug/${slug}`, false); // No auth required for public read
   }
 
   /**
-   * Create a new product
+   * Create a new product (Admin/Seller only)
    */
-  async createProduct(productData: ProductCreateData): Promise<{
-    success: boolean;
-    data: Product;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Product;
-      message: string;
-    }>('', {
-      method: 'POST',
-      body: JSON.stringify(productData),
-    }, false); // No auth required
+  async createProduct(productData: ProductCreateData): Promise<ApiResponse<Product>> {
+    return apiAuthService.post<Product>(`/products`, productData, true); // Auth required
   }
 
   /**
-   * Update an existing product
+   * Update an existing product (Admin/Seller only)
    */
-  async updateProduct(id: number, productData: Partial<ProductCreateData>): Promise<{
-    success: boolean;
-    data: Product;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Product;
-      message: string;
-    }>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(productData),
-    }, false); // No auth required
+  async updateProduct(id: number, productData: Partial<ProductCreateData>): Promise<ApiResponse<Product>> {
+    return apiAuthService.put<Product>(`/products/${id}`, productData, true); // Auth required
   }
 
   /**
-   * Delete a product
+   * Delete a product (Admin/Seller only)
    */
-  async deleteProduct(id: number): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      message: string;
-    }>(`/${id}`, {
-      method: 'DELETE',
-    }, false); // No auth required
+  async deleteProduct(id: number): Promise<ApiResponse> {
+    return apiAuthService.delete(`/products/${id}`, true); // Auth required
   }
 
   /**
    * Get product statistics
    */
-  async getProductStats(): Promise<{
-    success: boolean;
-    data: ProductStats;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: ProductStats;
-    }>('/stats', {}, false); // No auth required
+  async getProductStats(): Promise<ApiResponse<ProductStats>> {
+    return apiAuthService.get<ProductStats>(`/products/stats`, false); // No auth required for public read
   }
 
   /**
    * Get products by category slug
    */
-  async getProductsByCategory(categorySlug: string, subcategorySlug?: string): Promise<{
-    success: boolean;
-    data: Product[];
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }> {
+  async getProductsByCategory(categorySlug: string, subcategorySlug?: string): Promise<ApiResponse<Product[]>> {
     // First get the category ID from the category API
-    const categoryResponse = await fetch(`${envConfig.getApiBaseUrl()}/categories?slug=${categorySlug}`);
-    const categoryData = await categoryResponse.json();
+    const categoryResponse = await apiAuthService.get(`/categories?slug=${categorySlug}`, false);
     
-    if (!categoryData.success || !categoryData.data.length) {
-      throw new Error('Category not found');
+    if (!categoryResponse.success || !categoryResponse.data?.length) {
+      return {
+        success: false,
+        message: 'Category not found',
+        errors: ['CATEGORY_NOT_FOUND'],
+        timestamp: new Date().toISOString(),
+      };
     }
 
-    const category = categoryData.data[0];
+    const category = categoryResponse.data[0];
     let subcategoryId: number | undefined;
 
     if (subcategorySlug) {

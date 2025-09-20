@@ -327,8 +327,6 @@
       ├── AuthModal.tsx         # ✅ Authentication modal
       ├── GoogleOAuthButton.tsx # ✅ Google OAuth button
       ├── AccountSwitcher.tsx   # ✅ Account switching component
-      ❌ Navbar.tsx             # Tailwind-styled navigation bar
-      ❌ Sidebar.tsx
       ❌ ProtectedRoute.tsx     # RBAC
       ❌ ErrorBoundary.tsx      # React error boundary
       ❌ LoadingSkeleton.tsx    # Skeleton screens

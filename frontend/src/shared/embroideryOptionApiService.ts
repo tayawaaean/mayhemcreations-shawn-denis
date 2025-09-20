@@ -1,4 +1,5 @@
 import { envConfig } from './envConfig';
+import { apiAuthService, ApiResponse } from './apiAuthService';
 
 export interface EmbroideryOption {
   id: number;
@@ -48,43 +49,10 @@ class EmbroideryOptionApiService {
     this.baseUrl = `${envConfig.getApiBaseUrl()}/embroidery-options`;
   }
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    requireAuth: boolean = true
-  ): Promise<T> {
-    const token = localStorage.getItem('authToken');
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(requireAuth && token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   /**
    * Get all embroidery options with optional filtering
    */
-  async getEmbroideryOptions(filters: EmbroideryOptionFilters = {}): Promise<{
-    success: boolean;
-    data: EmbroideryOption[];
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }> {
+  async getEmbroideryOptions(filters: EmbroideryOptionFilters = {}): Promise<ApiResponse<EmbroideryOption[]>> {
     const params = new URLSearchParams();
     
     if (filters.category) params.append('category', filters.category);
@@ -96,119 +64,57 @@ class EmbroideryOptionApiService {
     if (filters.limit) params.append('limit', filters.limit.toString());
 
     const queryString = params.toString();
-    const endpoint = queryString ? `?${queryString}` : '';
+    const endpoint = `/embroidery-options${queryString ? `?${queryString}` : ''}`;
 
-    return this.makeRequest<{
-      success: boolean;
-      data: EmbroideryOption[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint, {}, false); // No auth required for public access
+    return apiAuthService.get<EmbroideryOption[]>(endpoint, false); // No auth required for public access
   }
 
   /**
    * Get a single embroidery option by ID
    */
-  async getEmbroideryOptionById(id: number): Promise<{
-    success: boolean;
-    data: EmbroideryOption;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: EmbroideryOption;
-    }>(`/${id}`, {}, false); // No auth required for public access
+  async getEmbroideryOptionById(id: number): Promise<ApiResponse<EmbroideryOption>> {
+    return apiAuthService.get<EmbroideryOption>(`/embroidery-options/${id}`, false); // No auth required for public access
   }
 
   /**
-   * Create a new embroidery option
+   * Create a new embroidery option (Admin/Seller only)
    */
-  async createEmbroideryOption(embroideryOptionData: CreateEmbroideryOptionData): Promise<{
-    success: boolean;
-    data: EmbroideryOption;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: EmbroideryOption;
-      message: string;
-    }>('', {
-      method: 'POST',
-      body: JSON.stringify(embroideryOptionData),
-    }, true); // Auth required
+  async createEmbroideryOption(embroideryOptionData: CreateEmbroideryOptionData): Promise<ApiResponse<EmbroideryOption>> {
+    return apiAuthService.post<EmbroideryOption>(`/embroidery-options`, embroideryOptionData, true); // Auth required
   }
 
   /**
-   * Update an existing embroidery option
+   * Update an existing embroidery option (Admin/Seller only)
    */
-  async updateEmbroideryOption(id: number, embroideryOptionData: Partial<CreateEmbroideryOptionData>): Promise<{
-    success: boolean;
-    data: EmbroideryOption;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: EmbroideryOption;
-      message: string;
-    }>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(embroideryOptionData),
-    }, true); // Auth required
+  async updateEmbroideryOption(id: number, embroideryOptionData: Partial<CreateEmbroideryOptionData>): Promise<ApiResponse<EmbroideryOption>> {
+    return apiAuthService.put<EmbroideryOption>(`/embroidery-options/${id}`, embroideryOptionData, true); // Auth required
   }
 
   /**
-   * Delete an embroidery option
+   * Delete an embroidery option (Admin/Seller only)
    */
-  async deleteEmbroideryOption(id: number): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      message: string;
-    }>(`/${id}`, {
-      method: 'DELETE',
-    }, true); // Auth required
+  async deleteEmbroideryOption(id: number): Promise<ApiResponse> {
+    return apiAuthService.delete(`/embroidery-options/${id}`, true); // Auth required
   }
 
   /**
-   * Toggle embroidery option active status
+   * Toggle embroidery option active status (Admin/Seller only)
    */
-  async toggleEmbroideryOptionStatus(id: number, isActive: boolean): Promise<{
-    success: boolean;
-    data: EmbroideryOption;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: EmbroideryOption;
-      message: string;
-    }>(`/${id}/toggle`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isActive }),
-    }, true); // Auth required
+  async toggleEmbroideryOptionStatus(id: number, isActive: boolean): Promise<ApiResponse<EmbroideryOption>> {
+    return apiAuthService.patch<EmbroideryOption>(`/embroidery-options/${id}/toggle`, { isActive }, true); // Auth required
   }
 
   /**
    * Get embroidery options by category
    */
-  async getEmbroideryOptionsByCategory(category: string): Promise<{
-    success: boolean;
-    data: EmbroideryOption[];
-  }> {
+  async getEmbroideryOptionsByCategory(category: string): Promise<ApiResponse<EmbroideryOption[]>> {
     return this.getEmbroideryOptions({ category, isActive: true });
   }
 
   /**
    * Get active embroidery options for ecommerce
    */
-  async getActiveEmbroideryOptions(): Promise<{
-    success: boolean;
-    data: EmbroideryOption[];
-  }> {
+  async getActiveEmbroideryOptions(): Promise<ApiResponse<EmbroideryOption[]>> {
     return this.getEmbroideryOptions({ isActive: true });
   }
 }

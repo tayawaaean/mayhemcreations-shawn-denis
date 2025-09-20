@@ -16,6 +16,7 @@ import categoryRoute from './routes/categoryRoute';
 import productRoute from './routes/productRoute';
 import variantRoute from './routes/variantRoute';
 import embroideryOptionRoute from './routes/embroideryOptionRoute';
+import cartRoute from './routes/cartRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -37,7 +38,7 @@ app.use(securityHeaders);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true, // Allow cookies to be sent
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -123,6 +124,7 @@ app.use('/api/v1/categories', categoryRoute);
 app.use('/api/v1/products', productRoute);
 app.use('/api/v1/variants', variantRoute);
 app.use('/api/v1/embroidery-options', embroideryOptionRoute);
+app.use('/api/v1/cart', cartRoute);
 
 // 404 handler
 app.use(notFound);

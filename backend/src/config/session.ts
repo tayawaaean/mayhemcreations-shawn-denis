@@ -21,7 +21,7 @@ const sessionConfig = session({
     secure: process.env.NODE_ENV === 'production', // Only send over HTTPS in production
     httpOnly: true, // Prevent XSS attacks
     maxAge: 86400000, // 24 hours in milliseconds
-    sameSite: 'strict' as const, // CSRF protection
+    sameSite: 'lax' as const, // Allow cross-origin requests for development
   },
   name: 'mayhem.sid', // Custom session cookie name
 });

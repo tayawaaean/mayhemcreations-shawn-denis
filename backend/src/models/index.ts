@@ -7,6 +7,7 @@ import { Category, CategoryAttributes, CategoryCreationAttributes } from './cate
 import Product, { ProductAttributes, ProductCreateAttributes } from './productModel';
 import Variant, { VariantAttributes, VariantCreationAttributes } from './variantModel';
 import { EmbroideryOption, EmbroideryOptionAttributes, EmbroideryOptionCreationAttributes } from './embroideryOptionModel';
+import { Cart, CartAttributes, CartCreationAttributes } from './cartModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -83,6 +84,30 @@ const setupAssociations = (): void => {
     foreignKey: 'productId',
     as: 'variants',
   });
+
+  // User has many Cart items
+  User.hasMany(Cart, {
+    foreignKey: 'userId',
+    as: 'cartItems',
+  });
+
+  // Cart belongs to User
+  Cart.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // Cart belongs to Product
+  Cart.belongsTo(Product, {
+    foreignKey: 'productId',
+    as: 'product',
+  });
+
+  // Product has many Cart items
+  Product.hasMany(Cart, {
+    foreignKey: 'productId',
+    as: 'cartItems',
+  });
 };
 
 // Initialize associations
@@ -118,6 +143,9 @@ export {
   EmbroideryOption,
   EmbroideryOptionAttributes,
   EmbroideryOptionCreationAttributes,
+  Cart,
+  CartAttributes,
+  CartCreationAttributes,
 };
 
 // Export all models for easy access
@@ -130,6 +158,7 @@ export const models = {
   Product,
   Variant,
   EmbroideryOption,
+  Cart,
 };
 
 // Database synchronization function

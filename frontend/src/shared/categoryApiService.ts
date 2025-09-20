@@ -1,4 +1,5 @@
 import { envConfig } from './envConfig';
+import { apiAuthService, ApiResponse } from './apiAuthService';
 
 export interface Category {
   id: number;
@@ -53,43 +54,10 @@ class CategoryApiService {
     this.baseUrl = `${envConfig.getApiBaseUrl()}/categories`;
   }
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    requireAuth: boolean = false
-  ): Promise<T> {
-    const token = localStorage.getItem('authToken');
-    
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(requireAuth && token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   /**
    * Get all categories with optional filtering
    */
-  async getCategories(filters: CategoryFilters = {}): Promise<{
-    success: boolean;
-    data: Category[];
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }> {
+  async getCategories(filters: CategoryFilters = {}): Promise<ApiResponse<Category[]>> {
     const params = new URLSearchParams();
     
     if (filters.status) params.append('status', filters.status);
@@ -106,95 +74,44 @@ class CategoryApiService {
     if (filters.limit) params.append('limit', filters.limit.toString());
 
     const queryString = params.toString();
-    const endpoint = queryString ? `?${queryString}` : '';
+    const endpoint = `/categories${queryString ? `?${queryString}` : ''}`;
 
-    return this.makeRequest<{
-      success: boolean;
-      data: Category[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint, {}, false); // No auth required
+    return apiAuthService.get<Category[]>(endpoint, false); // No auth required for public read
   }
 
   /**
    * Get a single category by ID
    */
-  async getCategoryById(id: number, includeChildren: boolean = true): Promise<{
-    success: boolean;
-    data: Category;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Category;
-    }>(`/${id}?includeChildren=${includeChildren}`, {}, false); // No auth required
+  async getCategoryById(id: number, includeChildren: boolean = true): Promise<ApiResponse<Category>> {
+    return apiAuthService.get<Category>(`/categories/${id}?includeChildren=${includeChildren}`, false); // No auth required for public read
   }
 
   /**
-   * Create a new category
+   * Create a new category (Admin only)
    */
-  async createCategory(categoryData: CategoryCreateData): Promise<{
-    success: boolean;
-    data: Category;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Category;
-      message: string;
-    }>('', {
-      method: 'POST',
-      body: JSON.stringify(categoryData),
-    }, false); // No auth required
+  async createCategory(categoryData: CategoryCreateData): Promise<ApiResponse<Category>> {
+    return apiAuthService.post<Category>(`/categories`, categoryData, true); // Auth required
   }
 
   /**
-   * Update a category
+   * Update a category (Admin only)
    */
-  async updateCategory(id: number, categoryData: CategoryUpdateData): Promise<{
-    success: boolean;
-    data: Category;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Category;
-      message: string;
-    }>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(categoryData),
-    }, false); // No auth required
+  async updateCategory(id: number, categoryData: CategoryUpdateData): Promise<ApiResponse<Category>> {
+    return apiAuthService.put<Category>(`/categories/${id}`, categoryData, true); // Auth required
   }
 
   /**
-   * Delete a category
+   * Delete a category (Admin only)
    */
-  async deleteCategory(id: number, force: boolean = false): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      message: string;
-    }>(`/${id}?force=${force}`, {
-      method: 'DELETE',
-    }, false); // No auth required
+  async deleteCategory(id: number, force: boolean = false): Promise<ApiResponse> {
+    return apiAuthService.delete(`/categories/${id}?force=${force}`, true); // Auth required
   }
 
   /**
    * Get category statistics
    */
-  async getCategoryStats(): Promise<{
-    success: boolean;
-    data: CategoryStats;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: CategoryStats;
-    }>('/stats', {}, false); // No auth required
+  async getCategoryStats(): Promise<ApiResponse<CategoryStats>> {
+    return apiAuthService.get<CategoryStats>(`/categories/stats`, false); // No auth required for public read
   }
 
   /**
@@ -207,7 +124,7 @@ class CategoryApiService {
       sortBy: 'sortOrder',
       sortOrder: 'ASC'
     });
-    return response.data;
+    return response.data || [];
   }
 
   /**
@@ -220,7 +137,7 @@ class CategoryApiService {
       sortBy: 'sortOrder',
       sortOrder: 'ASC'
     });
-    return response.data;
+    return response.data || [];
   }
 
   /**
@@ -233,7 +150,7 @@ class CategoryApiService {
       sortBy: 'name',
       sortOrder: 'ASC'
     });
-    return response.data;
+    return response.data || [];
   }
 }
 

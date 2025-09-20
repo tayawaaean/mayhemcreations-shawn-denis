@@ -1,4 +1,5 @@
 import { envConfig } from './envConfig';
+import { apiAuthService, ApiResponse } from './apiAuthService';
 
 export interface Variant {
   id: number;
@@ -86,38 +87,10 @@ export interface VariantInventoryStatus {
 class VariantApiService {
   private baseUrl = `${envConfig.getApiBaseUrl()}/variants`;
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   /**
    * Get all variants with optional filtering
    */
-  async getVariants(filters: VariantFilters = {}): Promise<{
-    success: boolean;
-    data: Variant[];
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      pages: number;
-    };
-  }> {
+  async getVariants(filters: VariantFilters = {}): Promise<ApiResponse<Variant[]>> {
     const params = new URLSearchParams();
     
     if (filters.productId) params.append('productId', filters.productId.toString());
@@ -129,111 +102,53 @@ class VariantApiService {
     if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
 
     const queryString = params.toString();
-    const endpoint = `${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/variants${queryString ? `?${queryString}` : ''}`;
 
-    return this.makeRequest<{
-      success: boolean;
-      data: Variant[];
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(endpoint, {
-      method: 'GET',
-    });
+    return apiAuthService.get<Variant[]>(endpoint, false); // No auth required for public read
   }
 
   /**
    * Get a single variant by ID
    */
-  async getVariantById(id: number): Promise<{
-    success: boolean;
-    data: Variant;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Variant;
-    }>(`/${id}`, {
-      method: 'GET',
-    });
+  async getVariantById(id: number): Promise<ApiResponse<Variant>> {
+    return apiAuthService.get<Variant>(`/variants/${id}`, false); // No auth required for public read
   }
 
   /**
-   * Create a new variant
+   * Create a new variant (Admin/Seller only)
    */
-  async createVariant(variantData: CreateVariantData): Promise<{
-    success: boolean;
-    data: Variant;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Variant;
-      message: string;
-    }>('', {
-      method: 'POST',
-      body: JSON.stringify(variantData),
-    });
+  async createVariant(variantData: CreateVariantData): Promise<ApiResponse<Variant>> {
+    return apiAuthService.post<Variant>(`/variants`, variantData, true); // Auth required
   }
 
   /**
-   * Update a variant
+   * Update a variant (Admin/Seller only)
    */
-  async updateVariant(id: number, variantData: Partial<CreateVariantData>): Promise<{
-    success: boolean;
-    data: Variant;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      data: Variant;
-      message: string;
-    }>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(variantData),
-    });
+  async updateVariant(id: number, variantData: Partial<CreateVariantData>): Promise<ApiResponse<Variant>> {
+    return apiAuthService.put<Variant>(`/variants/${id}`, variantData, true); // Auth required
   }
 
   /**
-   * Delete a variant
+   * Delete a variant (Admin/Seller only)
    */
-  async deleteVariant(id: number): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    return this.makeRequest<{
-      success: boolean;
-      message: string;
-    }>(`/${id}`, {
-      method: 'DELETE',
-    });
+  async deleteVariant(id: number): Promise<ApiResponse> {
+    return apiAuthService.delete(`/variants/${id}`, true); // Auth required
   }
 
   /**
-   * Update variant inventory (add or subtract stock)
+   * Update variant inventory (add or subtract stock) (Admin/Seller only)
    */
   async updateVariantInventory(
     variantId: number, 
     quantity: number, 
     operation: 'add' | 'subtract' | 'set', 
     reason?: string
-  ): Promise<VariantInventoryUpdateResponse> {
-    const response = await this.makeRequest<{
-      success: boolean;
-      data: VariantInventoryUpdateResponse;
-      message: string;
-    }>(`/${variantId}/inventory`, {
-      method: 'PUT',
-      body: JSON.stringify({ quantity, operation, reason }),
-    });
-
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to update variant inventory');
-    }
-
-    return response.data;
+  ): Promise<ApiResponse<VariantInventoryUpdateResponse>> {
+    return apiAuthService.put<VariantInventoryUpdateResponse>(
+      `/variants/${variantId}/inventory`, 
+      { quantity, operation, reason }, 
+      true
+    ); // Auth required
   }
 
   /**
@@ -243,7 +158,7 @@ class VariantApiService {
     lowStockThreshold?: number,
     outOfStock?: boolean,
     productId?: number
-  ): Promise<VariantInventoryStatus> {
+  ): Promise<ApiResponse<VariantInventoryStatus>> {
     const params = new URLSearchParams();
     if (lowStockThreshold !== undefined) {
       params.append('lowStockThreshold', lowStockThreshold.toString());
@@ -256,31 +171,19 @@ class VariantApiService {
     }
 
     const queryString = params.toString();
-    const endpoint = `/inventory/status${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/variants/inventory/status${queryString ? `?${queryString}` : ''}`;
 
-    const response = await this.makeRequest<{
-      success: boolean;
-      data: VariantInventoryStatus;
-      message: string;
-    }>(endpoint, {
-      method: 'GET',
-    });
-
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to fetch variant inventory status');
-    }
-
-    return response.data;
+    return apiAuthService.get<VariantInventoryStatus>(endpoint, false); // No auth required for public read
   }
 
   /**
-   * Quick stock adjustment (add or subtract)
+   * Quick stock adjustment (add or subtract) (Admin/Seller only)
    */
   async adjustVariantStock(
     variantId: number, 
     adjustment: number, 
     reason?: string
-  ): Promise<VariantInventoryUpdateResponse> {
+  ): Promise<ApiResponse<VariantInventoryUpdateResponse>> {
     const operation = adjustment >= 0 ? 'add' : 'subtract';
     const quantity = Math.abs(adjustment);
     
@@ -288,13 +191,13 @@ class VariantApiService {
   }
 
   /**
-   * Set variant stock to a specific value
+   * Set variant stock to a specific value (Admin/Seller only)
    */
   async setVariantStock(
     variantId: number, 
     stock: number, 
     reason?: string
-  ): Promise<VariantInventoryUpdateResponse> {
+  ): Promise<ApiResponse<VariantInventoryUpdateResponse>> {
     return this.updateVariantInventory(variantId, stock, 'set', reason);
   }
 }

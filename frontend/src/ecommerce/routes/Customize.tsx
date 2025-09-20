@@ -23,6 +23,8 @@ export default function Customize() {
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCartConfirmation, setShowCartConfirmation] = useState(false)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
 
@@ -292,39 +294,56 @@ export default function Customize() {
     }
   }
 
-
-  const handleCheckout = async () => {
+  const handleAddToCart = async () => {
     if (!product) return
     
-    // Add customized item to cart with stock validation
-    const success = await addToCart(product.id.toString(), customizationData.quantity, {
-      design: customizationData.design ? {
-        name: customizationData.design.name,
-        size: customizationData.design.size,
-        preview: customizationData.design.preview
-      } : null,
-      selectedStyles: {
-        coverage: customizationData.selectedStyles.coverage,
-        material: customizationData.selectedStyles.material,
-        border: customizationData.selectedStyles.border,
-        threads: customizationData.selectedStyles.threads,
-        backing: customizationData.selectedStyles.backing,
-        upgrades: customizationData.selectedStyles.upgrades,
-        cutting: customizationData.selectedStyles.cutting
-      },
-      placement: customizationData.placement,
-      size: customizationData.size || 'medium',
-      color: customizationData.color,
-      notes: customizationData.notes,
-      designPosition: customizationData.designPosition,
-      designScale: customizationData.designScale,
-      designRotation: customizationData.designRotation
-    })
+    setIsAddingToCart(true)
     
-    if (success) {
-      console.log('Added customized item to cart:', customizationData)
-      navigate('/checkout')
+    try {
+      // Add customized item to cart with stock validation
+      const success = await addToCart(product.id.toString(), customizationData.quantity, {
+        design: customizationData.design ? {
+          name: customizationData.design.name,
+          size: customizationData.design.size,
+          preview: customizationData.design.preview
+        } : null,
+        selectedStyles: {
+          coverage: customizationData.selectedStyles.coverage,
+          material: customizationData.selectedStyles.material,
+          border: customizationData.selectedStyles.border,
+          threads: customizationData.selectedStyles.threads,
+          backing: customizationData.selectedStyles.backing,
+          upgrades: customizationData.selectedStyles.upgrades,
+          cutting: customizationData.selectedStyles.cutting
+        },
+        placement: customizationData.placement,
+        size: customizationData.size || 'medium',
+        color: customizationData.color,
+        notes: customizationData.notes,
+        designPosition: customizationData.designPosition,
+        designScale: customizationData.designScale,
+        designRotation: customizationData.designRotation
+      })
+      
+      if (success) {
+        setShowCartConfirmation(true)
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error)
+    } finally {
+      setIsAddingToCart(false)
     }
+  }
+
+  const handleProceedToCheckout = () => {
+    setShowCartConfirmation(false)
+    navigate('/checkout')
+  }
+
+  const handleContinueShopping = () => {
+    setShowCartConfirmation(false)
+    // Navigate to products page to browse more items
+    navigate('/products')
   }
 
   return (
@@ -951,7 +970,7 @@ export default function Customize() {
                 <div className="space-y-3 sm:space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Base Price</span>
-                    <span className="font-semibold text-sm sm:text-base">${customizationData.basePrice.toFixed(2)}</span>
+                    <span className="font-semibold text-sm sm:text-base">${(Number(customizationData.basePrice) || 0).toFixed(2)}</span>
                   </div>
                   
                   <div className="flex items-center justify-between">
@@ -968,7 +987,7 @@ export default function Customize() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.coverage.name}</span>
                       <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.coverage.price.toFixed(2)}`}
+                        {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.coverage.price) || 0).toFixed(2)}`}
                       </span>
                     </div>
                   )}
@@ -977,7 +996,7 @@ export default function Customize() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.material.name}</span>
                       <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.material.price.toFixed(2)}`}
+                        {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.material.price) || 0).toFixed(2)}`}
                       </span>
                     </div>
                   )}
@@ -986,7 +1005,7 @@ export default function Customize() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.border.name}</span>
                       <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.border.price.toFixed(2)}`}
+                        {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.border.price) || 0).toFixed(2)}`}
                       </span>
                     </div>
                   )}
@@ -1001,7 +1020,7 @@ export default function Customize() {
                   {customizationData.selectedStyles.threads.map((thread) => (
                     <div key={thread.id} className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{thread.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">+${thread.price.toFixed(2)}</span>
+                      <span className="font-semibold text-sm sm:text-base">+${(Number(thread.price) || 0).toFixed(2)}</span>
                     </div>
                   ))}
                   
@@ -1009,7 +1028,7 @@ export default function Customize() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.backing.name}</span>
                       <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.backing.price.toFixed(2)}`}
+                        {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.backing.price) || 0).toFixed(2)}`}
                       </span>
                     </div>
                   )}
@@ -1017,7 +1036,7 @@ export default function Customize() {
                   {customizationData.selectedStyles.upgrades.map((upgrade) => (
                     <div key={upgrade.id} className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{upgrade.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">+${upgrade.price.toFixed(2)}</span>
+                      <span className="font-semibold text-sm sm:text-base">+${(Number(upgrade.price) || 0).toFixed(2)}</span>
                     </div>
                   ))}
                   
@@ -1025,7 +1044,7 @@ export default function Customize() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.cutting.name}</span>
                       <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.cutting.price === 0 ? 'Free' : `+$${customizationData.selectedStyles.cutting.price.toFixed(2)}`}
+                        {customizationData.selectedStyles.cutting.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.cutting.price) || 0).toFixed(2)}`}
                       </span>
                     </div>
                   )}
@@ -1042,9 +1061,14 @@ export default function Customize() {
                   <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                     Previous
                   </Button>
-                  <Button variant="add-to-cart" onClick={handleCheckout} className="w-full sm:w-auto">
+                  <Button 
+                    variant="add-to-cart" 
+                    onClick={handleAddToCart} 
+                    disabled={isAddingToCart}
+                    className="w-full sm:w-auto"
+                  >
                     <ShoppingCart className="w-4 h-4 mr-2" />
-                    Proceed to Checkout
+                    {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
                   </Button>
                 </div>
               </div>
@@ -1152,6 +1176,46 @@ export default function Customize() {
                   className="px-6"
                 >
                   Got it!
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cart Confirmation Modal */}
+      {showCartConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 sm:p-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-green-600" />
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Item Added to Cart!
+              </h3>
+              
+              <p className="text-gray-600 mb-6">
+                Your customized {product?.title} has been successfully added to your cart.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleContinueShopping}
+                  className="w-full sm:w-auto"
+                >
+                  Continue Shopping
+                </Button>
+                
+                <Button
+                  variant="add-to-cart"
+                  onClick={handleProceedToCheckout}
+                  className="w-full sm:w-auto"
+                >
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Proceed to Checkout
                 </Button>
               </div>
             </div>

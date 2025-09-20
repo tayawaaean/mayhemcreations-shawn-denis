@@ -63,12 +63,12 @@ export async function authenticateAsAdmin(): Promise<SeederAuthContext> {
       });
 
       // Associate with role
-      await adminUser.setRole(adminRole);
+      // Role is already set via roleId in create
       logger.info('✅ Admin user created');
     } else {
       // Ensure admin user has admin role
       if (adminUser.roleId !== adminRole.id) {
-        await adminUser.setRole(adminRole);
+        // Role is already set via roleId in create
         logger.info('✅ Admin user role updated');
       }
     }

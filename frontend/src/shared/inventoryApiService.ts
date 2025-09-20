@@ -1,4 +1,5 @@
 import { envConfig } from './envConfig';
+import { apiAuthService, ApiResponse } from './apiAuthService';
 
 export interface InventoryUpdate {
   productId: number;
@@ -56,48 +57,20 @@ export interface BulkUpdateResponse {
 class InventoryApiService {
   private baseUrl = `${envConfig.getApiBaseUrl()}/products`;
 
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response.json();
-  }
-
   /**
-   * Update inventory for a single product
+   * Update inventory for a single product (Admin/Seller only)
    */
   async updateInventory(
     productId: number, 
     quantity: number, 
     operation: 'add' | 'subtract' | 'set', 
     reason?: string
-  ): Promise<InventoryUpdateResponse> {
-    const response = await this.makeRequest<{
-      success: boolean;
-      data: InventoryUpdateResponse;
-      message: string;
-    }>(`/${productId}/inventory`, {
-      method: 'PUT',
-      body: JSON.stringify({ quantity, operation, reason }),
-    });
-
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to update inventory');
-    }
-
-    return response.data;
+  ): Promise<ApiResponse<InventoryUpdateResponse>> {
+    return apiAuthService.put<InventoryUpdateResponse>(
+      `/products/${productId}/inventory`, 
+      { quantity, operation, reason }, 
+      true
+    ); // Auth required
   }
 
   /**
@@ -106,7 +79,7 @@ class InventoryApiService {
   async getInventoryStatus(
     lowStockThreshold?: number,
     outOfStock?: boolean
-  ): Promise<InventoryStatus> {
+  ): Promise<ApiResponse<InventoryStatus>> {
     const params = new URLSearchParams();
     if (lowStockThreshold !== undefined) {
       params.append('lowStockThreshold', lowStockThreshold.toString());
@@ -116,51 +89,30 @@ class InventoryApiService {
     }
 
     const queryString = params.toString();
-    const endpoint = `/inventory/status${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/products/inventory/status${queryString ? `?${queryString}` : ''}`;
 
-    const response = await this.makeRequest<{
-      success: boolean;
-      data: InventoryStatus;
-      message: string;
-    }>(endpoint, {
-      method: 'GET',
-    });
-
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to fetch inventory status');
-    }
-
-    return response.data;
+    return apiAuthService.get<InventoryStatus>(endpoint, false); // No auth required for public read
   }
 
   /**
-   * Bulk update inventory for multiple products
+   * Bulk update inventory for multiple products (Admin/Seller only)
    */
-  async bulkUpdateInventory(updates: InventoryUpdate[]): Promise<BulkUpdateResponse> {
-    const response = await this.makeRequest<{
-      success: boolean;
-      data: BulkUpdateResponse;
-      message: string;
-    }>('/inventory/bulk', {
-      method: 'PUT',
-      body: JSON.stringify({ updates }),
-    });
-
-    if (!response.success) {
-      throw new Error(response.message || 'Failed to perform bulk inventory update');
-    }
-
-    return response.data;
+  async bulkUpdateInventory(updates: InventoryUpdate[]): Promise<ApiResponse<BulkUpdateResponse>> {
+    return apiAuthService.put<BulkUpdateResponse>(
+      `/products/inventory/bulk`, 
+      { updates }, 
+      true
+    ); // Auth required
   }
 
   /**
-   * Quick stock adjustment (add or subtract)
+   * Quick stock adjustment (add or subtract) (Admin/Seller only)
    */
   async adjustStock(
     productId: number, 
     adjustment: number, 
     reason?: string
-  ): Promise<InventoryUpdateResponse> {
+  ): Promise<ApiResponse<InventoryUpdateResponse>> {
     const operation = adjustment >= 0 ? 'add' : 'subtract';
     const quantity = Math.abs(adjustment);
     
@@ -168,13 +120,13 @@ class InventoryApiService {
   }
 
   /**
-   * Set stock to a specific value
+   * Set stock to a specific value (Admin/Seller only)
    */
   async setStock(
     productId: number, 
     stock: number, 
     reason?: string
-  ): Promise<InventoryUpdateResponse> {
+  ): Promise<ApiResponse<InventoryUpdateResponse>> {
     return this.updateInventory(productId, stock, 'set', reason);
   }
 }
