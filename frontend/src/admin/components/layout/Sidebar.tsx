@@ -25,7 +25,8 @@ import {
   Store,
   BarChart,
   Cog,
-  RotateCcw
+  RotateCcw,
+  Clock
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -56,6 +57,7 @@ const navigationSections = [
     icon: ShoppingCart,
     items: [
       { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, adminOnly: false },
+      { name: 'Pending Review', href: '/admin/pending-review', icon: Clock, adminOnly: false },
       { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: false },
       { name: 'Reviews', href: '/admin/reviews', icon: Star, adminOnly: false }
     ]

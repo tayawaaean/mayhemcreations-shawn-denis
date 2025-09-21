@@ -9,6 +9,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import Orders from './pages/Orders'
+import PendingReview from './pages/PendingReview'
 import Customers from './pages/Customers'
 import Reviews from './pages/Reviews'
 import Messages from './pages/Messages'
@@ -34,6 +35,7 @@ const SellerApp: React.FC = () => {
                     <Route index element={<Dashboard />} />
                     <Route path="products" element={<Products />} />
                     <Route path="orders" element={<Orders />} />
+                    <Route path="pending-review" element={<PendingReview />} />
                     <Route path="customers" element={<Customers />} />
                     <Route path="reviews" element={<Reviews />} />
                     <Route path="messages" element={<Messages />} />

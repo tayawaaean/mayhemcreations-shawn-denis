@@ -19,6 +19,8 @@ import embroideryOptionRoute from './routes/embroideryOptionRoute';
 import cartRoute from './routes/cartRoute';
 import faqRoute from './routes/faqRoute';
 import materialCostRoute from './routes/materialCostRoute';
+import customEmbroideryRoute from './routes/customEmbroideryRoute';
+import orderReviewRoute from './routes/orderReviewRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -129,6 +131,8 @@ app.use('/api/v1/embroidery-options', embroideryOptionRoute);
 app.use('/api/v1/cart', cartRoute);
 app.use('/api/v1/faqs', faqRoute);
 app.use('/api/v1/material-costs', materialCostRoute);
+app.use('/api/v1/custom-embroidery', customEmbroideryRoute);
+app.use('/api/v1/orders', orderReviewRoute);
 
 // 404 handler
 app.use(notFound);

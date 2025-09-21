@@ -1,6 +1,19 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react'
+import { Facebook, Instagram, Phone, MapPin, ExternalLink } from 'lucide-react'
+
+// Custom SVG Icons for social media platforms
+const EtsyIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M8.564 2.445c0-.325.033-.52.59-.52h7.465c1.3 0 1.51.3 1.51 1.28v1.8h-3.92c-.59 0-.59.28-.59.52v3.44c0 .28 0 .52.59.52h3.92v8.1c0 1.04-.21 1.28-1.51 1.28H8.564c-.59 0-.59-.28-.59-.52V2.445zm1.18 10.92c0 .28 0 .52.59.52h4.33c.59 0 .59-.28.59-.52V9.445c0-.28 0-.52-.59-.52h-4.33c-.59 0-.59.28-.59.52v3.92z"/>
+  </svg>
+)
+
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+  </svg>
+)
 
 export default function Footer() {
   return (
@@ -22,13 +35,16 @@ export default function Footer() {
               Crafting quality custom embroidery since 2018. We bring your vision to life with professional-grade equipment and exceptional attention to detail.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">
+              <a href="https://etsy.com/shop/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                <EtsyIcon className="w-5 h-5" />
+              </a>
+              <a href="https://tiktok.com/@Mayhem_Creation" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                <TikTokIcon className="w-5 h-5" />
+              </a>
+              <a href="https://facebook.com/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">
+              <a href="https://instagram.com/Mayhem_Creaton" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
                 <Instagram className="w-5 h-5" />
               </a>
             </div>
@@ -61,16 +77,30 @@ export default function Footer() {
             <h3 className="font-semibold text-lg">Contact Info</h3>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
-                <Mail className="w-4 h-4 text-accent" />
-                <span className="text-gray-400 text-sm">hello@mayhemcreation.com</span>
-              </div>
-              <div className="flex items-center space-x-3">
                 <Phone className="w-4 h-4 text-accent" />
-                <span className="text-gray-400 text-sm">(555) 123-4567</span>
+                <span className="text-gray-400 text-sm">614-715-4742</span>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="w-4 h-4 text-accent mt-1" />
                 <span className="text-gray-400 text-sm">128 Persimmon Dr<br />Newark, OH 43055</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-3">
+                  <EtsyIcon className="w-4 h-4 text-accent" />
+                  <a href="https://etsy.com/shop/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@MayhemCreationLLC</a>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <TikTokIcon className="w-4 h-4 text-accent" />
+                  <a href="https://tiktok.com/@Mayhem_Creation" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@Mayhem_Creation</a>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Facebook className="w-4 h-4 text-accent" />
+                  <a href="https://facebook.com/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@MayhemCreationLLC</a>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Instagram className="w-4 h-4 text-accent" />
+                  <a href="https://instagram.com/Mayhem_Creaton" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@Mayhem_Creaton</a>
+                </div>
               </div>
             </div>
           </div>

@@ -765,3 +765,4 @@ export const bulkUpdateInventory = async (req: Request, res: Response): Promise<
     });
   }
 };
+

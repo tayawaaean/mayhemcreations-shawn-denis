@@ -47,34 +47,50 @@ export default function Home() {
               From custom logos to personal monograms, we bring your vision to life with professional embroidery services.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-accent text-xl">🎨</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            <div className="text-center p-8 bg-gray-50 rounded-xl group hover:shadow-xl transition-all duration-300 hover:bg-white">
+              <div className="w-full h-64 rounded-xl overflow-hidden mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <img 
+                  src="https://images.unsplash.com/photo-1507525586584-6a9c816efbed?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                  alt="Custom Patches"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Custom Design</h3>
-              <p className="text-sm text-gray-600">Unique designs from your ideas</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Custom Patches</h3>
+              <p className="text-base text-gray-600">Unique designs from your ideas</p>
             </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-accent text-xl">🏆</span>
+            <div className="text-center p-8 bg-gray-50 rounded-xl group hover:shadow-xl transition-all duration-300 hover:bg-white">
+              <div className="w-full h-64 rounded-xl overflow-hidden mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <img 
+                  src="https://images.unsplash.com/photo-1526290766257-c015850e4629?q=80&w=1080&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                  alt="Logo Embroidery"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Logo Embroidery</h3>
-              <p className="text-sm text-gray-600">Professional logo work</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Logo Embroidery</h3>
+              <p className="text-base text-gray-600">Professional logo work</p>
             </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-accent text-xl">✂️</span>
+            <div className="text-center p-8 bg-gray-50 rounded-xl group hover:shadow-xl transition-all duration-300 hover:bg-white">
+              <div className="w-full h-64 rounded-xl overflow-hidden mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <img 
+                  src="https://images.unsplash.com/photo-1614904301802-53243f11a17c?q=80&w=1080&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                  alt="Text and Monograms"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Text & Monograms</h3>
-              <p className="text-sm text-gray-600">Personalized text embroidery</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Text & Monograms</h3>
+              <p className="text-base text-gray-600">Personalized text embroidery</p>
             </div>
-            <div className="text-center p-6 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-accent text-xl">⚡</span>
+            <div className="text-center p-8 bg-gray-50 rounded-xl group hover:shadow-xl transition-all duration-300 hover:bg-white">
+              <div className="w-full h-64 rounded-xl overflow-hidden mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <img 
+                  src="https://images.unsplash.com/photo-1630930737762-95fba69e2dad?q=80&w=1080&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" 
+                  alt="Rush Service"
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Rush Service</h3>
-              <p className="text-sm text-gray-600">Fast-track orders available</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Rush Service</h3>
+              <p className="text-base text-gray-600">Fast-track orders available</p>
             </div>
           </div>
           <div className="text-center">

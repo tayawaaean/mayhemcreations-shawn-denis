@@ -48,12 +48,15 @@ export type ProductReview = {
 export type CartItem = {
   productId: string
   quantity: number
+  reviewStatus: 'pending' | 'approved' | 'rejected' | 'needs-changes'
   customization?: {
     design: {
       name: string
       size: number
       preview: string
+      base64?: string
     } | null
+    mockup?: string
     selectedStyles: {
       coverage: { id: string; name: string; price: number } | null
       material: { id: string; name: string; price: number } | null
@@ -73,6 +76,25 @@ export type CartItem = {
     }
     designScale: number
     designRotation: number
+    // Embroidery-specific data
+    embroideryData?: {
+      dimensions: {
+        width: number
+        height: number
+      }
+      materialCosts: {
+        fabricCost: number
+        patchAttachCost: number
+        threadCost: number
+        bobbinCost: number
+        cutAwayStabilizerCost: number
+        washAwayStabilizerCost: number
+        totalCost: number
+      }
+      optionsPrice: number
+      totalPrice: number
+      reviewStatus: 'pending' | 'approved' | 'rejected' | 'needs-changes'
+    }
   }
 }
 

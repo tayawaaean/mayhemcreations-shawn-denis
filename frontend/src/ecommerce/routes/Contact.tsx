@@ -1,6 +1,19 @@
 import React, { useState } from 'react'
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users, Facebook, Instagram } from 'lucide-react'
 import Button from '../../components/Button'
+
+// Custom SVG Icons for social media platforms
+const EtsyIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M8.564 2.445c0-.325.033-.52.59-.52h7.465c1.3 0 1.51.3 1.51 1.28v1.8h-3.92c-.59 0-.59.28-.59.52v3.44c0 .28 0 .52.59.52h3.92v8.1c0 1.04-.21 1.28-1.51 1.28H8.564c-.59 0-.59-.28-.59-.52V2.445zm1.18 10.92c0 .28 0 .52.59.52h4.33c.59 0 .59-.28.59-.52V9.445c0-.28 0-.52-.59-.52h-4.33c-.59 0-.59.28-.59.52v3.92z"/>
+  </svg>
+)
+
+const TikTokIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+  </svg>
+)
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -38,19 +51,13 @@ export default function Contact() {
     {
       icon: Phone,
       title: 'Phone',
-      details: ['(555) 123-4567', '(555) 987-6543'],
+      details: ['614-715-4742'],
       description: 'Call us for immediate assistance'
-    },
-    {
-      icon: Mail,
-      title: 'Email',
-      details: ['hello@mayhemcreation.com', 'orders@mayhemcreation.com'],
-      description: 'Email us anytime'
     },
     {
       icon: MapPin,
       title: 'Address',
-      details: ['123 Embroidery Lane', 'Craft City, CC 12345'],
+      details: ['128 Persimmon Dr', 'Newark, OH 43055'],
       description: 'Visit our workshop'
     },
     {
@@ -297,23 +304,62 @@ export default function Contact() {
                   })}
                 </div>
 
+                {/* Social Media */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Follow Us</h3>
+                  <p className="text-gray-600 mb-4">
+                    Stay connected and see our latest work on social media!
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <a
+                      href="https://etsy.com/shop/MayhemCreationLLC"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                    >
+                      <EtsyIcon className="w-5 h-5 text-accent" />
+                      <span className="text-sm font-medium text-gray-700">@MayhemCreationLLC</span>
+                    </a>
+                    <a
+                      href="https://tiktok.com/@Mayhem_Creation"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                    >
+                      <TikTokIcon className="w-5 h-5 text-accent" />
+                      <span className="text-sm font-medium text-gray-700">@Mayhem_Creation</span>
+                    </a>
+                    <a
+                      href="https://facebook.com/MayhemCreationLLC"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                    >
+                      <Facebook className="w-5 h-5 text-accent" />
+                      <span className="text-sm font-medium text-gray-700">@MayhemCreationLLC</span>
+                    </a>
+                    <a
+                      href="https://instagram.com/Mayhem_Creaton"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                    >
+                      <Instagram className="w-5 h-5 text-accent" />
+                      <span className="text-sm font-medium text-gray-700">@Mayhem_Creaton</span>
+                    </a>
+                  </div>
+                </div>
+
                 {/* Quick Actions */}
                 <div className="bg-accent/5 rounded-xl p-6 border border-accent/20">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
                   <div className="space-y-3">
                     <a
-                      href="tel:+15551234567"
+                      href="tel:+16147154742"
                       className="flex items-center space-x-3 text-gray-700 hover:text-accent transition-colors duration-200"
                     >
                       <Phone className="w-5 h-5" />
                       <span>Call us now</span>
-                    </a>
-                    <a
-                      href="mailto:hello@mayhemcreation.com"
-                      className="flex items-center space-x-3 text-gray-700 hover:text-accent transition-colors duration-200"
-                    >
-                      <Mail className="w-5 h-5" />
-                      <span>Send us an email</span>
                     </a>
                     <a
                       href="/products"

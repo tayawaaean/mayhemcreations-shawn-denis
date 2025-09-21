@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw } from 'lucide-react'
+import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
+import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
 
 interface OrderItem {
   id: string
@@ -12,227 +13,239 @@ interface OrderItem {
   quantity: number
   price: number
   customization?: {
-    text: string
-    color: string
-    position: string
+    design?: {
+      name: string
+      preview: string
+    }
+    mockup?: string
+    selectedStyles?: any
+    placement?: string
+    size?: string
+    color?: string
+    notes?: string
   }
 }
 
 interface Order {
-  id: string
+  id: number
   orderNumber: string
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout'
   orderDate: string
-  estimatedDelivery: string
   total: number
   items: OrderItem[]
-  shippingAddress: {
-    name: string
-    street: string
-    city: string
-    state: string
-    zipCode: string
-  }
-  trackingNumber?: string
-  paymentMethod: string
-  paymentStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded'
-  paymentProvider: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual'
-  paymentDetails?: {
-    transactionId?: string
-    providerTransactionId?: string
-    cardLast4?: string
-    cardBrand?: string
-    processedAt?: string
-    failedAt?: string
-    refundedAt?: string
-    refundAmount?: number
-  }
+  adminNotes?: string
+  reviewedAt?: string
+  adminPictureReplies?: PictureReply[]
+  customerConfirmations?: CustomerConfirmation[]
+  pictureReplyUploadedAt?: string
+  customerConfirmedAt?: string
+  originalOrderData?: any[] // Store original order data for matching
 }
 
-// Mock order data
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'MC-2024-001',
-    status: 'delivered',
-    orderDate: '2024-01-15',
-    estimatedDelivery: '2024-01-22',
-    total: 45.99,
-    items: [
-      {
-        id: '1',
-        productId: 'tee',
-        productName: 'Classic T-Shirt',
-        productImage: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop&crop=center',
-        quantity: 2,
-        price: 19.99,
-        customization: {
-          text: 'Mayhem Creation',
-          color: 'Red',
-          position: 'Center Chest'
-        }
-      }
-    ],
-    shippingAddress: {
-      name: 'John Doe',
-      street: '123 Main St',
-      city: 'Anytown',
-      state: 'CA',
-      zipCode: '12345'
-    },
-    trackingNumber: '1Z999AA1234567890',
-    paymentMethod: 'Credit Card',
-    paymentStatus: 'completed',
-    paymentProvider: 'stripe',
-    paymentDetails: {
-      transactionId: 'txn_1234567890',
-      providerTransactionId: 'pi_1234567890abcdef',
-      cardLast4: '4242',
-      cardBrand: 'visa',
-      processedAt: '2024-01-15T10:30:15Z'
-    }
-  },
-  {
-    id: '2',
-    orderNumber: 'MC-2024-002',
-    status: 'shipped',
-    orderDate: '2024-01-20',
-    estimatedDelivery: '2024-01-27',
-    total: 67.50,
-    items: [
-      {
-        id: '2',
-        productId: 'hoodie',
-        productName: 'Zip Hoodie',
-        productImage: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop&crop=center',
-        quantity: 1,
-        price: 45.00,
-        customization: {
-          text: 'Custom Design',
-          color: 'Blue',
-          position: 'Back'
-        }
-      },
-      {
-        id: '3',
-        productId: 'cap',
-        productName: 'Snapback Cap',
-        productImage: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=400&fit=crop&crop=center',
-        quantity: 1,
-        price: 22.50,
-        customization: {
-          text: 'Logo',
-          color: 'Black',
-          position: 'Front'
-        }
-      }
-    ],
-    shippingAddress: {
-      name: 'John Doe',
-      street: '123 Main St',
-      city: 'Anytown',
-      state: 'CA',
-      zipCode: '12345'
-    },
-    trackingNumber: '1Z999AA9876543210',
-    paymentMethod: 'PayPal',
-    paymentStatus: 'completed',
-    paymentProvider: 'paypal',
-    paymentDetails: {
-      transactionId: 'txn_0987654321',
-      providerTransactionId: 'PAYID-1234567890ABCDEF',
-      processedAt: '2024-01-20T14:22:30Z'
-    }
-  },
-  {
-    id: '3',
-    orderNumber: 'MC-2024-003',
-    status: 'processing',
-    orderDate: '2024-01-25',
-    estimatedDelivery: '2024-02-01',
-    total: 32.99,
-    items: [
-      {
-        id: '4',
-        productId: 'polo',
-        productName: 'Performance Polo',
-        productImage: 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop&crop=center',
-        quantity: 1,
-        price: 32.99,
-        customization: {
-          text: 'Company Logo',
-          color: 'Navy',
-          position: 'Left Chest'
-        }
-      }
-    ],
-    shippingAddress: {
-      name: 'John Doe',
-      street: '123 Main St',
-      city: 'Anytown',
-      state: 'CA',
-      zipCode: '12345'
-    },
-    paymentMethod: 'Google Pay',
-    paymentStatus: 'failed',
-    paymentProvider: 'google_pay',
-    paymentDetails: {
-      transactionId: 'txn_5566778899',
-      providerTransactionId: 'google_pay_failed_1234567890',
-      failedAt: '2024-01-25T16:45:05Z'
-    }
-  },
-  {
-    id: '4',
-    orderNumber: 'MC-2024-004',
-    status: 'pending',
-    orderDate: '2024-01-28',
-    estimatedDelivery: '2024-02-05',
-    total: 28.50,
-    items: [
-      {
-        id: '5',
-        productId: 'cap',
-        productName: 'Trucker Cap',
-        productImage: 'https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&h=400&fit=crop&crop=center',
-        quantity: 1,
-        price: 28.50,
-        customization: {
-          text: 'Custom Logo',
-          color: 'Black',
-          position: 'Front'
-        }
-      }
-    ],
-    shippingAddress: {
-      name: 'John Doe',
-      street: '123 Main St',
-      city: 'Anytown',
-      state: 'CA',
-      zipCode: '12345'
-    },
-    paymentMethod: 'Credit Card',
-    paymentStatus: 'pending',
-    paymentProvider: 'stripe',
-    paymentDetails: {
-      transactionId: 'txn_4433221100',
-      providerTransactionId: 'pi_pending_1234567890'
+// Helper function to convert OrderReview to Order
+const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
+  const orderData = Array.isArray(orderReview.order_data) 
+    ? orderReview.order_data 
+    : JSON.parse(orderReview.order_data as string);
+
+  console.log('🔍 Converting order review to order:', {
+    orderId: orderReview.id,
+    orderData: orderData,
+    total: orderReview.total,
+    adminPictureReplies: orderReview.admin_picture_replies,
+    adminPictureRepliesType: typeof orderReview.admin_picture_replies
+  });
+
+  // Debug picture replies and item IDs
+  if (orderReview.admin_picture_replies) {
+    const parsedReplies = Array.isArray(orderReview.admin_picture_replies) ? 
+      orderReview.admin_picture_replies : 
+      JSON.parse(orderReview.admin_picture_replies as string);
+    console.log('🔍 Picture replies debug:', {
+      replies: parsedReplies,
+      itemIds: parsedReplies.map((r: any) => r.itemId),
+      orderItemIds: orderData.map((item: any) => ({ 
+        id: item.id, 
+        productId: item.productId,
+        productName: item.product?.title || item.productName,
+        productImage: item.product?.image
+      }))
+    });
+  }
+
+  // Map old statuses to new statuses
+  const mapStatus = (oldStatus: string): Order['status'] => {
+    switch (oldStatus) {
+      case 'pending':
+        return 'pending-review'
+      case 'approved':
+        return 'pending-payment' // After customer approves, goes to pending payment
+      case 'rejected':
+        return 'rejected-needs-upload'
+      case 'needs-changes':
+        return 'picture-reply-pending'
+      case 'picture-reply-approved':
+        return 'pending-payment' // After customer approves picture reply, goes to pending payment
+      case 'pending-payment':
+        return 'pending-payment'
+      case 'approved-processing':
+        return 'approved-processing'
+      case 'in-production':
+        return 'in-production'
+      case 'ready-for-checkout':
+        return 'ready-for-checkout'
+      default:
+        return oldStatus as Order['status']
     }
   }
-]
+
+  return {
+    id: orderReview.id,
+    orderNumber: `MC-${orderReview.id}`,
+    status: mapStatus(orderReview.status),
+    orderDate: orderReview.submitted_at,
+    total: Number(orderReview.total) || 0,
+    items: orderData.map((item: any) => {
+      let itemPrice = 0;
+      
+      console.log('🔍 Processing item:', {
+        productId: item.productId,
+        productPrice: item.product?.price,
+        customization: item.customization,
+        embroideryData: item.customization?.embroideryData
+      });
+      
+      // For custom embroidery items, use the embroidery total price
+      if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.totalPrice) {
+        itemPrice = Number(item.customization.embroideryData.totalPrice) || 0;
+        console.log('💰 Custom embroidery price:', itemPrice);
+      }
+      // For regular products with customization, calculate total price including customization costs
+      else if (item.customization?.selectedStyles) {
+        let basePrice = Number(item.product?.price) || 0;
+        let customizationCost = 0;
+        
+        // Add costs from selected styles
+        const { selectedStyles } = item.customization;
+        if (selectedStyles.coverage) customizationCost += Number(selectedStyles.coverage.price) || 0;
+        if (selectedStyles.material) customizationCost += Number(selectedStyles.material.price) || 0;
+        if (selectedStyles.border) customizationCost += Number(selectedStyles.border.price) || 0;
+        if (selectedStyles.threads) {
+          selectedStyles.threads.forEach((thread: any) => {
+            customizationCost += Number(thread.price) || 0;
+          });
+        }
+        if (selectedStyles.backing) customizationCost += Number(selectedStyles.backing.price) || 0;
+        if (selectedStyles.upgrades) {
+          selectedStyles.upgrades.forEach((upgrade: any) => {
+            customizationCost += Number(upgrade.price) || 0;
+          });
+        }
+        if (selectedStyles.cutting) customizationCost += Number(selectedStyles.cutting.price) || 0;
+        
+        itemPrice = basePrice + customizationCost;
+        console.log('💰 Regular product with customization:', { basePrice, customizationCost, total: itemPrice });
+      }
+      // For regular products without customization, use base price
+      else {
+        itemPrice = Number(item.product?.price) || 0;
+        console.log('💰 Regular product without customization:', itemPrice);
+      }
+      
+      return {
+        id: item.id || item.productId,
+        productId: item.productId,
+        productName: (() => {
+          // For custom embroidery items - show design name
+          if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designName) {
+            return `Custom Embroidery: ${item.customization.embroideryData.designName}`;
+          }
+          // For custom embroidery items with design name in customization
+          if (item.productId === 'custom-embroidery' && item.customization?.design?.name) {
+            return `Custom Embroidery: ${item.customization.design.name}`;
+          }
+          // For regular products
+          return item.product?.title || item.productName || 'Custom Product';
+        })(),
+        productImage: (() => {
+          // For custom embroidery items - show uploaded design
+          if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designImage) {
+            return item.customization.embroideryData.designImage;
+          }
+          // For custom embroidery items with design preview
+          if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
+            return item.customization.design.preview;
+          }
+          // For regular products with customization - show final product mockup
+          if (item.customization?.mockup) {
+            return item.customization.mockup;
+          }
+          // For regular products without customization - show product image
+          if (item.product?.image) {
+            return item.product.image;
+          }
+          // Default placeholder
+          return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI0MCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+        })(),
+        quantity: item.quantity || 1,
+        price: itemPrice,
+        customization: item.customization
+      };
+    }),
+    adminNotes: orderReview.admin_notes,
+    reviewedAt: orderReview.reviewed_at,
+    adminPictureReplies: orderReview.admin_picture_replies ? 
+      (Array.isArray(orderReview.admin_picture_replies) ? 
+        orderReview.admin_picture_replies : 
+        (() => {
+          try {
+            return JSON.parse(orderReview.admin_picture_replies as string);
+          } catch (error) {
+            console.error('Error parsing admin_picture_replies:', error);
+            return [];
+          }
+        })()) : 
+      undefined,
+    customerConfirmations: orderReview.customer_confirmations ? 
+      (Array.isArray(orderReview.customer_confirmations) ? 
+        orderReview.customer_confirmations : 
+        (() => {
+          try {
+            return JSON.parse(orderReview.customer_confirmations as string);
+          } catch (error) {
+            console.error('Error parsing customer_confirmations:', error);
+            return [];
+          }
+        })()) : 
+      undefined,
+    pictureReplyUploadedAt: orderReview.picture_reply_uploaded_at,
+    customerConfirmedAt: orderReview.customer_confirmed_at,
+    originalOrderData: orderData // Store original order data for matching
+  };
+};
 
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
-    case 'pending':
+    case 'pending-review':
       return <Clock className="w-5 h-5 text-yellow-500" />
-    case 'processing':
-      return <Package className="w-5 h-5 text-blue-500" />
-    case 'shipped':
-      return <Truck className="w-5 h-5 text-purple-500" />
-    case 'delivered':
-      return <CheckCircle className="w-5 h-5 text-purple-500" />
-    case 'cancelled':
+    case 'rejected-needs-upload':
       return <XCircle className="w-5 h-5 text-red-500" />
+    case 'picture-reply-pending':
+      return <ImageIcon className="w-5 h-5 text-blue-500" />
+    case 'picture-reply-rejected':
+      return <XCircle className="w-5 h-5 text-red-500" />
+    case 'picture-reply-approved':
+      return <CheckCircle className="w-5 h-5 text-green-500" />
+    case 'pending-payment':
+      return <CreditCard className="w-5 h-5 text-orange-500" />
+    case 'approved-processing':
+      return <CheckCircle className="w-5 h-5 text-green-500" />
+    case 'ready-for-production':
+      return <AlertCircle className="w-5 h-5 text-orange-500" />
+    case 'in-production':
+      return <Truck className="w-5 h-5 text-blue-500" />
+    case 'ready-for-checkout':
+      return <CreditCard className="w-5 h-5 text-purple-500" />
     default:
       return <Clock className="w-5 h-5 text-gray-500" />
   }
@@ -240,16 +253,26 @@ const getStatusIcon = (status: Order['status']) => {
 
 const getStatusText = (status: Order['status']) => {
   switch (status) {
-    case 'pending':
-      return 'Pending'
-    case 'processing':
-      return 'Processing'
-    case 'shipped':
-      return 'Shipped'
-    case 'delivered':
-      return 'Delivered'
-    case 'cancelled':
-      return 'Cancelled'
+    case 'pending-review':
+      return 'Pending Admin Review'
+    case 'rejected-needs-upload':
+      return 'Rejected - Re-upload Required'
+    case 'picture-reply-pending':
+      return 'Picture Reply Pending'
+    case 'picture-reply-rejected':
+      return 'Picture Rejected - Admin Will Re-upload'
+    case 'picture-reply-approved':
+      return 'Picture Approved'
+    case 'pending-payment':
+      return 'Pending Payment'
+    case 'approved-processing':
+      return 'Approved - Processing Design'
+    case 'ready-for-production':
+      return 'Ready for Production'
+    case 'in-production':
+      return 'In Production'
+    case 'ready-for-checkout':
+      return 'Ready for Checkout'
     default:
       return 'Unknown'
   }
@@ -257,144 +280,341 @@ const getStatusText = (status: Order['status']) => {
 
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
-    case 'pending':
+    case 'pending-review':
       return 'bg-yellow-100 text-yellow-800'
-    case 'processing':
-      return 'bg-blue-100 text-blue-800'
-    case 'shipped':
-      return 'bg-purple-100 text-purple-800'
-    case 'delivered':
-      return 'bg-purple-100 text-purple-800'
-    case 'cancelled':
+    case 'rejected-needs-upload':
       return 'bg-red-100 text-red-800'
-    default:
-      return 'bg-gray-100 text-gray-800'
-  }
-}
-
-const getPaymentStatusIcon = (status: Order['paymentStatus']) => {
-  switch (status) {
-    case 'completed':
-      return <CheckCircle className="w-4 h-4 text-purple-600" />
-    case 'failed':
-      return <XCircle className="w-4 h-4 text-red-600" />
-    case 'pending':
-      return <Clock className="w-4 h-4 text-yellow-600" />
-    case 'processing':
-      return <Clock className="w-4 h-4 text-blue-600" />
-    case 'refunded':
-      return <DollarSign className="w-4 h-4 text-orange-600" />
-    case 'partially_refunded':
-      return <DollarSign className="w-4 h-4 text-orange-600" />
-    case 'cancelled':
-      return <XCircle className="w-4 h-4 text-gray-600" />
-    default:
-      return <AlertCircle className="w-4 h-4 text-gray-600" />
-  }
-}
-
-const getPaymentStatusColor = (status: Order['paymentStatus']) => {
-  switch (status) {
-    case 'completed':
-      return 'bg-purple-100 text-purple-800'
-    case 'failed':
-      return 'bg-red-100 text-red-800'
-    case 'pending':
-      return 'bg-yellow-100 text-yellow-800'
-    case 'processing':
+    case 'picture-reply-pending':
       return 'bg-blue-100 text-blue-800'
-    case 'refunded':
+    case 'picture-reply-rejected':
+      return 'bg-red-100 text-red-800'
+    case 'picture-reply-approved':
+      return 'bg-green-100 text-green-800'
+    case 'pending-payment':
       return 'bg-orange-100 text-orange-800'
-    case 'partially_refunded':
+    case 'approved-processing':
+      return 'bg-green-100 text-green-800'
+    case 'ready-for-production':
       return 'bg-orange-100 text-orange-800'
-    case 'cancelled':
-      return 'bg-gray-100 text-gray-800'
+    case 'in-production':
+      return 'bg-blue-100 text-blue-800'
+    case 'ready-for-checkout':
+      return 'bg-purple-100 text-purple-800'
     default:
       return 'bg-gray-100 text-gray-800'
   }
 }
 
-const getPaymentMethodIcon = (provider: Order['paymentProvider']) => {
-  switch (provider) {
-    case 'stripe':
-      return <CreditCard className="w-4 h-4" />
-    case 'paypal':
-      return <span className="text-blue-600 font-bold text-xs">PP</span>
-    case 'google_pay':
-      return <span className="text-gray-900 font-bold text-xs">G</span>
-    case 'apple_pay':
-      return <span className="text-gray-900 font-bold text-xs">A</span>
-    default:
-      return <CreditCard className="w-4 h-4" />
+// Helper function to find item by reply itemId
+const findItemForReply = (reply: PictureReply, order: Order): { productName: string; productImage: string; quantity: number } => {
+  console.log('🔍 Finding item for reply:', {
+    replyItemId: reply.itemId,
+    orderItems: order.items.map(item => ({ id: item.id, productId: item.productId })),
+    originalOrderData: order.originalOrderData?.map(item => ({ id: item.id, productId: item.productId }))
+  });
+
+  // First try to find in converted items by exact ID match
+  let item = order.items.find(item => item.id === reply.itemId);
+  
+  if (item) {
+    console.log('✅ Found item in converted items:', item);
+    return {
+      productName: item.productName,
+      productImage: item.productImage,
+      quantity: item.quantity
+    };
   }
+  
+  // Try to find by productId as fallback
+  item = order.items.find(item => item.productId === reply.itemId);
+  
+  if (item) {
+    console.log('✅ Found item by productId in converted items:', item);
+    return {
+      productName: item.productName,
+      productImage: item.productImage,
+      quantity: item.quantity
+    };
+  }
+  
+  // If item not found, try to find it in the original order data
+  if (order.originalOrderData) {
+    let originalItem = order.originalOrderData.find(origItem => origItem.id === reply.itemId);
+    
+    if (!originalItem) {
+      // Try by productId as fallback
+      originalItem = order.originalOrderData.find(origItem => origItem.productId === reply.itemId);
+    }
+    
+    if (originalItem) {
+      console.log('✅ Found item in original order data:', originalItem);
+      return {
+        productName: (() => {
+          // For custom embroidery items - show design name
+          if (originalItem.productId === 'custom-embroidery' && originalItem.customization?.embroideryData?.designName) {
+            return `Custom Embroidery: ${originalItem.customization.embroideryData.designName}`;
+          }
+          // For custom embroidery items with design name in customization
+          if (originalItem.productId === 'custom-embroidery' && originalItem.customization?.design?.name) {
+            return `Custom Embroidery: ${originalItem.customization.design.name}`;
+          }
+          // For regular products
+          return originalItem.product?.title || originalItem.productName || 'Custom Product';
+        })(),
+        productImage: (() => {
+          // For custom embroidery items - show uploaded design
+          if (originalItem.productId === 'custom-embroidery' && originalItem.customization?.embroideryData?.designImage) {
+            return originalItem.customization.embroideryData.designImage;
+          }
+          // For custom embroidery items with design preview
+          if (originalItem.productId === 'custom-embroidery' && originalItem.customization?.design?.preview) {
+            return originalItem.customization.design.preview;
+          }
+          // For regular products with customization - show final product mockup
+          if (originalItem.customization?.mockup) {
+            return originalItem.customization.mockup;
+          }
+          // For regular products without customization - show product image
+          if (originalItem.product?.image) {
+            return originalItem.product.image;
+          }
+          // Default placeholder
+          return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI0MCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+        })(),
+        quantity: originalItem.quantity || 1
+      };
+    }
+  }
+  
+  console.log('❌ Item not found for reply:', reply.itemId);
+  
+  // Fallback
+  return {
+    productName: 'Custom Product',
+    productImage: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI0MCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==',
+    quantity: 1
+  };
 }
+
 
 export default function MyOrders() {
   const { user, isLoggedIn } = useAuth()
-  const [orders, setOrders] = useState<Order[]>(mockOrders)
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
-  const [showReviewForm, setShowReviewForm] = useState(false)
-  const [showCancelModal, setShowCancelModal] = useState(false)
-  const [showRefundModal, setShowRefundModal] = useState(false)
-  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
+  const [pictureConfirmations, setPictureConfirmations] = useState<{[itemId: string]: {confirmed: boolean | null, notes: string}}>({})
+  const [submittingConfirmations, setSubmittingConfirmations] = useState(false)
+  const [showReuploadModal, setShowReuploadModal] = useState(false)
+  const [reuploadFiles, setReuploadFiles] = useState<{[itemId: string]: File | null}>({})
+  const [submittingReupload, setSubmittingReupload] = useState(false)
+
+  // Load orders on component mount
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadOrders()
+    }
+  }, [isLoggedIn])
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      console.log('🔄 Loading user orders...')
+      const response = await orderReviewApiService.getUserReviewOrders()
+      console.log('📊 Orders API response:', response)
+      
+      if (response.success && response.data) {
+        const convertedOrders = response.data.map(convertOrderReviewToOrder)
+        console.log('✅ Orders loaded:', convertedOrders)
+        setOrders(convertedOrders)
+      } else {
+        console.log('❌ Failed to load orders:', response.message)
+        setOrders([])
+      }
+    } catch (error) {
+      console.error('❌ Error loading orders:', error)
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order)
     setShowOrderDetails(true)
-  }
-
-  const handleLeaveReview = (order: Order) => {
-    setSelectedOrder(order)
-    setShowReviewForm(true)
-  }
-
-  const handleCancelOrder = (order: Order) => {
-    setSelectedOrder(order)
-    setShowCancelModal(true)
-  }
-
-  const confirmCancelOrder = () => {
-    if (selectedOrder) {
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.id === selectedOrder.id 
-            ? { ...order, status: 'cancelled' as const }
-            : order
-        )
-      )
-      setShowCancelModal(false)
-      setSelectedOrder(null)
+    
+    // Load existing picture confirmations if any
+    if (order.adminPictureReplies && order.adminPictureReplies.length > 0) {
+      const existingConfirmations: {[itemId: string]: {confirmed: boolean | null, notes: string}} = {};
+      
+      console.log('🔍 Loading existing confirmations:', {
+        orderId: order.id,
+        adminPictureReplies: order.adminPictureReplies,
+        customerConfirmations: order.customerConfirmations,
+        customerConfirmationsType: typeof order.customerConfirmations
+      });
+      
+      // Check if there are existing customer confirmations
+      if (order.customerConfirmations && Array.isArray(order.customerConfirmations)) {
+        order.customerConfirmations.forEach(conf => {
+          existingConfirmations[conf.itemId] = {
+            confirmed: conf.confirmed,
+            notes: conf.notes || ''
+          };
+        });
+        console.log('✅ Loaded existing confirmations:', existingConfirmations);
+      } else {
+        console.log('ℹ️ No existing confirmations found');
+      }
+      
+      setPictureConfirmations(existingConfirmations);
     }
-  }
-
-  const handleRequestRefund = (order: Order) => {
-    setSelectedOrder(order)
-    setShowRefundModal(true)
-  }
-
-  const handleRefundRequestSubmit = (refundRequest: RefundRequest) => {
-    setRefundRequests(prev => [...prev, refundRequest])
-    // In a real app, this would send to the backend
-    console.log('Refund request submitted:', refundRequest)
-  }
-
-  const canRequestRefund = (order: Order) => {
-    // Can request refund if order is delivered or shipped, and payment is completed
-    return (order.status === 'delivered' || order.status === 'shipped') && 
-           order.paymentStatus === 'completed' &&
-           !refundRequests.some(req => req.orderId === order.id)
   }
 
   const handleCloseModal = () => {
     setShowOrderDetails(false)
-    setShowReviewForm(false)
-    setShowCancelModal(false)
     setSelectedOrder(null)
+    setPictureConfirmations({})
   }
+
+  // Handle picture confirmation change
+  const handlePictureConfirmationChange = (itemId: string, confirmed: boolean) => {
+    setPictureConfirmations(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        confirmed
+      }
+    }))
+  }
+
+  // Handle picture confirmation notes change
+  const handlePictureConfirmationNotesChange = (itemId: string, notes: string) => {
+    setPictureConfirmations(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        notes
+      }
+    }))
+  }
+
+  // Submit picture confirmations
+  const handleSubmitPictureConfirmations = async () => {
+    if (!selectedOrder) return
+
+    try {
+      setSubmittingConfirmations(true)
+      
+      const confirmationData: CustomerConfirmation[] = Object.entries(pictureConfirmations)
+        .filter(([_, data]) => data.confirmed !== null) // Only include items with a decision
+        .map(([itemId, data]) => ({
+          itemId,
+          confirmed: data.confirmed!,
+          notes: data.notes || undefined
+        }))
+
+      const response = await orderReviewApiService.confirmPictureReplies(selectedOrder.id, confirmationData)
+      
+      if (response.success) {
+        // Check if all pictures were approved
+        const allApproved = confirmationData.every(conf => conf.confirmed === true)
+        const anyRejected = confirmationData.some(conf => conf.confirmed === false)
+        
+        if (allApproved) {
+          alert('All pictures approved! Order is ready for production.')
+        } else if (anyRejected) {
+          alert('Some pictures were rejected. Admin will upload new designs.')
+        }
+        
+        setPictureConfirmations({})
+        // Reload orders to get updated data
+        loadOrders()
+      } else {
+        alert('Failed to submit confirmations. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error submitting confirmations:', error)
+      alert('Error submitting confirmations. Please try again.')
+    } finally {
+      setSubmittingConfirmations(false)
+    }
+  }
+
+  // Handle proceed to checkout
+  const handleProceedToCheckout = (order: Order) => {
+    // Navigate to checkout with the order data
+    // This would typically involve passing the order data to the checkout page
+    console.log('Proceeding to checkout for order:', order)
+    // For now, just show an alert - you can implement the actual checkout flow
+    alert('Proceeding to checkout...')
+  }
+
+  // Handle re-upload modal
+  const handleOpenReuploadModal = (order: Order) => {
+    setSelectedOrder(order)
+    setShowReuploadModal(true)
+    setReuploadFiles({})
+  }
+
+  const handleCloseReuploadModal = () => {
+    setShowReuploadModal(false)
+    setSelectedOrder(null)
+    setReuploadFiles({})
+  }
+
+  // Handle file selection for re-upload
+  const handleReuploadFileChange = (itemId: string, file: File | null) => {
+    setReuploadFiles(prev => ({
+      ...prev,
+      [itemId]: file
+    }))
+  }
+
+  // Submit re-uploaded files
+  const handleSubmitReupload = async () => {
+    if (!selectedOrder) return
+
+    try {
+      setSubmittingReupload(true)
+      
+      // Convert files to base64
+      const reuploadData = await Promise.all(
+        Object.entries(reuploadFiles)
+          .filter(([_, file]) => file !== null)
+          .map(async ([itemId, file]) => {
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(file!)
+            })
+            return {
+              itemId,
+              designFile: base64,
+              fileName: file!.name
+            }
+          })
+      )
+
+      // Submit re-upload (you'll need to implement this API endpoint)
+      console.log('Re-uploading files:', reuploadData)
+      alert('Re-upload functionality will be implemented with backend API')
+      
+      // Close modal and reload orders
+      handleCloseReuploadModal()
+      loadOrders()
+    } catch (error) {
+      console.error('Error re-uploading files:', error)
+      alert('Error re-uploading files. Please try again.')
+    } finally {
+      setSubmittingReupload(false)
+    }
+  }
+
+
 
   if (!isLoggedIn) {
     return (
@@ -425,6 +645,19 @@ export default function MyOrders() {
       }
     })
 
+  if (loading) {
+    return (
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading your orders...</p>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
@@ -454,11 +687,16 @@ export default function MyOrders() {
             className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
           >
             <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="pending-review">Pending Admin Review</option>
+            <option value="rejected-needs-upload">Rejected - Re-upload Required</option>
+            <option value="picture-reply-pending">Picture Reply Pending</option>
+            <option value="picture-reply-rejected">Picture Rejected</option>
+            <option value="picture-reply-approved">Picture Approved</option>
+            <option value="pending-payment">Pending Payment</option>
+            <option value="approved-processing">Approved - Processing Design</option>
+            <option value="ready-for-production">Ready for Production</option>
+            <option value="in-production">In Production</option>
+            <option value="ready-for-checkout">Ready for Checkout</option>
           </select>
 
           <select
@@ -504,23 +742,49 @@ export default function MyOrders() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-900">${order.total.toFixed(2)}</p>
-                    <div className="flex items-center justify-end space-x-2 mt-1">
-                      {getPaymentMethodIcon(order.paymentProvider)}
-                      <span className="text-sm text-gray-500">{order.paymentMethod}</span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.paymentStatus)}`}>
-                        {getPaymentStatusIcon(order.paymentStatus)}
-                        <span className="ml-1">{order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}</span>
-                      </span>
-                    </div>
-                    {order.trackingNumber && (
-                      <p className="text-sm text-gray-500 mt-1">Tracking: {order.trackingNumber}</p>
+                    <p className="text-lg font-semibold text-gray-900">${(Number(order.total) || 0).toFixed(2)}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Submitted: {new Date(order.orderDate).toLocaleDateString()}
+                    </p>
+                    {order.reviewedAt && (
+                      <p className="text-sm text-gray-500">
+                        Reviewed: {new Date(order.reviewedAt).toLocaleDateString()}
+                      </p>
                     )}
                   </div>
                 </div>
-              </div>
+                </div>
 
-              {/* Order Items */}
+                {/* Status Message */}
+                {selectedOrder && selectedOrder.status === 'pending-payment' && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <CreditCard className="h-6 w-6 text-orange-600" />
+                      <div>
+                        <h3 className="text-lg font-medium text-orange-800">Payment Required</h3>
+                        <p className="text-sm text-orange-700 mt-1">
+                          Your design has been approved! Please proceed to checkout to complete your payment and begin processing.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedOrder && selectedOrder.status === 'approved-processing' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                      <div>
+                        <h3 className="text-lg font-medium text-green-800">Design Approved!</h3>
+                        <p className="text-sm text-green-700 mt-1">
+                          Your design has been approved and is being processed. You can now proceed to checkout to complete your order.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Order Items */}
               <div className="px-6 py-4">
                 <div className="space-y-4">
                   {order.items.map((item) => (
@@ -539,13 +803,27 @@ export default function MyOrders() {
                         <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
                         {item.customization && (
                           <div className="mt-1 text-xs text-gray-600">
-                            <p>Custom: {item.customization.text}</p>
-                            <p>Color: {item.customization.color} | Position: {item.customization.position}</p>
+                            {item.customization.design && (
+                              <p>Design: {item.customization.design.name}</p>
+                            )}
+                            {item.customization.placement && (
+                              <p>Placement: {item.customization.placement}</p>
+                            )}
+                            {item.customization.size && (
+                              <p>Size: {item.customization.size}</p>
+                            )}
+                            {item.customization.color && (
+                              <p>Color: {item.customization.color}</p>
+                            )}
+                            {item.customization.notes && (
+                              <p>Notes: {item.customization.notes}</p>
+                            )}
                           </div>
                         )}
+                        
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
+                        <p className="text-sm font-medium text-gray-900">${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}</p>
                       </div>
                     </div>
                   ))}
@@ -556,8 +834,21 @@ export default function MyOrders() {
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
-                    <p>Estimated delivery: {new Date(order.estimatedDelivery).toLocaleDateString()}</p>
-                    <p>Shipping to: {order.shippingAddress.city}, {order.shippingAddress.state}</p>
+                    <p>Submitted: {new Date(order.orderDate).toLocaleDateString()}</p>
+                    {order.reviewedAt && (
+                      <p>Reviewed: {new Date(order.reviewedAt).toLocaleDateString()}</p>
+                    )}
+                    {order.adminNotes && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                        <div className="flex items-start space-x-2">
+                          <MessageSquare className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs font-medium text-blue-800">Admin Notes:</p>
+                            <p className="text-xs text-blue-700">{order.adminNotes}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex space-x-2">
                     <Button 
@@ -565,36 +856,17 @@ export default function MyOrders() {
                       size="sm"
                       onClick={() => handleViewDetails(order)}
                     >
+                      <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </Button>
-                    {order.status === 'delivered' && (
+                    {order.status === 'picture-reply-pending' && (
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => handleLeaveReview(order)}
+                        className="text-blue-600 hover:text-blue-700"
                       >
-                        Leave Review
-                      </Button>
-                    )}
-                    {canRequestRefund(order) && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-orange-600 hover:text-orange-700"
-                        onClick={() => handleRequestRefund(order)}
-                      >
-                        <RotateCcw className="w-4 h-4 mr-1" />
-                        Request Refund
-                      </Button>
-                    )}
-                    {order.status === 'pending' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => handleCancelOrder(order)}
-                      >
-                        Cancel Order
+                        <ImageIcon className="w-4 h-4 mr-1" />
+                        Review Pictures
                       </Button>
                     )}
                   </div>
@@ -629,7 +901,7 @@ export default function MyOrders() {
                       <p className="text-lg font-semibold text-gray-900">{selectedOrder.orderNumber}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Order Date</p>
+                      <p className="text-sm font-medium text-gray-500">Submitted Date</p>
                       <p className="text-lg font-semibold text-gray-900">
                         {new Date(selectedOrder.orderDate).toLocaleDateString()}
                       </p>
@@ -645,38 +917,55 @@ export default function MyOrders() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Total</p>
-                      <p className="text-lg font-semibold text-gray-900">${selectedOrder.total.toFixed(2)}</p>
+                      <p className="text-lg font-semibold text-gray-900">${(Number(selectedOrder.total) || 0).toFixed(2)}</p>
                     </div>
+                    {selectedOrder.reviewedAt && (
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Payment Method</p>
-                      <div className="flex items-center space-x-2">
-                        {getPaymentMethodIcon(selectedOrder.paymentProvider)}
-                        <span className="text-lg font-semibold text-gray-900">{selectedOrder.paymentMethod}</span>
+                        <p className="text-sm font-medium text-gray-500">Reviewed Date</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {new Date(selectedOrder.reviewedAt).toLocaleDateString()}
+                        </p>
                       </div>
+                    )}
+                    {selectedOrder.adminNotes && (
+                      <div className="col-span-2">
+                        <p className="text-sm font-medium text-gray-500">Admin Notes</p>
+                        <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded">
+                          <p className="text-sm text-blue-800">{selectedOrder.adminNotes}</p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Payment Status</p>
-                      <div className="flex items-center">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${getPaymentStatusColor(selectedOrder.paymentStatus)}`}>
-                          {getPaymentStatusIcon(selectedOrder.paymentStatus)}
-                          <span className="ml-2">{selectedOrder.paymentStatus.charAt(0).toUpperCase() + selectedOrder.paymentStatus.slice(1)}</span>
-                        </span>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Shipping Address */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Shipping Address</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="font-medium text-gray-900">{selectedOrder.shippingAddress.name}</p>
-                    <p className="text-gray-700">{selectedOrder.shippingAddress.street}</p>
-                    <p className="text-gray-700">
-                      {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state} {selectedOrder.shippingAddress.zipCode}
-                    </p>
+                {/* Status Message */}
+                {selectedOrder && selectedOrder.status === 'pending-payment' && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <CreditCard className="h-6 w-6 text-orange-600" />
+                      <div>
+                        <h3 className="text-lg font-medium text-orange-800">Payment Required</h3>
+                        <p className="text-sm text-orange-700 mt-1">
+                          Your design has been approved! Please proceed to checkout to complete your payment and begin processing.
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {selectedOrder && selectedOrder.status === 'approved-processing' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                      <div>
+                        <h3 className="text-lg font-medium text-green-800">Design Approved!</h3>
+                        <p className="text-sm text-green-700 mt-1">
+                          Your design has been approved and is being processed. You can now proceed to checkout to complete your order.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Order Items */}
                 <div>
@@ -696,226 +985,268 @@ export default function MyOrders() {
                         <div className="flex-1">
                           <h4 className="font-medium text-gray-900">{item.productName}</h4>
                           <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                          <p className="text-sm text-gray-500">Price: ${item.price.toFixed(2)} each</p>
+                          <p className="text-sm text-gray-500">Price: ${(Number(item.price) || 0).toFixed(2)} each</p>
                           {item.customization && (
                             <div className="mt-2 text-sm text-gray-600">
-                              <p><strong>Customization:</strong> {item.customization.text}</p>
+                              {item.customization.design && (
+                                <p><strong>Design:</strong> {item.customization.design.name}</p>
+                              )}
+                              {item.customization.placement && (
+                                <p><strong>Placement:</strong> {item.customization.placement}</p>
+                              )}
+                              {item.customization.size && (
+                                <p><strong>Size:</strong> {item.customization.size}</p>
+                              )}
+                              {item.customization.color && (
                               <p><strong>Color:</strong> {item.customization.color}</p>
-                              <p><strong>Position:</strong> {item.customization.position}</p>
+                              )}
+                              {item.customization.notes && (
+                                <p><strong>Notes:</strong> {item.customization.notes}</p>
+                              )}
                             </div>
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold text-gray-900">${(item.price * item.quantity).toFixed(2)}</p>
+                          <p className="font-semibold text-gray-900">${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Tracking Info */}
-                {selectedOrder.trackingNumber && (
+                {/* Picture Replies Section */}
+                {selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Tracking Information</h3>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm font-medium text-gray-500">Tracking Number</p>
-                      <p className="text-lg font-mono text-gray-900">{selectedOrder.trackingNumber}</p>
-                      <p className="text-sm text-gray-500 mt-2">
-                        Estimated delivery: {new Date(selectedOrder.estimatedDelivery).toLocaleDateString()}
-                      </p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                      <ImageIcon className="w-5 h-5 text-purple-600" />
+                      <span>Admin Picture Replies</span>
+                    </h3>
+                    <div className="space-y-4">
+                      {selectedOrder.adminPictureReplies.map((reply, index) => {
+                        const item = selectedOrder.items.find(item => 
+                          item.id === reply.itemId || 
+                          item.productId === reply.itemId ||
+                          String(item.id) === String(reply.itemId) ||
+                          String(item.productId) === String(reply.itemId)
+                        );
+                        
+                        return (
+                          <div key={index} className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                            <div className="flex items-start space-x-4">
+                              <img
+                                src={reply.image}
+                                alt="Admin picture reply"
+                                className="w-32 h-32 object-cover rounded border border-purple-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(reply.image, '_blank')}
+                              />
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <h4 className="font-medium text-purple-800">
+                                    Reply for: {item?.productName || `Item ID: ${reply.itemId}`}
+                                  </h4>
+                                  <span className="text-xs text-purple-600">
+                                    Qty: {item?.quantity || 1}
+                                  </span>
+                                </div>
+                                
+                                {reply.notes && (
+                                  <p className="text-sm text-purple-700 mb-3">
+                                    <strong>Admin Notes:</strong> {reply.notes}
+                                  </p>
+                                )}
+                                
+                                {/* Picture Confirmation Actions */}
+                                <div className="space-y-3">
+                                  {selectedOrder && (selectedOrder.status === 'pending-payment' || selectedOrder.status === 'approved-processing') ? (
+                                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                      <div className="flex items-center space-x-2">
+                                        <Clock className="h-4 w-4 text-orange-600" />
+                                        <span className="text-sm font-medium text-orange-800">
+                                          {selectedOrder.status === 'pending-payment' 
+                                            ? 'Design approved - Payment required to proceed'
+                                            : 'Design approved and being processed - No further action needed'
+                                          }
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <p className="text-sm font-medium text-gray-700">Do you approve this picture?</p>
+                                      <div className="flex space-x-4">
+                                        <label className="flex items-center space-x-2">
+                                          <input
+                                            type="radio"
+                                            name={`confirmation-${reply.itemId}`}
+                                            checked={pictureConfirmations[reply.itemId]?.confirmed === true}
+                                            onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
+                                            className="text-green-600 focus:ring-green-500"
+                                          />
+                                          <span className="text-sm text-green-700">✓ Approve</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2">
+                                          <input
+                                            type="radio"
+                                            name={`confirmation-${reply.itemId}`}
+                                            checked={pictureConfirmations[reply.itemId]?.confirmed === false}
+                                            onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
+                                            className="text-red-600 focus:ring-red-500"
+                                          />
+                                          <span className="text-sm text-red-700">✗ Reject</span>
+                                        </label>
+                                      </div>
+                                      
+                                      {/* Notes */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Your Notes (Optional)
+                                        </label>
+                                        <textarea
+                                          value={pictureConfirmations[reply.itemId]?.notes || ''}
+                                          onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
+                                          rows={2}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                          placeholder="Add any comments about this picture..."
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
+
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <Button onClick={handleCloseModal}>
-                  Close
-                </Button>
+              <div className="mt-6 flex justify-between items-center">
+                <div className="flex space-x-3">
+                  <Button onClick={handleCloseModal}>
+                    Close
+                  </Button>
+                  
+                  {/* Submit Picture Confirmations Button */}
+                  {selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0 && Object.values(pictureConfirmations).some(c => c.confirmed !== null) && selectedOrder.status !== 'pending-payment' && selectedOrder.status !== 'approved-processing' && (
+                    <Button 
+                      onClick={handleSubmitPictureConfirmations}
+                      disabled={submittingConfirmations}
+                      className="bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                      {submittingConfirmations ? 'Submitting...' : 'Submit Picture Confirmations'}
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                  {/* Re-upload Button for rejected orders */}
+                  {selectedOrder.status === 'rejected-needs-upload' && (
+                    <Button 
+                      onClick={() => handleOpenReuploadModal(selectedOrder)}
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      Re-upload Design
+                    </Button>
+                  )}
+                  
+                  {/* Checkout Button for pending-payment */}
+                  {selectedOrder && selectedOrder.status === 'pending-payment' && (
+                    <Button 
+                      onClick={() => handleProceedToCheckout(selectedOrder)}
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                    >
+                      Proceed to Checkout
+                    </Button>
+                  )}
+                  
+                  {/* Proceed to Checkout Button */}
+                  {selectedOrder.status === 'ready-for-checkout' && (
+                    <Button 
+                      onClick={() => handleProceedToCheckout(selectedOrder)}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Proceed to Checkout
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Review Form Modal */}
-      {showReviewForm && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Leave a Review</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      {/* Re-upload Modal */}
+      {showReuploadModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Re-upload Design Files</h2>
+              <button
+                onClick={handleCloseReuploadModal}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                <p className="text-gray-600">
-                  Review your order: <strong>{selectedOrder.orderNumber}</strong>
-                </p>
-                
-                {selectedOrder.items.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg">
+            <div className="space-y-4">
+              <p className="text-gray-600 mb-4">
+                Your design was rejected. Please upload new design files for the items below:
+              </p>
+              
+              {selectedOrder.items.map((item) => (
+                <div key={item.id} className="p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center space-x-4 mb-3">
                     <img
                       src={item.productImage}
                       alt={item.productName}
-                      className="w-12 h-12 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = '/demo-images/placeholder.txt';
-                      }}
+                      className="w-16 h-16 object-cover rounded border border-gray-200"
                     />
                     <div>
-                      <p className="font-medium text-gray-900">{item.productName}</p>
+                      <h4 className="font-medium text-gray-900">{item.productName}</h4>
                       <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
                     </div>
                   </div>
-                ))}
-
-                <div className="space-y-4">
+                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-                    <div className="flex space-x-1">
-                      {[1, 2, 3, 4, 5].map((rating) => (
-                        <button
-                          key={rating}
-                          className="text-2xl hover:text-yellow-400 transition-colors"
-                        >
-                          ⭐
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Review Title</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload New Design File
+                    </label>
                     <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-                      placeholder="Summarize your experience"
+                      type="file"
+                      accept="image/*,.pdf,.ai,.eps,.svg"
+                      onChange={(e) => handleReuploadFileChange(item.id, e.target.files?.[0] || null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Your Review</label>
-                    <textarea
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-                      placeholder="Tell us about your experience with this product..."
-                    />
+                    {reuploadFiles[item.id] && (
+                      <p className="text-sm text-green-600 mt-1">
+                        Selected: {reuploadFiles[item.id]?.name}
+                      </p>
+                    )}
                   </div>
                 </div>
-              </div>
+              ))}
+            </div>
 
-              <div className="mt-6 flex space-x-3">
-                <Button variant="outline" onClick={handleCloseModal} className="flex-1">
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => {
-                    alert('Review submitted successfully! Thank you for your feedback.')
-                    handleCloseModal()
-                  }}
-                  className="flex-1"
-                >
-                  Submit Review
-                </Button>
-              </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <Button onClick={handleCloseReuploadModal}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmitReupload}
+                disabled={submittingReupload || Object.values(reuploadFiles).every(file => file === null)}
+                className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50"
+              >
+                {submittingReupload ? 'Uploading...' : 'Submit Re-upload'}
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Cancel Order Confirmation Modal */}
-      {showCancelModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Cancel Order</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <img
-                    src={selectedOrder.items[0]?.productImage}
-                    alt={selectedOrder.items[0]?.productName}
-                    className="w-12 h-12 object-cover rounded-lg border border-gray-200"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = '/demo-images/placeholder.txt';
-                    }}
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">Order #{selectedOrder.orderNumber}</p>
-                    <p className="text-sm text-gray-500">
-                      {selectedOrder.items.length} item{selectedOrder.items.length !== 1 ? 's' : ''} • ${selectedOrder.total.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <XCircle className="h-5 w-5 text-yellow-400" />
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">
-                        Are you sure you want to cancel this order?
-                      </h3>
-                      <div className="mt-2 text-sm text-yellow-700">
-                        <p>This action cannot be undone. Once cancelled, you'll need to place a new order if you change your mind.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600">
-                  <p><strong>Order Date:</strong> {new Date(selectedOrder.orderDate).toLocaleDateString()}</p>
-                  <p><strong>Estimated Delivery:</strong> {new Date(selectedOrder.estimatedDelivery).toLocaleDateString()}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex space-x-3">
-                <Button 
-                  variant="outline" 
-                  onClick={handleCloseModal} 
-                  className="flex-1"
-                >
-                  Keep Order
-                </Button>
-                <Button 
-                  onClick={confirmCancelOrder}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                >
-                  Yes, Cancel Order
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Refund Request Modal */}
-      {selectedOrder && (
-        <RefundRequestModal
-          isOpen={showRefundModal}
-          onClose={() => setShowRefundModal(false)}
-          orderId={selectedOrder.id}
-          orderTotal={selectedOrder.total}
-          onRequestRefund={handleRefundRequestSubmit}
-        />
-      )}
     </main>
   )
 }

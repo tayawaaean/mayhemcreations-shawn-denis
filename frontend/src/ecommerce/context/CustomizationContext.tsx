@@ -470,7 +470,7 @@ const defaultCustomizationData: CustomizationData = {
     upgrades: [],
     cutting: null
   },
-  placement: 'front',
+  placement: 'manual',
   size: '',
   color: '#000000',
   quantity: 1,
@@ -565,20 +565,20 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   }
 
   const calculateTotalPrice = () => {
-    const basePrice = customizationData.basePrice
+    const basePrice = Number(customizationData.basePrice) || 0
     const { selectedStyles } = customizationData
     
     let totalStylePrice = 0
-    if (selectedStyles.coverage) totalStylePrice += selectedStyles.coverage.price
-    if (selectedStyles.material) totalStylePrice += selectedStyles.material.price
-    if (selectedStyles.border) totalStylePrice += selectedStyles.border.price
-    if (selectedStyles.backing) totalStylePrice += selectedStyles.backing.price
-    if (selectedStyles.cutting) totalStylePrice += selectedStyles.cutting.price
+    if (selectedStyles.coverage) totalStylePrice += Number(selectedStyles.coverage.price) || 0
+    if (selectedStyles.material) totalStylePrice += Number(selectedStyles.material.price) || 0
+    if (selectedStyles.border) totalStylePrice += Number(selectedStyles.border.price) || 0
+    if (selectedStyles.backing) totalStylePrice += Number(selectedStyles.backing.price) || 0
+    if (selectedStyles.cutting) totalStylePrice += Number(selectedStyles.cutting.price) || 0
     
-    selectedStyles.threads.forEach(thread => totalStylePrice += thread.price)
-    selectedStyles.upgrades.forEach(upgrade => totalStylePrice += upgrade.price)
+    selectedStyles.threads.forEach(thread => totalStylePrice += Number(thread.price) || 0)
+    selectedStyles.upgrades.forEach(upgrade => totalStylePrice += Number(upgrade.price) || 0)
     
-    const quantity = customizationData.quantity
+    const quantity = Number(customizationData.quantity) || 1
     return (basePrice + totalStylePrice) * quantity
   }
 

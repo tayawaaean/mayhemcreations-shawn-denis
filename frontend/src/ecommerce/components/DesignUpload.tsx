@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react'
-import { Upload, X, Image as ImageIcon, Ruler, Calculator, Palette, CheckCircle, ArrowRight, ArrowLeft, Star, DollarSign } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, Ruler, Calculator, Palette, CheckCircle, ArrowRight, ArrowLeft, Star, DollarSign, ShoppingCart } from 'lucide-react'
 import Button from '../../components/Button'
 import { embroideryOptionApiService, EmbroideryOption } from '../../shared/embroideryOptionApiService'
 import { MaterialPricingService, CostBreakdown } from '../../shared/materialPricingService'
+import { useCart } from '../context/CartContext'
 
 interface DesignUploadProps {
   onPriceUpdate?: (totalPrice: number, basePrice: number, optionsPrice: number) => void
@@ -20,6 +21,7 @@ const stepCategories = [
 ] as const
 
 const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpdate }) => {
+  const { add: addToCart } = useCart()
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
@@ -28,6 +30,7 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
   const [materialCosts, setMaterialCosts] = useState<CostBreakdown | null>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [showReview, setShowReview] = useState(false)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [selectedStyles, setSelectedStyles] = useState<{
     coverage: EmbroideryOption | null
     material: EmbroideryOption | null
@@ -228,6 +231,146 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
 
   const formatPrice = (price: number | string) => MaterialPricingService.formatPrice(price)
 
+  const handleAddToCart = async () => {
+    if (!uploadedFile || !materialCosts || !preview) {
+      alert('Please upload a design and ensure all required fields are completed')
+      return
+    }
+
+    setIsAddingToCart(true)
+    try {
+      // Convert file to base64 for storage
+      const fileToBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.readAsDataURL(file)
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = error => reject(error)
+        })
+      }
+
+      const designBase64 = await fileToBase64(uploadedFile)
+
+      // Calculate total price
+      const allSelectedOptions = [
+        selectedStyles.coverage,
+        selectedStyles.material,
+        selectedStyles.border,
+        selectedStyles.backing,
+        selectedStyles.cutting,
+        ...selectedStyles.threads,
+        ...selectedStyles.upgrades
+      ].filter(Boolean) as EmbroideryOption[]
+
+      const optionsPrice = allSelectedOptions.reduce((sum, option) => {
+        const price = typeof option.price === 'string' ? parseFloat(option.price) || 0 : option.price
+        return sum + price
+      }, 0)
+
+      const totalPrice = materialCosts.totalCost + optionsPrice
+
+      // Create customization data for cart
+      const customization = {
+        design: {
+          name: uploadedFile.name,
+          size: uploadedFile.size,
+          preview: preview,
+          base64: designBase64
+        },
+        mockup: preview,
+        selectedStyles: {
+          coverage: selectedStyles.coverage ? {
+            id: selectedStyles.coverage.id.toString(),
+            name: selectedStyles.coverage.name,
+            price: typeof selectedStyles.coverage.price === 'string' ? parseFloat(selectedStyles.coverage.price) || 0 : selectedStyles.coverage.price
+          } : null,
+          material: selectedStyles.material ? {
+            id: selectedStyles.material.id.toString(),
+            name: selectedStyles.material.name,
+            price: typeof selectedStyles.material.price === 'string' ? parseFloat(selectedStyles.material.price) || 0 : selectedStyles.material.price
+          } : null,
+          border: selectedStyles.border ? {
+            id: selectedStyles.border.id.toString(),
+            name: selectedStyles.border.name,
+            price: typeof selectedStyles.border.price === 'string' ? parseFloat(selectedStyles.border.price) || 0 : selectedStyles.border.price
+          } : null,
+          threads: selectedStyles.threads.map(thread => ({
+            id: thread.id.toString(),
+            name: thread.name,
+            price: typeof thread.price === 'string' ? parseFloat(thread.price) || 0 : thread.price
+          })),
+          backing: selectedStyles.backing ? {
+            id: selectedStyles.backing.id.toString(),
+            name: selectedStyles.backing.name,
+            price: typeof selectedStyles.backing.price === 'string' ? parseFloat(selectedStyles.backing.price) || 0 : selectedStyles.backing.price
+          } : null,
+          upgrades: selectedStyles.upgrades.map(upgrade => ({
+            id: upgrade.id.toString(),
+            name: upgrade.name,
+            price: typeof upgrade.price === 'string' ? parseFloat(upgrade.price) || 0 : upgrade.price
+          })),
+          cutting: selectedStyles.cutting ? {
+            id: selectedStyles.cutting.id.toString(),
+            name: selectedStyles.cutting.name,
+            price: typeof selectedStyles.cutting.price === 'string' ? parseFloat(selectedStyles.cutting.price) || 0 : selectedStyles.cutting.price
+          } : null
+        },
+        placement: 'front' as const,
+        size: 'medium' as const,
+        color: '#000000',
+        notes: `Custom embroidery: ${size.width}" × ${size.height}" - ${uploadedFile.name}`,
+        designPosition: { x: 50, y: 50 },
+        designScale: 1,
+        designRotation: 0,
+        // Add embroidery-specific data
+        embroideryData: {
+          dimensions: {
+            width: size.width,
+            height: size.height
+          },
+          materialCosts: materialCosts,
+          optionsPrice: optionsPrice,
+          totalPrice: totalPrice,
+          designImage: designBase64, // Store the design image
+          reviewStatus: 'pending' // Initial review status
+        }
+      }
+
+      // Add to cart using a special product ID for custom embroidery
+      const success = await addToCart('custom-embroidery', 1, customization)
+      
+      if (success) {
+        alert('Custom embroidery added to cart successfully! It will be reviewed before checkout.')
+        setShowReview(false)
+        // Reset form
+        setUploadedFile(null)
+        setPreview(null)
+        setSize({ width: 0, height: 0 })
+        setSelectedStyles({
+          coverage: null,
+          material: null,
+          border: null,
+          threads: [],
+          backing: null,
+          upgrades: [],
+          cutting: null
+        })
+        setCurrentStep(0)
+        setMaterialCosts(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+      } else {
+        alert('Failed to add to cart. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error adding custom embroidery to cart:', error)
+      alert('An error occurred while adding to cart. Please try again.')
+    } finally {
+      setIsAddingToCart(false)
+    }
+  }
+
   if (showReview) {
     return (
       <div className="space-y-6">
@@ -292,11 +435,12 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
               Back to Edit
             </Button>
             <Button
-              disabled={!uploadedFile || !pricing || pricing.totalPrice === 0}
+              onClick={handleAddToCart}
+              disabled={!uploadedFile || !materialCosts || materialCosts.totalCost === 0 || isAddingToCart}
               className="w-full sm:w-auto group"
             >
-              Get Quote
-              <CheckCircle className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
+              {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+              <ShoppingCart className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
             </Button>
           </div>
         </div>

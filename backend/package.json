@@ -16,6 +16,8 @@
     "seed:force": "node --env-file=.env -r ts-node/register src/seeders/index.ts --force",
     "seed:clear": "node --env-file=.env -r ts-node/register src/seeders/index.ts --clear",
     "seed:reset": "node --env-file=.env -r ts-node/register src/seeders/index.ts --reset",
+    "clear-orders": "node --env-file=.env clear-orders-standalone.js",
+    "reset-orders": "node --env-file=.env clear-orders-standalone.js --reset-pending",
     "seed:roles": "node --env-file=.env -r ts-node/register src/seeders/index.ts --roles-only",
     "seed:users": "node --env-file=.env -r ts-node/register src/seeders/index.ts --users-only",
     "seed:variants": "node --env-file=.env -r ts-node/register src/seeders/index.ts --variants-only",

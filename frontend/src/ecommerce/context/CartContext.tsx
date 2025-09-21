@@ -24,7 +24,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const raw = localStorage.getItem(LOCAL_KEY)
-      return raw ? JSON.parse(raw) : []
+      if (raw) {
+        const items = JSON.parse(raw)
+        // Ensure all items have reviewStatus
+        return items.map((item: any) => ({
+          ...item,
+          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
+        }))
+      }
+      return []
     } catch (e) {
       return []
     }
@@ -68,6 +76,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           productId: item.productId,
           quantity: item.quantity,
           customization: item.customization,
+          reviewStatus: item.reviewStatus || 'approved',
           product: item.product, // Include the full product data from database
         }))
         
@@ -85,7 +94,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const raw = localStorage.getItem(LOCAL_KEY)
         if (raw) {
-          setItems(JSON.parse(raw))
+          const items = JSON.parse(raw)
+          // Ensure all items have reviewStatus
+          const itemsWithReviewStatus = items.map((item: any) => ({
+            ...item,
+            reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
+          }))
+          setItems(itemsWithReviewStatus)
         }
       } catch (e) {
         console.error('Error loading cart from localStorage:', e)
@@ -112,6 +127,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           productId: item.productId,
           quantity: item.quantity,
           customization: item.customization,
+          reviewStatus: item.reviewStatus || 'approved',
           product: item.product, // Include the full product data from database
         }))
         
@@ -149,10 +165,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const add = async (productId: string, qty = 1, customization?: CartItem['customization']): Promise<boolean> => {
-    const validation = await validateStock(productId, qty)
-    if (!validation.valid) {
-      alert(validation.message)
-      return false
+    // Skip stock validation for customized items (made-to-order)
+    if (!customization) {
+      const validation = await validateStock(productId, qty)
+      if (!validation.valid) {
+        alert(validation.message)
+        return false
+      }
     }
 
     if (isLoggedIn) {
@@ -170,6 +189,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
+                reviewStatus: response.data!.reviewStatus || 'approved',
               }
               return updated
             } else {
@@ -178,6 +198,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
+                reviewStatus: response.data!.reviewStatus || 'approved',
               }]
             }
           })
@@ -193,13 +214,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setItems((prev) => {
         // For customized items, always add as new item (don't merge with existing)
         if (customization) {
-          return [...prev, { productId, quantity: qty, customization }]
+          return [...prev, { 
+            productId, 
+            quantity: qty, 
+            customization,
+            reviewStatus: 'pending' as const // Customized items are always pending for guest users
+          }]
         }
         
         // For regular items, merge quantities if same product
         const found = prev.find((p) => p.productId === productId && !p.customization)
         if (found) return prev.map((p) => p.productId === productId && !p.customization ? { ...p, quantity: p.quantity + qty } : p)
-        return [...prev, { productId, quantity: qty }]
+        return [...prev, { 
+          productId, 
+          quantity: qty,
+          reviewStatus: 'approved' as const // Regular items are approved for guest users
+        }]
       })
       return true
     }
@@ -222,10 +252,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
   
   const update = async (productId: string, qty: number): Promise<boolean> => {
-    const validation = await validateStock(productId, qty)
-    if (!validation.valid) {
-      alert(validation.message)
-      return false
+    // Find the item to check if it's customized
+    const item = items.find((p) => p.productId === productId)
+    
+    // Skip stock validation for customized items (made-to-order)
+    if (!item?.customization) {
+      const validation = await validateStock(productId, qty)
+      if (!validation.valid) {
+        alert(validation.message)
+        return false
+      }
     }
 
     if (isLoggedIn) {

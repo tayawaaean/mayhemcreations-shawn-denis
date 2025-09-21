@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Cart, Product } from '../models';
 import { logger } from '../utils/logger';
+import { sequelize } from '../config/database';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -39,6 +40,7 @@ export const getCart = async (req: AuthenticatedRequest, res: Response, next: Ne
         {
           model: Product,
           as: 'product',
+          required: false, // Left join to include items without products (like custom embroidery)
           attributes: [
             'id', 'title', 'slug', 'description', 'price', 'image', 'alt',
             'status', 'featured', 'badges', 'availableColors', 'availableSizes',
@@ -53,9 +55,10 @@ export const getCart = async (req: AuthenticatedRequest, res: Response, next: Ne
     // Transform cart items to match frontend format
     const transformedItems = cartItems.map(item => ({
       id: item.id,
-      productId: item.productId.toString(),
+      productId: item.productId === 999999 ? 'custom-embroidery' : item.productId.toString(),
       quantity: item.quantity,
       customization: item.customization ? item.getCustomizationData() : undefined,
+      reviewStatus: item.reviewStatus,
       product: (item as any).product, // Type assertion for the included product
     }));
 
@@ -108,28 +111,37 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
       return;
     }
 
-    // Validate product exists and is active
-    const product = await Product.findOne({
-      where: { 
-        id: productId,
-        status: 'active'
-      },
-    });
-
-    if (!product) {
-      res.status(404).json({
-        success: false,
-        message: 'Product not found or inactive',
-        code: 'PRODUCT_NOT_FOUND',
+    // For custom embroidery items, skip product validation
+    let product = null;
+    let actualProductId = productId;
+    
+    if (productId === 'custom-embroidery') {
+      // Keep the string identifier for custom embroidery
+      actualProductId = 'custom-embroidery';
+    } else {
+      // Validate product exists and is active for regular products
+      product = await Product.findOne({
+        where: { 
+          id: productId,
+          status: 'active'
+        },
       });
-      return;
+
+      if (!product) {
+        res.status(404).json({
+          success: false,
+          message: 'Product not found or inactive',
+          code: 'PRODUCT_NOT_FOUND',
+        });
+        return;
+      }
     }
 
     // Check if item already exists in cart
     const existingItem = await Cart.findOne({
       where: { 
         userId,
-        productId: parseInt(productId),
+        productId: actualProductId,
       },
     });
 
@@ -137,8 +149,8 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
       // Update quantity if item exists
       const newQuantity = existingItem.quantity + quantity;
       
-      // Validate stock
-      if (product.stock && newQuantity > product.stock) {
+      // Validate stock (skip for custom embroidery items)
+      if (product && product.stock && newQuantity > product.stock) {
         res.status(400).json({
           success: false,
           message: `Only ${product.stock} items available in stock`,
@@ -156,9 +168,10 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
         success: true,
         data: {
           id: existingItem.id,
-          productId: existingItem.productId.toString(),
+          productId: productId, // Return original productId (custom-embroidery or numeric)
           quantity: existingItem.quantity,
           customization: existingItem.customization ? existingItem.getCustomizationData() : undefined,
+          reviewStatus: existingItem.reviewStatus,
         },
         message: 'Cart item updated successfully',
         timestamp: new Date().toISOString(),
@@ -168,9 +181,10 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
       const now = new Date();
       const cartItem = await Cart.create({
         userId,
-        productId: parseInt(productId),
+        productId: actualProductId,
         quantity,
         customization: customization ? JSON.stringify(customization) : undefined,
+        reviewStatus: customization ? 'pending' : 'approved', // Only customized items need review
         createdAt: now,
         updatedAt: now,
       });
@@ -179,9 +193,10 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
         success: true,
         data: {
           id: cartItem.id,
-          productId: cartItem.productId.toString(),
+          productId: productId, // Return original productId (custom-embroidery or numeric)
           quantity: cartItem.quantity,
           customization: cartItem.customization ? cartItem.getCustomizationData() : undefined,
+          reviewStatus: cartItem.reviewStatus,
         },
         message: 'Item added to cart successfully',
         timestamp: new Date().toISOString(),
@@ -361,6 +376,8 @@ export const removeFromCart = async (req: AuthenticatedRequest, res: Response, n
  * @route DELETE /api/v1/cart
  * @access Private (Customer only)
  */
+
+
 export const clearCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -437,9 +454,10 @@ export const syncCart = async (req: AuthenticatedRequest, res: Response, next: N
         const now = new Date();
         const cartItem = await Cart.create({
           userId,
-          productId: parseInt(item.productId),
+          productId: item.productId,
           quantity: item.quantity,
           customization: item.customization ? JSON.stringify(item.customization) : undefined,
+          reviewStatus: 'pending', // All synced items start as pending review
           createdAt: now,
           updatedAt: now,
         });
@@ -451,9 +469,10 @@ export const syncCart = async (req: AuthenticatedRequest, res: Response, next: N
       success: true,
       data: cartItems.map(item => ({
         id: item.id,
-        productId: item.productId.toString(),
+        productId: item.productId === 999999 ? 'custom-embroidery' : item.productId.toString(),
         quantity: item.quantity,
         customization: item.customization ? item.getCustomizationData() : undefined,
+        reviewStatus: item.reviewStatus,
       })),
       message: 'Cart synced successfully',
       timestamp: new Date().toISOString(),

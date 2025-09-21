@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator } from 'lucide-react'
+import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator, Eye } from 'lucide-react'
 import { useCustomization } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
 import { MaterialPricingService, InputParameters, CostBreakdown } from '../../shared/materialPricingService'
+import { fileToBase64, captureElementAsBase64 } from '../../shared/fileUtils'
 import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
 import ChatWidget from '../components/ChatWidget'
@@ -21,6 +22,8 @@ export default function Customize() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
   const [showGuidelines, setShowGuidelines] = useState(false)
+  const [showFinalView, setShowFinalView] = useState(false)
+  const [showFinalDesignModal, setShowFinalDesignModal] = useState(false)
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -30,8 +33,8 @@ export default function Customize() {
   const initializedRef = useRef(false)
   
   // Embroidery pricing state
-  const [embroideryWidth, setEmbroideryWidth] = useState<number>(0)
-  const [embroideryHeight, setEmbroideryHeight] = useState<number>(0)
+  const [embroideryWidth, setEmbroideryWidth] = useState<number>(3)
+  const [embroideryHeight, setEmbroideryHeight] = useState<number>(3)
   const [embroideryPricing, setEmbroideryPricing] = useState<CostBreakdown | null>(null)
   const [pricingLoading, setPricingLoading] = useState(false)
 
@@ -331,13 +334,52 @@ export default function Customize() {
     setIsAddingToCart(true)
     
     try {
+      // Convert design to base64 if it exists
+      let designBase64 = null
+      if (customizationData.design) {
+        try {
+          designBase64 = await fileToBase64(customizationData.design.file)
+        } catch (error) {
+          console.error('Error converting design to base64:', error)
+          // Fallback to existing preview if conversion fails
+          designBase64 = customizationData.design.preview
+        }
+      }
+
+      // Capture mockup image if design exists
+      let mockupBase64 = null
+      if (customizationData.design && productRef.current) {
+        try {
+          // Ensure we're in final view for clean capture
+          const wasInFinalView = showFinalView
+          if (!wasInFinalView) {
+            setShowFinalView(true)
+            // Wait for UI to update
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+          
+          mockupBase64 = await captureElementAsBase64(productRef.current, {
+            backgroundColor: '#ffffff'
+          })
+          
+          // Restore previous state if it was changed
+          if (!wasInFinalView) {
+            setShowFinalView(false)
+          }
+        } catch (error) {
+          console.error('Error capturing mockup:', error)
+        }
+      }
+
       // Add customized item to cart with stock validation
       const success = await addToCart(product.id.toString(), customizationData.quantity, {
         design: customizationData.design ? {
           name: customizationData.design.name,
           size: customizationData.design.size,
-          preview: customizationData.design.preview
+          preview: designBase64 || customizationData.design.preview,
+          base64: designBase64 // Store base64 for persistence
         } : null,
+        mockup: mockupBase64, // Store mockup image
         selectedStyles: {
           coverage: customizationData.selectedStyles.coverage,
           material: customizationData.selectedStyles.material,
@@ -375,6 +417,14 @@ export default function Customize() {
     setShowCartConfirmation(false)
     // Navigate to products page to browse more items
     navigate('/products')
+  }
+
+  const handleViewFinalDesign = () => {
+    setShowFinalDesignModal(true)
+  }
+
+  const handleBackToEditing = () => {
+    setShowFinalView(false)
   }
 
   return (
@@ -469,7 +519,9 @@ export default function Customize() {
           {/* Left Side - Product Preview */}
           <div className="space-y-4 sm:space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Preview</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {showFinalView ? 'Final Product Preview' : 'Product Preview'}
+              </h3>
               
               {/* Product Image with Design Overlay */}
               <div className="relative" ref={productRef}>
@@ -481,11 +533,13 @@ export default function Customize() {
                  {customizationData.design && (
                    <div
                      className={`absolute select-none ${
-                       isDragging 
-                         ? 'cursor-grabbing scale-105 z-10' 
-                         : customizationData.placement === 'manual' 
-                           ? 'cursor-grab hover:scale-105 transition-all duration-200'
-                           : 'cursor-default'
+                       showFinalView 
+                         ? 'cursor-default' 
+                         : isDragging 
+                           ? 'cursor-grabbing scale-105 z-10' 
+                           : customizationData.placement === 'manual' 
+                             ? 'cursor-grab hover:scale-105 transition-all duration-200'
+                             : 'cursor-default'
                      }`}
                      style={{
                        left: `${isDragging ? dragPosition.x : (customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x)}px`,
@@ -493,99 +547,108 @@ export default function Customize() {
                        transform: `scale(${customizationData.designScale}) rotate(${customizationData.designRotation}deg)`,
                        transformOrigin: 'center'
                      }}
-                     onMouseDown={handleDesignStart}
-                     onMouseMove={handleDesignMove}
-                     onMouseUp={handleDesignEnd}
-                     onMouseLeave={handleDesignEnd}
-                     onTouchStart={handleDesignStart}
-                     onTouchMove={handleDesignMove}
-                     onTouchEnd={handleDesignEnd}
-                     onWheel={handleDesignWheel}
+                     onMouseDown={!showFinalView ? handleDesignStart : undefined}
+                     onMouseMove={!showFinalView ? handleDesignMove : undefined}
+                     onMouseUp={!showFinalView ? handleDesignEnd : undefined}
+                     onMouseLeave={!showFinalView ? handleDesignEnd : undefined}
+                     onTouchStart={!showFinalView ? handleDesignStart : undefined}
+                     onTouchMove={!showFinalView ? handleDesignMove : undefined}
+                     onTouchEnd={!showFinalView ? handleDesignEnd : undefined}
+                     onWheel={!showFinalView ? handleDesignWheel : undefined}
                    >
                      {/* Design Image with Enhanced Styling */}
                      <div className="relative group">
                        <img
                          src={customizationData.design.preview}
                          alt="Design preview"
-                         className="w-24 h-24 object-contain drop-shadow-2xl border-2 border-white/50 rounded-lg"
+                         className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
                          style={{
-                           filter: isDragging ? 'brightness(1.1) contrast(1.1)' : 'none'
+                           width: `${embroideryWidth * 20}px`,
+                           height: `${embroideryHeight * 20}px`,
+                           objectFit: 'fill',
+                           filter: showFinalView ? 'none' : (isDragging ? 'brightness(1.1) contrast(1.1)' : 'none')
                          }}
                        />
                        
-                       {/* Drag Handle - Always Visible */}
-                       <div className={`absolute -top-2 -left-2 bg-accent text-white p-1 rounded-full shadow-lg transition-all duration-200 ${
-                         isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                       }`}>
-                         <Grip className="w-3 h-3" />
-                       </div>
+                       {/* Design Controls - Only show when not in final view */}
+                       {!showFinalView && (
+                         <>
+                           {/* Drag Handle - Always Visible */}
+                           <div className={`absolute -top-2 -left-2 bg-accent text-white p-1 rounded-full shadow-lg transition-all duration-200 ${
+                             isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
+                           }`}>
+                             <Grip className="w-3 h-3" />
+                           </div>
                        
-                       {/* Close/Remove Button */}
-                       <button
-                         className={`absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-red-600 ${
-                           isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                         }`}
-                         onClick={(e) => {
-                           e.stopPropagation()
-                           removeDesign()
-                         }}
-                         title="Remove design"
-                       >
-                         <X className="w-3 h-3" />
-                       </button>
+                           {/* Close/Remove Button */}
+                           <button
+                             className={`absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-red-600 ${
+                               isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
+                             }`}
+                             onClick={(e) => {
+                               e.stopPropagation()
+                               removeDesign()
+                             }}
+                             title="Remove design"
+                           >
+                             <X className="w-3 h-3" />
+                           </button>
                        
-                       {/* Replace Design Button */}
-                       <button
-                         className={`absolute -bottom-2 -right-2 bg-blue-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-blue-600 ${
-                           isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                         }`}
-                         onClick={(e) => {
-                           e.stopPropagation()
-                           const input = document.getElementById('design-upload') as HTMLInputElement
-                           if (input) {
-                             input.value = ''
-                             input.click()
-                           }
-                         }}
-                         title="Replace design"
-                       >
-                         <Upload className="w-3 h-3" />
-                       </button>
+                           {/* Replace Design Button */}
+                           <button
+                             className={`absolute -bottom-2 -right-2 bg-blue-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-blue-600 ${
+                               isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
+                             }`}
+                             onClick={(e) => {
+                               e.stopPropagation()
+                               const input = document.getElementById('design-upload') as HTMLInputElement
+                               if (input) {
+                                 input.value = ''
+                                 input.click()
+                               }
+                             }}
+                             title="Replace design"
+                           >
+                             <Upload className="w-3 h-3" />
+                           </button>
                        
-                       {/* Corner Resize Handles */}
-                       <div className="absolute -top-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                       <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                       <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           {/* Corner Resize Handles */}
+                           <div className="absolute -top-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           <div className="absolute -top-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                        
-                       {/* Rotation Handle */}
-                       <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-accent rounded-full border border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
-                     </div>
+                           {/* Rotation Handle */}
+                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-accent rounded-full border border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           
+                           {/* Enhanced Tooltip - Only show in manual mode */}
+                           {customizationData.placement === 'manual' && (
+                             <div className={`absolute -top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap transition-all duration-200 ${
+                               isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'
+                             }`}>
+                               <div className="flex items-center space-x-2">
+                                 <Grip className="w-3 h-3" />
+                                 <span>Drag handle to move</span>
+                                 <span className="text-gray-400">•</span>
+                                 <span>Scroll to resize</span>
+                                 <span className="text-gray-400">•</span>
+                                 <span>Ctrl+scroll to rotate</span>
+                               </div>
+                               {/* Tooltip Arrow */}
+                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                             </div>
+                           )}
                      
-           {/* Enhanced Tooltip - Only show in manual mode */}
-           {customizationData.placement === 'manual' && (
-             <div className={`absolute -top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap transition-all duration-200 ${
-               isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'
-             }`}>
-               <div className="flex items-center space-x-2">
-                 <Grip className="w-3 h-3" />
-                 <span>Drag handle to move</span>
-                 <span className="text-gray-400">•</span>
-                 <span>Scroll to resize</span>
-                 <span className="text-gray-400">•</span>
-                 <span>Ctrl+scroll to rotate</span>
-               </div>
-               {/* Tooltip Arrow */}
-               <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-             </div>
-           )}
-                     
-                     {/* Scale Indicator */}
-                     <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
-                       {Math.round(customizationData.designScale * 100)}%
+                           {/* Scale Indicator */}
+                           <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
+                             {Math.round(customizationData.designScale * 100)}%
+                           </div>
+                         </>
+                       )}
                      </div>
                    </div>
                  )}
+                </div>
               </div>
 
               {customizationData.design && (
@@ -628,21 +691,37 @@ export default function Customize() {
               {/* Design Controls */}
               {customizationData.design && currentStep === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Design Controls</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Embroidery Sizing</h3>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Scale: {Math.round(customizationData.designScale * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="2"
-                      step="0.1"
-                      value={customizationData.designScale}
-                      onChange={(e) => setCustomizationData({ designScale: parseFloat(e.target.value) })}
-                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Length (inches): {embroideryWidth.toFixed(1)}"
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="12"
+                        step="0.1"
+                        value={embroideryWidth}
+                        onChange={(e) => setEmbroideryWidth(parseFloat(e.target.value))}
+                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Height (inches): {embroideryHeight.toFixed(1)}"
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="12"
+                        step="0.1"
+                        value={embroideryHeight}
+                        onChange={(e) => setEmbroideryHeight(parseFloat(e.target.value))}
+                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -662,11 +741,14 @@ export default function Customize() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCustomizationData({
-                        designPosition: { x: 50, y: 50 },
-                        designScale: 1,
-                        designRotation: 0
-                      })}
+                      onClick={() => {
+                        setCustomizationData({
+                          designPosition: { x: 50, y: 50 },
+                          designRotation: 0
+                        })
+                        setEmbroideryWidth(3)
+                        setEmbroideryHeight(3)
+                      }}
                       className="w-full sm:w-auto"
                     >
                       <RotateCcw className="w-4 h-4 mr-1" />
@@ -1099,15 +1181,15 @@ export default function Customize() {
                 </div>
               )}
 
-              {/* Step 4: Choose Embroidery */}
-              {currentStep === 4 && (
-                <StepByStepCustomization 
-                  onComplete={nextStep} 
-                  onBackToDesign={() => setCurrentStep(2)}
-                />
-              )}
+            {/* Step 4: Choose Embroidery */}
+            {currentStep === 4 && (
+              <StepByStepCustomization 
+                onComplete={nextStep} 
+                onBackToDesign={() => setCurrentStep(2)}
+              />
+            )}
 
-              {/* Step 5: Review */}
+            {/* Step 5: Review */}
              {currentStep === 5 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Your Order</h3>
@@ -1204,29 +1286,47 @@ export default function Customize() {
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between text-base sm:text-lg font-bold">
                       <span>Total</span>
-                      <span>${(calculateTotalPrice() + (embroideryPricing?.totalCost || 0)).toFixed(2)}</span>
+                      <span>${((Number(calculateTotalPrice()) || 0) + (Number(embroideryPricing?.totalCost) || 0)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
-                  <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
-                    Previous
-                  </Button>
-                  <Button 
-                    variant="add-to-cart" 
-                    onClick={handleAddToCart} 
-                    disabled={isAddingToCart}
-                    className="w-full sm:w-auto"
-                  >
-                    <ShoppingCart className="w-4 h-4 mr-2" />
-                    {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
-                  </Button>
+                  {showFinalView ? (
+                    <>
+                      <Button variant="outline" onClick={handleBackToEditing} className="w-full sm:w-auto">
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Editing
+                      </Button>
+                      <Button 
+                        variant="add-to-cart" 
+                        onClick={handleAddToCart} 
+                        disabled={isAddingToCart}
+                        className="w-full sm:w-auto"
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
+                        Previous
+                      </Button>
+                      <Button 
+                        variant="primary" 
+                        onClick={handleViewFinalDesign} 
+                        disabled={!customizationData.design}
+                        className="w-full sm:w-auto"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View My Design
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
-
-          </div>
         </div>
 
         {/* Chat Widget - Positioned within responsive container */}
@@ -1369,6 +1469,156 @@ export default function Customize() {
                   <ShoppingCart className="w-4 h-4 mr-2" />
                   Proceed to Checkout
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Final Design Modal */}
+      {showFinalDesignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                  <Eye className="w-6 h-6 mr-2 text-accent" />
+                  Your Final Design
+                </h2>
+                <button
+                  onClick={() => setShowFinalDesignModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Product with Design */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                    {product?.title} - Final Product Preview
+                  </h3>
+                  <div className="flex justify-center">
+                    <div className="relative max-w-md w-full">
+                      <img
+                        src={product?.image}
+                        alt={product?.title}
+                        className="w-full h-80 object-cover rounded-lg shadow-lg"
+                      />
+                      {customizationData.design && (
+                        <div
+                          className="absolute select-none"
+                          style={{
+                            left: `${customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x}px`,
+                            top: `${customizationData.placement === 'manual' ? customizationData.designPosition.y : getAutomaticPosition(customizationData.placement).y}px`,
+                            transform: `scale(${customizationData.designScale}) rotate(${customizationData.designRotation}deg)`,
+                            transformOrigin: 'center'
+                          }}
+                        >
+                          <img
+                            src={customizationData.design.preview}
+                            alt="Design preview"
+                            className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
+                            style={{
+                              width: `${embroideryWidth * 20}px`,
+                              height: `${embroideryHeight * 20}px`,
+                              objectFit: 'fill'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Design Details */}
+                {customizationData.design && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Design Information</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Design Name:</span>
+                          <span className="font-medium">{customizationData.design.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">File Size:</span>
+                          <span className="font-medium">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Embroidery Size:</span>
+                          <span className="font-medium">{embroideryWidth}" × {embroideryHeight}"</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Placement:</span>
+                          <span className="font-medium capitalize">
+                            {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Scale:</span>
+                          <span className="font-medium">{Math.round(customizationData.designScale * 100)}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Rotation:</span>
+                          <span className="font-medium">{customizationData.designRotation}°</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Product:</span>
+                          <span className="font-medium">{product?.title}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{customizationData.color}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium uppercase">{customizationData.size}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Quantity:</span>
+                          <span className="font-medium">{customizationData.quantity}</span>
+                        </div>
+                        {customizationData.notes && (
+                          <div className="mt-3">
+                            <span className="text-gray-600 block mb-1">Notes:</span>
+                            <span className="text-sm bg-gray-50 p-2 rounded block">{customizationData.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFinalDesignModal(false)}
+                    className="w-full sm:w-auto"
+                  >
+                    Close Preview
+                  </Button>
+                  <Button
+                    variant="add-to-cart"
+                    onClick={() => {
+                      setShowFinalDesignModal(false)
+                      handleAddToCart()
+                    }}
+                    disabled={isAddingToCart}
+                    className="w-full sm:w-auto"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

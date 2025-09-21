@@ -9,6 +9,7 @@ import Variant, { VariantAttributes, VariantCreationAttributes } from './variant
 import { EmbroideryOption, EmbroideryOptionAttributes, EmbroideryOptionCreationAttributes } from './embroideryOptionModel';
 import { Cart, CartAttributes, CartCreationAttributes } from './cartModel';
 import { FAQ, FAQAttributes, FAQCreationAttributes } from './faqModel';
+import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationAttributes } from './customEmbroideryModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -109,6 +110,18 @@ const setupAssociations = (): void => {
     foreignKey: 'productId',
     as: 'cartItems',
   });
+
+  // User has many Custom Embroidery orders
+  User.hasMany(CustomEmbroidery, {
+    foreignKey: 'userId',
+    as: 'customEmbroideryOrders',
+  });
+
+  // Custom Embroidery belongs to User
+  CustomEmbroidery.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
 };
 
 // Initialize associations
@@ -150,6 +163,9 @@ export {
   FAQ,
   FAQAttributes,
   FAQCreationAttributes,
+  CustomEmbroidery,
+  CustomEmbroideryAttributes,
+  CustomEmbroideryCreationAttributes,
 };
 
 // Export all models for easy access
@@ -164,6 +180,7 @@ export const models = {
   EmbroideryOption,
   Cart,
   FAQ,
+  CustomEmbroidery,
 };
 
 // Database synchronization function

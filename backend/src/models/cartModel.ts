@@ -9,9 +9,10 @@ import { sequelize } from '../config/database';
 export interface CartAttributes {
   id: number;
   userId: number;
-  productId: number;
+  productId: number | string; // Support both integer IDs and string identifiers like 'custom-embroidery'
   quantity: number;
   customization?: string | null; // JSON string of customization data
+  reviewStatus: 'pending' | 'approved' | 'rejected' | 'needs-changes'; // Review status for all cart items
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,9 +22,10 @@ export interface CartCreationAttributes extends Optional<CartAttributes, 'id' | 
 export class Cart extends Model<CartAttributes, CartCreationAttributes> implements CartAttributes {
   public id!: number;
   public userId!: number;
-  public productId!: number;
+  public productId!: number | string;
   public quantity!: number;
   public customization?: string | null;
+  public reviewStatus!: 'pending' | 'approved' | 'rejected' | 'needs-changes';
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -86,16 +88,10 @@ Cart.init(
       comment: 'Reference to user',
     },
     productId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
       allowNull: false,
       field: 'product_id',
-      references: {
-        model: 'products',
-        key: 'id',
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'CASCADE',
-      comment: 'Reference to product',
+      comment: 'Product ID (integer for products, string for custom items like custom-embroidery)',
     },
     quantity: {
       type: DataTypes.INTEGER,
@@ -113,6 +109,13 @@ Cart.init(
       allowNull: true,
       field: 'customization',
       comment: 'JSON string of customization data',
+    },
+    reviewStatus: {
+      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes'),
+      allowNull: false,
+      defaultValue: 'pending',
+      field: 'review_status',
+      comment: 'Review status for cart items (all items require approval)',
     },
     createdAt: {
       type: DataTypes.DATE,

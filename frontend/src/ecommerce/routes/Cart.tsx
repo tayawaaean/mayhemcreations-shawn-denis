@@ -4,18 +4,37 @@ import { products } from '../../data/products'
 import { Link, useNavigate } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Eye, X, CheckCircle } from 'lucide-react'
 import Button from '../../components/Button'
+import { orderReviewApiService } from '../../shared/orderReviewApiService'
 
 export default function Cart() {
   const navigate = useNavigate()
   const { items, update, remove, clear } = useCart()
   const [selectedItem, setSelectedItem] = useState<typeof enriched[0] | null>(null)
+  const [showFinalProductModal, setShowFinalProductModal] = useState(false)
+  // Create virtual product for custom embroidery
+  const customEmbroideryProduct = {
+    id: 'custom-embroidery',
+    title: 'Custom Embroidery Design',
+    price: 0, // Price will be calculated from customization data
+    description: 'Custom embroidered design with your specifications',
+    image: '/demo-images/custom-embroidery.jpg', // You can add a placeholder image
+    alt: 'Custom embroidery design',
+    category: 'embroidery' as const
+  }
+
   const enriched = items.map((it) => ({ 
     ...it, 
-    product: it.product || products.find((p) => p.id === it.productId) 
+    product: it.product || 
+             (it.productId === 'custom-embroidery' ? customEmbroideryProduct : products.find((p) => p.id === it.productId))
   })).filter(item => item.product) // Filter out items without product data
   
   const calculateItemPrice = (item: typeof enriched[0]) => {
-    // Ensure we have a valid number for the base price
+    // For custom embroidery items, use the total price from embroideryData
+    if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+      return Number(item.customization.embroideryData.totalPrice) || 0
+    }
+    
+    // For regular items, calculate base price + customization costs
     let itemPrice = Number(item.product.price) || 0
     
     // Add customization costs if present
@@ -53,6 +72,56 @@ export default function Cart() {
     return numPrice.toFixed(2)
   }
 
+  // Handle submit for review
+  const handleSubmitForReview = async () => {
+    try {
+      // Get all pending items
+      const pendingItems = enriched.filter(item => item.reviewStatus === 'pending')
+      
+      if (pendingItems.length === 0) {
+        alert('No items to submit for review')
+        return
+      }
+
+      // Create order data for admin review
+      const orderData = {
+        items: pendingItems.map(item => ({
+          id: item.id, // Include the cart item ID for backend updates
+          productId: item.productId,
+          quantity: item.quantity,
+          customization: item.customization,
+          reviewStatus: 'pending' as const,
+          product: item.product
+        })),
+        subtotal: subtotal,
+        shipping: shipping,
+        tax: tax,
+        total: total,
+        submittedAt: new Date().toISOString()
+      }
+
+      // Submit for review via API
+      const response = await orderReviewApiService.submitForReview(orderData)
+      
+      if (response.success) {
+        // Show success message
+        alert(`Order submitted for review! Order ID: ${response.data?.orderReviewId}. You will be notified once the admin reviews your customized items.`)
+        
+        // Clear the cart after successful submission
+        clear()
+        
+        // Navigate to orders page
+        window.location.href = '/my-orders'
+      } else {
+        alert('Failed to submit for review. Please try again.')
+      }
+      
+    } catch (error) {
+      console.error('Error submitting for review:', error)
+      alert('Failed to submit for review. Please try again.')
+    }
+  }
+
   return (
     <main className="py-4 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -81,7 +150,7 @@ export default function Cart() {
                 <div key={item.productId} className="bg-white rounded-2xl shadow-sm border border-gray-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 p-4 sm:p-6">
                     <img 
-                      src={item.product.image} 
+                      src={item.customization?.mockup || item.product.image} 
                       alt={item.product.alt} 
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md flex-shrink-0" 
                     />
@@ -89,17 +158,52 @@ export default function Cart() {
                       <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{item.product.title}</h3>
                       <p className="text-xs sm:text-sm text-gray-600 mt-1">{item.product.description}</p>
                       
+                      {/* Review Status for All Items */}
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            item.reviewStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            item.reviewStatus === 'approved' ? 'bg-green-100 text-green-800' :
+                            item.reviewStatus === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {item.reviewStatus === 'pending' && 'Pending Review'}
+                            {item.reviewStatus === 'approved' && '✅ Approved'}
+                            {item.reviewStatus === 'rejected' && '❌ Needs Changes'}
+                            {item.reviewStatus === 'needs-changes' && '📝 Needs Changes'}
+                          </span>
+                        </div>
+                      </div>
+
                       {item.customization && (
                         <div className="mt-2 space-y-1">
-                          <p className="text-xs sm:text-sm font-medium text-accent">Customized Item</p>
-                          {item.customization.design && (
-                            <p className="text-xs text-gray-600">
-                              Design: {item.customization.design.name}
-                            </p>
+                          {item.productId === 'custom-embroidery' ? (
+                            <>
+                              <p className="text-xs sm:text-sm font-medium text-accent">Custom Embroidery Design</p>
+                              {item.customization.design && (
+                                <p className="text-xs text-gray-600">
+                                  Design: {item.customization.design.name}
+                                </p>
+                              )}
+                              {item.customization.embroideryData && (
+                                <p className="text-xs text-gray-600">
+                                  Size: {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs sm:text-sm font-medium text-accent">Customized Item</p>
+                              {item.customization.design && (
+                                <p className="text-xs text-gray-600">
+                                  Design: {item.customization.design.name}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-600">
+                                Placement: {item.customization.placement} • Size: {item.customization.size} • Color: {item.customization.color}
+                              </p>
+                            </>
                           )}
-                          <p className="text-xs text-gray-600">
-                            Placement: {item.customization.placement} • Size: {item.customization.size} • Color: {item.customization.color}
-                          </p>
                         </div>
                       )}
                       
@@ -107,7 +211,7 @@ export default function Cart() {
                         ${formatPrice(calculateItemPrice(item))}
                         {item.customization && (
                           <span className="text-xs sm:text-sm font-normal text-gray-500 ml-1">
-                            (includes customization)
+                            {item.productId === 'custom-embroidery' ? '(includes materials & options)' : '(includes customization)'}
                           </span>
                         )}
                       </div>
@@ -115,31 +219,41 @@ export default function Cart() {
                     
                     {/* Quantity Controls */}
                     <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
-                      <div className="flex items-center border border-gray-300 rounded-md">
-                        <button
-                          onClick={() => update(item.productId, Math.max(1, item.quantity - 1))}
-                          className="p-2 hover:bg-gray-50 transition-colors"
-                        >
-                          <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </button>
-                        <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => update(item.productId, item.quantity + 1)}
-                          className="p-2 hover:bg-gray-50 transition-colors"
-                        >
-                          <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </button>
-                      </div>
+                      {item.reviewStatus === 'pending' ? (
+                        // Items pending review have fixed quantity
+                        <div className="flex items-center border border-gray-300 rounded-md bg-gray-50">
+                          <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center text-gray-600">
+                            {item.quantity}
+                          </span>
+                        </div>
+                      ) : (
+                        // Approved items can have quantity changed
+                        <div className="flex items-center border border-gray-300 rounded-md">
+                          <button
+                            onClick={() => update(item.productId, Math.max(1, item.quantity - 1))}
+                            className="p-2 hover:bg-gray-50 transition-colors"
+                          >
+                            <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                          <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => update(item.productId, item.quantity + 1)}
+                            className="p-2 hover:bg-gray-50 transition-colors"
+                          >
+                            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </button>
+                        </div>
+                      )}
                       
                       {item.customization && (
                         <button
                           onClick={() => setSelectedItem(item)}
-                          className="p-2 text-accent hover:bg-accent/10 rounded-md transition-colors"
-                          title="View customization details"
+                          className="px-3 py-2 text-xs sm:text-sm text-accent hover:bg-accent/10 rounded-md transition-colors font-medium"
+                          title="View order details"
                         >
-                          <Eye className="w-4 h-4" />
+                          Order Details
                         </button>
                       )}
                       
@@ -198,13 +312,34 @@ export default function Cart() {
                   </div>
 
                   <div className="mt-4 sm:mt-6 space-y-3">
-                    <Button 
-                      size="lg" 
-                      className="w-full"
-                      onClick={() => navigate('/checkout')}
-                    >
-                      Proceed to Checkout
-                    </Button>
+                    {/* Check if there are any items that need review */}
+                    {enriched.some(item => 
+                      item.reviewStatus === 'pending'
+                    ) ? (
+                      <div className="space-y-3">
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                          <p className="text-sm text-yellow-800">
+                            You have customized items that need review. 
+                            Submit your order for admin review and approval.
+                          </p>
+                        </div>
+                        <Button 
+                          size="lg" 
+                          className="w-full bg-yellow-600 hover:bg-yellow-700"
+                          onClick={handleSubmitForReview}
+                        >
+                          Submit for Review
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        size="lg" 
+                        className="w-full"
+                        onClick={() => navigate('/checkout')}
+                      >
+                        Proceed to Checkout
+                      </Button>
+                    )}
                     
                     <div className="text-center">
                       <span className="text-xs sm:text-sm text-gray-600">
@@ -255,7 +390,7 @@ export default function Cart() {
                 {/* Product Info */}
                 <div className="flex flex-col sm:flex-row items-start space-y-3 sm:space-y-0 sm:space-x-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
                   <img
-                    src={selectedItem.product.image}
+                    src={selectedItem.customization?.mockup || selectedItem.product.image}
                     alt={selectedItem.product.title}
                     className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0"
                   />
@@ -281,14 +416,17 @@ export default function Cart() {
                     </h4>
                     <div className="flex items-center space-x-3 sm:space-x-4">
                       <img
-                        src={selectedItem.customization.design.preview}
+                        src={selectedItem.customization.design.base64 || selectedItem.customization.design.preview}
                         alt="Design preview"
                         className="w-12 h-12 sm:w-16 sm:h-16 object-contain border border-gray-200 rounded-lg flex-shrink-0"
                       />
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{selectedItem.customization.design.name}</p>
                         <p className="text-xs sm:text-sm text-gray-600">
-                          {(selectedItem.customization.design.size / 1024 / 1024).toFixed(2)} MB
+                          {selectedItem.customization.design.base64 
+                            ? `${(selectedItem.customization.design.base64.length / 1024 / 1024).toFixed(2)} MB`
+                            : `${(selectedItem.customization.design.size / 1024 / 1024).toFixed(2)} MB`
+                          }
                         </p>
                       </div>
                     </div>
@@ -484,18 +622,229 @@ export default function Cart() {
                 </div>
               </div>
               
-              <div className="mt-4 sm:mt-6 flex justify-end">
+              <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row gap-3 justify-end">
                 <Button
+                  variant="outline"
                   onClick={() => setSelectedItem(null)}
                   className="px-4 sm:px-6 w-full sm:w-auto"
                 >
                   Close
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowFinalProductModal(true)
+                  }}
+                  className="px-4 sm:px-6 w-full sm:w-auto flex items-center justify-center"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Final Product
                 </Button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Final Product Modal */}
+      {showFinalProductModal && selectedItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                  <Eye className="w-6 h-6 mr-2 text-accent" />
+                  Final Product Preview
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowFinalProductModal(false)
+                    setSelectedItem(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                {/* Product with Design */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                    {selectedItem.product.title} - Final Product
+                  </h3>
+                  <div className="flex justify-center">
+                    <div className="relative max-w-md w-full">
+                      <img
+                        src={selectedItem.product.image}
+                        alt={selectedItem.product.title}
+                        className="w-full h-80 object-cover rounded-lg shadow-lg"
+                      />
+                      {selectedItem.customization?.design && (
+                        <div
+                          className="absolute select-none"
+                          style={{
+                            left: `${selectedItem.customization.designPosition?.x || 150}px`,
+                            top: `${selectedItem.customization.designPosition?.y || 120}px`,
+                            transform: `scale(${selectedItem.customization.designScale || 1}) rotate(${selectedItem.customization.designRotation || 0}deg)`,
+                            transformOrigin: 'center'
+                          }}
+                        >
+                          <img
+                            src={selectedItem.customization.design.preview || selectedItem.customization.design.base64}
+                            alt="Design preview"
+                            className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              objectFit: 'fill'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Design Details */}
+                {selectedItem.customization && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">
+                        {selectedItem.productId === 'custom-embroidery' ? 'Embroidery Information' : 'Design Information'}
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        {selectedItem.customization.design && (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Design Name:</span>
+                              <span className="font-medium">{selectedItem.customization.design.name}</span>
+                            </div>
+                            {selectedItem.customization.design.size && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">File Size:</span>
+                                <span className="font-medium">{(selectedItem.customization.design.size / 1024 / 1024).toFixed(2)} MB</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {selectedItem.productId === 'custom-embroidery' && selectedItem.customization.embroideryData ? (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Dimensions:</span>
+                              <span className="font-medium">
+                                {selectedItem.customization.embroideryData.dimensions.width}" × {selectedItem.customization.embroideryData.dimensions.height}"
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Review Status:</span>
+                              <span className={`font-medium ${
+                                selectedItem.customization.embroideryData.reviewStatus === 'pending' ? 'text-yellow-600' :
+                                selectedItem.customization.embroideryData.reviewStatus === 'approved' ? 'text-green-600' :
+                                selectedItem.customization.embroideryData.reviewStatus === 'rejected' ? 'text-red-600' :
+                                'text-blue-600'
+                              }`}>
+                                {selectedItem.customization.embroideryData.reviewStatus.charAt(0).toUpperCase() + selectedItem.customization.embroideryData.reviewStatus.slice(1)}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Placement:</span>
+                              <span className="font-medium capitalize">
+                                {selectedItem.customization.placement === 'manual' ? 'Manual Position' : (selectedItem.customization.placement || '').replace('-', ' ')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Scale:</span>
+                              <span className="font-medium">{Math.round((selectedItem.customization.designScale || 1) * 100)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Rotation:</span>
+                              <span className="font-medium">{selectedItem.customization.designRotation || 0}°</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Product:</span>
+                          <span className="font-medium">{selectedItem.product.title}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{selectedItem.customization.color}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium uppercase">{selectedItem.customization.size}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Quantity:</span>
+                          <span className="font-medium">{selectedItem.quantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Price:</span>
+                          <span className="font-medium">${formatPrice(calculateItemPrice(selectedItem))}</span>
+                        </div>
+                        {selectedItem.customization.notes && (
+                          <div className="mt-3">
+                            <span className="text-gray-600 block mb-1">Notes:</span>
+                            <span className="text-sm bg-gray-50 p-2 rounded block">{selectedItem.customization.notes}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pricing Breakdown for Custom Embroidery */}
+                {selectedItem.productId === 'custom-embroidery' && selectedItem.customization?.embroideryData && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3">Pricing Breakdown</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Base Material Cost:</span>
+                        <span className="font-medium">${formatPrice(selectedItem.customization.embroideryData.materialCosts.totalCost)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Embroidery Options:</span>
+                        <span className="font-medium">${formatPrice(selectedItem.customization.embroideryData.optionsPrice)}</span>
+                      </div>
+                      <div className="border-t border-gray-200 pt-2 mt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Price:</span>
+                          <span className="text-lg">${formatPrice(selectedItem.customization.embroideryData.totalPrice)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowFinalProductModal(false)
+                      setSelectedItem(null)
+                    }}
+                    className="w-full sm:w-auto"
+                  >
+                    Close Preview
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }

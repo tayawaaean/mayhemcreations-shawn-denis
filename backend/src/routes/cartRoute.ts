@@ -58,4 +58,5 @@ router.delete('/', hybridAuthenticate, requireRole(['customer']), clearCart);
  */
 router.post('/sync', hybridAuthenticate, requireRole(['customer']), syncCart);
 
+
 export default router;

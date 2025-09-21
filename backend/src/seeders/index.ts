@@ -14,6 +14,13 @@ import {
   seedVariantsViaAPI, 
   seedEmbroideryOptionsViaAPI 
 } from './apiSeederService';
+import { 
+  clearAllOrders, 
+  resetOrdersToPending, 
+  clearOrderReviews, 
+  clearCarts, 
+  clearCustomEmbroidery 
+} from './clearOrdersSeeder';
 import { Op } from 'sequelize';
 
 /**
@@ -164,6 +171,24 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
       await seedMaterialCosts();
     }
 
+    // Migrate picture reply columns
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
+      logger.info('🔧 Migrating picture reply columns...');
+      await migratePictureReplyColumns();
+    }
+
+    // Fix cart foreign key constraint
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
+      logger.info('🔧 Fixing cart foreign key constraint...');
+      await fixCartForeignKeyConstraint();
+    }
+
+    // Fix cart product_id column type
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
+      logger.info('🔧 Fixing cart product_id column type...');
+      await fixCartProductIdColumnType();
+    }
+
     logger.info('🎉 Database seeding completed successfully!');
     
     // Display summary
@@ -171,6 +196,136 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     
   } catch (error) {
     logger.error('❌ Error during seeding process:', error);
+    throw error;
+  }
+}
+
+async function migratePictureReplyColumns(): Promise<void> {
+  try {
+    logger.info('🔄 Adding picture reply columns to order_reviews table...');
+    
+    // Check if columns already exist
+    const [columns] = await sequelize.query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'order_reviews' 
+      AND COLUMN_NAME IN ('admin_picture_replies', 'customer_confirmations', 'picture_reply_uploaded_at', 'customer_confirmed_at')
+    `);
+    
+    const existingColumns = columns.map((col: any) => col.COLUMN_NAME);
+    logger.info(`📊 Existing columns: ${existingColumns.join(', ') || 'none'}`);
+    
+    // Add missing columns
+    const columnsToAdd = [];
+    
+    if (!existingColumns.includes('admin_picture_replies')) {
+      columnsToAdd.push('ADD COLUMN admin_picture_replies JSON NULL AFTER admin_notes');
+    }
+    
+    if (!existingColumns.includes('customer_confirmations')) {
+      columnsToAdd.push('ADD COLUMN customer_confirmations JSON NULL AFTER admin_picture_replies');
+    }
+    
+    if (!existingColumns.includes('picture_reply_uploaded_at')) {
+      columnsToAdd.push('ADD COLUMN picture_reply_uploaded_at DATETIME NULL AFTER customer_confirmations');
+    }
+    
+    if (!existingColumns.includes('customer_confirmed_at')) {
+      columnsToAdd.push('ADD COLUMN customer_confirmed_at DATETIME NULL AFTER picture_reply_uploaded_at');
+    }
+    
+    if (columnsToAdd.length > 0) {
+      const alterQuery = `ALTER TABLE order_reviews ${columnsToAdd.join(', ')}`;
+      logger.info(`🔧 Executing query: ${alterQuery}`);
+      
+      await sequelize.query(alterQuery);
+      logger.info('✅ Picture reply columns added successfully');
+    } else {
+      logger.info('✅ All picture reply columns already exist');
+    }
+    
+  } catch (error) {
+    logger.error('❌ Error migrating picture reply columns:', error);
+    throw error;
+  }
+}
+
+async function fixCartForeignKeyConstraint(): Promise<void> {
+  try {
+    logger.info('🔄 Fixing cart foreign key constraint...');
+    
+    // Check if foreign key constraint exists
+    const [constraints] = await sequelize.query(`
+      SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+      WHERE TABLE_NAME = 'carts' 
+      AND TABLE_SCHEMA = DATABASE()
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+    `);
+    
+    logger.info(`📊 Existing foreign key constraints: ${constraints.length}`);
+    
+    // Remove foreign key constraint if it exists
+    if (constraints.length > 0) {
+      for (const constraint of constraints) {
+        const constraintData = constraint as any;
+        if (constraintData.REFERENCED_TABLE_NAME === 'products') {
+          logger.info(`🔧 Dropping foreign key constraint: ${constraintData.CONSTRAINT_NAME}`);
+          await sequelize.query(`ALTER TABLE carts DROP FOREIGN KEY ${constraintData.CONSTRAINT_NAME}`);
+          logger.info('✅ Foreign key constraint dropped successfully');
+        }
+      }
+    } else {
+      logger.info('✅ No foreign key constraints found on carts table');
+    }
+    
+    // Verify the fix
+    const [updatedConstraints] = await sequelize.query(`
+      SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+      WHERE TABLE_NAME = 'carts' 
+      AND TABLE_SCHEMA = DATABASE()
+      AND REFERENCED_TABLE_NAME IS NOT NULL
+    `);
+    
+    logger.info(`📊 Updated constraints: ${updatedConstraints.length} remaining`);
+    
+  } catch (error) {
+    logger.error('❌ Error fixing cart foreign key constraint:', error);
+    throw error;
+  }
+}
+
+async function fixCartProductIdColumnType(): Promise<void> {
+  try {
+    logger.info('🔄 Fixing cart product_id column type...');
+    
+    // Check current column type
+    const [columns] = await sequelize.query(`
+      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'carts' 
+      AND TABLE_SCHEMA = DATABASE()
+      AND COLUMN_NAME = 'product_id'
+    `);
+    
+    if (columns.length > 0) {
+      const columnInfo = columns[0] as any;
+      logger.info(`📊 Current product_id column type: ${columnInfo.COLUMN_TYPE}`);
+      
+      if (columnInfo.DATA_TYPE === 'int') {
+        logger.info('🔧 Converting product_id from INT to VARCHAR...');
+        await sequelize.query(`ALTER TABLE carts MODIFY COLUMN product_id VARCHAR(255) NOT NULL`);
+        logger.info('✅ product_id column converted to VARCHAR successfully');
+      } else {
+        logger.info('✅ product_id column is already VARCHAR type');
+      }
+    } else {
+      logger.warn('⚠️ product_id column not found in carts table');
+    }
+    
+  } catch (error) {
+    logger.error('❌ Error fixing cart product_id column type:', error);
     throw error;
   }
 }
@@ -338,6 +493,18 @@ if (require.main === module) {
       case '--clear-all':
         clearAllData().then(() => process.exit(0)).catch(error => {
           logger.error('❌ Clear failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--clear-orders':
+        clearAllOrders().then(() => process.exit(0)).catch(error => {
+          logger.error('❌ Clear orders failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--reset-orders':
+        resetOrdersToPending().then(() => process.exit(0)).catch(error => {
+          logger.error('❌ Reset orders failed:', error);
           process.exit(1);
         });
         break;

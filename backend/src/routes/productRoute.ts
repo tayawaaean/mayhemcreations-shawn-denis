@@ -85,4 +85,5 @@ router.get('/inventory/status', getInventoryStatus);
  */
 router.put('/inventory/bulk', hybridAuthenticate, requireRole(['admin', 'seller']), bulkUpdateInventory);
 
+
 export default router;
