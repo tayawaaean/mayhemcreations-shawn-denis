@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './ecommerce/components/Navbar'
 import Footer from './ecommerce/components/Footer'
 import ChatWidget from './ecommerce/components/ChatWidget'
-import { ChatProvider } from './ecommerce/context/ChatContext'
+import { RealTimeChatProvider } from './shared/realTimeChatContext'
 import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
 import { AuthProvider } from './ecommerce/context/AuthContext'
@@ -30,7 +30,7 @@ export default function App() {
     <MultiAccountProvider>
       <AuthProvider>
         <CartProvider>
-          <ChatProvider>
+          <RealTimeChatProvider>
             <CustomizationProvider>
             <Routes>
             {/* Employee Login Route */}
@@ -156,10 +156,10 @@ export default function App() {
             } />
             <Route path="/verify-email" element={<VerifyEmail />} />
           </Routes>
-        </CustomizationProvider>
-      </ChatProvider>
-    </CartProvider>
-    </AuthProvider>
+            </CustomizationProvider>
+          </RealTimeChatProvider>
+        </CartProvider>
+      </AuthProvider>
     </MultiAccountProvider>
   )
 }

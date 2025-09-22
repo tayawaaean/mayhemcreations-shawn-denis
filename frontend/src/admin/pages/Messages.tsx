@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useAdmin } from '../context/AdminContext'
+import { useAdminChat } from '../context/AdminChatContext'
 import {
   Search,
   Send,
@@ -12,17 +13,44 @@ import {
   ArrowLeft,
   Circle,
   MessageCircle,
-  Users
+  Users,
+  Wifi,
+  WifiOff
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 
 const Messages: React.FC = () => {
   const { state, dispatch } = useAdmin()
-  const { messages, customers } = state
-  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  const { customers } = state
+  const { 
+    messages, 
+    sendMessage, 
+    setTyping,
+    isUserTyping, 
+    onlineCustomers, 
+    selectedCustomer, 
+    setSelectedCustomer, 
+    markAsRead, 
+    getUnreadCount,
+    threads
+  } = useAdminChat()
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+
+  // Helper to derive a human-friendly display name
+  const { customerDirectory } = useAdminChat() as any
+  const getDisplayName = (customer: any | null | undefined, fallbackId: string): string => {
+    const fromDir = customerDirectory?.[fallbackId]
+    const dirName = fromDir?.name
+    const dirEmail = fromDir?.email
+    if (!customer && (dirName || dirEmail)) {
+      return dirName || dirEmail || `Customer ${fallbackId}`
+    }
+    if (!customer) return `Customer ${fallbackId}`
+    const fullName = [customer.firstName, customer.lastName].filter(Boolean).join(' ').trim()
+    return customer.name || fullName || customer.email || dirName || `Customer ${fallbackId}`
+  }
 
   // Group messages by customer
   const messagesByCustomer = messages.reduce((acc, message) => {
@@ -33,44 +61,49 @@ const Messages: React.FC = () => {
     return acc
   }, {} as Record<string, typeof messages>)
 
-  // Get unique customers with their latest message
-  const customerList = Object.keys(messagesByCustomer).map(customerId => {
-    const customer = customers.find(c => c.id === customerId)
-    const customerMessages = messagesByCustomer[customerId]
-    const latestMessage = customerMessages[customerMessages.length - 1]
-    const unreadCount = customerMessages.filter(m => !m.isRead && !m.isFromAdmin).length
+  // Get unique customers with their latest message (include unknown customers)
+  // Build conversation list from threads first (persisted), then from in-memory if new
+  const customerIdsFromMessages = Object.keys(messagesByCustomer)
+  const baseList = threads.map(t => t.customerId)
+  const mergedIds = Array.from(new Set([...baseList, ...customerIdsFromMessages]))
+
+  const customerList = mergedIds.map(customerId => {
+    const customer = customers.find(c => String(c.id) === String(customerId))
+    const customerMessages = messagesByCustomer[customerId] || []
+    const latestMessage = threads.find(t => t.customerId === customerId)?.lastMessage || (customerMessages.length ? {
+      text: customerMessages[customerMessages.length - 1].text,
+      sender: customerMessages[customerMessages.length - 1].sender,
+      timestamp: customerMessages[customerMessages.length - 1].timestamp.toISOString()
+    } : undefined)
+    const unreadCount = getUnreadCount(customerId)
+    const isOnline = onlineCustomers.includes(customerId)
+    const isTyping = isUserTyping[customerId] || false
     
     return {
+      customerId,
       customer,
       latestMessage,
       unreadCount,
-      messageCount: customerMessages.length
+      messageCount: customerMessages.length,
+      isOnline,
+      isTyping
     }
-  }).filter(item => item.customer)
+  })
 
-  const filteredCustomers = customerList.filter(item => 
-    item.customer?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.customer?.email.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredCustomers = customerList.filter(item => {
+    const name = item.customer?.name || `Customer ${item.customerId}`
+    const email = item.customer?.email || ''
+    const q = searchQuery.toLowerCase()
+    return name.toLowerCase().includes(q) || email.toLowerCase().includes(q) || item.customerId.toLowerCase().includes(q)
+  })
 
   const selectedCustomerMessages = selectedCustomer ? messagesByCustomer[selectedCustomer] || [] : []
-  const selectedCustomerData = selectedCustomer ? customers.find(c => c.id === selectedCustomer) : null
+  const selectedCustomerData = selectedCustomer ? customers.find(c => String(c.id) === String(selectedCustomer)) : null
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedCustomer) return
 
-    const message = {
-      id: `msg-${Date.now()}`,
-      customerId: selectedCustomer,
-      customer: selectedCustomerData!,
-      content: newMessage,
-      type: 'text' as const,
-      isFromAdmin: true,
-      isRead: true,
-      createdAt: new Date()
-    }
-
-    dispatch({ type: 'ADD_MESSAGE', payload: message })
+    sendMessage(newMessage, selectedCustomer)
     setNewMessage('')
   }
 
@@ -191,17 +224,17 @@ const Messages: React.FC = () => {
             ) : (
               filteredCustomers.map((item) => (
                 <div
-                  key={item.customer!.id}
-                  onClick={() => setSelectedCustomer(item.customer!.id)}
+                  key={item.customer?.id || item.customerId}
+                  onClick={() => setSelectedCustomer(item.customer?.id || item.customerId)}
                   className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-all duration-200 ${
-                    selectedCustomer === item.customer!.id
+                    selectedCustomer === (item.customer?.id || item.customerId)
                       ? 'bg-blue-50 border-blue-200 shadow-sm'
                       : 'hover:shadow-sm'
                   }`}
                 >
                   <div className="flex items-center space-x-3">
                     <div className="relative">
-                      {item.customer!.avatar ? (
+                      {item.customer?.avatar ? (
                         <img
                           src={item.customer!.avatar}
                           alt={item.customer!.name}
@@ -209,24 +242,26 @@ const Messages: React.FC = () => {
                         />
                       ) : (
                         <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-gray-100">
-                          <span className="text-white font-semibold text-sm">
-                            {item.customer!.name.charAt(0).toUpperCase()}
-                          </span>
+                            <span className="text-white font-semibold text-sm">
+                              {getDisplayName(item.customer, item.customerId).charAt(0).toUpperCase()}
+                            </span>
                         </div>
                       )}
                       {/* Online status indicator */}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 border-2 border-white rounded-full ${
+                        item.isOnline ? 'bg-green-500' : 'bg-gray-400'
+                      }`}></div>
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <h3 className="text-sm font-semibold text-gray-900 truncate">
-                          {item.customer!.name}
+                          {getDisplayName(item.customer, item.customerId)}
                         </h3>
                         <div className="flex items-center space-x-2">
                           {item.latestMessage && (
                             <span className="text-xs text-gray-400">
-                              {formatTime(item.latestMessage.createdAt)}
+                              {formatTime(new Date(item.latestMessage.timestamp))}
                             </span>
                           )}
                           {item.unreadCount > 0 && (
@@ -238,20 +273,20 @@ const Messages: React.FC = () => {
                       </div>
 
                       <p className="text-sm text-gray-600 truncate mb-1">
-                        {item.latestMessage?.content || 'No messages yet'}
+                        {item.isTyping ? (
+                          <span className="text-blue-500 italic">Typing...</span>
+                        ) : (
+                          item.latestMessage?.text || 'No messages yet'
+                        )}
                       </p>
 
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">
                           {item.messageCount} message{item.messageCount !== 1 ? 's' : ''}
                         </span>
-                        {item.latestMessage?.isFromAdmin && (
+                        {item.latestMessage && item.latestMessage.sender === 'admin' && (
                           <div className="flex items-center space-x-1">
-                            {item.latestMessage.isRead ? (
-                              <CheckCheck className="w-3 h-3 text-blue-500" />
-                            ) : (
-                              <Check className="w-3 h-3 text-gray-400" />
-                            )}
+                            <Check className="w-3 h-3 text-gray-400" />
                           </div>
                         )}
                       </div>
@@ -274,16 +309,16 @@ const Messages: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
-                      {selectedCustomerData!.avatar ? (
+                      {selectedCustomerData?.avatar ? (
                         <img
-                          src={selectedCustomerData!.avatar}
-                          alt={selectedCustomerData!.name}
+                          src={selectedCustomerData.avatar}
+                          alt={selectedCustomerData.name}
                           className="h-10 w-10 rounded-full object-cover ring-2 ring-gray-100"
                         />
                       ) : (
                         <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-gray-100">
                           <span className="text-white font-semibold text-sm">
-                            {selectedCustomerData!.name.charAt(0).toUpperCase()}
+                            {(selectedCustomerData?.name || selectedCustomer).charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
@@ -291,7 +326,7 @@ const Messages: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                        {selectedCustomerData!.name}
+                        {getDisplayName(selectedCustomerData, selectedCustomer!)}
                       </h3>
                       <p className="text-xs sm:text-sm text-gray-600 flex items-center">
                         <Circle className="w-2 h-2 bg-green-500 rounded-full mr-1" />
@@ -309,15 +344,16 @@ const Messages: React.FC = () => {
                     <MessageCircle className="w-16 h-16 text-gray-300 mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Start a conversation</h3>
                     <p className="text-sm text-gray-600 max-w-sm">
-                      Send a message to {selectedCustomerData!.name} to begin your conversation
+                      Send a message to {getDisplayName(selectedCustomerData, selectedCustomer!)} to begin your conversation
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {selectedCustomerMessages.map((message, index) => {
                       const prevMessage = index > 0 ? selectedCustomerMessages[index - 1] : null
-                      const showDate = !prevMessage ||
-                        new Date(message.createdAt).toDateString() !== new Date(prevMessage.createdAt).toDateString()
+                      const currentDate = new Date(message.timestamp)
+                      const prevDate = prevMessage ? new Date(prevMessage.timestamp) : null
+                      const showDate = !prevDate || currentDate.toDateString() !== prevDate.toDateString()
 
                       return (
                         <div key={message.id}>
@@ -325,51 +361,51 @@ const Messages: React.FC = () => {
                             <div className="flex items-center justify-center my-6">
                               <div className="bg-white px-4 py-2 rounded-full shadow-sm border border-gray-200">
                                 <span className="text-xs font-medium text-gray-600">
-                                  {formatDate(message.createdAt)}
+                                  {formatDate(message.timestamp)}
                                 </span>
                               </div>
                             </div>
                           )}
 
                           <div className={`flex items-end space-x-3 ${
-                            message.isFromAdmin ? 'justify-end' : 'justify-start'
+                            message.sender === 'admin' ? 'justify-end' : 'justify-start'
                           }`}>
-                            {!message.isFromAdmin && (
+                            {message.sender !== 'admin' && (
                               <div className="flex-shrink-0">
-                                {selectedCustomerData!.avatar ? (
+                                {selectedCustomerData?.avatar ? (
                                   <img
-                                    src={selectedCustomerData!.avatar}
-                                    alt={selectedCustomerData!.name}
+                                    src={selectedCustomerData.avatar}
+                                    alt={selectedCustomerData.name}
                                     className="h-8 w-8 rounded-full object-cover"
                                   />
                                 ) : (
                                   <div className="h-8 w-8 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center">
                                     <span className="text-white font-semibold text-xs">
-                                      {selectedCustomerData!.name.charAt(0).toUpperCase()}
+                                      {(selectedCustomerData?.name || selectedCustomer).charAt(0).toUpperCase()}
                                     </span>
                                   </div>
                                 )}
                               </div>
                             )}
 
-                            <div className={`max-w-xs sm:max-w-md lg:max-w-lg ${
-                              message.isFromAdmin ? 'order-first' : ''
+                              <div className={`max-w-xs sm:max-w-md lg:max-w-lg ${
+                              message.sender === 'admin' ? 'order-first' : ''
                             }`}>
                               <div className={`px-4 py-3 rounded-2xl shadow-sm ${
-                                message.isFromAdmin
+                                message.sender === 'admin'
                                   ? 'bg-blue-500 text-white rounded-br-md'
                                   : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
                               }`}>
-                                <p className="text-sm leading-relaxed">{message.content}</p>
+                                <p className="text-sm leading-relaxed">{message.text}</p>
                               </div>
 
                               <div className={`flex items-center mt-1 space-x-1 text-xs ${
-                                message.isFromAdmin
+                                message.sender === 'admin'
                                   ? 'justify-end text-blue-100'
                                   : 'justify-start text-gray-500'
                               }`}>
-                                <span>{formatTime(message.createdAt)}</span>
-                                {message.isFromAdmin && (
+                                <span>{formatTime(message.timestamp)}</span>
+                                {message.sender === 'admin' && (
                                   <span className="ml-1">
                                     {message.isRead ? (
                                       <CheckCheck className="h-3 w-3" />
@@ -381,7 +417,7 @@ const Messages: React.FC = () => {
                               </div>
                             </div>
 
-                            {message.isFromAdmin && (
+                            {message.sender === 'admin' && (
                               <div className="flex-shrink-0">
                                 <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
                                   <span className="text-white font-semibold text-xs">A</span>
@@ -411,10 +447,13 @@ const Messages: React.FC = () => {
                     <div className="flex items-end bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all duration-200">
                       <textarea
                         rows={1}
-                        placeholder={`Message ${selectedCustomerData!.name}...`}
+                        placeholder={`Message ${getDisplayName(selectedCustomerData, selectedCustomer!)}...`}
                         value={newMessage}
                         onChange={(e) => {
                           setNewMessage(e.target.value)
+                          if (selectedCustomer) {
+                            setTyping(selectedCustomer, e.target.value.trim().length > 0)
+                          }
                           e.target.style.height = 'auto'
                           e.target.style.height = e.target.scrollHeight + 'px'
                         }}
@@ -447,7 +486,7 @@ const Messages: React.FC = () => {
 
                 {/* Typing indicator placeholder */}
                 <div className="mt-3 text-xs text-gray-500 opacity-0 transition-opacity duration-200" id="typing-indicator">
-                  {selectedCustomerData!.name} is typing...
+                  {selectedCustomerData?.name || `Customer ${selectedCustomer}`} is typing...
                 </div>
               </div>
             </>

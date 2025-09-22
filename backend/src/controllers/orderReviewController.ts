@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sequelize } from '../config/database';
 import { logger } from '../utils/logger';
+import { getWebSocketService } from '../services/websocketService';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -406,6 +407,15 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // Get user_id for WebSocket notification
+    const [userResult] = await sequelize.query(`
+      SELECT user_id FROM order_reviews WHERE id = ?
+    `, {
+      replacements: [id]
+    });
+
+    const userId = (userResult as any)[0]?.user_id;
+
     res.status(200).json({
       success: true,
       data: {
@@ -417,6 +427,17 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       message: 'Order review status updated successfully',
       timestamp: new Date().toISOString(),
     });
+
+    // Emit WebSocket event for real-time updates
+    const webSocketService = getWebSocketService();
+    if (webSocketService && userId) {
+      webSocketService.emitOrderStatusChange(parseInt(id), {
+        userId,
+        status,
+        adminNotes,
+        reviewedAt: new Date().toISOString()
+      });
+    }
 
     logger.info(`Order review ${id} status updated to ${status}`, {
       orderReviewId: id,
@@ -480,6 +501,15 @@ export const uploadPictureReply = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // Get user_id for WebSocket notification
+    const [userResult] = await sequelize.query(`
+      SELECT user_id FROM order_reviews WHERE id = ?
+    `, {
+      replacements: [id]
+    });
+
+    const userId = (userResult as any)[0]?.user_id;
+
     res.status(200).json({
       success: true,
       data: {
@@ -490,6 +520,16 @@ export const uploadPictureReply = async (req: AuthenticatedRequest, res: Respons
       message: 'Picture replies uploaded successfully',
       timestamp: new Date().toISOString(),
     });
+
+    // Emit WebSocket event for real-time updates
+    const webSocketService = getWebSocketService();
+    if (webSocketService && userId) {
+      webSocketService.emitPictureReplyUploaded(parseInt(id), {
+        userId,
+        pictureReplies: pictureRepliesWithTimestamp,
+        uploadedAt: new Date().toISOString()
+      });
+    }
 
     logger.info(`Picture replies uploaded for order review ${id}`, {
       orderReviewId: id,
@@ -557,6 +597,16 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
       message: 'Picture confirmations submitted successfully',
       timestamp: new Date().toISOString(),
     });
+
+    // Emit WebSocket event for real-time updates
+    const webSocketService = getWebSocketService();
+    if (webSocketService && req.user?.id) {
+      webSocketService.emitCustomerConfirmation(parseInt(id), {
+        userId: req.user.id,
+        confirmations,
+        confirmedAt: new Date().toISOString()
+      });
+    }
 
     logger.info(`Picture confirmations submitted for order review ${id}`, {
       orderReviewId: id,

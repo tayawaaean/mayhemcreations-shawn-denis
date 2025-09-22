@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check } from 'lucide-react'
+import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
+import { useWebSocket } from '../../hooks/useWebSocket'
 
 interface OrderItem {
   id: string
@@ -53,7 +54,8 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
     orderData: orderData,
     total: orderReview.total,
     adminPictureReplies: orderReview.admin_picture_replies,
-    adminPictureRepliesType: typeof orderReview.admin_picture_replies
+    adminPictureRepliesType: typeof orderReview.admin_picture_replies,
+    status: orderReview.status
   });
 
   // Debug picture replies and item IDs
@@ -99,7 +101,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
     }
   }
 
-  return {
+  const convertedOrder = {
     id: orderReview.id,
     orderNumber: `MC-${orderReview.id}`,
     status: mapStatus(orderReview.status),
@@ -222,6 +224,16 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
     customerConfirmedAt: orderReview.customer_confirmed_at,
     originalOrderData: orderData // Store original order data for matching
   };
+
+  console.log('🔍 Final converted order:', {
+    orderId: convertedOrder.id,
+    status: convertedOrder.status,
+    hasAdminPictureReplies: !!convertedOrder.adminPictureReplies,
+    adminPictureRepliesLength: convertedOrder.adminPictureReplies?.length || 0,
+    adminPictureReplies: convertedOrder.adminPictureReplies
+  });
+
+  return convertedOrder;
 };
 
 const getStatusIcon = (status: Order['status']) => {
@@ -411,6 +423,9 @@ export default function MyOrders() {
   const [showReuploadModal, setShowReuploadModal] = useState(false)
   const [reuploadFiles, setReuploadFiles] = useState<{[itemId: string]: File | null}>({})
   const [submittingReupload, setSubmittingReupload] = useState(false)
+  
+  // WebSocket hook for real-time updates
+  const { subscribe, isConnected } = useWebSocket()
 
   // Load orders on component mount
   useEffect(() => {
@@ -418,6 +433,62 @@ export default function MyOrders() {
       loadOrders()
     }
   }, [isLoggedIn])
+
+  // WebSocket event listeners for real-time updates
+  useEffect(() => {
+    if (!isConnected || !isLoggedIn) return;
+
+    // Listen for picture reply received
+    const unsubscribePictureReply = subscribe('picture_reply_received', (data) => {
+      console.log('🔌 Real-time picture reply received:', data);
+      setOrders(prev => prev.map(order => 
+        order.id === data.orderId 
+          ? { 
+              ...order, 
+              adminPictureReplies: data.replyData.pictureReplies,
+              status: 'picture-reply-pending'
+            }
+          : order
+      ));
+    });
+
+    // Listen for order status updates
+    const unsubscribeStatusUpdate = subscribe('order_status_updated', (data) => {
+      console.log('🔌 Real-time order status update:', data);
+      setOrders(prev => prev.map(order => 
+        order.id === data.orderId 
+          ? { 
+              ...order, 
+              status: data.statusData.status
+            }
+          : order
+      ));
+    });
+
+    // Listen for confirmation submitted
+    const unsubscribeConfirmation = subscribe('confirmation_submitted', (data) => {
+      console.log('🔌 Real-time confirmation submitted:', data);
+      // Update the order with confirmation data
+      setOrders(prev => prev.map(order => 
+        order.id === data.orderId 
+          ? { 
+              ...order, 
+              customerConfirmations: data.confirmationData.confirmations,
+              status: data.confirmationData.confirmations.some((c: any) => c.confirmed === false) 
+                ? 'rejected-needs-upload' 
+                : 'pending-payment'
+            }
+          : order
+      ));
+    });
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribePictureReply();
+      unsubscribeStatusUpdate();
+      unsubscribeConfirmation();
+    };
+  }, [isConnected, isLoggedIn, subscribe]);
 
   const loadOrders = async () => {
     try {
@@ -443,6 +514,19 @@ export default function MyOrders() {
   }
 
   const handleViewDetails = (order: Order) => {
+    console.log('🔍 Opening order details:', {
+      orderId: order.id,
+      status: order.status,
+      hasAdminPictureReplies: !!order.adminPictureReplies,
+      adminPictureRepliesLength: order.adminPictureReplies?.length || 0,
+      adminPictureReplies: order.adminPictureReplies,
+      items: order.items.map(item => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName
+      }))
+    });
+    
     setSelectedOrder(order)
     setShowOrderDetails(true)
     
@@ -661,7 +745,16 @@ export default function MyOrders() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Orders</h1>
+        <div className="flex items-center space-x-4">
+          <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
+          {/* WebSocket connection status */}
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm text-gray-600">
+              {isConnected ? 'Live Updates' : 'Offline'}
+            </span>
+          </div>
+        </div>
         <p className="text-gray-600">Track and manage your orders</p>
       </div>
 
@@ -859,16 +952,6 @@ export default function MyOrders() {
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </Button>
-                    {order.status === 'picture-reply-pending' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        <ImageIcon className="w-4 h-4 mr-1" />
-                        Review Pictures
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1014,108 +1097,256 @@ export default function MyOrders() {
                   </div>
                 </div>
 
-                {/* Picture Replies Section */}
-                {selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0 && (
+                {/* Picture Replies Section - Grouped by Product */}
+                {(() => {
+                  console.log('🔍 Debug adminPictureReplies:', {
+                    hasAdminPictureReplies: !!selectedOrder.adminPictureReplies,
+                    isArray: Array.isArray(selectedOrder.adminPictureReplies),
+                    length: selectedOrder.adminPictureReplies?.length,
+                    adminPictureReplies: selectedOrder.adminPictureReplies,
+                    selectedOrderId: selectedOrder.id,
+                    status: selectedOrder.status
+                  });
+                  
+                  return selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0;
+                })() && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                      <ImageIcon className="w-5 h-5 text-purple-600" />
-                      <span>Admin Picture Replies</span>
+                      <MessageSquare className="w-5 h-5 text-blue-600" />
+                      <span>Design Review Conversations</span>
                     </h3>
-                    <div className="space-y-4">
-                      {selectedOrder.adminPictureReplies.map((reply, index) => {
-                        const item = selectedOrder.items.find(item => 
-                          item.id === reply.itemId || 
-                          item.productId === reply.itemId ||
-                          String(item.id) === String(reply.itemId) ||
-                          String(item.productId) === String(reply.itemId)
-                        );
+                    
+                    {/* Group replies by item */}
+                    <div className="space-y-6">
+                      {selectedOrder.items.map((item, itemIndex) => {
+                        // Find replies for this specific item
+                        const itemReplies = selectedOrder.adminPictureReplies?.filter(reply => {
+                          // Enhanced matching logic to handle various ID formats
+                          const matches = 
+                            // Exact matches
+                            reply.itemId === item.id || 
+                            reply.itemId === item.productId ||
+                            String(reply.itemId) === String(item.id) ||
+                            String(reply.itemId) === String(item.productId) ||
+                            // Handle custom-embroidery-0 vs custom-embroidery mismatch
+                            (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery') ||
+                            (reply.itemId === 'custom-embroidery' && item.id === 'custom-embroidery-0') ||
+                            // Handle other potential mismatches with startsWith/contains
+                            (reply.itemId && item.id && reply.itemId.startsWith(item.id)) ||
+                            (reply.itemId && item.id && item.id.startsWith(reply.itemId)) ||
+                            (reply.itemId && item.productId && reply.itemId.startsWith(item.productId)) ||
+                            (reply.itemId && item.productId && item.productId.startsWith(reply.itemId));
+                          
+                          console.log('🔍 Item reply matching:', {
+                            itemId: item.id,
+                            productId: item.productId,
+                            replyItemId: reply.itemId,
+                            matches,
+                            itemName: item.productName,
+                            customEmbroideryMatch: (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery'),
+                            startsWithMatch: (reply.itemId && item.id && reply.itemId.startsWith(item.id))
+                          });
+                          
+                          return matches;
+                        }) || [];
+                        
+                        console.log('🔍 Item replies found:', {
+                          itemId: item.id,
+                          itemName: item.productName,
+                          replyCount: itemReplies.length,
+                          replies: itemReplies
+                        });
+                        
+                        // Skip if no replies for this item
+                        if (itemReplies.length === 0) {
+                          console.log('🔍 No replies found for item:', {
+                            itemId: item.id,
+                            itemName: item.productName,
+                            productId: item.productId
+                          });
+                          return null;
+                        }
                         
                         return (
-                          <div key={index} className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                            <div className="flex items-start space-x-4">
-                              <img
-                                src={reply.image}
-                                alt="Admin picture reply"
-                                className="w-32 h-32 object-cover rounded border border-purple-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(reply.image, '_blank')}
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <h4 className="font-medium text-purple-800">
-                                    Reply for: {item?.productName || `Item ID: ${reply.itemId}`}
-                                  </h4>
-                                  <span className="text-xs text-purple-600">
-                                    Qty: {item?.quantity || 1}
-                                  </span>
-                                </div>
+                          <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-white">
+                            <div className="flex items-start space-x-4 mb-4">
+                              {/* Item Image */}
+                              <div className="flex-shrink-0">
+                                <img
+                                  src={item.productImage}
+                                  alt={item.productName}
+                                  className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => window.open(item.productImage, '_blank')}
+                                />
+                              </div>
+                              
+                              {/* Item Details */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-gray-900 mb-1">{item.productName}</h4>
+                                <p className="text-sm text-gray-500 mb-3">Qty: {item.quantity || 1}</p>
                                 
-                                {reply.notes && (
-                                  <p className="text-sm text-purple-700 mb-3">
-                                    <strong>Admin Notes:</strong> {reply.notes}
-                                  </p>
-                                )}
-                                
-                                {/* Picture Confirmation Actions */}
-                                <div className="space-y-3">
-                                  {selectedOrder && (selectedOrder.status === 'pending-payment' || selectedOrder.status === 'approved-processing') ? (
-                                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                                      <div className="flex items-center space-x-2">
-                                        <Clock className="h-4 w-4 text-orange-600" />
-                                        <span className="text-sm font-medium text-orange-800">
-                                          {selectedOrder.status === 'pending-payment' 
-                                            ? 'Design approved - Payment required to proceed'
-                                            : 'Design approved and being processed - No further action needed'
-                                          }
-                                        </span>
+                                {/* Chat-like conversation for this item */}
+                                <div className="space-y-3 max-h-80 overflow-y-auto">
+                                  {itemReplies.map((reply, replyIndex) => (
+                                    <div key={replyIndex} className="space-y-2">
+                                      {/* Admin Message */}
+                                      <div className="flex justify-start">
+                                        <div className="max-w-xs lg:max-w-md">
+                                          <div className="bg-blue-500 text-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                                            <div className="flex items-start space-x-3">
+                                              <img
+                                                src={reply.image}
+                                                alt="Admin Picture Reply"
+                                                className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+                                                onClick={() => window.open(reply.image, '_blank')}
+                                              />
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-blue-100 mb-1">Admin</p>
+                                                {reply.notes && (
+                                                  <p className="text-sm text-white mb-2">{reply.notes}</p>
+                                                )}
+                                                <p className="text-xs text-blue-200 opacity-75">
+                                                  {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleString() : 'Unknown time'}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Customer Response */}
+                                      <div className="flex justify-end">
+                                        <div className="max-w-xs lg:max-w-md">
+                                          {selectedOrder && (selectedOrder.status === 'pending-payment' || selectedOrder.status === 'approved-processing') ? (
+                                            <div className="bg-green-100 text-green-800 rounded-2xl rounded-br-md px-4 py-3 shadow-sm border border-green-200">
+                                              <div className="flex items-center space-x-2 mb-1">
+                                                <User className="h-4 w-4" />
+                                                <p className="text-sm font-medium">You</p>
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-200 text-green-800">
+                                                  ✓ Approved
+                                                </span>
+                                              </div>
+                                              <p className="text-sm">
+                                                {selectedOrder.status === 'pending-payment' 
+                                                  ? 'Design approved - Payment required to proceed'
+                                                  : 'Design approved and being processed - No further action needed'
+                                                }
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <div className="bg-gray-100 text-gray-600 rounded-2xl rounded-br-md px-4 py-3 shadow-sm border border-gray-200">
+                                              <div className="flex items-center space-x-2 mb-2">
+                                                <User className="h-4 w-4" />
+                                                <p className="text-sm font-medium">Your Response</p>
+                                              </div>
+                                              
+                                              <div className="space-y-3">
+                                                <p className="text-sm font-medium text-gray-700">Do you approve this picture?</p>
+                                                <div className="flex space-x-4">
+                                                  <label className="flex items-center space-x-2">
+                                                    <input
+                                                      type="radio"
+                                                      name={`confirmation-${reply.itemId}`}
+                                                      checked={pictureConfirmations[reply.itemId]?.confirmed === true}
+                                                      onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
+                                                      className="text-green-600 focus:ring-green-500"
+                                                    />
+                                                    <span className="text-sm text-green-700">✓ Approve</span>
+                                                  </label>
+                                                  <label className="flex items-center space-x-2">
+                                                    <input
+                                                      type="radio"
+                                                      name={`confirmation-${reply.itemId}`}
+                                                      checked={pictureConfirmations[reply.itemId]?.confirmed === false}
+                                                      onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
+                                                      className="text-red-600 focus:ring-red-500"
+                                                    />
+                                                    <span className="text-sm text-red-700">✗ Reject</span>
+                                                  </label>
+                                                </div>
+                                                
+                                                {/* Notes */}
+                                                <div>
+                                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    Your Notes (Optional)
+                                                  </label>
+                                                  <textarea
+                                                    value={pictureConfirmations[reply.itemId]?.notes || ''}
+                                                    onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
+                                                    rows={2}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                                                    placeholder="Add any comments about this picture..."
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                  ) : (
-                                    <>
-                                      <p className="text-sm font-medium text-gray-700">Do you approve this picture?</p>
-                                      <div className="flex space-x-4">
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`confirmation-${reply.itemId}`}
-                                            checked={pictureConfirmations[reply.itemId]?.confirmed === true}
-                                            onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
-                                            className="text-green-600 focus:ring-green-500"
-                                          />
-                                          <span className="text-sm text-green-700">✓ Approve</span>
-                                        </label>
-                                        <label className="flex items-center space-x-2">
-                                          <input
-                                            type="radio"
-                                            name={`confirmation-${reply.itemId}`}
-                                            checked={pictureConfirmations[reply.itemId]?.confirmed === false}
-                                            onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
-                                            className="text-red-600 focus:ring-red-500"
-                                          />
-                                          <span className="text-sm text-red-700">✗ Reject</span>
-                                        </label>
-                                      </div>
-                                      
-                                      {/* Notes */}
-                                      <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                          Your Notes (Optional)
-                                        </label>
-                                        <textarea
-                                          value={pictureConfirmations[reply.itemId]?.notes || ''}
-                                          onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
-                                          rows={2}
-                                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                          placeholder="Add any comments about this picture..."
-                                        />
-                                      </div>
-                                    </>
-                                  )}
+                                  ))}
                                 </div>
                               </div>
                             </div>
                           </div>
                         );
                       })}
+                      
+                      {/* Show message if no items have replies */}
+                      {selectedOrder.items.every((item, itemIndex) => {
+                        const itemReplies = selectedOrder.adminPictureReplies?.filter(reply => {
+                          // Use the same enhanced matching logic
+                          return reply.itemId === item.id || 
+                            reply.itemId === item.productId ||
+                            String(reply.itemId) === String(item.id) ||
+                            String(reply.itemId) === String(item.productId) ||
+                            (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery') ||
+                            (reply.itemId === 'custom-embroidery' && item.id === 'custom-embroidery-0') ||
+                            (reply.itemId && item.id && reply.itemId.startsWith(item.id)) ||
+                            (reply.itemId && item.id && item.id.startsWith(reply.itemId)) ||
+                            (reply.itemId && item.productId && reply.itemId.startsWith(item.productId)) ||
+                            (reply.itemId && item.productId && item.productId.startsWith(reply.itemId));
+                        }) || [];
+                        return itemReplies.length === 0;
+                      }) && (
+                        <div className="text-center py-8">
+                          <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-lg font-medium text-gray-900">No Design Samples Found</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Admin hasn't uploaded design samples for any items in this order yet.
+                          </p>
+                          <div className="mt-4 text-xs text-gray-400">
+                            <p>Debug Info:</p>
+                            <p>Total adminPictureReplies: {selectedOrder.adminPictureReplies?.length || 0}</p>
+                            <p>Available reply item IDs: {selectedOrder.adminPictureReplies?.map(r => r.itemId).join(', ') || 'None'}</p>
+                            <p>Order item IDs: {selectedOrder.items.map(item => item.id).join(', ')}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Debug section - show when no conversations */}
+                {(!selectedOrder.adminPictureReplies || !Array.isArray(selectedOrder.adminPictureReplies) || selectedOrder.adminPictureReplies.length === 0) && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center space-x-2">
+                      <MessageSquare className="w-5 h-5 text-gray-400" />
+                      <span>Design Review Conversations</span>
+                    </h3>
+                    <div className="text-center py-8">
+                      <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-2 text-lg font-medium text-gray-900">No Design Samples Yet</h3>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Admin hasn't uploaded design samples for this order yet.
+                      </p>
+                      <div className="mt-4 text-xs text-gray-400">
+                        <p>Debug Info:</p>
+                        <p>Has adminPictureReplies: {selectedOrder.adminPictureReplies ? 'Yes' : 'No'}</p>
+                        <p>Is Array: {Array.isArray(selectedOrder.adminPictureReplies) ? 'Yes' : 'No'}</p>
+                        <p>Length: {selectedOrder.adminPictureReplies?.length || 0}</p>
+                        <p>Order Status: {selectedOrder.status}</p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1135,7 +1366,7 @@ export default function MyOrders() {
                       disabled={submittingConfirmations}
                       className="bg-purple-600 hover:bg-purple-700 text-white"
                     >
-                      {submittingConfirmations ? 'Submitting...' : 'Submit Picture Confirmations'}
+                      {submittingConfirmations ? 'Submitting...' : 'Submit Design Review'}
                     </Button>
                   )}
                 </div>

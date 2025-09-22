@@ -2,6 +2,7 @@ import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { AdminProvider } from './context/AdminContext'
 import { AdminAuthProvider } from './context/AdminAuthContext'
+import { AdminChatProvider } from './context/AdminChatContext'
 import { RoleProvider } from './context/RoleContext'
 import SharedLayout from './components/layout/SharedLayout'
 import Sidebar from './components/layout/Sidebar'
@@ -33,6 +34,7 @@ const AdminApp: React.FC = () => {
     <AdminAuthProvider>
       <RoleProvider initialRole="admin">
         <AdminProvider>
+          <AdminChatProvider>
           <Routes>
             <Route path="/*" element={
               <ProtectedRoute requiredRole="admin">
@@ -65,6 +67,7 @@ const AdminApp: React.FC = () => {
             }>
             </Route>
           </Routes>
+          </AdminChatProvider>
         </AdminProvider>
       </RoleProvider>
     </AdminAuthProvider>

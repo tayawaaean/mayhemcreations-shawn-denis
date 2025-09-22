@@ -20,12 +20,13 @@ import {
   CreditCard
 } from 'lucide-react'
 import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiService' // Updated with new status types
+import { useAdminWebSocket } from '../../hooks/useWebSocket'
 
 const PendingReview: React.FC = () => {
   const [reviews, setReviews] = useState<OrderReview[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedStatus, setSelectedStatus] = useState('pending')
+  const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedPictureReplyStatus, setSelectedPictureReplyStatus] = useState('all')
   const [selectedReviews, setSelectedReviews] = useState<number[]>([])
   const [selectedReview, setSelectedReview] = useState<OrderReview | null>(null)
@@ -38,11 +39,80 @@ const PendingReview: React.FC = () => {
   const itemsPerPage = 10
   const [pictureReplies, setPictureReplies] = useState<{[itemId: string]: {image: string, notes: string}}>({})
   const [uploadingPictures, setUploadingPictures] = useState(false)
+  
+  // WebSocket hook for real-time updates
+  const { subscribe, isConnected } = useAdminWebSocket()
 
   // Load reviews on component mount
   useEffect(() => {
     loadReviews()
   }, [])
+
+  // WebSocket event listeners for real-time updates
+  useEffect(() => {
+    if (!isConnected) return;
+
+    // Listen for design review updates
+    const unsubscribeDesignReview = subscribe('design_review_updated', (data) => {
+      console.log('🔌 Real-time design review update:', data);
+      setReviews(prev => prev.map(review => 
+        review.id === data.orderId 
+          ? { ...review, ...data.reviewData }
+          : review
+      ));
+    });
+
+    // Listen for picture reply uploads
+    const unsubscribePictureReply = subscribe('picture_reply_uploaded', (data) => {
+      console.log('🔌 Real-time picture reply upload:', data);
+      setReviews(prev => prev.map(review => 
+        review.id === data.orderId 
+          ? { 
+              ...review, 
+              admin_picture_replies: data.replyData.pictureReplies,
+              picture_reply_uploaded_at: data.replyData.uploadedAt
+            }
+          : review
+      ));
+    });
+
+    // Listen for customer confirmations
+    const unsubscribeConfirmation = subscribe('customer_confirmation_received', (data) => {
+      console.log('🔌 Real-time customer confirmation:', data);
+      setReviews(prev => prev.map(review => 
+        review.id === data.orderId 
+          ? { 
+              ...review, 
+              customer_confirmations: data.confirmationData.confirmations,
+              customer_confirmed_at: data.confirmationData.confirmedAt
+            }
+          : review
+      ));
+    });
+
+    // Listen for order status changes
+    const unsubscribeStatusChange = subscribe('order_status_changed', (data) => {
+      console.log('🔌 Real-time order status change:', data);
+      setReviews(prev => prev.map(review => 
+        review.id === data.orderId 
+          ? { 
+              ...review, 
+              status: data.statusData.status,
+              admin_notes: data.statusData.adminNotes,
+              reviewed_at: data.statusData.reviewedAt
+            }
+          : review
+      ));
+    });
+
+    // Cleanup subscriptions
+    return () => {
+      unsubscribeDesignReview();
+      unsubscribePictureReply();
+      unsubscribeConfirmation();
+      unsubscribeStatusChange();
+    };
+  }, [isConnected, subscribe]);
 
   const loadReviews = async () => {
     try {
@@ -299,6 +369,22 @@ const PendingReview: React.FC = () => {
     }
   }
 
+  // Helper function to get proper item name
+  const getItemName = (item: any) => {
+    // For custom embroidery items - show design name
+    if (item?.productId === 'custom-embroidery') {
+      if (item?.customization?.embroideryData?.designName) {
+        return `Custom Embroidery: ${item.customization.embroideryData.designName}`;
+      }
+      if (item?.customization?.design?.name) {
+        return `Custom Embroidery: ${item.customization.design.name}`;
+      }
+      return 'Custom Embroidery';
+    }
+    // For regular products
+    return item?.product?.title || 'Custom Product';
+  };
+
   const getPictureReplyStatus = (review: OrderReview) => {
     // Check if there are admin picture replies
     const hasPictureReplies = review.admin_picture_replies && review.admin_picture_replies.length > 0;
@@ -326,31 +412,172 @@ const PendingReview: React.FC = () => {
     const hasCustomerConfirmations = customerConfirmations && Array.isArray(customerConfirmations) && customerConfirmations.length > 0;
     const customerConfirmedAt = review.customer_confirmed_at;
 
-    if (hasCustomerConfirmations && customerConfirmedAt) {
+    if (hasCustomerConfirmations) {
       // Check if all picture replies have been confirmed
       const allConfirmed = customerConfirmations?.every(conf => conf.confirmed === true);
       const anyRejected = customerConfirmations?.some(conf => conf.confirmed === false);
+      const confirmedCount = customerConfirmations?.filter(conf => conf.confirmed === true).length || 0;
+      const rejectedCount = customerConfirmations?.filter(conf => conf.confirmed === false).length || 0;
 
       if (allConfirmed) {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Confirmed
+            Confirmed ({confirmedCount})
           </span>
         );
-      } else if (anyRejected) {
+      } else if (anyRejected && confirmedCount === 0) {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
             <XCircle className="h-3 w-3 mr-1" />
-            Rejected
+            Rejected ({rejectedCount})
           </span>
+        );
+      } else if (anyRejected && confirmedCount > 0) {
+        return (
+          <div className="group relative">
+            <div className="flex items-center space-x-1 cursor-pointer">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                {confirmedCount}
+              </span>
+              <span className="text-gray-400">/</span>
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                <XCircle className="h-3 w-3 mr-1" />
+                {rejectedCount}
+              </span>
+              <span className="text-xs text-gray-500 ml-1">Mixed</span>
+            </div>
+            
+            {/* Tooltip with item details */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10">
+              <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg max-w-xs">
+                <div className="space-y-1">
+                  {(() => {
+                    try {
+                      const orderData = typeof review.order_data === 'string' 
+                        ? JSON.parse(review.order_data) 
+                        : review.order_data;
+                      
+                      if (Array.isArray(orderData)) {
+                        return customerConfirmations?.map((conf: any) => {
+                          // Use robust matching logic - check if itemId contains productId
+                          const item = orderData.find((item: any) => {
+                            // Check exact matches first
+                            if (item.id === conf.itemId || 
+                                item.productId === conf.itemId ||
+                                String(item.id) === String(conf.itemId) ||
+                                String(item.productId) === String(conf.itemId)) {
+                              return true;
+                            }
+                            
+                            // Check if itemId starts with productId (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                            if (conf.itemId && item.productId && conf.itemId.startsWith(item.productId)) {
+                              return true;
+                            }
+                            
+                            // Check if itemId contains productId with index (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                            if (conf.itemId && item.productId && conf.itemId.includes(item.productId)) {
+                              return true;
+                            }
+                            
+                            return false;
+                          });
+                          
+                          // Use the same getItemName function as Order Items section
+                          const itemName = item ? getItemName(item) : '';
+                          return (
+                            <div key={conf.itemId} className="flex items-center space-x-2">
+                              {conf.confirmed ? (
+                                <CheckCircle className="h-3 w-3 text-green-400 flex-shrink-0" />
+                              ) : (
+                                <XCircle className="h-3 w-3 text-red-400 flex-shrink-0" />
+                              )}
+                              <span className="truncate">{itemName}</span>
+                            </div>
+                          );
+                        });
+                      }
+                      return null;
+                    } catch (e) {
+                      return null;
+                    }
+                  })()}
+                </div>
+                <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          </div>
         );
       } else {
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-            <Clock className="h-3 w-3 mr-1" />
-            Partial
-          </span>
+          <div className="group relative">
+            <div className="flex items-center space-x-1 cursor-pointer">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <Clock className="h-3 w-3 mr-1" />
+                Partial
+              </span>
+            </div>
+            
+            {/* Tooltip with item details */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10">
+              <div className="bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg max-w-xs">
+                <div className="space-y-1">
+                  {(() => {
+                    try {
+                      const orderData = typeof review.order_data === 'string' 
+                        ? JSON.parse(review.order_data) 
+                        : review.order_data;
+                      
+                      if (Array.isArray(orderData)) {
+                        return customerConfirmations?.map((conf: any) => {
+                          // Use robust matching logic - check if itemId contains productId
+                          const item = orderData.find((item: any) => {
+                            // Check exact matches first
+                            if (item.id === conf.itemId || 
+                                item.productId === conf.itemId ||
+                                String(item.id) === String(conf.itemId) ||
+                                String(item.productId) === String(conf.itemId)) {
+                              return true;
+                            }
+                            
+                            // Check if itemId starts with productId (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                            if (conf.itemId && item.productId && conf.itemId.startsWith(item.productId)) {
+                              return true;
+                            }
+                            
+                            // Check if itemId contains productId with index (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                            if (conf.itemId && item.productId && conf.itemId.includes(item.productId)) {
+                              return true;
+                            }
+                            
+                            return false;
+                          });
+                          
+                          // Use the same getItemName function as Order Items section
+                          const itemName = item ? getItemName(item) : '';
+                          return (
+                            <div key={conf.itemId} className="flex items-center space-x-2">
+                              {conf.confirmed ? (
+                                <CheckCircle className="h-3 w-3 text-green-400 flex-shrink-0" />
+                              ) : (
+                                <XCircle className="h-3 w-3 text-red-400 flex-shrink-0" />
+                              )}
+                              <span className="truncate">{itemName}</span>
+                            </div>
+                          );
+                        });
+                      }
+                      return null;
+                    } catch (e) {
+                      return null;
+                    }
+                  })()}
+                </div>
+                <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+          </div>
         );
       }
     }
@@ -367,14 +594,14 @@ const PendingReview: React.FC = () => {
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending Review' },
-    { value: 'needs-changes', label: 'Picture Reply Pending' },
+    { value: 'needs-changes', label: 'Design Review Pending' },
     { value: 'pending-payment', label: 'Pending Payment' },
     { value: 'approved-processing', label: 'Approved - Processing Design' },
     { value: 'rejected', label: 'Rejected - Needs Re-upload' }
   ]
 
   const pictureReplyStatusOptions = [
-    { value: 'all', label: 'All Picture Replies' },
+    { value: 'all', label: 'All Design Reviews' },
     { value: 'no-reply', label: 'No Reply' },
     { value: 'pending', label: 'Pending Confirmation' },
     { value: 'confirmed', label: 'Confirmed' },
@@ -452,7 +679,16 @@ const PendingReview: React.FC = () => {
       {/* Page header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Pending Review</h1>
+          <div className="flex items-center space-x-4">
+            <h1 className="text-3xl font-bold text-gray-900">Pending Review</h1>
+            {/* WebSocket connection status */}
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Live Updates' : 'Offline'}
+              </span>
+            </div>
+          </div>
           <p className="mt-2 text-gray-600">
             Review and approve customized orders before checkout
           </p>
@@ -779,7 +1015,7 @@ const PendingReview: React.FC = () => {
                   return adminPictureReplies && Array.isArray(adminPictureReplies) && adminPictureReplies.length > 0;
                 })() && (
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h4 className="font-medium text-blue-900 mb-3">Picture Reply Summary</h4>
+                    <h4 className="font-medium text-blue-900 mb-3">Design Review Summary</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-600">
@@ -836,6 +1072,105 @@ const PendingReview: React.FC = () => {
                         <div className="text-sm text-red-700">Rejected</div>
                       </div>
                     </div>
+                    
+                    {/* Item-by-item status breakdown */}
+                    {(() => {
+                      try {
+                        const orderData = typeof selectedReview.order_data === 'string' 
+                          ? JSON.parse(selectedReview.order_data) 
+                          : selectedReview.order_data;
+                        
+                        let customerConfirmations = selectedReview.customer_confirmations;
+                        if (typeof customerConfirmations === 'string') {
+                          try {
+                            customerConfirmations = JSON.parse(customerConfirmations);
+                          } catch (e) {
+                            customerConfirmations = [];
+                          }
+                        }
+                        
+                        if (Array.isArray(orderData) && customerConfirmations && customerConfirmations.length > 0) {
+                          return (
+                            <div className="mt-4">
+                              <h5 className="font-medium text-blue-900 mb-2">Item Status Breakdown:</h5>
+                              <div className="space-y-2">
+                                {customerConfirmations.map((conf: any) => {
+                                  // Debug: Log all available data
+                                  console.log('🔍 Customer confirmation:', conf);
+                                  console.log('🔍 Order data items:', orderData.map((item: any) => ({ 
+                                    id: item.id, 
+                                    productId: item.productId,
+                                    idType: typeof item.id,
+                                    productIdType: typeof item.productId
+                                  })));
+                                  console.log('🔍 Looking for itemId:', conf.itemId, 'type:', typeof conf.itemId);
+                                  
+                                  // Use robust matching logic - check if itemId contains productId
+                                  const item = orderData.find((item: any) => {
+                                    // Check exact matches first
+                                    if (item.id === conf.itemId || 
+                                        item.productId === conf.itemId ||
+                                        String(item.id) === String(conf.itemId) ||
+                                        String(item.productId) === String(conf.itemId)) {
+                                      return true;
+                                    }
+                                    
+                                    // Check if itemId starts with productId (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                                    if (conf.itemId && item.productId && conf.itemId.startsWith(item.productId)) {
+                                      return true;
+                                    }
+                                    
+                                    // Check if itemId contains productId with index (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                                    if (conf.itemId && item.productId && conf.itemId.includes(item.productId)) {
+                                      return true;
+                                    }
+                                    
+                                    return false;
+                                  });
+                                  
+                                  console.log('🔍 Checking item:', { 
+                                    itemId: item?.id, 
+                                    productId: item?.productId, 
+                                    confItemId: conf.itemId,
+                                    itemFound: !!item
+                                  });
+                                  
+                                  console.log('🔍 Found item:', item);
+                                  
+                                  // Use the same getItemName function as Order Items section
+                                  const itemName = item ? getItemName(item) : '';
+                                  
+                                  console.log('🔍 Final item name:', itemName);
+                                  
+                                  return (
+                                    <div key={conf.itemId} className="flex items-center justify-between p-2 bg-white rounded border">
+                                      <span className="text-sm font-medium text-gray-900 truncate flex-1 mr-2">
+                                        {itemName || `Item ID: ${conf.itemId} (Not Found)`}
+                                      </span>
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                        conf.confirmed === true 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : conf.confirmed === false
+                                          ? 'bg-red-100 text-red-800'
+                                          : 'bg-yellow-100 text-yellow-800'
+                                      }`}>
+                                        {conf.confirmed === true ? '✓ Confirmed' : 
+                                         conf.confirmed === false ? '✗ Rejected' : 
+                                         '⏳ Pending'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      } catch (e) {
+                        return null;
+                      }
+                    })()}
+                    
                     {selectedReview.picture_reply_uploaded_at && (
                       <div className="mt-3 text-sm text-blue-600">
                         <strong>Last Uploaded:</strong> {new Date(selectedReview.picture_reply_uploaded_at).toLocaleDateString()}
@@ -927,11 +1262,23 @@ const PendingReview: React.FC = () => {
                                     </div>
                                     
                                     {/* Product Details */}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-gray-900 truncate">
-                                        {item.product?.title || (item.productId === 'custom-embroidery' ? 'Custom Embroidery' : 'Custom Item')}
-                                      </p>
-                                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-gray-900 truncate">
+                                         {(() => {
+                                           // Debug logging for Order Items section
+                                           console.log('Order Items - Item data:', {
+                                             itemId: item.id,
+                                             productId: item?.productId,
+                                             customization: item?.customization,
+                                             embroideryData: item?.customization?.embroideryData,
+                                             design: item?.customization?.design
+                                           });
+                                           const name = getItemName(item);
+                                           console.log('Order Items - Item name:', name);
+                                           return name;
+                                         })()}
+                                        </p>
+                                        <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                                       {item.customization && (
                                         <div className="mt-1">
                                           <p className="text-sm text-blue-600">
@@ -945,6 +1292,65 @@ const PendingReview: React.FC = () => {
                                           )}
                                         </div>
                                       )}
+                                      
+                                      {/* Customer Confirmation Status for this item */}
+                                      {(() => {
+                                        // Parse customer confirmations if it's a string
+                                        let customerConfirmations = selectedReview.customer_confirmations;
+                                        if (typeof customerConfirmations === 'string') {
+                                          try {
+                                            customerConfirmations = JSON.parse(customerConfirmations);
+                                          } catch (e) {
+                                            customerConfirmations = [];
+                                          }
+                                        }
+                                        
+                                        // Use robust matching logic for customer confirmations
+                                        const customerConfirmation = customerConfirmations?.find((conf: any) => {
+                                          // Check exact matches first
+                                          if (item.id === conf.itemId || 
+                                              item.productId === conf.itemId ||
+                                              String(item.id) === String(conf.itemId) ||
+                                              String(item.productId) === String(conf.itemId)) {
+                                            return true;
+                                          }
+                                          
+                                          // Check if itemId starts with productId (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                                          if (conf.itemId && item.productId && conf.itemId.startsWith(item.productId)) {
+                                            return true;
+                                          }
+                                          
+                                          // Check if itemId contains productId with index (e.g., "custom-embroidery-0" matches "custom-embroidery")
+                                          if (conf.itemId && item.productId && conf.itemId.includes(item.productId)) {
+                                            return true;
+                                          }
+                                          
+                                          return false;
+                                        });
+                                        if (customerConfirmation) {
+                                          return (
+                                            <div className="mt-2">
+                                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                                customerConfirmation.confirmed === true 
+                                                  ? 'bg-green-100 text-green-800' 
+                                                  : customerConfirmation.confirmed === false
+                                                  ? 'bg-red-100 text-red-800'
+                                                  : 'bg-yellow-100 text-yellow-800'
+                                              }`}>
+                                                {customerConfirmation.confirmed === true ? '✓ Confirmed by Customer' : 
+                                                 customerConfirmation.confirmed === false ? '✗ Rejected by Customer' : 
+                                                 '⏳ Pending Customer Review'}
+                                              </span>
+                                              {customerConfirmation.notes && (
+                                                <p className="text-xs text-gray-600 mt-1">
+                                                  <strong>Customer Notes:</strong> {customerConfirmation.notes}
+                                                </p>
+                                              )}
+                                            </div>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </div>
                                   </div>
                                 </div>
@@ -1042,9 +1448,9 @@ const PendingReview: React.FC = () => {
                   </div>
                 )}
 
-                {/* Picture Reply Section */}
+                {/* Design Review Section */}
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-4">Picture Replies</h4>
+                  <h4 className="font-medium text-gray-900 mb-4">Design Review & Communication</h4>
                   
                   {(() => {
                     const orderData = Array.isArray(selectedReview.order_data) 
@@ -1174,90 +1580,209 @@ const PendingReview: React.FC = () => {
                                       }
                                     }
                                     
+                                    // Debug logging for picture replies
+                                    console.log('🔍 Picture Reply Debug:', {
+                                      itemId: item.id,
+                                      itemKey: itemKey,
+                                      productId: item.productId,
+                                      adminPictureReplies: adminPictureReplies,
+                                      adminPictureRepliesType: typeof adminPictureReplies,
+                                      isArray: Array.isArray(adminPictureReplies),
+                                      allReplyItemIds: adminPictureReplies?.map((r: any) => r.itemId) || []
+                                    });
+                                    
                                     const existingReplies = (adminPictureReplies && Array.isArray(adminPictureReplies)) 
                                       ? adminPictureReplies.filter((reply: any) => {
                                           const replyItemId = reply.itemId;
-                                          return replyItemId === item.id || replyItemId === itemKey;
+                                          
+                                          // Multiple matching strategies
+                                          const exactMatch = replyItemId === item.id || replyItemId === itemKey;
+                                          const productIdMatch = replyItemId === item.productId;
+                                          const stringMatch = String(replyItemId) === String(item.id) || String(replyItemId) === String(itemKey);
+                                          
+                                          // Check if replyItemId starts with or contains the item's productId
+                                          const startsWithMatch = replyItemId && item.productId && replyItemId.startsWith(item.productId);
+                                          const containsMatch = replyItemId && item.productId && replyItemId.includes(item.productId);
+                                          
+                                          // Check if replyItemId starts with or contains the item's id
+                                          const startsWithIdMatch = replyItemId && item.id && replyItemId.startsWith(item.id);
+                                          const containsIdMatch = replyItemId && item.id && replyItemId.includes(item.id);
+                                          
+                                          const matches = exactMatch || productIdMatch || stringMatch || startsWithMatch || containsMatch || startsWithIdMatch || containsIdMatch;
+                                          
+                                          console.log('🔍 Enhanced Reply matching:', {
+                                            replyItemId,
+                                            itemId: item.id,
+                                            itemKey,
+                                            productId: item.productId,
+                                            exactMatch,
+                                            productIdMatch,
+                                            stringMatch,
+                                            startsWithMatch,
+                                            containsMatch,
+                                            startsWithIdMatch,
+                                            containsIdMatch,
+                                            matches
+                                          });
+                                          return matches;
                                         })
                                       : [];
                                     
+                                    console.log('🔍 Existing replies for item:', {
+                                      itemId: item.id,
+                                      existingReplies: existingReplies.length
+                                    });
+                                    
                                     if (existingReplies.length > 0) {
                                       return (
-                                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                          <h6 className="text-sm font-medium text-blue-900 mb-2">Admin Picture Replies</h6>
-                                          {existingReplies.map((reply: any, replyIndex: number) => (
-                                            <div key={replyIndex} className="mb-3 last:mb-0">
-                                              <div className="flex items-start space-x-3">
-                                                <img
-                                                  src={reply.image}
-                                                  alt="Admin Picture Reply"
-                                                  className="w-20 h-20 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                                  onClick={() => handleImageClick(
-                                                    reply.image,
-                                                    'Admin Picture Reply',
-                                                    'admin-reply'
-                                                  )}
-                                                />
-                                                <div className="flex-1">
-                                                  <p className="text-xs text-blue-700 mb-1">
-                                                    <strong>Uploaded:</strong> {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleDateString() : 'Unknown'}
-                                                  </p>
-                                                  {reply.notes && (
-                                                    <p className="text-xs text-blue-600">
-                                                      <strong>Notes:</strong> {reply.notes}
-                                                    </p>
-                                                  )}
-                                                  {/* Customer Confirmation Status */}
-                                                  {(() => {
-                                                    // Parse customer confirmations if it's a string
-                                                    let customerConfirmations = selectedReview.customer_confirmations;
-                                                    if (typeof customerConfirmations === 'string') {
-                                                      try {
-                                                        customerConfirmations = JSON.parse(customerConfirmations);
-                                                      } catch (e) {
-                                                        customerConfirmations = [];
-                                                      }
-                                                    }
-                                                    
-                                                    const customerConfirmation = customerConfirmations?.find((conf: any) => conf.itemId === reply.itemId);
-                                                    if (customerConfirmation) {
-                                                      return (
-                                                        <div className="mt-2">
-                                                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                                            customerConfirmation.confirmed === true 
-                                                              ? 'bg-green-100 text-green-800' 
-                                                              : customerConfirmation.confirmed === false
-                                                              ? 'bg-red-100 text-red-800'
-                                                              : 'bg-yellow-100 text-yellow-800'
-                                                          }`}>
-                                                            {customerConfirmation.confirmed === true ? '✓ Confirmed by Customer' : 
-                                                             customerConfirmation.confirmed === false ? '✗ Rejected by Customer' : 
-                                                             '⏳ Pending Customer Review'}
-                                                          </span>
-                                                          {customerConfirmation.notes && (
-                                                            <p className="text-xs text-gray-600 mt-1">
-                                                              <strong>Customer Notes:</strong> {customerConfirmation.notes}
+                                        <div className="mb-4">
+                                          <h6 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                                            <MessageSquare className="h-4 w-4 mr-2 text-blue-600" />
+                                            Design Review Conversation
+                                          </h6>
+                                          
+                                          {/* Chat-like conversation */}
+                                          <div className="space-y-3 max-h-96 overflow-y-auto">
+                                            {existingReplies.map((reply: any, replyIndex: number) => {
+                                              // Parse customer confirmations for this reply
+                                              let customerConfirmations = selectedReview.customer_confirmations;
+                                              if (typeof customerConfirmations === 'string') {
+                                                try {
+                                                  customerConfirmations = JSON.parse(customerConfirmations);
+                                                } catch (e) {
+                                                  customerConfirmations = [];
+                                                }
+                                              }
+                                              
+                                              const customerConfirmation = customerConfirmations?.find((conf: any) => {
+                                                if (reply.itemId === conf.itemId || String(reply.itemId) === String(conf.itemId)) return true;
+                                                if (conf.itemId && reply.itemId && conf.itemId.startsWith(reply.itemId)) return true;
+                                                if (conf.itemId && reply.itemId && conf.itemId.includes(reply.itemId)) return true;
+                                                return false;
+                                              });
+
+                                              return (
+                                                <div key={replyIndex} className="space-y-2">
+                                                  {/* Admin Message */}
+                                                  <div className="flex justify-end">
+                                                    <div className="max-w-xs lg:max-w-md">
+                                                      <div className="bg-blue-500 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+                                                        <div className="flex items-start space-x-3">
+                                                          <img
+                                                            src={reply.image}
+                                                            alt="Admin Picture Reply"
+                                                            className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            onClick={() => handleImageClick(
+                                                              reply.image,
+                                                              'Admin Picture Reply',
+                                                              'admin-reply'
+                                                            )}
+                                                          />
+                                                          <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium text-blue-100 mb-1">Admin</p>
+                                                            {reply.notes && (
+                                                              <p className="text-sm text-white mb-2">{reply.notes}</p>
+                                                            )}
+                                                            <p className="text-xs text-blue-200 opacity-75">
+                                                              {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleString() : 'Unknown time'}
                                                             </p>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+
+                                                  {/* Customer Response */}
+                                                  <div className="flex justify-start">
+                                                    <div className="max-w-xs lg:max-w-md">
+                                                      <div className={`rounded-2xl rounded-bl-md px-4 py-3 shadow-sm ${
+                                                        customerConfirmation?.confirmed === true 
+                                                          ? 'bg-green-100 text-green-800 border border-green-200'
+                                                          : customerConfirmation?.confirmed === false
+                                                          ? 'bg-red-100 text-red-800 border border-red-200'
+                                                          : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                                      }`}>
+                                                        <div className="flex items-center space-x-2 mb-1">
+                                                          <User className="h-4 w-4" />
+                                                          <p className="text-sm font-medium">Customer</p>
+                                                          {customerConfirmation && (
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                              customerConfirmation.confirmed === true 
+                                                                ? 'bg-green-200 text-green-800' 
+                                                                : customerConfirmation.confirmed === false
+                                                                ? 'bg-red-200 text-red-800'
+                                                                : 'bg-yellow-200 text-yellow-800'
+                                                            }`}>
+                                                              {customerConfirmation.confirmed === true ? '✓ Approved' : 
+                                                               customerConfirmation.confirmed === false ? '✗ Rejected' : 
+                                                               '⏳ Pending'}
+                                                            </span>
                                                           )}
                                                         </div>
-                                                      );
-                                                    }
-                                                    return (
-                                                      <div className="mt-2">
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                          ⏳ Awaiting Customer Review
-                                                        </span>
+                                                        
+                                                        {customerConfirmation ? (
+                                                          <div>
+                                                            {customerConfirmation.notes && (
+                                                              <p className="text-sm mb-2">{customerConfirmation.notes}</p>
+                                                            )}
+                                                            <p className="text-xs opacity-75">
+                                                              {customerConfirmation.confirmedAt ? 
+                                                                new Date(customerConfirmation.confirmedAt).toLocaleString() : 
+                                                                'Response pending'
+                                                              }
+                                                            </p>
+                                                          </div>
+                                                        ) : (
+                                                          <div>
+                                                            <p className="text-sm">Awaiting customer response...</p>
+                                                            <p className="text-xs opacity-75">Customer will review and respond</p>
+                                                          </div>
+                                                        )}
                                                       </div>
-                                                    );
-                                                  })()}
+                                                    </div>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            </div>
-                                          ))}
+                                              );
+                                            })}
+                                          </div>
                                         </div>
                                       );
                                     }
-                                    return null;
+                                    
+                                    // Show chat-like empty state when no replies found
+                                    return (
+                                      <div className="mb-4">
+                                        <h6 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                                          <MessageSquare className="h-4 w-4 mr-2 text-gray-400" />
+                                          Design Review Conversation
+                                        </h6>
+                                        
+                                        <div className="flex justify-center">
+                                          <div className="max-w-xs lg:max-w-md">
+                                            <div className="bg-gray-100 text-gray-600 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-200">
+                                              <div className="flex items-center space-x-2 mb-1">
+                                                <Clock className="h-4 w-4" />
+                                                <p className="text-sm font-medium">System</p>
+                                              </div>
+                                              <p className="text-sm">No picture replies uploaded yet for this item.</p>
+                                              <p className="text-xs opacity-75 mt-1">Upload a picture reply to start the conversation.</p>
+                                              
+                                              {/* Debug info in development */}
+                                              {adminPictureReplies && Array.isArray(adminPictureReplies) && adminPictureReplies.length > 0 && (
+                                                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                                                  <p className="font-medium text-yellow-800">Debug Info:</p>
+                                                  <p>Total replies in order: {adminPictureReplies.length}</p>
+                                                  <p>Available reply item IDs: {adminPictureReplies.map((r: any) => r.itemId).join(', ')}</p>
+                                                  <p>Current item ID: {item.id}</p>
+                                                  <p>Current item key: {itemKey}</p>
+                                                  <p>Current product ID: {item.productId}</p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
                                   })()}
                                   
                                   {/* Status-specific content */}
@@ -1305,66 +1830,76 @@ const PendingReview: React.FC = () => {
                                     </div>
                                   )}
 
-                                  {/* Picture Upload - Only show when order is in picture reply pending status */}
+                                  {/* Chat-like Upload Section */}
                                   {selectedReview.status === 'needs-changes' && (
-                                    <>
-                                      <div className="mb-3">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                          Upload Picture Reply
-                                        </label>
-                                        <div className="flex items-center space-x-4">
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                              console.log('📁 File input changed for item:', itemKey);
-                                              const file = e.target.files?.[0]
-                                              console.log('📁 Selected file:', file);
-                                              if (file) {
-                                                handlePictureReplyUpload(itemKey, file)
-                                              } else {
-                                                console.log('❌ No file selected');
-                                              }
-                                            }}
-                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                          />
-                                          {pictureReplies[itemKey]?.image && (
-                                            <div className="flex items-center space-x-2 text-green-600">
-                                              <Check className="h-4 w-4" />
-                                              <span className="text-sm">Uploaded</span>
+                                    <div className="mt-4">
+                                      <div className="flex justify-end">
+                                        <div className="max-w-xs lg:max-w-md w-full">
+                                          <div className="bg-gray-50 border border-gray-200 rounded-2xl rounded-br-md px-4 py-3 shadow-sm">
+                                            <div className="flex items-center space-x-2 mb-2">
+                                              <User className="h-4 w-4 text-blue-600" />
+                                              <p className="text-sm font-medium text-gray-700">Send Design Sample</p>
                                             </div>
-                                          )}
+                                            
+                                            {/* File Upload */}
+                                            <div className="mb-3">
+                                              <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                  console.log('📁 File input changed for item:', itemKey);
+                                                  const file = e.target.files?.[0]
+                                                  console.log('📁 Selected file:', file);
+                                                  if (file) {
+                                                    handlePictureReplyUpload(itemKey, file)
+                                                  } else {
+                                                    console.log('❌ No file selected');
+                                                  }
+                                                }}
+                                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                              />
+                                              {pictureReplies[itemKey]?.image && (
+                                                <div className="flex items-center space-x-2 text-green-600 mt-2">
+                                                  <Check className="h-4 w-4" />
+                                                  <span className="text-sm">Image ready to send</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                            
+                                            {/* Notes Input */}
+                                            <div className="mb-3">
+                                              <textarea
+                                                value={pictureReplies[itemKey]?.notes || ''}
+                                                onChange={(e) => handlePictureReplyNotesChange(itemKey, e.target.value)}
+                                                rows={2}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
+                                                placeholder="Add a message with your picture..."
+                                              />
+                                            </div>
+                                            
+                                            {/* Preview */}
+                                            {pictureReplies[itemKey]?.image && (
+                                              <div className="mb-3">
+                                                <img
+                                                  src={pictureReplies[itemKey].image}
+                                                  alt="Preview"
+                                                  className="w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                                  onClick={() => handleImageClick(
+                                                    pictureReplies[itemKey].image,
+                                                    'Picture Reply Preview',
+                                                    'preview'
+                                                  )}
+                                                />
+                                              </div>
+                                            )}
+                                            
+                                            <p className="text-xs text-gray-500">
+                                              Click "Upload Design Samples" below to send to customer
+                                            </p>
+                                          </div>
                                         </div>
                                       </div>
-                                      
-                                      {/* Notes */}
-                                      <div className="mb-3">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                          Notes (Optional)
-                                        </label>
-                                        <textarea
-                                          value={pictureReplies[itemKey]?.notes || ''}
-                                          onChange={(e) => handlePictureReplyNotesChange(itemKey, e.target.value)}
-                                          rows={2}
-                                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                          placeholder="Add any notes about this picture reply..."
-                                        />
-                                      </div>
-                                      
-                                      {/* Preview */}
-                                      {pictureReplies[itemKey]?.image && (
-                                        <div>
-                                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Preview
-                                          </label>
-                                          <img
-                                            src={pictureReplies[itemKey].image}
-                                            alt="Preview"
-                                            className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                                          />
-                                        </div>
-                                      )}
-                                    </>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1413,7 +1948,7 @@ const PendingReview: React.FC = () => {
                         disabled={uploadingPictures}
                         className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {uploadingPictures ? 'Uploading...' : 'Upload Picture Replies'}
+                        {uploadingPictures ? 'Uploading...' : 'Upload Design Samples'}
                       </button>
                     )}
                   </div>
@@ -1492,7 +2027,7 @@ const PendingReview: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="pending">1. Pending Review</option>
-                    <option value="needs-changes">2. Picture Reply Pending</option>
+                    <option value="needs-changes">2. Design Review Pending</option>
                     <option value="pending-payment">3. Pending Payment</option>
                     <option value="approved-processing">4. Approved - Processing Design</option>
                     <option value="rejected">Rejected - Needs Re-upload</option>

@@ -22,6 +22,7 @@ import {
   clearCustomEmbroidery 
 } from './clearOrdersSeeder';
 import { Op } from 'sequelize';
+import Message from '../models/messageModel';
 
 /**
  * Main Seeder Runner
@@ -171,6 +172,12 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
       await seedMaterialCosts();
     }
 
+    // Fresh start for messages
+    logger.info('🧹 Clearing chat messages...');
+    await Message.sync();
+    await Message.destroy({ where: {} });
+    logger.info('✅ Chat messages cleared.');
+
     // Migrate picture reply columns
     if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
       logger.info('🔧 Migrating picture reply columns...');
@@ -187,6 +194,12 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
       logger.info('🔧 Fixing cart product_id column type...');
       await fixCartProductIdColumnType();
+    }
+
+    // Update order_reviews status ENUM
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
+      logger.info('🔧 Updating order_reviews status ENUM...');
+      await updateOrderReviewStatusEnum();
     }
 
     logger.info('🎉 Database seeding completed successfully!');
@@ -326,6 +339,78 @@ async function fixCartProductIdColumnType(): Promise<void> {
     
   } catch (error) {
     logger.error('❌ Error fixing cart product_id column type:', error);
+    throw error;
+  }
+}
+
+async function updateOrderReviewStatusEnum(): Promise<void> {
+  try {
+    logger.info('🔄 Updating order_reviews status ENUM...');
+    
+    // Check if the table exists first
+    const [tables] = await sequelize.query(`
+      SELECT TABLE_NAME 
+      FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_NAME = 'order_reviews' 
+      AND TABLE_SCHEMA = DATABASE()
+    `);
+    
+    if (tables.length === 0) {
+      logger.info('⚠️ order_reviews table does not exist, skipping ENUM update');
+      return;
+    }
+    
+    // Check current ENUM values
+    const [columns] = await sequelize.query(`
+      SELECT COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'order_reviews' 
+      AND TABLE_SCHEMA = DATABASE()
+      AND COLUMN_NAME = 'status'
+    `);
+    
+    if (columns.length > 0) {
+      const columnInfo = columns[0] as any;
+      logger.info(`📊 Current status column type: ${columnInfo.COLUMN_TYPE}`);
+      
+      // Check if the new values are already present
+      if (columnInfo.COLUMN_TYPE.includes('pending-payment') && columnInfo.COLUMN_TYPE.includes('approved-processing')) {
+        logger.info('✅ Status ENUM already includes new values');
+        return;
+      }
+    }
+    
+    // Update the status column to include new values
+    await sequelize.query(`
+      ALTER TABLE order_reviews 
+      MODIFY COLUMN status ENUM(
+        'pending', 
+        'approved', 
+        'rejected', 
+        'needs-changes', 
+        'pending-payment', 
+        'approved-processing'
+      ) NOT NULL DEFAULT 'pending'
+    `);
+    
+    logger.info('✅ order_reviews status ENUM updated successfully');
+    
+    // Verify the change
+    const [updatedColumns] = await sequelize.query(`
+      SELECT COLUMN_TYPE 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'order_reviews' 
+      AND TABLE_SCHEMA = DATABASE()
+      AND COLUMN_NAME = 'status'
+    `);
+    
+    if (updatedColumns.length > 0) {
+      const updatedColumnInfo = updatedColumns[0] as any;
+      logger.info(`📊 Updated status column type: ${updatedColumnInfo.COLUMN_TYPE}`);
+    }
+    
+  } catch (error) {
+    logger.error('❌ Error updating order_reviews status ENUM:', error);
     throw error;
   }
 }

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react'
-import { useChat } from '../context/ChatContext'
+import { MessageCircle, X, Send, Minimize2, Maximize2, Wifi, WifiOff } from 'lucide-react'
+import { useRealTimeChat } from '../../shared/realTimeChatContext'
 import Button from '../../components/Button'
 
 export default function ChatWidget() {
-  const { isOpen, setIsOpen, messages, sendMessage, isAdminTyping, isConnected, quickQuestions } = useChat()
+  const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions } = useRealTimeChat()
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -34,6 +34,11 @@ export default function ChatWidget() {
 
   const handleQuickQuestion = (question: string) => {
     sendMessage(question)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(e.target.value)
+    setTyping(e.target.value.trim().length > 0)
   }
 
   const formatTime = (date: Date) => {
@@ -163,7 +168,7 @@ export default function ChatWidget() {
                   ref={inputRef}
                   type="text"
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder="Type your message..."
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { loggingService } from '../../shared/loggingService'
-import MultiAccountStorageService from '../../shared/multiAccountStorage'
+import { apiService } from '../services/apiService'
 
 export interface AdminUser {
   id: string
@@ -16,7 +16,7 @@ interface AdminAuthContextType {
   isLoggedIn: boolean
   isAdmin: boolean
   isSeller: boolean
-  login: (user: AdminUser) => void
+  login: (email: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   isLoading: boolean
 }
@@ -39,61 +39,142 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   const [user, setUser] = useState<AdminUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Check authentication status using session-based auth
+  const checkAuth = async () => {
+    try {
+      console.log('🔐 Checking admin session authentication...');
+      const response = await apiService.getProfile();
+      
+      if (response.success && response.data) {
+        console.log('✅ Admin session authenticated:', response.data);
+        
+        // Validate that user has admin/employee role
+        const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
+        if (!allowedRoles.includes(response.data.user.role)) {
+          console.log('❌ User does not have admin/employee role:', response.data.user.role);
+          setUser(null);
+          return;
+        }
+
+        // Convert to AdminUser format
+        const adminUser: AdminUser = {
+          id: response.data.user.id.toString(),
+          email: response.data.user.email,
+          firstName: response.data.user.firstName || '',
+          lastName: response.data.user.lastName || '',
+          role: response.data.user.role === 'admin' ? 'admin' : 'seller',
+          avatar: response.data.user.avatar || `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+        };
+        
+        setUser(adminUser);
+        loggingService.info('auth', 'admin_authenticated', {
+          userId: response.data.user.id,
+          role: response.data.user.role
+        });
+      } else {
+        console.log('❌ Admin session not authenticated');
+        setUser(null);
+      }
+    } catch (error) {
+      console.error('❌ Admin auth check failed:', error);
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
-    // Check for employee account specifically, regardless of current account type
-    const employeeData = MultiAccountStorageService.getAccountAuthData('employee');
-    const isEmployeeAuthenticated = MultiAccountStorageService.isAccountAuthenticated('employee');
-    
-    if (employeeData && isEmployeeAuthenticated) {
-      // Validate that user has admin/employee role
-      const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
-      if (!allowedRoles.includes(employeeData.user.role)) {
-        console.warn('Invalid employee role detected in admin area')
-        setUser(null)
-        setIsLoading(false)
-        return
+    const initializeAuth = async () => {
+      setIsLoading(true);
+      await checkAuth();
+      setIsLoading(false);
+    };
+
+    initializeAuth();
+  }, []);
+
+  // Periodic auth check every 5 minutes
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      console.log('🔄 Periodic admin auth check...');
+      await checkAuth();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      console.log('🔐 Attempting admin login...');
+      setIsLoading(true);
+      
+      const response = await apiService.login(email, password);
+      
+      if (response.success && response.data) {
+        console.log('✅ Admin login successful:', response.data);
+        
+        // Validate that user has admin/employee role
+        const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
+        if (!allowedRoles.includes(response.data.user.role)) {
+          console.log('❌ User does not have admin/employee role:', response.data.user.role);
+          setUser(null);
+          setIsLoading(false);
+          return false;
+        }
+
+        // Convert to AdminUser format
+        const adminUser: AdminUser = {
+          id: response.data.user.id.toString(),
+          email: response.data.user.email,
+          firstName: response.data.user.firstName || '',
+          lastName: response.data.user.lastName || '',
+          role: response.data.user.role === 'admin' ? 'admin' : 'seller',
+          avatar: response.data.user.avatar || `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+        };
+        
+        setUser(adminUser);
+        
+        // Log successful login
+        loggingService.logLoginSuccess(
+          adminUser.id,
+          adminUser.email,
+          adminUser.role
+        );
+        
+        return true;
+      } else {
+        console.log('❌ Admin login failed:', response.message);
+        setUser(null);
+        return false;
       }
+    } catch (error) {
+      console.error('❌ Admin login error:', error);
+      setUser(null);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      // Convert employee account data to AdminUser format
-      const adminUser: AdminUser = {
-        id: employeeData.user.id.toString(),
-        email: employeeData.user.email,
-        firstName: employeeData.user.firstName || '',
-        lastName: employeeData.user.lastName || '',
-        role: employeeData.user.role === 'admin' ? 'admin' : 'seller',
-        avatar: employeeData.user.avatar || `https://ui-avatars.com/api/?name=${employeeData.user.firstName}+${employeeData.user.lastName}&background=3b82f6&color=ffffff`
+  const logout = async (): Promise<void> => {
+    try {
+      console.log('🔐 Admin logging out...');
+      
+      // Log logout before clearing user data
+      if (user) {
+        loggingService.logLogout(user.id, user.email, user.role);
       }
-      setUser(adminUser)
-    } else {
-      setUser(null)
+      
+      // Call backend logout to clear session
+      await apiService.logout();
+      
+      setUser(null);
+    } catch (error) {
+      console.error('❌ Admin logout error:', error);
+      // Clear user data even if logout fails
+      setUser(null);
     }
-    setIsLoading(false)
-  }, [])
-
-  const login = (userData: AdminUser) => {
-    setUser(userData)
-    // Switch to employee account when logging in
-    MultiAccountStorageService.switchAccount('employee')
-    
-    // Log successful login
-    loggingService.logLoginSuccess(
-      userData.id,
-      userData.email,
-      userData.role
-    )
-  }
-
-  const logout = async () => {
-    // Log logout before clearing user data
-    if (user) {
-      loggingService.logLogout(user.id, user.email, user.role)
-    }
-    
-    // Use multi-account logout for employee account only
-    await MultiAccountStorageService.logoutAccount('employee')
-    
-    setUser(null)
-  }
+  };
 
   const value: AdminAuthContextType = {
     user,

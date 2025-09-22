@@ -1,6 +1,8 @@
 import app from './app';
 import { testDatabaseConnection, syncDatabase, sequelize } from './models';
 import { logger } from './utils/logger';
+import { initializeWebSocket } from './services/websocketService';
+import { createServer } from 'http';
 
 // Environment variables are loaded via --env-file flag
 
@@ -21,11 +23,18 @@ const startServer = async (): Promise<void> => {
       logger.info('Database synchronized without altering existing tables');
     }
 
+    // Create HTTP server
+    const server = createServer(app);
+    
+    // Initialize WebSocket service
+    initializeWebSocket(server);
+    
     // Start the server
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT} in ${NODE_ENV} mode`);
       logger.info(`📊 Health check: http://localhost:${PORT}/health`);
       logger.info(`🔐 Auth API: http://localhost:${PORT}/api/v1/auth`);
+      logger.info(`🔌 WebSocket server ready for real-time updates`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

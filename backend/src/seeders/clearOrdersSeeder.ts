@@ -117,11 +117,11 @@ async function displayClearingSummary(): Promise<void> {
     const [customEmbroidery] = await sequelize.query('SELECT COUNT(*) as count FROM custom_embroidery_orders');
 
     logger.info('📊 Clearing Summary:');
-    logger.info(`   • Order reviews: ${orderReviews[0].count}`);
-    logger.info(`   • Total cart items: ${cartItems[0].count}`);
-    logger.info(`   • Pending cart items: ${pendingCarts[0].count}`);
-    logger.info(`   • Submitted cart items: ${submittedCarts[0].count}`);
-    logger.info(`   • Custom embroidery orders: ${customEmbroidery[0].count}`);
+    logger.info(`   • Order reviews: ${(orderReviews[0] as any).count}`);
+    logger.info(`   • Total cart items: ${(cartItems[0] as any).count}`);
+    logger.info(`   • Pending cart items: ${(pendingCarts[0] as any).count}`);
+    logger.info(`   • Submitted cart items: ${(submittedCarts[0] as any).count}`);
+    logger.info(`   • Custom embroidery orders: ${(customEmbroidery[0] as any).count}`);
     
   } catch (error) {
     logger.warn('⚠️ Could not display clearing summary:', error);

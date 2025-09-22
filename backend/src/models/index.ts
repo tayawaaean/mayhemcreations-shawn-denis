@@ -10,6 +10,7 @@ import { EmbroideryOption, EmbroideryOptionAttributes, EmbroideryOptionCreationA
 import { Cart, CartAttributes, CartCreationAttributes } from './cartModel';
 import { FAQ, FAQAttributes, FAQCreationAttributes } from './faqModel';
 import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationAttributes } from './customEmbroideryModel';
+import Message, { MessageAttributes, MessageCreationAttributes } from './messageModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -164,8 +165,11 @@ export {
   FAQAttributes,
   FAQCreationAttributes,
   CustomEmbroidery,
+  Message,
   CustomEmbroideryAttributes,
   CustomEmbroideryCreationAttributes,
+  MessageAttributes,
+  MessageCreationAttributes,
 };
 
 // Export all models for easy access
@@ -181,6 +185,7 @@ export const models = {
   Cart,
   FAQ,
   CustomEmbroidery,
+  Message,
 };
 
 // Database synchronization function

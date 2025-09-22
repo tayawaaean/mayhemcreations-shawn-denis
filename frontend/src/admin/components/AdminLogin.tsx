@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle } from 'lucide-react'
 import Button from '../../components/Button'
-import { apiService } from '../services/apiService'
+import { useAdminAuth } from '../context/AdminAuthContext'
 
 interface AdminUser {
   id: string
@@ -47,74 +47,38 @@ interface AdminLoginProps {
 
 export default function AdminLogin({ onLogin }: AdminLoginProps) {
   const navigate = useNavigate()
+  const { login, isLoading } = useAdminAuth()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedDemo, setSelectedDemo] = useState<AdminUser | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setError('')
 
     try {
-      // Call the real API for authentication with admin role validation
-      const response = await apiService.login(formData.email, formData.password, 'admin')
+      // Use the session-based login from AdminAuthContext
+      const success = await login(formData.email, formData.password)
       
-      if (response.success && response.data) {
-        const { user: apiUser, sessionId, accessToken, refreshToken } = response.data
-        
-        // Create admin user object
-        const adminUser: AdminUser = {
-          id: apiUser.id.toString(),
-          email: apiUser.email,
-          firstName: apiUser.firstName,
-          lastName: apiUser.lastName,
-          role: apiUser.role === 'admin' ? 'admin' : 'seller',
-          avatar: `https://ui-avatars.com/api/?name=${apiUser.firstName}+${apiUser.lastName}&background=3b82f6&color=ffffff`
+      if (success) {
+        // Call the onLogin callback if provided
+        if (onLogin) {
+          // The user data will be available from the context
+          onLogin({} as AdminUser) // This will be updated by the context
         }
 
-        // Store auth data
-        AuthStorageService.storeAuthData({
-          user: {
-            id: apiUser.id,
-            email: apiUser.email,
-            firstName: apiUser.firstName,
-            lastName: apiUser.lastName,
-            role: apiUser.role,
-            permissions: apiUser.permissions,
-            isEmailVerified: apiUser.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString()
-          },
-          session: {
-            sessionId,
-            accessToken,
-            refreshToken,
-            lastActivity: new Date().toISOString()
-          }
-        })
-
-        onLogin?.(adminUser)
-        
-        // Navigate based on role
-        if (adminUser.role === 'admin') {
-          navigate('/admin')
-        } else {
-          navigate('/seller')
-        }
+        // Navigate to admin dashboard
+        navigate('/admin')
       } else {
-        setError(response.message || 'Login failed')
+        setError('Invalid email or password')
       }
     } catch (error: any) {
       console.error('Login error:', error)
       setError(error.message || 'An error occurred during login')
-    } finally {
-      setIsLoading(false)
     }
   }
 
