@@ -22,6 +22,7 @@ import FAQ from './ecommerce/routes/FAQ'
 import Contact from './ecommerce/routes/Contact'
 import Cart from './ecommerce/routes/Cart'
 import Checkout from './ecommerce/routes/Checkout'
+import OrderCheckout from './ecommerce/routes/OrderCheckout'
 import MyOrders from './ecommerce/routes/MyOrders'
 import VerifyEmail from './pages/VerifyEmail'
 
@@ -139,6 +140,16 @@ export default function App() {
                 <Navbar />
                 <div className="flex-1">
                   <Checkout />
+                </div>
+                <Footer />
+                <ChatWidget />
+              </div>
+            } />
+            <Route path="/order-checkout" element={
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <div className="flex-1">
+                  <OrderCheckout />
                 </div>
                 <Footer />
                 <ChatWidget />

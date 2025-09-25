@@ -38,18 +38,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isCleared, setIsCleared] = useState(false)
 
   // Load cart from database when user logs in
   useEffect(() => {
-    if (isLoggedIn && user && user.id) {
+    if (isLoggedIn && user && user.id && !isCleared) {
       console.log('🛒 Loading cart for authenticated user:', user.email)
       loadCartFromDatabase()
-    } else {
+    } else if (!isLoggedIn) {
       console.log('🛒 User not authenticated, clearing cart')
       // Clear cart when user logs out
       setItems([])
+      setIsCleared(false)
     }
-  }, [isLoggedIn, user])
+  }, [isLoggedIn, user, isCleared])
 
   // Save to localStorage when items change (for guest users)
   useEffect(() => {
@@ -202,6 +204,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }]
             }
           })
+          setIsCleared(false) // Reset cleared flag when adding items
           return true
         }
         return false
@@ -231,6 +234,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           reviewStatus: 'approved' as const // Regular items are approved for guest users
         }]
       })
+      setIsCleared(false) // Reset cleared flag when adding items
       return true
     }
   }
@@ -287,6 +291,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       // Guest user - use localStorage
       setItems((prev) => prev.map((p) => p.productId === productId ? { ...p, quantity: qty } : p))
+      setIsCleared(false) // Reset cleared flag when updating items
       return true
     }
   }
@@ -301,6 +306,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     setItems([])
+    setIsCleared(true)
   }
 
   return <CartContext.Provider value={{ 

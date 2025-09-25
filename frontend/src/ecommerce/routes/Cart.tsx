@@ -108,7 +108,10 @@ export default function Cart() {
         alert(`Order submitted for review! Order ID: ${response.data?.orderReviewId}. You will be notified once the admin reviews your customized items.`)
         
         // Clear the cart after successful submission
-        clear()
+        await clear()
+        
+        // Clear localStorage as well to prevent reloading
+        localStorage.removeItem('mayhem_cart_v1')
         
         // Navigate to orders page
         window.location.href = '/my-orders'
@@ -312,34 +315,22 @@ export default function Cart() {
                   </div>
 
                   <div className="mt-4 sm:mt-6 space-y-3">
-                    {/* Check if there are any items that need review */}
-                    {enriched.some(item => 
-                      item.reviewStatus === 'pending'
-                    ) ? (
-                      <div className="space-y-3">
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                          <p className="text-sm text-yellow-800">
-                            You have customized items that need review. 
-                            Submit your order for admin review and approval.
-                          </p>
-                        </div>
-                        <Button 
-                          size="lg" 
-                          className="w-full bg-yellow-600 hover:bg-yellow-700"
-                          onClick={handleSubmitForReview}
-                        >
-                          Submit for Review
-                        </Button>
+                    {/* Submit for review - this is the only action in cart */}
+                    <div className="space-y-3">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800">
+                          Customized items require admin review before processing. 
+                          Submit your order for review and approval.
+                        </p>
                       </div>
-                    ) : (
                       <Button 
                         size="lg" 
-                        className="w-full"
-                        onClick={() => navigate('/checkout')}
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        onClick={handleSubmitForReview}
                       >
-                        Proceed to Checkout
+                        Submit for Review
                       </Button>
-                    )}
+                    </div>
                     
                     <div className="text-center">
                       <span className="text-xs sm:text-sm text-gray-600">

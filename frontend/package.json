@@ -10,6 +10,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@paypal/react-paypal-js": "^8.9.1",
+    "@stripe/stripe-js": "^7.9.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.257.0",
     "react": "^18.2.0",

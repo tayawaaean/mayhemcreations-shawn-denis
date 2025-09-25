@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User } from 'lucide-react'
 import Button from '../../components/Button'
@@ -410,6 +411,7 @@ const findItemForReply = (reply: PictureReply, order: Order): { productName: str
 
 
 export default function MyOrders() {
+  const navigate = useNavigate()
   const { user, isLoggedIn } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -630,11 +632,11 @@ export default function MyOrders() {
 
   // Handle proceed to checkout
   const handleProceedToCheckout = (order: Order) => {
-    // Navigate to checkout with the order data
-    // This would typically involve passing the order data to the checkout page
     console.log('Proceeding to checkout for order:', order)
-    // For now, just show an alert - you can implement the actual checkout flow
-    alert('Proceeding to checkout...')
+    // Store order data in sessionStorage for the checkout page
+    sessionStorage.setItem('checkoutOrder', JSON.stringify(order))
+    // Navigate to checkout page
+    navigate('/order-checkout')
   }
 
   // Handle re-upload modal

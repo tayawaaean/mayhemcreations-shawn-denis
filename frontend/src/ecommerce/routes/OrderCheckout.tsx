@@ -1,4 +1,9 @@
-import React, { useState } from 'react'
+/**
+ * Order Checkout Component
+ * Handles checkout for specific orders (not cart-based)
+ */
+
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, 
@@ -14,16 +19,32 @@ import {
   Truck,
   AlertCircle
 } from 'lucide-react'
-import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import Button from '../../components/Button'
 import StripePaymentForm from '../../components/StripePaymentForm'
 import PayPalButton from '../../components/PayPalButton'
 import { paymentService, PaymentData, PaymentResult } from '../../shared/paymentService'
 
-export default function Checkout() {
+interface OrderItem {
+  id: string
+  productId: string
+  productName: string
+  productImage: string
+  quantity: number
+  price: number
+  customization?: any
+}
+
+interface Order {
+  id: string | number
+  items: OrderItem[]
+  total: number
+  status: string
+}
+
+export default function OrderCheckout() {
   const navigate = useNavigate()
-  const { items, clear } = useCart()
+  const [order, setOrder] = useState<Order | null>(null)
   const [currentStep, setCurrentStep] = useState(1)
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal' | 'google'>('stripe')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -64,6 +85,55 @@ export default function Checkout() {
     { number: 3, title: 'Review', description: 'Order summary' }
   ]
 
+  // Load order from sessionStorage on component mount
+  useEffect(() => {
+    const orderData = sessionStorage.getItem('checkoutOrder')
+    console.log('🔍 Loading order data from sessionStorage:', orderData)
+    
+    if (orderData) {
+      try {
+        const parsedOrder = JSON.parse(orderData)
+        console.log('✅ Parsed order data:', parsedOrder)
+        setOrder(parsedOrder)
+      } catch (error) {
+        console.error('❌ Error parsing order data:', error)
+        navigate('/my-orders')
+      }
+    } else {
+      console.log('❌ No order data found in sessionStorage')
+      // No order data found, redirect to orders page
+      navigate('/my-orders')
+    }
+  }, [navigate])
+
+  // Handle Stripe Checkout success/cancel redirects
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('success')
+    const canceled = urlParams.get('canceled')
+    const orderId = urlParams.get('orderId')
+
+    if (success === 'true' && orderId) {
+      // Payment successful
+      setPaymentResult({
+        success: true,
+        paymentId: `stripe_${Date.now()}`,
+        payerEmail: formData.email
+      })
+      setIsComplete(true)
+      sessionStorage.removeItem('checkoutOrder')
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (canceled === 'true') {
+      // Payment canceled
+      setPaymentError('Payment was canceled. You can try again or choose a different payment method.')
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [formData.email])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
     setFormData(prev => ({
@@ -73,9 +143,9 @@ export default function Checkout() {
   }
 
   // Helper function to calculate item price including customization costs
-  const calculateItemPrice = (item: any) => {
+  const calculateItemPrice = (item: OrderItem) => {
     const product = products.find(p => p.id === item.productId)
-    if (!product) return 0
+    if (!product) return item.price // Use stored price if product not found
     
     let itemPrice = product.price
     
@@ -88,15 +158,15 @@ export default function Checkout() {
       if (selectedStyles.backing) itemPrice += selectedStyles.backing.price
       if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price
       
-      selectedStyles.threads.forEach((thread: any) => itemPrice += thread.price)
-      selectedStyles.upgrades.forEach((upgrade: any) => itemPrice += upgrade.price)
+      selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price)
+      selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price)
     }
     
     return itemPrice
   }
 
   const calculateSubtotal = () => {
-    return items.reduce((total, item) => {
+    return order.items.reduce((total, item) => {
       const itemPrice = calculateItemPrice(item)
       return total + (itemPrice * item.quantity)
     }, 0)
@@ -113,10 +183,7 @@ export default function Checkout() {
                formData.phone && formData.address && formData.city && 
                formData.state && formData.zipCode
       case 2:
-        if (paymentMethod === 'stripe') {
-          return formData.cardNumber && formData.expiryDate && formData.cvv && formData.cardName
-        }
-        return true // PayPal and Google Pay don't need card details
+        return true // Both Stripe and PayPal are ready to proceed
       case 3:
         return true
       default:
@@ -141,13 +208,73 @@ export default function Checkout() {
     setPaymentError(null)
     
     try {
-      // Prepare payment data
+      if (paymentMethod === 'stripe') {
+        // Use Stripe Checkout for Stripe payments
+        await handleStripeCheckout()
+      } else {
+        // Use existing payment service for PayPal
+        const paymentData: PaymentData = {
+          amount: Math.round(calculateTotal() * 100), // Convert to cents
+          currency: 'usd',
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+          description: `Order ${order.id} - ${order.items.length} item(s)`,
+          billingAddress: {
+            line1: formData.address,
+            line2: formData.apartment,
+            city: formData.city,
+            state: formData.state,
+            postal_code: formData.zipCode,
+            country: formData.country
+          },
+          items: order.items.map((item) => {
+            const product = products.find(p => p.id === item.productId)
+            const itemPrice = calculateItemPrice(item)
+            
+            return {
+              name: product?.name || item.productName,
+              quantity: item.quantity,
+              price: itemPrice,
+              currency: 'usd'
+            }
+          }),
+          metadata: {
+            orderId: order.id,
+            customerPhone: formData.phone,
+            notes: formData.notes
+          }
+        }
+
+        // Process payment
+        const result = await paymentService.processPayment(paymentMethod, paymentData)
+        setPaymentResult(result)
+
+        if (result.success) {
+          setIsComplete(true)
+          // Clear sessionStorage after successful payment
+          sessionStorage.removeItem('checkoutOrder')
+        } else {
+          setPaymentError(result.error || 'Payment failed')
+        }
+      }
+    } catch (error) {
+      console.error('Payment processing error:', error)
+      setPaymentError(error instanceof Error ? error.message : 'Payment processing failed')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleStripeCheckout = async () => {
+    try {
+      // For now, use the existing Stripe service as a fallback
+      // TODO: Implement proper Stripe Checkout session creation on backend
       const paymentData: PaymentData = {
         amount: Math.round(calculateTotal() * 100), // Convert to cents
         currency: 'usd',
         customerEmail: formData.email,
         customerName: `${formData.firstName} ${formData.lastName}`,
-        description: `Order for ${items.length} item(s)`,
+        description: `Order ${order.id} - ${order.items.length} item(s)`,
         billingAddress: {
           line1: formData.address,
           line2: formData.apartment,
@@ -156,85 +283,38 @@ export default function Checkout() {
           postal_code: formData.zipCode,
           country: formData.country
         },
-        items: items.map((item, index) => {
+        items: order.items.map((item) => {
           const product = products.find(p => p.id === item.productId)
           const itemPrice = calculateItemPrice(item)
           
           return {
-            name: product?.name || `Product ${item.productId}`,
+            name: product?.name || item.productName,
             quantity: item.quantity,
             price: itemPrice,
             currency: 'usd'
           }
         }),
         metadata: {
-          orderId: `order-${Date.now()}`,
+          orderId: order.id,
           customerPhone: formData.phone,
           notes: formData.notes
         }
       }
 
-      // Process payment
-      const result = await paymentService.processPayment(paymentMethod, paymentData)
+      // Process payment using existing Stripe service
+      const result = await paymentService.processPayment('stripe', paymentData)
       setPaymentResult(result)
 
       if (result.success) {
-        // Create order with payment information
-        const orderData = {
-          id: `order-${Date.now()}`,
-          orderNumber: `MC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
-          status: 'processing',
-          orderDate: new Date().toISOString().split('T')[0],
-          estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          total: calculateTotal(),
-          items: items.map((item, index) => ({
-            id: `item-${index}`,
-            productId: item.productId,
-            productName: `Product ${item.productId}`,
-            productImage: 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=Product',
-            quantity: item.quantity,
-            price: item.price,
-            customization: item.customization
-          })),
-          shippingAddress: {
-            name: `${formData.firstName} ${formData.lastName}`,
-            street: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zipCode: formData.zipCode
-          },
-          paymentMethod: paymentMethod === 'stripe' ? 'Credit Card' : 
-                        paymentMethod === 'paypal' ? 'PayPal' : 
-                        paymentMethod === 'google' ? 'Google Pay' : 'Credit Card',
-          paymentStatus: 'completed',
-          paymentProvider: paymentMethod,
-          paymentDetails: {
-            transactionId: result.paymentId || `txn_${Date.now()}`,
-            providerTransactionId: result.paymentId || `${paymentMethod}_${Date.now()}`,
-            processedAt: new Date().toISOString(),
-            ...(result.payerEmail && { payerEmail: result.payerEmail }),
-            ...(result.payerName && { payerName: result.payerName })
-          }
-        }
-        
-        // In a real app, this would be sent to your backend
-        console.log('Order created:', orderData)
-        
         setIsComplete(true)
-        
-        // Clear cart after successful order
-        setTimeout(() => {
-          clear()
-          navigate('/')
-        }, 3000)
+        // Clear sessionStorage after successful payment
+        sessionStorage.removeItem('checkoutOrder')
       } else {
         setPaymentError(result.error || 'Payment failed')
       }
     } catch (error) {
-      console.error('Payment processing error:', error)
-      setPaymentError(error instanceof Error ? error.message : 'Payment processing failed')
-    } finally {
-      setIsProcessing(false)
+      console.error('Stripe payment error:', error)
+      setPaymentError('Failed to process payment. Please try again.')
     }
   }
 
@@ -252,6 +332,18 @@ export default function Checkout() {
     setPaymentError(error instanceof Error ? error.message : 'Payment failed')
   }
 
+  // Show loading state while order is being loaded
+  if (!order) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading order details...</p>
+        </div>
+      </main>
+    )
+  }
+
   if (isComplete) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -259,13 +351,13 @@ export default function Checkout() {
           <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-purple-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
           <p className="text-gray-600 mb-6">
-            Your order has been confirmed and will be processed shortly. 
-            You'll receive an email confirmation soon.
+            Your payment has been processed successfully. 
+            Your order will be processed shortly.
           </p>
           <div className="space-y-2 text-sm text-gray-500">
-            <p>Order ID: #MAY-{Date.now().toString().slice(-6)}</p>
+            <p>Order ID: {order.id}</p>
             <p>Payment Method: {paymentMethod === 'stripe' ? 'Credit Card' : 
                                paymentMethod === 'paypal' ? 'PayPal' : 
                                paymentMethod === 'google' ? 'Google Pay' : 'Credit Card'}</p>
@@ -273,24 +365,13 @@ export default function Checkout() {
             {paymentResult?.paymentId && (
               <p>Transaction ID: {paymentResult.paymentId}</p>
             )}
-            {paymentResult?.payerEmail && (
-              <p>Payer Email: {paymentResult.payerEmail}</p>
-            )}
             <p>Estimated delivery: 3-5 business days</p>
           </div>
-        </div>
-      </main>
-    )
-  }
-
-  if (items.length === 0) {
-    return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Your cart is empty</h1>
-          <Button onClick={() => navigate('/products')}>
-            Continue Shopping
-          </Button>
+          <div className="mt-6">
+            <Button onClick={() => navigate('/my-orders')}>
+              View My Orders
+            </Button>
+          </div>
         </div>
       </main>
     )
@@ -303,49 +384,50 @@ export default function Checkout() {
         <div className="mb-8">
           <Button
             variant="outline"
-            onClick={() => navigate('/cart')}
+            onClick={() => navigate('/my-orders')}
             className="flex items-center mb-6"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Cart
+            Back to Orders
           </Button>
+          
           <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-          <p className="text-gray-600 mt-2">Complete your order securely</p>
-        </div>
-
-        {/* Progress Steps */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                  currentStep >= step.number 
-                    ? 'bg-accent text-white' 
-                    : 'bg-gray-200 text-gray-600'
-                }`}>
-                  {step.number}
-                </div>
-                <div className="ml-3">
-                  <p className={`font-medium ${
-                    currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
-                  }`}>
-                    {step.title}
-                  </p>
-                  <p className="text-sm text-gray-500">{step.description}</p>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`w-16 h-0.5 mx-4 ${
-                    currentStep > step.number ? 'bg-accent' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
-          </div>
+          <p className="text-gray-600 mt-2">Complete your order for Order #{order.id}</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Progress Steps */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                {steps.map((step, index) => (
+                  <div key={step.number} className="flex items-center">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+                      currentStep >= step.number
+                        ? 'bg-accent text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      {step.number}
+                    </div>
+                    <div className="ml-3">
+                      <p className={`text-sm font-medium ${
+                        currentStep >= step.number ? 'text-accent' : 'text-gray-600'
+                      }`}>
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-gray-500">{step.description}</p>
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className={`w-16 h-0.5 mx-4 ${
+                        currentStep > step.number ? 'bg-accent' : 'bg-gray-200'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Step 1: Shipping Information */}
             {currentStep === 1 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -369,7 +451,7 @@ export default function Checkout() {
                           value={formData.firstName}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Enter your first name"
+                          placeholder="Enter first name"
                         />
                       </div>
                       <div>
@@ -382,7 +464,7 @@ export default function Checkout() {
                           value={formData.lastName}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Enter your last name"
+                          placeholder="Enter last name"
                         />
                       </div>
                     </div>
@@ -398,7 +480,7 @@ export default function Checkout() {
                           value={formData.email}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Enter your email"
+                          placeholder="Enter email address"
                         />
                       </div>
                       <div>
@@ -411,7 +493,7 @@ export default function Checkout() {
                           value={formData.phone}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Enter your phone number"
+                          placeholder="Enter phone number"
                         />
                       </div>
                     </div>
@@ -431,7 +513,7 @@ export default function Checkout() {
                           value={formData.address}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Enter your street address"
+                          placeholder="Enter street address"
                         />
                       </div>
                       
@@ -445,11 +527,11 @@ export default function Checkout() {
                           value={formData.apartment}
                           onChange={handleInputChange}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                          placeholder="Apartment, suite, unit, etc."
+                          placeholder="Apartment, suite, etc."
                         />
                       </div>
                       
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <div className="grid md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             City *
@@ -476,19 +558,20 @@ export default function Checkout() {
                             placeholder="Enter state"
                           />
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            ZIP Code *
-                          </label>
-                          <input
-                            type="text"
-                            name="zipCode"
-                            value={formData.zipCode}
-                            onChange={handleInputChange}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                            placeholder="Enter ZIP code"
-                          />
-                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          ZIP Code *
+                        </label>
+                        <input
+                          type="text"
+                          name="zipCode"
+                          value={formData.zipCode}
+                          onChange={handleInputChange}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
+                          placeholder="Enter ZIP code"
+                        />
                       </div>
                       
                       <div>
@@ -541,7 +624,7 @@ export default function Checkout() {
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium text-gray-900">Choose Payment Method</h3>
                     
-                    {/* Stripe */}
+                    {/* Stripe Checkout */}
                     <div 
                       className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
                         paymentMethod === 'stripe' 
@@ -557,7 +640,7 @@ export default function Checkout() {
                           </div>
                           <div>
                             <h4 className="font-medium text-gray-900">Credit/Debit Card</h4>
-                            <p className="text-sm text-gray-600">Visa, Mastercard, American Express</p>
+                            <p className="text-sm text-gray-600">Secure checkout with Stripe</p>
                           </div>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 ${
@@ -602,37 +685,6 @@ export default function Checkout() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Google Pay */}
-                    <div 
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'google' 
-                          ? 'border-accent bg-accent/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setPaymentMethod('google')}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center mr-4">
-                            <span className="text-white font-bold text-sm">G</span>
-                          </div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">Google Pay</h4>
-                            <p className="text-sm text-gray-600">Pay with Google Pay</p>
-                          </div>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 ${
-                          paymentMethod === 'google' 
-                            ? 'border-accent bg-accent' 
-                            : 'border-gray-300'
-                        }`}>
-                          {paymentMethod === 'google' && (
-                            <div className="w-full h-full rounded-full bg-white scale-50"></div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Payment Forms */}
@@ -654,7 +706,7 @@ export default function Checkout() {
                             country: formData.country
                           },
                           metadata: {
-                            orderId: `order-${Date.now()}`,
+                            orderId: order.id,
                             customerPhone: formData.phone,
                             notes: formData.notes
                           }
@@ -673,15 +725,15 @@ export default function Checkout() {
                         paymentData={{
                           amount: calculateTotal(),
                           currency: 'usd',
-                          description: `Order for ${items.length} item(s)`,
+                          description: `Order ${order.id} - ${order.items.length} item(s)`,
                           customerEmail: formData.email,
                           customerName: `${formData.firstName} ${formData.lastName}`,
-                          items: items.map((item, index) => {
+                          items: order.items.map((item) => {
                             const product = products.find(p => p.id === item.productId)
                             const itemPrice = calculateItemPrice(item)
                             
                             return {
-                              name: product?.name || `Product ${item.productId}`,
+                              name: product?.name || item.productName,
                               quantity: item.quantity,
                               price: itemPrice,
                               currency: 'usd'
@@ -700,21 +752,6 @@ export default function Checkout() {
                           height: 50
                         }}
                       />
-                    </div>
-                  )}
-
-                  {paymentMethod === 'google' && (
-                    <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Google Pay</h3>
-                      <div className="p-6 bg-gray-50 rounded-lg text-center">
-                        <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <span className="text-white font-bold text-xl">G</span>
-                        </div>
-                        <p className="text-gray-600 mb-4">Google Pay integration coming soon</p>
-                        <p className="text-sm text-gray-500">
-                          For now, please use Credit Card or PayPal payment methods.
-                        </p>
-                      </div>
                     </div>
                   )}
 
@@ -760,59 +797,73 @@ export default function Checkout() {
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
                     <div className="space-y-4">
-                      {items.map((item, index) => {
-                        const product = products.find(p => p.id === item.productId)
-                        if (!product) return null
-                        
-                        // Calculate item price including customization costs
-                        const itemPrice = calculateItemPrice(item)
-                        
-                        return (
-                          <div key={index} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-start space-x-4">
-                              <img
-                                src={product.image}
-                                alt={product.title}
-                                className="w-16 h-16 object-cover rounded-lg"
-                              />
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{product.title}</h4>
-                                <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                                
-                                {item.customization && (
-                                  <div className="mt-2 space-y-1">
-                                    <p className="text-sm font-medium text-gray-700">Customization:</p>
-                                    {item.customization.design && (
+                      {console.log('🔍 Order items for summary:', order?.items)}
+                      {order?.items?.length > 0 ? (
+                        order.items.map((item, index) => {
+                          const product = products.find(p => p.id === item.productId)
+                          console.log('🔍 Item details:', { item, product })
+                          if (!product) {
+                            console.log('❌ Product not found for item:', item.productId)
+                            return null
+                          }
+                          
+                          // Calculate item price including customization costs
+                          const itemPrice = calculateItemPrice(item)
+                          
+                          return (
+                            <div key={index} className="border border-gray-200 rounded-lg p-4">
+                              <div className="flex items-start space-x-4">
+                                <img
+                                  src={product.image}
+                                  alt={product.title}
+                                  className="w-16 h-16 object-cover rounded-lg"
+                                />
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-900">{product.title}</h4>
+                                  <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
+                                  
+                                  {item.customization && (
+                                    <div className="mt-2 space-y-1">
+                                      <p className="text-sm font-medium text-gray-700">Customization:</p>
+                                      {item.customization.design && (
+                                        <p className="text-xs text-gray-600">
+                                          Design: {item.customization.design.name}
+                                        </p>
+                                      )}
                                       <p className="text-xs text-gray-600">
-                                        Design: {item.customization.design.name}
+                                        Placement: {item.customization.placement}
                                       </p>
-                                    )}
-                                    <p className="text-xs text-gray-600">
-                                      Placement: {item.customization.placement}
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      Size: {item.customization.size}
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      Color: {item.customization.color}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="font-medium text-gray-900">
-                                  ${(itemPrice * item.quantity).toFixed(2)}
-                                </p>
-                                {item.customization && (
-                                  <p className="text-xs text-gray-500">
-                                    ${itemPrice.toFixed(2)} each
+                                      <p className="text-xs text-gray-600">
+                                        Size: {item.customization.size}
+                                      </p>
+                                      <p className="text-xs text-gray-600">
+                                        Color: {item.customization.color}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-medium text-gray-900">
+                                    ${(itemPrice * item.quantity).toFixed(2)}
                                   </p>
-                                )}
+                                  {item.customization && (
+                                    <p className="text-xs text-gray-500">
+                                      ${itemPrice.toFixed(2)} each
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">No items found in order</p>
+                          <p className="text-sm text-gray-400 mt-2">
+                            Order ID: {order?.id || 'Unknown'}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -857,13 +908,21 @@ export default function Checkout() {
                 </Button>
               ) : (
                 <Button
-                  variant="add-to-cart"
                   onClick={handlePlaceOrder}
-                  disabled={!canProceed() || isProcessing}
-                  isLoading={isProcessing}
+                  disabled={isProcessing}
+                  className="bg-accent hover:bg-accent/90"
                 >
-                  {isProcessing ? 'Processing...' : 'Place Order'}
-                  <Lock className="w-4 h-4 ml-2" />
+                  {isProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {paymentMethod === 'stripe' ? 'Processing with Stripe...' : 'Processing...'}
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      {paymentMethod === 'stripe' ? 'Pay with Stripe' : 'Complete Order'}
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -872,7 +931,7 @@ export default function Checkout() {
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Total</h3>
               
               <div className="space-y-4">
                 <div className="flex justify-between">
@@ -907,18 +966,16 @@ export default function Checkout() {
               </div>
 
               {/* Security Badges */}
-              <div className="mt-6 space-y-3">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Shield className="w-4 h-4 mr-2" />
-                  <span>256-bit SSL encryption</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Lock className="w-4 h-4 mr-2" />
-                  <span>Secure payment processing</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Truck className="w-4 h-4 mr-2" />
-                  <span>Fast & reliable delivery</span>
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="flex items-center space-x-4 text-xs text-gray-500">
+                  <div className="flex items-center">
+                    <Shield className="w-4 h-4 mr-1" />
+                    <span>Secure</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Truck className="w-4 h-4 mr-1" />
+                    <span>Fast Delivery</span>
+                  </div>
                 </div>
               </div>
             </div>

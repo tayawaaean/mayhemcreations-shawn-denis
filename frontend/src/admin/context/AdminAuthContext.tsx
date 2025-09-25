@@ -48,10 +48,28 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       if (response.success && response.data) {
         console.log('✅ Admin session authenticated:', response.data);
         
-        // Validate that user has admin/employee role
+        // Check if user has a role and validate admin/employee role
+        const userRole = response.data.user.role
         const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
-        if (!allowedRoles.includes(response.data.user.role)) {
-          console.log('❌ User does not have admin/employee role:', response.data.user.role);
+        
+        // Handle different role structures
+        let roleName: string | null = null
+        if (userRole) {
+          if (typeof userRole === 'string') {
+            roleName = userRole
+          } else if (userRole && typeof userRole === 'object' && 'name' in userRole) {
+            roleName = userRole.name
+          }
+        }
+        
+        console.log('🔍 User role information:', {
+          role: userRole,
+          roleName: roleName,
+          userEmail: response.data.user.email
+        });
+        
+        if (!roleName || !allowedRoles.includes(roleName)) {
+          console.log('❌ User does not have admin/employee role:', roleName);
           setUser(null);
           return;
         }
@@ -62,14 +80,14 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
           email: response.data.user.email,
           firstName: response.data.user.firstName || '',
           lastName: response.data.user.lastName || '',
-          role: response.data.user.role === 'admin' ? 'admin' : 'seller',
-          avatar: response.data.user.avatar || `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+          role: roleName === 'admin' ? 'admin' : 'seller',
+          avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
         };
         
         setUser(adminUser);
         loggingService.info('auth', 'admin_authenticated', {
           userId: response.data.user.id,
-          role: response.data.user.role
+          role: roleName
         });
       } else {
         console.log('❌ Admin session not authenticated');
@@ -113,10 +131,28 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       if (response.success && response.data) {
         console.log('✅ Admin login successful:', response.data);
         
-        // Validate that user has admin/employee role
+        // Check if user has a role and validate admin/employee role
+        const userRole = response.data.user.role
         const allowedRoles = ['admin', 'manager', 'designer', 'support', 'moderator', 'seller']
-        if (!allowedRoles.includes(response.data.user.role)) {
-          console.log('❌ User does not have admin/employee role:', response.data.user.role);
+        
+        // Handle different role structures
+        let roleName: string | null = null
+        if (userRole) {
+          if (typeof userRole === 'string') {
+            roleName = userRole
+          } else if (userRole && typeof userRole === 'object' && 'name' in userRole) {
+            roleName = userRole.name
+          }
+        }
+        
+        console.log('🔍 Login - User role information:', {
+          role: userRole,
+          roleName: roleName,
+          userEmail: response.data.user.email
+        });
+        
+        if (!roleName || !allowedRoles.includes(roleName)) {
+          console.log('❌ User does not have admin/employee role:', roleName);
           setUser(null);
           setIsLoading(false);
           return false;
@@ -128,8 +164,8 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
           email: response.data.user.email,
           firstName: response.data.user.firstName || '',
           lastName: response.data.user.lastName || '',
-          role: response.data.user.role === 'admin' ? 'admin' : 'seller',
-          avatar: response.data.user.avatar || `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+          role: roleName === 'admin' ? 'admin' : 'seller',
+          avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
         };
         
         setUser(adminUser);
