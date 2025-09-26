@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
+import { useAdminChat } from '../../context/AdminChatContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
   LayoutDashboard,
@@ -97,9 +98,10 @@ const SellerSidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { state } = useAdmin()
+  const { messages: chatMessages } = useAdminChat()
   const { logout } = useAdminAuth()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const unreadMessages = state.messages.filter(m => !m.isFromAdmin && !m.isRead).length
+  const unreadMessages = chatMessages.filter(m => m.sender === 'user' && !m.isRead).length
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => {

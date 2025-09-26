@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Minimize2, Maximize2, Wifi, WifiOff } from 'lucide-react'
+import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip } from 'lucide-react'
 import { useRealTimeChat } from '../../shared/realTimeChatContext'
 import Button from '../../components/Button'
 
 export default function ChatWidget() {
-  const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions } = useRealTimeChat()
+  const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions, unreadCount } = useRealTimeChat()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -32,6 +33,25 @@ export default function ChatWidget() {
     }
   }
 
+  const handleAttachClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const event = new CustomEvent('ecom_send_attachment', { detail: { file, dataUrl: String(reader.result) } })
+        window.dispatchEvent(event)
+      }
+      reader.readAsDataURL(file)
+    } finally {
+      e.target.value = ''
+    }
+  }
+
   const handleQuickQuestion = (question: string) => {
     sendMessage(question)
   }
@@ -53,9 +73,9 @@ export default function ChatWidget() {
           className="w-14 h-14 bg-accent rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group hover:scale-105"
         >
           <MessageCircle className="w-6 h-6 text-white" />
-          {messages.length > 1 && (
+          {unreadCount > 0 && (
             <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-xs text-white font-bold">{messages.length - 1}</span>
+              <span className="text-xs text-white font-bold">{unreadCount}</span>
             </div>
           )}
         </button>
@@ -116,7 +136,25 @@ export default function ChatWidget() {
                         : 'bg-gray-100 text-gray-900 rounded-bl-md'
                     }`}
                   >
-                    <p className="text-sm">{message.text}</p>
+                    {message.type === 'image' && message.attachment ? (
+                      <img 
+                        src={typeof message.attachment === 'string' ? message.attachment : message.attachment.data} 
+                        alt={message.attachment?.name || 'image'} 
+                        className="max-w-full rounded-md mb-1" 
+                      />
+                    ) : null}
+                    {message.type === 'file' && message.attachment ? (
+                      <a 
+                        href={typeof message.attachment === 'string' ? message.attachment : message.attachment.data} 
+                        download={message.attachment?.name} 
+                        className="text-xs underline break-all"
+                      >
+                        {message.attachment.name || 'Download file'}
+                      </a>
+                    ) : null}
+                    {(!message.type || message.type === 'text') && (
+                      <p className="text-sm">{message.text}</p>
+                    )}
                     <p className={`text-xs mt-1 ${
                       message.sender === 'user' ? 'text-white/70' : 'text-gray-500'
                     }`}>
@@ -163,7 +201,7 @@ export default function ChatWidget() {
 
             {/* Input */}
             <div className="p-4 border-t border-gray-200">
-              <form onSubmit={handleSendMessage} className="flex space-x-2">
+              <form onSubmit={handleSendMessage} className="flex space-x-2 items-center">
                 <input
                   ref={inputRef}
                   type="text"
@@ -172,6 +210,10 @@ export default function ChatWidget() {
                   placeholder="Type your message..."
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
                 />
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+                <button type="button" onClick={handleAttachClick} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100">
+                  <Paperclip className="w-4 h-4" />
+                </button>
                 <Button
                   type="submit"
                   size="sm"

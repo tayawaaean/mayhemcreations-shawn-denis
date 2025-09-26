@@ -275,10 +275,38 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     const productData = req.body;
 
     // Validate required fields
-    if (!productData.title || !productData.slug || !productData.description || !productData.price || !productData.image || !productData.alt || !productData.categoryId) {
+    if (!productData.title || !productData.slug || !productData.description || !productData.price || !productData.alt || !productData.categoryId) {
       res.status(400).json({
         success: false,
-        message: 'Missing required fields: title, slug, description, price, image, alt, categoryId'
+        message: 'Missing required fields: title, slug, description, price, alt, categoryId'
+      });
+      return;
+    }
+
+    // Handle multiple images
+    let processedImageData = productData.image; // For backward compatibility
+    let imagesArray: string[] = [];
+    let primaryImageIndex = 0;
+
+    if (productData.images && Array.isArray(productData.images) && productData.images.length > 0) {
+      imagesArray = productData.images;
+      primaryImageIndex = productData.primaryImageIndex || 0;
+      
+      // Ensure primary image index is valid
+      if (primaryImageIndex >= imagesArray.length) {
+        primaryImageIndex = 0;
+      }
+      
+      // Set the primary image for backward compatibility
+      processedImageData = imagesArray[primaryImageIndex];
+    } else if (productData.image) {
+      // Single image provided - convert to array format
+      imagesArray = [productData.image];
+      processedImageData = productData.image;
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'At least one image is required'
       });
       return;
     }
@@ -318,7 +346,12 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       }
     }
 
-    const product = await Product.create(productData);
+    const product = await Product.create({
+      ...productData,
+      image: processedImageData,
+      images: imagesArray,
+      primaryImageIndex: primaryImageIndex
+    });
 
     // Fetch the created product with associations
     const createdProduct = await Product.findByPk(product.id, {
@@ -369,6 +402,32 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    // Handle multiple images update
+    let processedImageData = updateData.image || product.image;
+    let imagesArray = updateData.images || product.images || [];
+    let primaryImageIndex = updateData.primaryImageIndex !== undefined ? updateData.primaryImageIndex : product.primaryImageIndex || 0;
+
+    if (updateData.images && Array.isArray(updateData.images) && updateData.images.length > 0) {
+      imagesArray = updateData.images;
+      primaryImageIndex = updateData.primaryImageIndex || 0;
+      
+      // Ensure primary image index is valid
+      if (primaryImageIndex >= imagesArray.length) {
+        primaryImageIndex = 0;
+      }
+      
+      // Set the primary image for backward compatibility
+      processedImageData = imagesArray[primaryImageIndex];
+    } else if (updateData.image) {
+      // Single image provided - update the array
+      if (imagesArray.length === 0) {
+        imagesArray = [updateData.image];
+      } else {
+        imagesArray[primaryImageIndex] = updateData.image;
+      }
+      processedImageData = updateData.image;
+    }
+
     // Check if slug is being changed and if it already exists
     if (updateData.slug && updateData.slug !== product.slug) {
       const existingProduct = await Product.findOne({
@@ -408,7 +467,12 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       }
     }
 
-    await product.update(updateData);
+    await product.update({
+      ...updateData,
+      image: processedImageData,
+      images: imagesArray,
+      primaryImageIndex: primaryImageIndex
+    });
 
     // Fetch the updated product with associations
     const updatedProduct = await Product.findByPk(product.id, {

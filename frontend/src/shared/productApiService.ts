@@ -20,6 +20,8 @@ export interface Product {
   description: string;
   price: number;
   image: string;
+  images?: string[];
+  primaryImageIndex?: number;
   alt: string;
   categoryId: number;
   subcategoryId?: number;
@@ -96,6 +98,8 @@ export interface ProductCreateData {
   description: string;
   price: number;
   image: string;
+  images?: string[];
+  primaryImageIndex?: number;
   alt: string;
   categoryId: number;
   subcategoryId?: number;

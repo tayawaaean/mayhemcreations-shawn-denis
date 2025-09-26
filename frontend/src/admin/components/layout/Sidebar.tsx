@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
+import { useAdminChat } from '../../context/AdminChatContext'
 import { useRole } from '../../context/RoleContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import {
@@ -115,10 +116,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { state } = useAdmin()
+  const { messages: chatMessages } = useAdminChat()
   const { role } = useRole()
   const { logout } = useAdminAuth()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const unreadMessages = state.messages.filter(m => !m.isFromAdmin && !m.isRead).length
+  // Total unread from chat context (user-sent messages not yet marked read)
+  const unreadMessages = chatMessages.filter(m => m.sender === 'user' && !m.isRead).length
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => {

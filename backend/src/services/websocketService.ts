@@ -14,7 +14,9 @@ export class WebSocketService {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
         methods: ["GET", "POST"],
         credentials: true
-      }
+      },
+      // Increase payload limit to support base64 image/file attachments (~10MB)
+      maxHttpBufferSize: 10 * 1024 * 1024
     });
 
     this.setupEventHandlers();
@@ -48,15 +50,19 @@ export class WebSocketService {
           const [rows] = await sequelize.query(`
             SELECT 
               m.customer_id AS customerId,
-              ANY_VALUE(m.text) AS text,
-              ANY_VALUE(m.sender) AS sender,
-              MAX(m.created_at) AS timestamp,
-              ANY_VALUE(u.first_name) AS firstName,
-              ANY_VALUE(u.last_name) AS lastName,
-              ANY_VALUE(u.email) AS email
+              m.text,
+              m.sender,
+              m.created_at AS timestamp,
+              u.first_name AS firstName,
+              u.last_name AS lastName,
+              u.email AS email
             FROM messages m
+            INNER JOIN (
+              SELECT customer_id, MAX(created_at) AS max_created
+              FROM messages
+              GROUP BY customer_id
+            ) lm ON lm.customer_id = m.customer_id AND lm.max_created = m.created_at
             LEFT JOIN users u ON u.id = m.customer_id
-            GROUP BY m.customer_id
             ORDER BY timestamp DESC
             LIMIT 200
           `);
@@ -115,6 +121,8 @@ export class WebSocketService {
             text: r.text,
             sender: r.sender,
             timestamp: (r as any).createdAt as Date,
+            type: (r as any).type,
+            attachment: (r as any).attachment,
           }));
           socket.emit('chat_history', {
             customerId,
@@ -151,6 +159,8 @@ export class WebSocketService {
             text: r.text,
             sender: r.sender,
             timestamp: (r as any).createdAt as Date,
+            type: (r as any).type,
+            attachment: (r as any).attachment,
           }));
           socket.emit('chat_history', {
             customerId: data.customerId,
@@ -167,15 +177,19 @@ export class WebSocketService {
           const [rows] = await sequelize.query(`
             SELECT 
               m.customer_id AS customerId,
-              ANY_VALUE(m.text) AS text,
-              ANY_VALUE(m.sender) AS sender,
-              MAX(m.created_at) AS timestamp,
-              ANY_VALUE(u.first_name) AS firstName,
-              ANY_VALUE(u.last_name) AS lastName,
-              ANY_VALUE(u.email) AS email
+              m.text,
+              m.sender,
+              m.created_at AS timestamp,
+              u.first_name AS firstName,
+              u.last_name AS lastName,
+              u.email AS email
             FROM messages m
+            INNER JOIN (
+              SELECT customer_id, MAX(created_at) AS max_created
+              FROM messages
+              GROUP BY customer_id
+            ) lm ON lm.customer_id = m.customer_id AND lm.max_created = m.created_at
             LEFT JOIN users u ON u.id = m.customer_id
-            GROUP BY m.customer_id
             ORDER BY timestamp DESC
             LIMIT 200
           `);
@@ -195,8 +209,8 @@ export class WebSocketService {
         }
       });
 
-      // Handle chat messages
-      socket.on('chat_message', async (data: { messageId: string; text: string; customerId: string; timestamp: string }) => {
+      // Handle chat messages (text or attachment)
+      socket.on('chat_message', async (data: { messageId: string; text?: string; customerId: string; timestamp: string; type?: 'text' | 'image' | 'file'; attachment?: any }) => {
         logger.info(`💬 Chat message from ${socket.id} for customer ${data.customerId}: ${data.text}`);
 
         // Determine sender based on room membership
@@ -219,7 +233,15 @@ export class WebSocketService {
 
         // Persist message
         try {
-          await Message.create({ customerId: Number(data.customerId), sender, text: data.text });
+          const created = await Message.create({
+            customerId: Number(data.customerId),
+            sender,
+            // Some older schemas require non-null text; default to empty string for attachments
+            text: data.text ?? '',
+            type: data.type ?? 'text',
+            attachment: data.attachment ?? null,
+          } as any);
+          logger.info(`💾 Saved message ${created.id} for customer ${data.customerId} (type=${data.type ?? 'text'})`);
         } catch (e) {
           logger.warn(`Failed to persist chat message for ${data.customerId}: ${(e as any).message}`);
         }
@@ -227,9 +249,11 @@ export class WebSocketService {
         // Emit to both customer and admins with correct sender
         this.emitChatMessage(data.customerId, {
           messageId: data.messageId,
-          text: data.text,
+          text: data.text ?? null,
           sender,
           customerId: data.customerId,
+          type: data.type ?? 'text',
+          attachment: data.attachment ?? null,
           name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
           email: profile?.email || null
         });

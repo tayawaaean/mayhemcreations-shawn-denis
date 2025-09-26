@@ -5,11 +5,13 @@ import { webSocketService } from './websocketService';
 
 export interface ChatMessage {
   id: string;
-  text: string;
+  text?: string;
   sender: 'user' | 'admin';
   timestamp: Date;
   isTyping?: boolean;
   customerId?: string;
+  type?: 'text' | 'image' | 'file';
+  attachment?: any;
 }
 
 interface RealTimeChatContextType {
@@ -23,17 +25,36 @@ interface RealTimeChatContextType {
   isCustomerOnline: boolean;
   quickQuestions: string[];
   typingTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
+  unreadCount: number;
 }
 
 const RealTimeChatContext = createContext<RealTimeChatContextType | undefined>(undefined);
 
 export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoggedIn } = useAuth();
+  const normalizeAttachment = (att: any): any => {
+    if (!att) return att;
+    if (typeof att === 'string') {
+      const str = att.trim();
+      if (str.startsWith('{') || str.startsWith('[')) {
+        try { return JSON.parse(str); } catch {}
+      }
+      return str; // data URL
+    }
+    return att;
+  };
   const { subscribe, isConnected } = useWebSocket();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, _setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [isCustomerOnline, setIsCustomerOnline] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const setIsOpen = (open: boolean) => {
+    _setIsOpen(open);
+    if (open) {
+      setUnreadCount(0);
+    }
+  };
   const [quickQuestions] = useState([
     "What are your business hours?",
     "How long does shipping take?",
@@ -83,10 +104,12 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       const newMessage: ChatMessage = {
         id: data.messageId,
-        text: data.text,
+        text: data.text ?? undefined,
         sender: data.sender,
         timestamp: new Date(data.timestamp),
         customerId: data.customerId
+        , type: (data as any).type,
+        attachment: normalizeAttachment((data as any).attachment)
       };
 
       // Prevent duplicates when echoing messages we already appended locally
@@ -94,6 +117,11 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
         const exists = prev.some(msg => msg.id === newMessage.id);
         return exists ? prev : [...prev, newMessage];
       });
+
+      // Update unread counter for admin messages when widget closed
+      if (data.sender === 'admin' && !isOpen) {
+        setUnreadCount(c => c + 1);
+      }
     });
 
     // Listen for admin typing status
@@ -109,10 +137,12 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (String(data.customerId) !== String(customerId)) return;
       const history = data.messages.map(m => ({
         id: String(m.id),
-        text: m.text,
+        text: m.text ?? undefined,
         sender: m.sender,
         timestamp: new Date(m.timestamp),
         customerId,
+        type: (m as any).type,
+        attachment: normalizeAttachment((m as any).attachment),
       }));
       setMessages(history);
     });
@@ -170,6 +200,60 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     typingTimeout.current = setTimeout(() => {
       webSocketService.sendTypingStatus(customerId, false);
     }, 3000);
+  };
+
+  // Bridge file input in ChatWidget to this provider
+  useEffect(() => {
+    const onAttach = async (e: any) => {
+      const { file, dataUrl } = e.detail || {};
+      if (!file || !dataUrl) return;
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const isImage = file.type.startsWith('image/');
+      const localMessage: ChatMessage = {
+        id: messageId,
+        sender: 'user',
+        timestamp: new Date(),
+        customerId,
+        type: isImage ? 'image' : 'file',
+        attachment: {
+          name: file.name,
+          size: file.size,
+          mimeType: file.type,
+          data: dataUrl,
+        }
+      };
+      setMessages(prev => [...prev, localMessage]);
+      webSocketService.sendChatAttachment(messageId, customerId, { type: localMessage.type!, attachment: localMessage.attachment });
+    };
+    window.addEventListener('ecom_send_attachment', onAttach as any);
+    return () => window.removeEventListener('ecom_send_attachment', onAttach as any);
+  }, [customerId]);
+
+  const sendAttachment = async (file: File) => {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const isImage = file.type.startsWith('image/');
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const localMessage: ChatMessage = {
+      id: messageId,
+      sender: 'user',
+      timestamp: new Date(),
+      customerId,
+      type: isImage ? 'image' : 'file',
+      attachment: {
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+        data: base64,
+      }
+    };
+    setMessages(prev => [...prev, localMessage]);
+    webSocketService.sendChatAttachment(messageId, customerId, { type: localMessage.type!, attachment: localMessage.attachment });
   };
 
   // Set typing status immediately (for input changes)

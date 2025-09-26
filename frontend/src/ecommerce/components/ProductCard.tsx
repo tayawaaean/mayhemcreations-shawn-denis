@@ -3,9 +3,24 @@ import type { Product } from '../../types'
 import { Link } from 'react-router-dom'
 import { Heart, Eye, Star } from 'lucide-react'
 import Button from '../../components/Button'
+import ProductSlideshow from './ProductSlideshow'
+import { getAllProductImages } from '../../shared/imageUtils'
 
 export default function ProductCard({ product }: { product: Product }) {
   const [isHovered, setIsHovered] = useState(false)
+
+  // Debug logging
+  console.log('ProductCard received product:', {
+    id: product.id,
+    title: product.title,
+    image: product.image,
+    images: product.images,
+    primaryImageIndex: product.primaryImageIndex
+  })
+
+  // Prepare images for slideshow
+  const images = getAllProductImages(product)
+  console.log('ProductCard processed images:', images)
 
   return (
     <article
@@ -16,10 +31,13 @@ export default function ProductCard({ product }: { product: Product }) {
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         <Link to={`/product/${product.id}`} className="block">
-          <img
-            src={product.image}
+          <ProductSlideshow
+            images={images}
             alt={product.alt}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            showThumbnails={false}
+            autoPlay={isHovered && images.length > 1}
+            autoPlayInterval={2000}
+            className="w-full h-full"
           />
         </Link>
 

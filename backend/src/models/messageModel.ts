@@ -5,7 +5,9 @@ export interface MessageAttributes {
   id: number;
   customerId: number;
   sender: 'user' | 'admin';
-  text: string;
+  text: string | null;
+  type?: 'text' | 'image' | 'file';
+  attachment?: any | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -16,7 +18,9 @@ export class Message extends Model<MessageAttributes, MessageCreationAttributes>
   public id!: number;
   public customerId!: number;
   public sender!: 'user' | 'admin';
-  public text!: string;
+  public text!: string | null;
+  public type?: 'text' | 'image' | 'file';
+  public attachment?: any | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -38,9 +42,18 @@ Message.init(
       allowNull: false,
     },
     text: {
-      type: DataTypes.TEXT,
-      allowNull: false,
+    type: DataTypes.TEXT,
+    allowNull: true,
     },
+  type: {
+    type: DataTypes.ENUM('text', 'image', 'file'),
+    allowNull: false,
+    defaultValue: 'text',
+  },
+  attachment: {
+    type: DataTypes.JSON,
+    allowNull: true,
+  },
   },
   {
     sequelize,

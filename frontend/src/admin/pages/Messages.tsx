@@ -26,6 +26,7 @@ const Messages: React.FC = () => {
     messages, 
     sendMessage, 
     setTyping,
+    sendAttachment,
     isUserTyping, 
     onlineCustomers, 
     selectedCustomer, 
@@ -35,6 +36,7 @@ const Messages: React.FC = () => {
     threads
   } = useAdminChat()
   const [newMessage, setNewMessage] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
 
@@ -111,6 +113,20 @@ const Messages: React.FC = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
+    }
+  }
+
+  const handleAttachClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedCustomer || !sendAttachment) return
+    try {
+      await sendAttachment(file, selectedCustomer)
+    } finally {
+      e.target.value = ''
     }
   }
 
@@ -225,7 +241,11 @@ const Messages: React.FC = () => {
               filteredCustomers.map((item) => (
                 <div
                   key={item.customer?.id || item.customerId}
-                  onClick={() => setSelectedCustomer(item.customer?.id || item.customerId)}
+                  onClick={() => {
+                    const id = item.customer?.id || item.customerId
+                    setSelectedCustomer(id)
+                    markAsRead(id)
+                  }}
                   className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-all duration-200 ${
                     selectedCustomer === (item.customer?.id || item.customerId)
                       ? 'bg-blue-50 border-blue-200 shadow-sm'
@@ -275,8 +295,14 @@ const Messages: React.FC = () => {
                       <p className="text-sm text-gray-600 truncate mb-1">
                         {item.isTyping ? (
                           <span className="text-blue-500 italic">Typing...</span>
+                        ) : item.latestMessage ? (
+                          item.latestMessage.text && item.latestMessage.text.trim().length > 0 ? (
+                            item.latestMessage.text
+                          ) : (
+                            (item.latestMessage as any).type === 'image' ? 'Image' : 'Attachment'
+                          )
                         ) : (
-                          item.latestMessage?.text || 'No messages yet'
+                          'No messages yet'
                         )}
                       </p>
 
@@ -396,21 +422,47 @@ const Messages: React.FC = () => {
                                   ? 'bg-blue-500 text-white rounded-br-md'
                                   : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
                               }`}>
-                                <p className="text-sm leading-relaxed">{message.text}</p>
+                                {message.type === 'image' && (message as any).attachment ? (
+                                  <img 
+                                    src={typeof (message as any).attachment === 'string' ? (message as any).attachment : (message as any).attachment.data}
+                                    alt={(message as any).attachment?.name || 'image'} 
+                                    className="max-w-full rounded-md mb-1" 
+                                  />
+                                ) : null}
+                                {message.type === 'file' && (message as any).attachment ? (
+                                  <a 
+                                    href={typeof (message as any).attachment === 'string' ? (message as any).attachment : (message as any).attachment.data} 
+                                    download={(message as any).attachment?.name} 
+                                    className={`text-xs underline break-all ${message.sender === 'admin' ? 'text-white' : 'text-blue-600'}`}
+                                  >
+                                    {(message as any).attachment.name || 'Download file'}
+                                  </a>
+                                ) : null}
+                                {(!message.type || message.type === 'text') && (
+                                  <p className="text-sm leading-relaxed">{message.text}</p>
+                                )}
                               </div>
 
-                              <div className={`flex items-center mt-1 space-x-1 text-xs ${
+                              <div className={`flex items-center mt-1 space-x-1 text-[12px] font-medium ${
                                 message.sender === 'admin'
-                                  ? 'justify-end text-blue-100'
-                                  : 'justify-start text-gray-500'
+                                  ? 'justify-end'
+                                  : 'justify-start'
                               }`}>
-                                <span>{formatTime(message.timestamp)}</span>
+                                <span
+                                  className={
+                                    message.sender === 'admin'
+                                      ? 'px-2 py-0.5 rounded bg-blue-600 text-white shadow-sm'
+                                      : 'px-2 py-0.5 rounded bg-gray-800 text-white shadow-sm'
+                                  }
+                                >
+                                  {formatTime(message.timestamp)}
+                                </span>
                                 {message.sender === 'admin' && (
                                   <span className="ml-1">
                                     {message.isRead ? (
-                                      <CheckCheck className="h-3 w-3" />
+                                      <CheckCheck className="h-3 w-3 text-blue-600" />
                                     ) : (
-                                      <Check className="h-3 w-3" />
+                                      <Check className="h-3 w-3 text-blue-600" />
                                     )}
                                   </span>
                                 )}
@@ -436,7 +488,9 @@ const Messages: React.FC = () => {
               {/* Message Input */}
               <div className="bg-white border-t border-gray-200 p-4 sm:p-6">
                 <div className="flex items-end space-x-3">
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
                   <button
+                    onClick={handleAttachClick}
                     className="p-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors duration-200 flex-shrink-0"
                     title="Attach file"
                   >

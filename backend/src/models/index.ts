@@ -123,6 +123,18 @@ const setupAssociations = (): void => {
     foreignKey: 'userId',
     as: 'user',
   });
+
+  // Message belongs to User (customer)
+  Message.belongsTo(User, {
+    foreignKey: 'customerId',
+    as: 'customer',
+  });
+
+  // User has many Messages
+  User.hasMany(Message, {
+    foreignKey: 'customerId',
+    as: 'messages',
+  });
 };
 
 // Initialize associations

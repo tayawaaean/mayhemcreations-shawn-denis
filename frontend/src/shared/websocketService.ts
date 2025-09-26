@@ -13,7 +13,7 @@ export interface WebSocketEvents {
   order_status_updated: (data: { orderId: number; statusData: any; timestamp: string }) => void;
   
   // Chat events
-  chat_message_received: (data: { messageId: string; text: string; sender: 'user' | 'admin'; customerId: string; timestamp: string; isTyping?: boolean }) => void;
+  chat_message_received: (data: { messageId: string; text?: string | null; sender: 'user' | 'admin'; customerId: string; timestamp: string; isTyping?: boolean; type?: 'text' | 'image' | 'file'; attachment?: any }) => void;
   chat_message_sent: (data: { messageId: string; text: string; sender: 'user' | 'admin'; customerId: string; timestamp: string }) => void;
   admin_typing: (data: { customerId: string; isTyping: boolean }) => void;
   user_typing: (data: { customerId: string; isTyping: boolean }) => void;
@@ -28,6 +28,11 @@ class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+
+  // Track desired room memberships to survive reconnects
+  private desiredUserId: string | null = null;
+  private wantsAdminRoom = false;
+  private desiredChatRooms: Set<string> = new Set();
 
   constructor() {
     // Only initialize in browser environment
@@ -65,6 +70,22 @@ class WebSocketService {
       console.log('🔌 WebSocket connected:', this.socket?.id);
       this.isConnected = true;
       this.reconnectAttempts = 0;
+
+      // Re-join desired rooms after (re)connect
+      if (this.desiredUserId) {
+        this.socket!.emit('join_user_room', this.desiredUserId);
+        console.log(`👤 (re)joined user room for user ${this.desiredUserId}`);
+      }
+      if (this.wantsAdminRoom) {
+        this.socket!.emit('join_admin_room');
+        console.log('👨‍💼 (re)joined admin room');
+      }
+      if (this.desiredChatRooms.size > 0) {
+        this.desiredChatRooms.forEach((customerId) => {
+          this.socket!.emit('join_chat_room', customerId);
+          console.log(`💬 (re)joined chat room for customer ${customerId}`);
+        });
+      }
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -97,6 +118,7 @@ class WebSocketService {
 
   // Join user room for customer-specific events
   public joinUserRoom(userId: string): void {
+    this.desiredUserId = userId;
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_user_room', userId);
       console.log(`👤 Joined user room for user ${userId}`);
@@ -105,6 +127,7 @@ class WebSocketService {
 
   // Join admin room for admin-specific events
   public joinAdminRoom(): void {
+    this.wantsAdminRoom = true;
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_admin_room');
       console.log('👨‍💼 Joined admin room');
@@ -168,6 +191,19 @@ class WebSocketService {
     }
   }
 
+  public sendChatAttachment(messageId: string, customerId: string, payload: { type: 'image' | 'file'; attachment: any; text?: string }): void {
+    if (typeof window !== 'undefined' && this.socket && this.isConnected) {
+      this.socket.emit('chat_message', {
+        messageId,
+        customerId,
+        type: payload.type,
+        attachment: payload.attachment,
+        text: payload.text ?? null,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
   public sendTypingStatus(customerId: string, isTyping: boolean): void {
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('typing_status', {
@@ -179,12 +215,14 @@ class WebSocketService {
   }
 
   public joinChatRoom(customerId: string): void {
+    this.desiredChatRooms.add(customerId);
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_chat_room', customerId);
     }
   }
 
   public leaveChatRoom(customerId: string): void {
+    this.desiredChatRooms.delete(customerId);
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('leave_chat_room', customerId);
     }

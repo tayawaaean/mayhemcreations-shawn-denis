@@ -29,7 +29,7 @@ export default function Products() {
         label: 'All Products',
         value: ''
       },
-      ...categories.map(category => ({
+      ...(categories || []).map(category => ({
         id: category.id.toString(),
         label: category.name,
         value: category.slug,
@@ -87,9 +87,27 @@ export default function Products() {
           })
         ])
         
-        setCategories(categoriesResponse.data)
-        setProducts(productsResponse.data)
-        setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data))
+        console.log('API Responses:', { categoriesResponse, productsResponse })
+        console.log('Products with images:', productsResponse.data?.map(p => {
+          let parsedImages = p.images
+          if (typeof p.images === 'string') {
+            try {
+              parsedImages = JSON.parse(p.images)
+            } catch (e) {
+              parsedImages = []
+            }
+          }
+          return {
+            id: p.id,
+            title: p.title,
+            image: p.image,
+            images: parsedImages,
+            primaryImageIndex: p.primaryImageIndex
+          }
+        }))
+        setCategories(categoriesResponse.data || [])
+        setProducts(productsResponse.data || [])
+        setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data || []))
       } catch (err) {
         setError('Failed to load data')
         console.error('Error fetching data:', err)
@@ -136,7 +154,7 @@ export default function Products() {
   }
 
   // Transform database products to frontend Product type
-  const transformedProducts = products.map(product => {
+  const transformedProducts = (products || []).map(product => {
     // Calculate total stock from variants
     const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
     

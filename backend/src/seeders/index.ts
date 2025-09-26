@@ -8,6 +8,8 @@ import { seedVariants, clearVariants } from './variantSeeder';
 import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
 import { seedFAQs, clearFAQs } from './faqSeeder';
 import { seedMaterialCosts, clearMaterialCosts } from './materialCostSeeder';
+import { updateMessagesSchemaForAttachments } from './messageAttachmentSeeder';
+import { seedMultiImageProducts, clearMultiImageProducts, updateExistingProductsWithImages } from './multiImageProductSeeder';
 import { 
   seedCategoriesViaAPI, 
   seedProductsViaAPI, 
@@ -57,6 +59,52 @@ async function updateSchema(): Promise<void> {
   }
 }
 
+/**
+ * Update products table schema to support multiple images
+ */
+async function updateProductsSchema(): Promise<void> {
+  try {
+    logger.info('🔄 Updating products table schema for multi-image support...');
+    
+    // Check if columns already exist
+    const [columns] = await sequelize.query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'products' 
+      AND COLUMN_NAME IN ('images', 'primary_image_index')
+    `);
+    
+    const existingColumns = columns.map((col: any) => col.COLUMN_NAME);
+    logger.info(`📊 Existing columns: ${existingColumns.join(', ') || 'none'}`);
+    
+    // Add missing columns
+    const columnsToAdd = [];
+    
+    if (!existingColumns.includes('images')) {
+      columnsToAdd.push('ADD COLUMN images JSON NULL AFTER image');
+    }
+    
+    if (!existingColumns.includes('primary_image_index')) {
+      columnsToAdd.push('ADD COLUMN primary_image_index INT NULL DEFAULT 0 AFTER images');
+    }
+    
+    if (columnsToAdd.length > 0) {
+      const alterQuery = `ALTER TABLE products ${columnsToAdd.join(', ')}`;
+      logger.info(`🔧 Executing query: ${alterQuery}`);
+      
+      await sequelize.query(alterQuery);
+      logger.info('✅ Products table schema updated successfully');
+      logger.info('📝 Added images (JSON) and primary_image_index (INT) columns');
+    } else {
+      logger.info('✅ Products table already has multi-image columns');
+    }
+    
+  } catch (error) {
+    logger.error('❌ Error updating products schema:', error);
+    throw error;
+  }
+}
+
 export interface SeederOptions {
   force?: boolean;
   clear?: boolean;
@@ -68,6 +116,8 @@ export interface SeederOptions {
   embroideryOnly?: boolean;
   faqsOnly?: boolean;
   materialCostsOnly?: boolean;
+  multiImageProductsOnly?: boolean;
+  updateExistingProducts?: boolean;
   useApi?: boolean; // Use API-based seeding with authentication
 }
 
@@ -80,6 +130,16 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     logger.info('🔄 Syncing database...');
     await syncDatabase(options.force || false);
     logger.info('✅ Database synced successfully!');
+
+    // Always ensure messages table has attachment columns (idempotent)
+    logger.info('🔧 Ensuring messages table has attachment columns...');
+    await updateMessagesSchemaForAttachments();
+
+    // Update products table schema for multi-image support (controlled by flags)
+    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
+      logger.info('🔧 Updating products table schema...');
+      await updateProductsSchema();
+    }
 
     // Clear data if requested
     if (options.clear) {
@@ -170,6 +230,18 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     if (options.materialCostsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly)) {
       logger.info('🌱 Seeding material costs...');
       await seedMaterialCosts();
+    }
+
+    // Seed Multi-Image Products
+    if (options.multiImageProductsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly)) {
+      logger.info('🌱 Seeding multi-image products...');
+      await seedMultiImageProducts();
+    }
+
+    // Update existing products with image arrays
+    if (options.updateExistingProducts) {
+      logger.info('🔄 Updating existing products with image arrays...');
+      await updateExistingProductsWithImages();
     }
 
     // Fresh start for messages
@@ -539,6 +611,12 @@ if (require.main === module) {
       case '--material-costs-only':
         options.materialCostsOnly = true;
         break;
+      case '--multi-image-products-only':
+        options.multiImageProductsOnly = true;
+        break;
+      case '--update-existing-products':
+        options.updateExistingProducts = true;
+        break;
       case '--use-api':
         options.useApi = true;
         break;
@@ -546,8 +624,17 @@ if (require.main === module) {
         clearProducts().then(() => {
           logger.info('✅ Products cleared successfully!');
           process.exit(0);
-        }).catch(error => {
+        }).catch((error: unknown) => {
           logger.error('❌ Clear products failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--clear-multi-image-products':
+        clearMultiImageProducts().then(() => {
+          logger.info('✅ Multi-image products cleared successfully!');
+          process.exit(0);
+        }).catch((error: unknown) => {
+          logger.error('❌ Clear multi-image products failed:', error);
           process.exit(1);
         });
         break;
@@ -555,7 +642,7 @@ if (require.main === module) {
         Promise.all([clearProducts(), clearCategories(), clearVariants()]).then(() => {
           logger.info('✅ All data cleared successfully! (Users retained)');
           process.exit(0);
-        }).catch(error => {
+        }).catch((error: unknown) => {
           logger.error('❌ Clear data failed:', error);
           process.exit(1);
         });
@@ -564,31 +651,49 @@ if (require.main === module) {
         updateSchema().then(() => {
           logger.info('✅ Schema updated successfully!');
           process.exit(0);
-        }).catch(error => {
+        }).catch((error: unknown) => {
           logger.error('❌ Schema update failed:', error);
           process.exit(1);
         });
         break;
+      case '--update-products-schema':
+        updateProductsSchema().then(() => {
+          logger.info('✅ Products schema updated successfully!');
+          process.exit(0);
+        }).catch((error: unknown) => {
+          logger.error('❌ Products schema update failed:', error);
+          process.exit(1);
+        });
+        break;
+      case '--update-messages-schema':
+        updateMessagesSchemaForAttachments().then(() => {
+          logger.info('✅ Messages schema updated successfully!');
+          process.exit(0);
+        }).catch((error: unknown) => {
+          logger.error('❌ Messages schema update failed:', error);
+          process.exit(1);
+        });
+        break;
       case '--reset':
-        resetDatabase().then(() => process.exit(0)).catch(error => {
+        resetDatabase().then(() => process.exit(0)).catch((error: unknown) => {
           logger.error('❌ Reset failed:', error);
           process.exit(1);
         });
         break;
       case '--clear-all':
-        clearAllData().then(() => process.exit(0)).catch(error => {
+        clearAllData().then(() => process.exit(0)).catch((error: unknown) => {
           logger.error('❌ Clear failed:', error);
           process.exit(1);
         });
         break;
       case '--clear-orders':
-        clearAllOrders().then(() => process.exit(0)).catch(error => {
+        clearAllOrders().then(() => process.exit(0)).catch((error: unknown) => {
           logger.error('❌ Clear orders failed:', error);
           process.exit(1);
         });
         break;
       case '--reset-orders':
-        resetOrdersToPending().then(() => process.exit(0)).catch(error => {
+        resetOrdersToPending().then(() => process.exit(0)).catch((error: unknown) => {
           logger.error('❌ Reset orders failed:', error);
           process.exit(1);
         });
@@ -600,7 +705,7 @@ if (require.main === module) {
   runSeeders(options).then(() => {
     logger.info('✅ Seeding process completed!');
     process.exit(0);
-  }).catch(error => {
+  }).catch((error: unknown) => {
     logger.error('❌ Seeding failed:', error);
     process.exit(1);
   });

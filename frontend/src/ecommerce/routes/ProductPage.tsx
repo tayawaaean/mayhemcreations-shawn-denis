@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Heart, Share2, Star, ShoppingCart, ArrowRight } from 'lucide-react'
 import Button from '../../components/Button'
+import ProductSlideshow from '../components/ProductSlideshow'
 import { productApiService, Product } from '../../shared/productApiService'
+import { getAllProductImages } from '../../shared/imageUtils'
 
 export default function ProductPage() {
   const { id } = useParams()
@@ -10,7 +12,6 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedImage, setSelectedImage] = useState(0)
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -21,7 +22,7 @@ export default function ProductPage() {
         setError(null)
         
         const response = await productApiService.getProductById(parseInt(id))
-        setProduct(response.data)
+        setProduct(response.data || null)
       } catch (err) {
         setError('Product not found')
         console.error('Error fetching product:', err)
@@ -59,7 +60,18 @@ export default function ProductPage() {
     )
   }
 
-  const images = [product.image] // Single image for now, can be expanded later
+  // Debug logging
+  console.log('ProductPage received product:', {
+    id: product.id,
+    title: product.title,
+    image: product.image,
+    images: product.images,
+    primaryImageIndex: product.primaryImageIndex
+  })
+
+  // Prepare images for slideshow
+  const images = getAllProductImages(product)
+  console.log('ProductPage processed images:', images)
   
   // Calculate total stock from variants
   const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
@@ -82,37 +94,13 @@ export default function ProductPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* Product Images */}
           <div className="space-y-4">
-            {/* Main Image */}
-            <div className="aspect-square overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-200">
-              <img
-                src={images[selectedImage]}
-                alt={product.alt}
-                className="w-full h-full object-cover"
-              />
-            </div>
-
-            {/* Thumbnail Images */}
-            {images.length > 1 && (
-              <div className="flex space-x-2 overflow-x-auto">
-                {images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                      selectedImage === index
-                        ? 'border-gray-900'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt={`${product.title} view ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
+            <ProductSlideshow
+              images={images}
+              alt={product.alt}
+              showThumbnails={true}
+              autoPlay={false}
+              className="w-full"
+            />
           </div>
 
           {/* Product Details */}

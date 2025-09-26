@@ -4,6 +4,8 @@ export type Product = {
   price: number
   description: string
   image: string
+  images?: string[]
+  primaryImageIndex?: number
   alt: string
   badges?: string[]
   category: 'apparel' | 'accessories' | 'embroidery'

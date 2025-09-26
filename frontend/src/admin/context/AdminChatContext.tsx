@@ -1,21 +1,25 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAdminWebSocket } from '../../hooks/useWebSocket';
 import { webSocketService } from '../../shared/websocketService';
+import { messageApiService } from '../../shared/messageApiService';
 
 export interface AdminChatMessage {
   id: string;
-  text: string;
+  text?: string;
   sender: 'user' | 'admin';
   timestamp: Date;
   customerId: string;
   customerName?: string;
   customerEmail?: string;
   isRead?: boolean;
+  type?: 'text' | 'image' | 'file';
+  attachment?: any;
 }
 
 interface AdminChatContextType {
   messages: AdminChatMessage[];
   sendMessage: (text: string, customerId: string) => void;
+  sendAttachment?: (file: File, customerId: string) => Promise<void>;
   setTyping: (customerId: string, isTyping: boolean) => void;
   isUserTyping: { [customerId: string]: boolean };
   onlineCustomers: string[];
@@ -23,7 +27,7 @@ interface AdminChatContextType {
   setSelectedCustomer: (customerId: string | null) => void;
   markAsRead: (customerId: string) => void;
   getUnreadCount: (customerId: string) => number;
-  typingTimeout: React.MutableRefObject<{ [customerId: string]: NodeJS.Timeout | null }>;
+  typingTimeout: React.MutableRefObject<{ [customerId: string]: ReturnType<typeof setTimeout> | null }>;
   customerDirectory: Record<string, { name?: string | null; email?: string | null }>;
   threads: Array<{ customerId: string; lastMessage?: { text: string; sender: 'user' | 'admin'; timestamp: string } }>;
 }
@@ -31,6 +35,17 @@ interface AdminChatContextType {
 const AdminChatContext = createContext<AdminChatContextType | undefined>(undefined);
 
 export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const normalizeAttachment = (att: any): any => {
+    if (!att) return att;
+    if (typeof att === 'string') {
+      const str = att.trim();
+      if (str.startsWith('{') || str.startsWith('[')) {
+        try { return JSON.parse(str); } catch {}
+      }
+      return str; // data URL
+    }
+    return att;
+  };
   const { subscribe, isConnected } = useAdminWebSocket();
   const [messages, setMessages] = useState<AdminChatMessage[]>([]);
   const [isUserTyping, setIsUserTyping] = useState<{ [customerId: string]: boolean }>({});
@@ -39,7 +54,82 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [threads, setThreads] = useState<Array<{ customerId: string; lastMessage?: { text: string; sender: 'user' | 'admin'; timestamp: string } }>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   
-  const typingTimeout = useRef<{ [customerId: string]: NodeJS.Timeout | null }>({});
+  const typingTimeout = useRef<{ [customerId: string]: ReturnType<typeof setTimeout> | null }>({});
+
+  // Load existing messages and threads on initialization
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        console.log('🔄 Loading existing chat data...');
+        
+        // Load recent messages
+        const recentMessagesResponse = await messageApiService.getRecentMessages(100);
+        if (recentMessagesResponse.success && recentMessagesResponse.data) {
+          const existingMessages: AdminChatMessage[] = recentMessagesResponse.data.map(msg => ({
+            id: msg.id.toString(),
+            text: msg.text ?? undefined,
+            sender: msg.sender,
+            timestamp: new Date(msg.createdAt),
+            customerId: msg.customerId.toString(),
+            customerName: msg.customer?.name || msg.customer?.email || `Customer ${msg.customerId}`,
+            customerEmail: msg.customer?.email,
+            isRead: msg.sender === 'admin',
+            type: (msg as any).type,
+            attachment: normalizeAttachment((msg as any).attachment)
+          }));
+          
+          setMessages(existingMessages);
+          console.log(`✅ Loaded ${existingMessages.length} existing messages`);
+          
+          // Update customer directory with loaded data
+          const customerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
+          recentMessagesResponse.data.forEach(msg => {
+            if (msg.customer) {
+              customerDirectoryUpdate[msg.customerId.toString()] = {
+                name: msg.customer.name,
+                email: msg.customer.email
+              };
+            }
+          });
+          setCustomerDirectory(prev => ({ ...prev, ...customerDirectoryUpdate }));
+        }
+
+        // Load chat threads
+        const threadsResponse = await messageApiService.getChatThreads();
+        if (threadsResponse.success && threadsResponse.data) {
+          const existingThreads = threadsResponse.data.map(thread => ({
+            customerId: thread.customerId.toString(),
+            lastMessage: thread.lastMessage ? {
+              text: thread.lastMessage.text || '',
+              type: (thread.lastMessage as any).type,
+              sender: thread.lastMessage.sender,
+              timestamp: thread.lastMessage.timestamp
+            } : undefined
+          }));
+          
+          setThreads(existingThreads);
+          console.log(`✅ Loaded ${existingThreads.length} existing threads`);
+          
+          // Update customer directory with thread data
+          const threadCustomerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
+          threadsResponse.data.forEach(thread => {
+            const c = (thread as any).customer;
+            if (c?.firstName || c?.lastName || c?.email || c?.name) {
+              threadCustomerDirectoryUpdate[thread.customerId.toString()] = {
+                name: c?.name || `${c?.firstName || ''} ${c?.lastName || ''}`.trim() || null,
+                email: c?.email || null
+              };
+            }
+          });
+          setCustomerDirectory(prev => ({ ...prev, ...threadCustomerDirectoryUpdate }));
+        }
+      } catch (error) {
+        console.error('❌ Error loading existing chat data:', error);
+      }
+    };
+
+    loadExistingData();
+  }, []);
 
   // WebSocket event listeners
   useEffect(() => {
@@ -62,13 +152,15 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const newMessage: AdminChatMessage = {
         id: data.messageId,
-        text: data.text,
+        text: (data as any).text ?? undefined,
         sender: data.sender,
         timestamp: new Date(data.timestamp),
         customerId: data.customerId,
         customerName: (data as any).name || undefined,
         customerEmail: (data as any).email || undefined,
-        isRead: data.sender === 'admin' // Admin messages are read by default
+        isRead: data.sender === 'admin',
+        type: (data as any).type,
+        attachment: normalizeAttachment((data as any).attachment)
       };
 
       setMessages(prev => {
@@ -80,7 +172,7 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Update threads with latest activity
       setThreads(prev => {
         const others = prev.filter(t => t.customerId !== data.customerId);
-        return [{ customerId: data.customerId, lastMessage: { text: data.text, sender: data.sender, timestamp: data.timestamp } }, ...others];
+        return [{ customerId: data.customerId, lastMessage: { text: (data as any).text ?? '', sender: data.sender, timestamp: (data as any).timestamp } }, ...others];
       });
     });
 
@@ -171,10 +263,12 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (String(data.customerId) !== String(selectedCustomer)) return;
       const history: AdminChatMessage[] = data.messages.map((m: any) => ({
         id: String(m.id),
-        text: m.text,
+        text: m.text ?? undefined,
         sender: m.sender,
         timestamp: new Date(m.timestamp),
-        customerId: selectedCustomer!
+        customerId: selectedCustomer!,
+        type: (m as any).type,
+        attachment: normalizeAttachment((m as any).attachment)
       }));
       setMessages(prev => {
         // Merge without duplicates
@@ -182,6 +276,10 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         for (const m of history) map.set(m.id, m);
         return Array.from(map.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       });
+      // Mark all user messages for this customer as read when opening
+      setMessages(prev => prev.map(msg => (
+        msg.customerId === selectedCustomer && msg.sender === 'user' ? { ...msg, isRead: true } : msg
+      )));
     };
 
     webSocketService.on('chat_history' as any, onHistory as any);
@@ -222,6 +320,34 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 1000);
   };
 
+  const sendAttachment = async (file: File, customerId: string) => {
+    const messageId = `admin_msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const isImage = !!file.type && file.type.startsWith('image/');
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const newMessage: AdminChatMessage = {
+      id: messageId,
+      sender: 'admin',
+      timestamp: new Date(),
+      customerId,
+      isRead: true,
+      type: (isImage ? 'image' : 'file') as 'image' | 'file',
+      attachment: {
+        name: file.name,
+        size: file.size,
+        mimeType: file.type,
+        data: base64,
+      }
+    };
+    setMessages(prev => [...prev, newMessage]);
+    webSocketService.sendChatAttachment(messageId, customerId, { type: newMessage.type === 'image' ? 'image' : 'file', attachment: newMessage.attachment });
+  };
+
   const setTyping = (customerId: string, isTyping: boolean) => {
     webSocketService.sendTypingStatus(customerId, isTyping);
     if (typingTimeout.current[customerId]) {
@@ -253,6 +379,7 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const value: AdminChatContextType = {
     messages,
     sendMessage,
+    sendAttachment,
     setTyping,
     isUserTyping,
     onlineCustomers,

@@ -7,7 +7,9 @@ export interface ProductAttributes {
   slug: string;
   description: string;
   price: number;
-  image: string;
+  image: string; // Keep for backward compatibility - will be the primary image
+  images?: string[]; // Array of base64 images
+  primaryImageIndex?: number; // Index of the primary image in the images array
   alt: string;
   categoryId: number;
   subcategoryId?: number;
@@ -38,6 +40,8 @@ class Product extends Model<ProductAttributes, ProductCreateAttributes> implemen
   public description!: string;
   public price!: number;
   public image!: string;
+  public images?: string[];
+  public primaryImageIndex?: number;
   public alt!: string;
   public categoryId!: number;
   public subcategoryId?: number;
@@ -95,6 +99,32 @@ Product.init(
       type: DataTypes.TEXT('long'), // Use LONGTEXT to handle large base64 images
       allowNull: false,
       field: 'image',
+    },
+    images: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'images',
+      get(): string[] {
+        const value = this.getDataValue('images');
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            return [];
+          }
+        }
+        return Array.isArray(value) ? value : [];
+      },
+      set(value: string[] | undefined) {
+        this.setDataValue('images', value);
+      }
+    },
+    primaryImageIndex: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      field: 'primary_image_index',
     },
     alt: {
       type: DataTypes.STRING(255),

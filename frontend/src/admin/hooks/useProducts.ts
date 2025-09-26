@@ -41,13 +41,13 @@ export const useProducts = () => {
       })
       
       // Transform database products to admin format
-      const transformedProducts = response.data.map(product => ({
+      const transformedProducts = (response.data || []).map(product => ({
         ...product,
         // Add any admin-specific transformations here
         costPrice: 0, // Default value, can be added to database later
         salePrice: product.price, // Default to regular price
         variants: [], // Default empty array, can be added to database later
-        images: [product.image] // Convert single image to array format
+        images: product.images && product.images.length > 0 ? product.images : (product.image ? [product.image] : []) // Handle both single and multiple images
       }))
       
       setProducts(transformedProducts)
@@ -81,9 +81,9 @@ export const useProducts = () => {
       const newProduct = {
         ...response.data,
         costPrice: productData.costPrice || 0,
-        salePrice: productData.salePrice || response.data.price,
+        salePrice: productData.salePrice || (response.data?.price || productData.price),
         variants: productData.variants || [],
-        images: productData.images || [response.data.image]
+        images: productData.images || [response.data?.image || productData.image]
       }
       
       setProducts(prev => [newProduct, ...prev])
@@ -109,6 +109,8 @@ export const useProducts = () => {
         description: productData.description,
         price: productData.price,
         image: productData.image,
+        images: productData.images,
+        primaryImageIndex: productData.primaryImageIndex,
         alt: productData.alt,
         categoryId: productData.categoryId,
         subcategoryId: productData.subcategoryId,
@@ -124,7 +126,8 @@ export const useProducts = () => {
         weight: productData.weight,
         dimensions: productData.dimensions,
         materials: productData.materials,
-        careInstructions: productData.careInstructions
+        careInstructions: productData.careInstructions,
+        hasSizing: productData.hasSizing
       }
       
       const response = await productApiService.updateProduct(id, dbProductData)
@@ -135,7 +138,7 @@ export const useProducts = () => {
         costPrice: productData.costPrice,
         salePrice: productData.salePrice,
         variants: productData.variants,
-        images: productData.images
+        images: productData.images || response.data?.images
       }
       
       setProducts(prev => prev.map(p => p.id === id ? updatedProduct : p))
