@@ -1,8 +1,6 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
-import Navbar from './ecommerce/components/Navbar'
-import Footer from './ecommerce/components/Footer'
-import ChatWidget from './ecommerce/components/ChatWidget'
+import EcommerceLayout from './ecommerce/components/EcommerceLayout'
 import { RealTimeChatProvider } from './shared/realTimeChatContext'
 import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
@@ -45,125 +43,68 @@ export default function App() {
             
             {/* Public Routes */}
             <Route path="/" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Home />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <Home />
+              </EcommerceLayout>
             } />
             <Route path="/products" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Products />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <Products />
+              </EcommerceLayout>
             } />
             <Route path="/product/:id" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <ProductPage />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <ProductPage />
+              </EcommerceLayout>
             } />
             <Route path="/customize/:id" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Customize />
-                </div>
-                <Footer />
-              </div>
+              <EcommerceLayout>
+                <Customize />
+              </EcommerceLayout>
             } />
             <Route path="/customized-embroidery" element={
               <ProtectedRoute fallbackPath="/contact">
-                <div className="min-h-screen flex flex-col">
-                  <Navbar />
-                  <div className="flex-1">
-                    <CustomizedEmbroidery />
-                  </div>
-                  <Footer />
-                  <ChatWidget />
-                </div>
+                <EcommerceLayout>
+                  <CustomizedEmbroidery />
+                </EcommerceLayout>
               </ProtectedRoute>
             } />
             <Route path="/about" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <About />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <About />
+              </EcommerceLayout>
             } />
             <Route path="/faq" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <FAQ />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <FAQ />
+              </EcommerceLayout>
             } />
             <Route path="/contact" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Contact />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <Contact />
+              </EcommerceLayout>
             } />
             <Route path="/cart" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Cart />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <Cart />
+              </EcommerceLayout>
             } />
             <Route path="/checkout" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <Checkout />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <Checkout />
+              </EcommerceLayout>
             } />
             <Route path="/order-checkout" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
-                  <OrderCheckout />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+              <EcommerceLayout>
+                <OrderCheckout />
+              </EcommerceLayout>
             } />
             <Route path="/my-orders" element={
-              <div className="min-h-screen flex flex-col">
-                <Navbar />
-                <div className="flex-1">
+              <ProtectedRoute fallbackPath="/contact">
+                <EcommerceLayout>
                   <MyOrders />
-                </div>
-                <Footer />
-                <ChatWidget />
-              </div>
+                </EcommerceLayout>
+              </ProtectedRoute>
             } />
             <Route path="/verify-email" element={<VerifyEmail />} />
           </Routes>

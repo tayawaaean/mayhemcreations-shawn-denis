@@ -11,6 +11,7 @@ import {
   mockAdminUsers
 } from '../data/mockData'
 import { embroideryOptionApiService } from '../../shared/embroideryOptionApiService'
+import { adminAnalyticsApiService } from '../../shared/adminAnalyticsApiService'
 
 type AdminState = {
   products: AdminProduct[]
@@ -62,6 +63,7 @@ type AdminAction =
   | { type: 'SET_SELECTED_ORDER'; payload: Order | null }
   | { type: 'SET_SELECTED_CUSTOMER'; payload: Customer | null }
   | { type: 'SET_SELECTED_REVIEW'; payload: Review | null }
+  | { type: 'SET_ANALYTICS'; payload: Analytics }
 
 const initialState: AdminState = {
   products: mockProducts,
@@ -178,6 +180,8 @@ const adminReducer = (state: AdminState, action: AdminAction): AdminState => {
       return { ...state, selectedCustomer: action.payload }
     case 'SET_SELECTED_REVIEW':
       return { ...state, selectedReview: action.payload }
+    case 'SET_ANALYTICS':
+      return { ...state, analytics: action.payload }
     default:
       return state
   }
@@ -197,7 +201,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true })
         const response = await embroideryOptionApiService.getEmbroideryOptions()
-        if (response.success) {
+        if (response.success && response.data) {
           dispatch({ type: 'SET_EMBROIDERY_OPTIONS', payload: response.data })
         }
       } catch (error) {
@@ -209,6 +213,90 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
 
     fetchEmbroideryOptions()
+  }, [])
+
+  // Fetch analytics data from API on mount
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        console.log('🔄 Fetching analytics data...')
+        const response = await adminAnalyticsApiService.getDashboardAnalytics()
+        
+        if (response.success && response.data) {
+          console.log('📊 Analytics API Response:', response.data)
+          console.log('👥 Total Customers from API:', response.data.totalCustomers)
+          console.log('📦 Total Products from API:', response.data.totalProducts)
+          console.log('⚠️ Low Stock Variants from API:', response.data.lowStockVariants)
+          console.log('⚠️ Low Stock Count:', response.data.lowStockCount)
+          
+          // Convert the API data to match the Analytics type
+          const analyticsData: Analytics = {
+            totalSales: mockAnalytics.totalSales, // Keep mock for now, can be replaced later
+            totalOrders: mockAnalytics.totalOrders, // Keep mock for now, can be replaced later
+            totalProducts: response.data.totalProducts,
+            totalCustomers: response.data.totalCustomers,
+            salesGrowth: mockAnalytics.salesGrowth, // Keep mock for now
+            ordersGrowth: mockAnalytics.ordersGrowth, // Keep mock for now
+            customersGrowth: mockAnalytics.customersGrowth, // Keep mock for now
+            revenueChart: mockAnalytics.revenueChart, // Keep mock for now
+            topProducts: mockAnalytics.topProducts, // Keep mock for now
+            recentOrders: mockAnalytics.recentOrders, // Keep mock for now
+            lowStockProducts: response.data.lowStockVariants.map(variant => ({
+              id: variant.id.toString(),
+              title: variant.product?.title || variant.name || 'Unknown Product',
+              slug: variant.product?.slug || '',
+              sku: variant.sku,
+              price: variant.price || variant.product?.price || 0,
+              status: 'active' as 'active' | 'draft' | 'archived',
+              featured: false,
+              stock: variant.stock,
+              image: variant.image || variant.product?.image || '',
+              alt: variant.product?.title || variant.name || '',
+              description: '', // Default value
+              shortDescription: '', // Default value
+              images: [variant.image || variant.product?.image || ''].filter(Boolean),
+              primaryImage: variant.image || variant.product?.image || '',
+              category: variant.product?.category?.name || 'Uncategorized',
+              subcategory: '', // Default value
+              variants: [{
+                id: variant.id.toString(),
+                name: variant.name,
+                color: variant.color || 'Default',
+                colorHex: variant.colorHex || '#000000',
+                size: variant.size || 'One Size',
+                sku: variant.sku,
+                stock: variant.stock,
+                price: variant.price || variant.product?.price || 0,
+                weight: variant.weight || 0,
+                dimensions: variant.dimensions || '',
+                isActive: variant.isActive
+              }],
+              tags: [], // Default value
+              metaTitle: '', // Default value
+              metaDescription: '', // Default value
+              seo: {
+                metaTitle: '',
+                metaDescription: '',
+                slug: variant.product?.slug || ''
+              },
+              createdAt: new Date(variant.createdAt),
+              updatedAt: new Date(variant.updatedAt)
+            }))
+          }
+          
+          dispatch({ type: 'SET_ANALYTICS', payload: analyticsData })
+          console.log('✅ Analytics data loaded successfully')
+          console.log('⚠️ Final Low Stock Products:', analyticsData.lowStockProducts)
+          console.log('⚠️ Final Low Stock Count:', analyticsData.lowStockProducts.length)
+        } else {
+          console.error('❌ Failed to fetch analytics:', response.message)
+        }
+      } catch (error) {
+        console.error('❌ Error fetching analytics:', error)
+      }
+    }
+
+    fetchAnalytics()
   }, [])
 
   return (

@@ -26,6 +26,7 @@ interface RealTimeChatContextType {
   quickQuestions: string[];
   typingTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
   unreadCount: number;
+  requestNotificationPermission: () => Promise<boolean>;
 }
 
 const RealTimeChatContext = createContext<RealTimeChatContextType | undefined>(undefined);
@@ -114,13 +115,28 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // Prevent duplicates when echoing messages we already appended locally
       setMessages(prev => {
-        const exists = prev.some(msg => msg.id === newMessage.id);
+        const exists = prev.some(msg => 
+          msg.id === newMessage.id || 
+          (msg.text === newMessage.text && 
+           msg.sender === newMessage.sender && 
+           Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000)
+        );
         return exists ? prev : [...prev, newMessage];
       });
 
       // Update unread counter for admin messages when widget closed
       if (data.sender === 'admin' && !isOpen) {
         setUnreadCount(c => c + 1);
+        
+        // Show browser notification for admin messages
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('New Message from Support', {
+            body: data.text || 'You have received a new message from our support team',
+            icon: '/favicon.svg',
+            tag: 'chat-message',
+            requireInteraction: false
+          });
+        }
       }
     });
 
@@ -268,6 +284,23 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, 2000);
   };
 
+  const requestNotificationPermission = async (): Promise<boolean> => {
+    if (!('Notification' in window)) {
+      return false;
+    }
+    
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+    
+    if (Notification.permission === 'denied') {
+      return false;
+    }
+    
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  };
+
   const value: RealTimeChatContextType = {
     isOpen,
     setIsOpen,
@@ -278,7 +311,9 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     isConnected,
     isCustomerOnline,
     quickQuestions,
-    typingTimeout
+    typingTimeout,
+    unreadCount,
+    requestNotificationPermission
   };
 
   return (

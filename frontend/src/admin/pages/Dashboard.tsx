@@ -7,12 +7,28 @@ import {
   Users, 
   TrendingUp, 
   TrendingDown,
-  AlertTriangle
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 
 const Dashboard: React.FC = () => {
   const { state } = useAdmin()
   const { analytics } = state
+  
+  // Pagination state for low stock alert
+  const [lowStockPage, setLowStockPage] = React.useState(1)
+  const lowStockItemsPerPage = 5
+  
+  // Calculate pagination for low stock products
+  const totalLowStockPages = Math.ceil(analytics.lowStockProducts.length / lowStockItemsPerPage)
+  const startIndex = (lowStockPage - 1) * lowStockItemsPerPage
+  const endIndex = startIndex + lowStockItemsPerPage
+  const paginatedLowStockProducts = analytics.lowStockProducts.slice(startIndex, endIndex)
+  
+  const handleLowStockPageChange = (page: number) => {
+    setLowStockPage(page)
+  }
 
   const stats = [
     {
@@ -157,38 +173,103 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Low Stock Alert */}
-      {analytics.lowStockProducts.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center mb-6">
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
             <div className="p-2 bg-yellow-50 rounded-lg mr-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900">Low Stock Alert</h3>
-          </div>
-          <div className="space-y-3">
-            {analytics.lowStockProducts.map((product) => (
-              <div key={product.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                <div className="flex items-center">
-                  <img 
-                    src={product.primaryImage} 
-                    alt={product.title}
-                    className="h-10 w-10 rounded-lg object-cover"
-                  />
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">{product.title}</p>
-                    <p className="text-sm text-gray-500">SKU: {product.sku}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-red-600 font-medium">
-                    {Math.min(...product.variants.map(v => v.stock))} units left
-                  </p>
-                </div>
-              </div>
-            ))}
+            <span className="ml-2 text-sm text-gray-500">({analytics.lowStockProducts.length} variants)</span>
           </div>
         </div>
-      )}
+        {analytics.lowStockProducts.length > 0 ? (
+          <>
+            <div className="space-y-3">
+              {paginatedLowStockProducts.map((product) => (
+                <div key={product.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <div className="flex items-center">
+                    <img 
+                      src={product.primaryImage} 
+                      alt={product.title}
+                      className="h-10 w-10 rounded-lg object-cover"
+                    />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">{product.title}</p>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <span>SKU: {product.sku}</span>
+                        {product.variants && product.variants.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span>{product.variants[0].color}</span>
+                            <span>•</span>
+                            <span>{product.variants[0].size}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-red-600 font-medium">
+                      {product.variants && product.variants.length > 0 
+                        ? `${product.variants[0].stock} units left`
+                        : 'No stock data'
+                      }
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalLowStockPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+                <div className="text-sm text-gray-500">
+                  Showing {startIndex + 1}-{Math.min(endIndex, analytics.lowStockProducts.length)} of {analytics.lowStockProducts.length} variants
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleLowStockPageChange(lowStockPage - 1)}
+                    disabled={lowStockPage === 1}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalLowStockPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => handleLowStockPageChange(page)}
+                        className={`px-3 py-1 text-sm rounded-lg ${
+                          page === lowStockPage
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <button
+                    onClick={() => handleLowStockPageChange(lowStockPage + 1)}
+                    disabled={lowStockPage === totalLowStockPages}
+                    className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No low stock variants found</p>
+            <p className="text-sm text-gray-400 mt-1">All variants have sufficient stock (threshold: ≤10 units)</p>
+          </div>
+        )}
+      </div>
 
       {/* Top Products */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">

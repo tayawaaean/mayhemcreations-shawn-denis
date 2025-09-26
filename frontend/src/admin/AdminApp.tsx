@@ -4,6 +4,7 @@ import { AdminProvider } from './context/AdminContext'
 import { AdminAuthProvider } from './context/AdminAuthContext'
 import { AdminChatProvider } from './context/AdminChatContext'
 import { RoleProvider } from './context/RoleContext'
+import { InventoryProvider } from '../shared/inventoryContext'
 import SharedLayout from './components/layout/SharedLayout'
 import Sidebar from './components/layout/Sidebar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -34,40 +35,42 @@ const AdminApp: React.FC = () => {
     <AdminAuthProvider>
       <RoleProvider initialRole="admin">
         <AdminProvider>
-          <AdminChatProvider>
-          <Routes>
-            <Route path="/*" element={
-              <ProtectedRoute requiredRole="admin">
-                <Routes>
-                  <Route path="/*" element={<SharedLayout SidebarComponent={Sidebar} />}>
-                    <Route index element={<Dashboard />} />
-                    <Route path="products" element={<Products />} />
-                    <Route path="orders" element={<Orders />} />
-                    <Route path="pending-review" element={<PendingReview />} />
-                    <Route path="customers" element={<Customers />} />
-                    <Route path="reviews" element={<Reviews />} />
-                    <Route path="users" element={<UsersPage />} />
-                    <Route path="messages" element={<Messages />} />
-                    <Route path="inventory" element={<Inventory />} />
-                    <Route path="categories" element={<Categories />} />
-                    <Route path="embroidery" element={<Embroidery />} />
-                    <Route path="faqs" element={<FAQs />} />
-                    <Route path="material-costs" element={<MaterialCosts />} />
-                    <Route path="material-costs-test" element={<MaterialCostsTest />} />
-                    <Route path="analytics" element={<Analytics />} />
-                    <Route path="chat-settings" element={<ChatSettings />} />
-                    <Route path="payment-logs" element={<PaymentLogs />} />
-                    <Route path="payment-management" element={<PaymentManagement />} />
-                    <Route path="refund-management" element={<RefundManagement />} />
-                    <Route path="system-logs" element={<SystemLogs />} />
-                    <Route path="profile" element={<Profile />} />
-                  </Route>
-                </Routes>
-              </ProtectedRoute>
-            }>
-            </Route>
-          </Routes>
-          </AdminChatProvider>
+          <InventoryProvider>
+            <AdminChatProvider>
+              <Routes>
+                <Route path="/*" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <Routes>
+                      <Route path="/*" element={<SharedLayout SidebarComponent={Sidebar} />}>
+                        <Route index element={<Dashboard />} />
+                        <Route path="products" element={<Products />} />
+                        <Route path="orders" element={<Orders />} />
+                        <Route path="pending-review" element={<PendingReview />} />
+                        <Route path="customers" element={<Customers />} />
+                        <Route path="reviews" element={<Reviews />} />
+                        <Route path="users" element={<UsersPage />} />
+                        <Route path="messages" element={<Messages />} />
+                        <Route path="inventory" element={<Inventory />} />
+                        <Route path="categories" element={<Categories />} />
+                        <Route path="embroidery" element={<Embroidery />} />
+                        <Route path="faqs" element={<FAQs />} />
+                        <Route path="material-costs" element={<MaterialCosts />} />
+                        <Route path="material-costs-test" element={<MaterialCostsTest />} />
+                        <Route path="analytics" element={<Analytics />} />
+                        <Route path="chat-settings" element={<ChatSettings />} />
+                        <Route path="payment-logs" element={<PaymentLogs />} />
+                        <Route path="payment-management" element={<PaymentManagement />} />
+                        <Route path="refund-management" element={<RefundManagement />} />
+                        <Route path="system-logs" element={<SystemLogs />} />
+                        <Route path="profile" element={<Profile />} />
+                      </Route>
+                    </Routes>
+                  </ProtectedRoute>
+                }>
+                </Route>
+              </Routes>
+            </AdminChatProvider>
+          </InventoryProvider>
         </AdminProvider>
       </RoleProvider>
     </AdminAuthProvider>

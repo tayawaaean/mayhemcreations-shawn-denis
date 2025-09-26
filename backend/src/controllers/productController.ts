@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Product, Category, Variant } from '../models';
 import { logger } from '../utils/logger';
 import { Op } from 'sequelize';
+import { getWebSocketService } from '../services/websocketService';
 
 export interface ProductFilters {
   categoryId?: number;
@@ -473,6 +474,16 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       images: imagesArray,
       primaryImageIndex: primaryImageIndex
     });
+
+    // Emit WebSocket event for product status changes
+    const webSocketService = getWebSocketService();
+    if (webSocketService && updateData.status) {
+      webSocketService.emitProductStatusChange(product.id, {
+        status: updateData.status,
+        productTitle: product.title,
+        previousStatus: product.status
+      });
+    }
 
     // Fetch the updated product with associations
     const updatedProduct = await Product.findByPk(product.id, {

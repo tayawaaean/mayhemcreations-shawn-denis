@@ -5,9 +5,18 @@ import { Heart, Eye, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import ProductSlideshow from './ProductSlideshow'
 import { getAllProductImages } from '../../shared/imageUtils'
+import useProductUpdates from '../../hooks/useProductUpdates'
 
 export default function ProductCard({ product }: { product: Product }) {
   const [isHovered, setIsHovered] = useState(false)
+  
+  // Get real-time stock updates
+  const { stock, hasUpdates } = useProductUpdates(parseInt(product.id))
+  
+  // Use real-time stock if available, otherwise fall back to product stock
+  const currentStock = stock !== null ? stock : product.stock
+  const isOutOfStock = currentStock === 0
+  const isLowStock = currentStock !== undefined && currentStock <= 5 && currentStock > 0
 
   // Debug logging
   console.log('ProductCard received product:', {
@@ -15,7 +24,10 @@ export default function ProductCard({ product }: { product: Product }) {
     title: product.title,
     image: product.image,
     images: product.images,
-    primaryImageIndex: product.primaryImageIndex
+    primaryImageIndex: product.primaryImageIndex,
+    originalStock: product.stock,
+    realTimeStock: currentStock,
+    hasUpdates
   })
 
   // Prepare images for slideshow
@@ -44,15 +56,18 @@ export default function ProductCard({ product }: { product: Product }) {
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
           {/* Stock Badge */}
-          {product.stock !== undefined && (
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-              product.stock === 0 
+          {currentStock !== undefined && (
+            <span className={`px-2 py-1 text-xs font-medium rounded-full transition-all duration-300 ${
+              hasUpdates ? 'ring-2 ring-blue-400 ring-opacity-50' : ''
+            } ${
+              isOutOfStock 
                 ? 'bg-red-500 text-white' 
-                : product.stock <= 5 
+                : isLowStock 
                   ? 'bg-yellow-500 text-white' 
                   : 'bg-green-500 text-white'
             }`}>
-              {product.stock === 0 ? 'Out of Stock' : `${product.stock} in stock`}
+              {isOutOfStock ? 'Out of Stock' : `${currentStock} in stock`}
+              {hasUpdates && <span className="ml-1 text-blue-200">●</span>}
             </span>
           )}
           
@@ -88,13 +103,13 @@ export default function ProductCard({ product }: { product: Product }) {
           isHovered ? 'translate-y-0' : 'translate-y-full'
         }`}>
           <Button
-            variant={product.stock === 0 ? "outline" : "add-to-cart"}
+            variant={isOutOfStock ? "outline" : "add-to-cart"}
             size="sm"
             className="w-full"
-            disabled={product.stock === 0}
-            onClick={() => product.stock !== 0 && (window.location.href = `/customize/${product.id}`)}
+            disabled={isOutOfStock}
+            onClick={() => !isOutOfStock && (window.location.href = `/customize/${product.id}`)}
           >
-            {product.stock === 0 ? 'Out of Stock' : 'Start Customizing'}
+            {isOutOfStock ? 'Out of Stock' : 'Start Customizing'}
           </Button>
         </div>
       </div>

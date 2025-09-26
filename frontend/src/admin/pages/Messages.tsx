@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useAdmin } from '../context/AdminContext'
 import { useAdminChat } from '../context/AdminChatContext'
 import {
   Search,
@@ -20,8 +19,6 @@ import {
 import HelpModal from '../components/modals/HelpModal'
 
 const Messages: React.FC = () => {
-  const { state, dispatch } = useAdmin()
-  const { customers } = state
   const { 
     messages, 
     sendMessage, 
@@ -33,7 +30,8 @@ const Messages: React.FC = () => {
     setSelectedCustomer, 
     markAsRead, 
     getUnreadCount,
-    threads
+    threads,
+    allCustomers
   } = useAdminChat()
   const [newMessage, setNewMessage] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -63,14 +61,18 @@ const Messages: React.FC = () => {
     return acc
   }, {} as Record<string, typeof messages>)
 
-  // Get unique customers with their latest message (include unknown customers)
-  // Build conversation list from threads first (persisted), then from in-memory if new
+  // Get unique customers with their latest message (include all customers, not just those with conversations)
+  // Build conversation list from all customers first, then add conversation data if available
   const customerIdsFromMessages = Object.keys(messagesByCustomer)
-  const baseList = threads.map(t => t.customerId)
-  const mergedIds = Array.from(new Set([...baseList, ...customerIdsFromMessages]))
+  const threadCustomerIds = threads.map(t => t.customerId)
+  const allCustomerIds = allCustomers.map(c => c.id)
+  
+  // Merge all customer IDs (prioritize all customers, then add any from messages/threads not in allCustomers)
+  const mergedIds = Array.from(new Set([...allCustomerIds, ...threadCustomerIds, ...customerIdsFromMessages]))
 
   const customerList = mergedIds.map(customerId => {
-    const customer = customers.find(c => String(c.id) === String(customerId))
+    // Find customer from allCustomers
+    const customer = allCustomers.find(c => c.id === customerId)
     const customerMessages = messagesByCustomer[customerId] || []
     const latestMessage = threads.find(t => t.customerId === customerId)?.lastMessage || (customerMessages.length ? {
       text: customerMessages[customerMessages.length - 1].text,
@@ -100,7 +102,7 @@ const Messages: React.FC = () => {
   })
 
   const selectedCustomerMessages = selectedCustomer ? messagesByCustomer[selectedCustomer] || [] : []
-  const selectedCustomerData = selectedCustomer ? customers.find(c => String(c.id) === String(selectedCustomer)) : null
+  const selectedCustomerData = selectedCustomer ? allCustomers.find(c => c.id === selectedCustomer) : null
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedCustomer) return
@@ -234,8 +236,8 @@ const Messages: React.FC = () => {
             {filteredCustomers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4">
                 <Users className="w-12 h-12 text-gray-300 mb-4" />
-                <h3 className="text-sm font-medium text-gray-900 mb-2">No conversations yet</h3>
-                <p className="text-xs text-gray-500 text-center">Start a conversation by selecting a customer</p>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">No customers found</h3>
+                <p className="text-xs text-gray-500 text-center">Try adjusting your search terms</p>
               </div>
             ) : (
               filteredCustomers.map((item) => (
@@ -302,13 +304,17 @@ const Messages: React.FC = () => {
                             (item.latestMessage as any).type === 'image' ? 'Image' : 'Attachment'
                           )
                         ) : (
-                          'No messages yet'
+                          <span className="text-gray-400 italic">No messages yet - Click to start conversation</span>
                         )}
                       </p>
 
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">
-                          {item.messageCount} message{item.messageCount !== 1 ? 's' : ''}
+                          {item.messageCount > 0 ? (
+                            `${item.messageCount} message${item.messageCount !== 1 ? 's' : ''}`
+                          ) : (
+                            'Ready to chat'
+                          )}
                         </span>
                         {item.latestMessage && item.latestMessage.sender === 'admin' && (
                           <div className="flex items-center space-x-1">

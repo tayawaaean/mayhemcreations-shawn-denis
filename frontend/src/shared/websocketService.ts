@@ -20,6 +20,11 @@ export interface WebSocketEvents {
   chat_connected: (data: { customerId: string; timestamp: string }) => void;
   chat_disconnected: (data: { customerId: string; timestamp: string }) => void;
   chat_history: (data: { customerId: string; messages: { id: number; text: string; sender: 'user' | 'admin'; timestamp: string }[] }) => void;
+  
+  // Inventory events
+  inventory_updated: (data: { productId: number; variantId?: number | null; stock?: number; totalProductStock?: number; price?: number; status?: string; timestamp: string }) => void;
+  stock_alert: (data: { productId: number; variantId?: number | null; stockLevel: string; message: string; timestamp: string }) => void;
+  product_status_changed: (data: { productId: number; status: string; timestamp: string }) => void;
 }
 
 class WebSocketService {
@@ -137,14 +142,14 @@ class WebSocketService {
   // Subscribe to events
   public on<K extends keyof WebSocketEvents>(event: K, callback: WebSocketEvents[K]): void {
     if (typeof window !== 'undefined' && this.socket) {
-      this.socket.on(event, callback);
+      this.socket.on(event, callback as any);
     }
   }
 
   // Unsubscribe from events
   public off<K extends keyof WebSocketEvents>(event: K, callback?: WebSocketEvents[K]): void {
     if (typeof window !== 'undefined' && this.socket) {
-      this.socket.off(event, callback);
+      this.socket.off(event, callback as any);
     }
   }
 

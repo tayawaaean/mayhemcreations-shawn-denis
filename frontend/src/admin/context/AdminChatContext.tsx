@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useAdminWebSocket } from '../../hooks/useWebSocket';
 import { webSocketService } from '../../shared/websocketService';
 import { messageApiService } from '../../shared/messageApiService';
+import { adminApiService, Customer } from '../../shared/adminApiService';
 
 export interface AdminChatMessage {
   id: string;
@@ -30,6 +31,8 @@ interface AdminChatContextType {
   typingTimeout: React.MutableRefObject<{ [customerId: string]: ReturnType<typeof setTimeout> | null }>;
   customerDirectory: Record<string, { name?: string | null; email?: string | null }>;
   threads: Array<{ customerId: string; lastMessage?: { text: string; sender: 'user' | 'admin'; timestamp: string } }>;
+  allCustomers: Array<{ id: string; name?: string; email?: string; avatar?: string }>;
+  requestNotificationPermission: () => Promise<boolean>;
 }
 
 const AdminChatContext = createContext<AdminChatContextType | undefined>(undefined);
@@ -53,8 +56,46 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [customerDirectory, setCustomerDirectory] = useState<Record<string, { name?: string | null; email?: string | null }>>({});
   const [threads, setThreads] = useState<Array<{ customerId: string; lastMessage?: { text: string; sender: 'user' | 'admin'; timestamp: string } }>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
   
   const typingTimeout = useRef<{ [customerId: string]: ReturnType<typeof setTimeout> | null }>({});
+
+  // Load customers from API
+  useEffect(() => {
+    const loadCustomers = async () => {
+      try {
+        console.log('🔄 Loading customers from database...');
+        setCustomersLoading(true);
+        
+        const response = await adminApiService.getAllCustomers();
+        if (response.success && response.data) {
+          setAllCustomers(response.data);
+          console.log(`✅ Loaded ${response.data.length} customers from database`);
+          
+          // Update customer directory with loaded data
+          const customerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
+          response.data.forEach(customer => {
+            customerDirectoryUpdate[customer.id.toString()] = {
+              name: customer.firstName && customer.lastName 
+                ? `${customer.firstName} ${customer.lastName}`.trim()
+                : customer.firstName || customer.lastName || null,
+              email: customer.email
+            };
+          });
+          setCustomerDirectory(prev => ({ ...prev, ...customerDirectoryUpdate }));
+        } else {
+          console.error('❌ Failed to load customers:', response.message);
+        }
+      } catch (error) {
+        console.error('❌ Error loading customers:', error);
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+
+    loadCustomers();
+  }, []);
 
   // Load existing messages and threads on initialization
   useEffect(() => {
@@ -129,6 +170,17 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     loadExistingData();
+    
+    // Request notification permission for admin browser notifications
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          console.log('✅ Admin notification permission granted');
+        } else {
+          console.log('❌ Admin notification permission denied');
+        }
+      });
+    }
   }, []);
 
   // WebSocket event listeners
@@ -164,8 +216,14 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
 
       setMessages(prev => {
-        // Prevent duplicates from echo
-        const exists = prev.some(msg => msg.id === newMessage.id);
+        // Prevent duplicates from echo with enhanced logic
+        const exists = prev.some(msg => 
+          msg.id === newMessage.id || 
+          (msg.text === newMessage.text && 
+           msg.sender === newMessage.sender && 
+           msg.customerId === newMessage.customerId &&
+           Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000)
+        );
         return exists ? prev : [...prev, newMessage];
       });
 
@@ -174,6 +232,19 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const others = prev.filter(t => t.customerId !== data.customerId);
         return [{ customerId: data.customerId, lastMessage: { text: (data as any).text ?? '', sender: data.sender, timestamp: (data as any).timestamp } }, ...others];
       });
+
+      // Show browser notification for customer messages when admin is not focused on that customer
+      if (data.sender === 'user' && selectedCustomer !== data.customerId) {
+        const customerName = customerDirectory[data.customerId]?.name || `Customer ${data.customerId}`;
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`New Message from ${customerName}`, {
+            body: data.text || 'You have received a new message from a customer',
+            icon: '/favicon.svg',
+            tag: `admin-chat-${data.customerId}`,
+            requireInteraction: false
+          });
+        }
+      }
     });
 
     // Listen for user typing status
@@ -376,6 +447,23 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     ).length;
   };
 
+  const requestNotificationPermission = async (): Promise<boolean> => {
+    if (!('Notification' in window)) {
+      return false;
+    }
+    
+    if (Notification.permission === 'granted') {
+      return true;
+    }
+    
+    if (Notification.permission === 'denied') {
+      return false;
+    }
+    
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
+  };
+
   const value: AdminChatContextType = {
     messages,
     sendMessage,
@@ -389,7 +477,16 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     getUnreadCount,
     typingTimeout,
     customerDirectory,
-    threads
+    threads,
+    allCustomers: allCustomers.map(customer => ({
+      id: customer.id.toString(),
+      name: customer.firstName && customer.lastName 
+        ? `${customer.firstName} ${customer.lastName}`.trim()
+        : customer.firstName || customer.lastName || customer.email,
+      email: customer.email,
+      avatar: undefined // Customers don't have avatars in the current schema
+    })),
+    requestNotificationPermission
   };
 
   return (

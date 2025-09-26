@@ -367,20 +367,37 @@ export class WebSocketService {
 
   // Emit chat message to specific customer
   public emitChatMessage(customerId: string, messageData: any): void {
-    // Notify the specific customer
-    this.io.to(`chat_${customerId}`).emit('chat_message_received', {
+    const messagePayload = {
       ...messageData,
       timestamp: new Date().toISOString()
-    });
+    };
+
+    // Check if customer is actively in chat room
+    const chatRoom = this.io.sockets.adapter.rooms.get(`chat_${customerId}`);
+    const userRoom = this.io.sockets.adapter.rooms.get(`user_${customerId}`);
+    
+    const isInChatRoom = chatRoom && chatRoom.size > 0;
+    const isInUserRoom = userRoom && userRoom.size > 0;
+
+    if (isInChatRoom) {
+      // Customer is actively chatting - send to chat room only
+      this.io.to(`chat_${customerId}`).emit('chat_message_received', messagePayload);
+      logger.info(`📢 Emitted chat message for customer ${customerId} to chat room (actively chatting)`);
+    } else if (isInUserRoom) {
+      // Customer is logged in but not actively chatting - send to user room for notification
+      this.io.to(`user_${customerId}`).emit('chat_message_received', messagePayload);
+      logger.info(`📢 Emitted chat message for customer ${customerId} to user room (notification)`);
+    } else {
+      // Customer is not connected - still emit to user room in case they reconnect
+      this.io.to(`user_${customerId}`).emit('chat_message_received', messagePayload);
+      logger.info(`📢 Emitted chat message for customer ${customerId} to user room (offline notification)`);
+    }
 
     // Notify admins
     this.io.to('admin_room').emit('chat_message_received', {
-      ...messageData,
-      customerId,
-      timestamp: new Date().toISOString()
+      ...messagePayload,
+      customerId
     });
-
-    logger.info(`📢 Emitted chat message for customer ${customerId}`);
   }
 
   // Emit typing status
@@ -388,12 +405,24 @@ export class WebSocketService {
     const eventName = sender === 'admin' ? 'admin_typing' : 'user_typing';
     
     if (sender === 'admin') {
-      // Admin typing - notify customer
-      this.io.to(`chat_${customerId}`).emit(eventName, {
+      // Admin typing - notify customer based on their current state
+      const typingPayload = {
         customerId,
         isTyping,
         timestamp: new Date().toISOString()
-      });
+      };
+      
+      // Check if customer is actively in chat room
+      const chatRoom = this.io.sockets.adapter.rooms.get(`chat_${customerId}`);
+      const isInChatRoom = chatRoom && chatRoom.size > 0;
+      
+      if (isInChatRoom) {
+        // Customer is actively chatting - send to chat room only
+        this.io.to(`chat_${customerId}`).emit(eventName, typingPayload);
+      } else {
+        // Customer is not actively chatting - send to user room for notification
+        this.io.to(`user_${customerId}`).emit(eventName, typingPayload);
+      }
     } else {
       // User typing - notify admins
       this.io.to('admin_room').emit(eventName, {
@@ -417,6 +446,56 @@ export class WebSocketService {
     });
 
     logger.info(`📢 Emitted chat connection status for customer ${customerId}: ${connected}`);
+  }
+
+  // Emit inventory update to all connected clients
+  public emitInventoryUpdate(productId: number, variantId: number | null, updateData: any): void {
+    const inventoryPayload = {
+      productId,
+      variantId,
+      ...updateData,
+      timestamp: new Date().toISOString()
+    };
+
+    // Notify all connected clients about inventory changes
+    this.io.emit('inventory_updated', inventoryPayload);
+    
+    // Also notify specific rooms for targeted updates
+    this.io.to('admin_room').emit('inventory_updated', inventoryPayload);
+    this.io.to('ecommerce_room').emit('inventory_updated', inventoryPayload);
+
+    logger.info(`📦 Emitted inventory update for product ${productId}${variantId ? ` variant ${variantId}` : ''}`);
+  }
+
+  // Emit stock level alerts
+  public emitStockAlert(productId: number, variantId: number | null, alertData: any): void {
+    const alertPayload = {
+      productId,
+      variantId,
+      ...alertData,
+      timestamp: new Date().toISOString()
+    };
+
+    // Notify admins about stock alerts
+    this.io.to('admin_room').emit('stock_alert', alertPayload);
+
+    logger.info(`⚠️ Emitted stock alert for product ${productId}${variantId ? ` variant ${variantId}` : ''}`);
+  }
+
+  // Emit product status changes
+  public emitProductStatusChange(productId: number, statusData: any): void {
+    const statusPayload = {
+      productId,
+      ...statusData,
+      timestamp: new Date().toISOString()
+    };
+
+    // Notify all clients about product status changes
+    this.io.emit('product_status_changed', statusPayload);
+    this.io.to('admin_room').emit('product_status_changed', statusPayload);
+    this.io.to('ecommerce_room').emit('product_status_changed', statusPayload);
+
+    logger.info(`📦 Emitted product status change for product ${productId}`);
   }
 }
 

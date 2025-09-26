@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Variant, Product, Category } from '../models';
 import { logger } from '../utils/logger';
 import { Op } from 'sequelize';
+import { getWebSocketService } from '../services/websocketService';
 
 /**
  * Get all variants with optional filtering
@@ -382,6 +383,45 @@ export const updateVariantInventory = async (req: Request, res: Response): Promi
     await variant.update({ stock: newStock });
 
     logger.info(`Updated inventory for variant ${variant.name} (ID: ${variant.id}): ${currentStock} → ${newStock} (${operation} ${quantity})${reason ? ` - ${reason}` : ''}`);
+
+    // Calculate total product stock from all variants
+    const allVariants = await Variant.findAll({
+      where: { productId: variant.productId },
+      attributes: ['stock']
+    });
+    const totalProductStock = allVariants.reduce((sum, v) => sum + (v.stock || 0), 0);
+
+    // Emit WebSocket event for real-time updates
+    const webSocketService = getWebSocketService();
+    if (webSocketService) {
+      webSocketService.emitInventoryUpdate(variant.productId, variant.id, {
+        stock: newStock, // Individual variant stock
+        totalProductStock: totalProductStock, // Total product stock
+        previousStock: currentStock,
+        operation: operation,
+        quantity: quantity,
+        reason: reason || null,
+        variantName: variant.name,
+        sku: variant.sku
+      });
+
+      // Check for stock alerts
+      if (newStock <= 10 && newStock > 0) {
+        webSocketService.emitStockAlert(variant.productId, variant.id, {
+          stockLevel: 'low',
+          message: `Low stock alert: ${variant.name} has ${newStock} units remaining`,
+          variantName: variant.name,
+          sku: variant.sku
+        });
+      } else if (newStock === 0) {
+        webSocketService.emitStockAlert(variant.productId, variant.id, {
+          stockLevel: 'out',
+          message: `Out of stock: ${variant.name} is now out of stock`,
+          variantName: variant.name,
+          sku: variant.sku
+        });
+      }
+    }
 
     res.json({
       success: true,
