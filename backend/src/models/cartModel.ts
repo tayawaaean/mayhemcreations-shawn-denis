@@ -92,6 +92,7 @@ Cart.init(
       allowNull: false,
       field: 'product_id',
       comment: 'Product ID (integer for products, string for custom items like custom-embroidery)',
+      // Note: No foreign key constraint due to mixed data types (INTEGER for products, STRING for custom items)
     },
     quantity: {
       type: DataTypes.INTEGER,

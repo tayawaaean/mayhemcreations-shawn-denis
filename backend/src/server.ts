@@ -18,9 +18,9 @@ const startServer = async (): Promise<void> => {
     // Sync database (create tables if they don't exist)
     // In production, you should use migrations instead
     if (NODE_ENV === 'development') {
-      // Only sync without altering to avoid index issues
-      await sequelize.sync({ force: false });
-      logger.info('Database synchronized without altering existing tables');
+      // Use alter to modify existing table structure
+      await sequelize.sync({ alter: true });
+      logger.info('Database synchronized with table alterations');
     }
 
     // Create HTTP server

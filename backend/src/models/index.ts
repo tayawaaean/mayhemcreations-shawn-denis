@@ -11,6 +11,7 @@ import { Cart, CartAttributes, CartCreationAttributes } from './cartModel';
 import { FAQ, FAQAttributes, FAQCreationAttributes } from './faqModel';
 import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationAttributes } from './customEmbroideryModel';
 import Message, { MessageAttributes, MessageCreationAttributes } from './messageModel';
+import { OrderReview, OrderReviewAttributes, OrderReviewCreationAttributes } from './orderReviewModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -100,17 +101,9 @@ const setupAssociations = (): void => {
     as: 'user',
   });
 
-  // Cart belongs to Product
-  Cart.belongsTo(Product, {
-    foreignKey: 'productId',
-    as: 'product',
-  });
-
-  // Product has many Cart items
-  Product.hasMany(Cart, {
-    foreignKey: 'productId',
-    as: 'cartItems',
-  });
+  // Note: Cart-Product associations removed to support mixed productId types
+  // (integer for products, string for custom items like 'custom-embroidery')
+  // Product validation is handled at the application level in cartController
 
   // User has many Custom Embroidery orders
   User.hasMany(CustomEmbroidery, {
@@ -134,6 +127,18 @@ const setupAssociations = (): void => {
   User.hasMany(Message, {
     foreignKey: 'customerId',
     as: 'messages',
+  });
+
+  // OrderReview belongs to User
+  OrderReview.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // User has many OrderReviews
+  User.hasMany(OrderReview, {
+    foreignKey: 'userId',
+    as: 'orderReviews',
   });
 };
 
@@ -178,10 +183,13 @@ export {
   FAQCreationAttributes,
   CustomEmbroidery,
   Message,
+  OrderReview,
   CustomEmbroideryAttributes,
   CustomEmbroideryCreationAttributes,
   MessageAttributes,
   MessageCreationAttributes,
+  OrderReviewAttributes,
+  OrderReviewCreationAttributes,
 };
 
 // Export all models for easy access
@@ -198,6 +206,7 @@ export const models = {
   FAQ,
   CustomEmbroidery,
   Message,
+  OrderReview,
 };
 
 // Database synchronization function

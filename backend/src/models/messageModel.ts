@@ -28,14 +28,20 @@ export class Message extends Model<MessageAttributes, MessageCreationAttributes>
 Message.init(
   {
     id: {
-      type: DataTypes.INTEGER.UNSIGNED,
+      type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
     },
     customerId: {
-      type: DataTypes.INTEGER.UNSIGNED,
+      type: DataTypes.INTEGER,
       allowNull: false,
       field: 'customer_id',
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'NO ACTION',
     },
     sender: {
       type: DataTypes.ENUM('user', 'admin'),

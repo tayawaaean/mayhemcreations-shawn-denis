@@ -36,31 +36,46 @@ export const getCart = async (req: AuthenticatedRequest, res: Response, next: Ne
 
     const cartItems = await Cart.findAll({
       where: { userId },
-      include: [
-        {
-          model: Product,
-          as: 'product',
-          required: false, // Left join to include items without products (like custom embroidery)
+      order: [['createdAt', 'ASC']],
+    });
+
+    // Fetch product details for regular products (not custom items)
+    const productIds = cartItems
+      .map(item => item.productId)
+      .filter(id => typeof id === 'string' && !isNaN(Number(id)))
+      .map(id => Number(id));
+
+    const products = productIds.length > 0 
+      ? await Product.findAll({
+          where: { id: productIds },
           attributes: [
             'id', 'title', 'slug', 'description', 'price', 'image', 'alt',
             'status', 'featured', 'badges', 'availableColors', 'availableSizes',
             'averageRating', 'totalReviews', 'stock', 'sku', 'weight', 'dimensions',
             'materials', 'careInstructions', 'hasSizing'
           ],
-        },
-      ],
-      order: [['createdAt', 'ASC']],
-    });
+        })
+      : [];
+
+    // Create a map for quick product lookup
+    const productMap = new Map(products.map(product => [product.id, product]));
 
     // Transform cart items to match frontend format
-    const transformedItems = cartItems.map(item => ({
-      id: item.id,
-      productId: item.productId === 999999 ? 'custom-embroidery' : item.productId.toString(),
-      quantity: item.quantity,
-      customization: item.customization ? item.getCustomizationData() : undefined,
-      reviewStatus: item.reviewStatus,
-      product: (item as any).product, // Type assertion for the included product
-    }));
+    const transformedItems = cartItems.map(item => {
+      const productId = item.productId === 999999 ? 'custom-embroidery' : item.productId.toString();
+      const product = typeof item.productId === 'string' && !isNaN(Number(item.productId))
+        ? productMap.get(Number(item.productId))
+        : null;
+
+      return {
+        id: item.id,
+        productId,
+        quantity: item.quantity,
+        customization: item.customization ? item.getCustomizationData() : undefined,
+        reviewStatus: item.reviewStatus,
+        product, // Product details for regular products, null for custom items
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -253,12 +268,6 @@ export const updateCartItem = async (req: AuthenticatedRequest, res: Response, n
         id: itemId,
         userId,
       },
-      include: [
-        {
-          model: Product,
-          as: 'product',
-        },
-      ],
     });
 
     if (!cartItem) {
@@ -270,15 +279,17 @@ export const updateCartItem = async (req: AuthenticatedRequest, res: Response, n
       return;
     }
 
-    // Validate stock
-    const product = (cartItem as any).product;
-    if (product && product.stock && quantity > product.stock) {
-      res.status(400).json({
-        success: false,
-        message: `Only ${product.stock} items available in stock`,
-        code: 'INSUFFICIENT_STOCK',
-      });
-      return;
+    // Validate stock for regular products
+    if (typeof cartItem.productId === 'string' && !isNaN(Number(cartItem.productId))) {
+      const product = await Product.findByPk(Number(cartItem.productId));
+      if (product && product.stock && quantity > product.stock) {
+        res.status(400).json({
+          success: false,
+          message: `Only ${product.stock} items available in stock`,
+          code: 'INSUFFICIENT_STOCK',
+        });
+        return;
+      }
     }
 
     await cartItem.update({
