@@ -8,7 +8,7 @@ import { seedVariants, clearVariants } from './variantSeeder';
 import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
 import { seedFAQs, clearFAQs } from './faqSeeder';
 import { seedMaterialCosts, clearMaterialCosts } from './materialCostSeeder';
-import { updateMessagesSchemaForAttachments } from './messageAttachmentSeeder';
+// Schema alteration imports removed
 import { seedMultiImageProducts, clearMultiImageProducts, updateExistingProductsWithImages } from './multiImageProductSeeder';
 import { 
   seedCategoriesViaAPI, 
@@ -31,79 +31,9 @@ import Message from '../models/messageModel';
  * This script manages database seeding for development and testing
  */
 
-/**
- * Update database schema
- */
-async function updateSchema(): Promise<void> {
-  try {
-    logger.info('🔄 Updating database schema...');
-    
-    // Import models to ensure they're loaded
-    await import('../models/categoryModel');
-    
-    // Force sync the Category table to update the schema
-    await sequelize.sync({ alter: true, force: false });
-    
-    // Also run the direct ALTER command as backup
-    await sequelize.query(`
-      ALTER TABLE Categories 
-      MODIFY COLUMN image TEXT
-    `);
-    
-    logger.info('✅ Database schema updated successfully!');
-    logger.info('📝 Image column changed from VARCHAR(500) to TEXT');
-    logger.info('🔄 Models synced with alter: true');
-  } catch (error) {
-    logger.error('❌ Error updating schema:', error);
-    throw error;
-  }
-}
+// Schema updates removed - models are the single source of truth
 
-/**
- * Update products table schema to support multiple images
- */
-async function updateProductsSchema(): Promise<void> {
-  try {
-    logger.info('🔄 Updating products table schema for multi-image support...');
-    
-    // Check if columns already exist
-    const [columns] = await sequelize.query(`
-      SELECT COLUMN_NAME 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'products' 
-      AND COLUMN_NAME IN ('images', 'primary_image_index')
-    `);
-    
-    const existingColumns = columns.map((col: any) => col.COLUMN_NAME);
-    logger.info(`📊 Existing columns: ${existingColumns.join(', ') || 'none'}`);
-    
-    // Add missing columns
-    const columnsToAdd = [];
-    
-    if (!existingColumns.includes('images')) {
-      columnsToAdd.push('ADD COLUMN images JSON NULL AFTER image');
-    }
-    
-    if (!existingColumns.includes('primary_image_index')) {
-      columnsToAdd.push('ADD COLUMN primary_image_index INT NULL DEFAULT 0 AFTER images');
-    }
-    
-    if (columnsToAdd.length > 0) {
-      const alterQuery = `ALTER TABLE products ${columnsToAdd.join(', ')}`;
-      logger.info(`🔧 Executing query: ${alterQuery}`);
-      
-      await sequelize.query(alterQuery);
-      logger.info('✅ Products table schema updated successfully');
-      logger.info('📝 Added images (JSON) and primary_image_index (INT) columns');
-    } else {
-      logger.info('✅ Products table already has multi-image columns');
-    }
-    
-  } catch (error) {
-    logger.error('❌ Error updating products schema:', error);
-    throw error;
-  }
-}
+// Schema updates removed - models are the single source of truth
 
 export interface SeederOptions {
   force?: boolean;
@@ -131,15 +61,7 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     await syncDatabase(options.force || false);
     logger.info('✅ Database synced successfully!');
 
-    // Always ensure messages table has attachment columns (idempotent)
-    logger.info('🔧 Ensuring messages table has attachment columns...');
-    await updateMessagesSchemaForAttachments();
-
-    // Update products table schema for multi-image support (controlled by flags)
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
-      logger.info('🔧 Updating products table schema...');
-      await updateProductsSchema();
-    }
+    // Schema updates removed - models handle all database structure
 
     // Clear data if requested
     if (options.clear) {
@@ -244,35 +166,14 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
       await updateExistingProductsWithImages();
     }
 
-    // Fresh start for messages
+    // Clear messages data
     logger.info('🧹 Clearing chat messages...');
-    await Message.sync();
     await Message.destroy({ where: {} });
     logger.info('✅ Chat messages cleared.');
 
-    // Migrate picture reply columns
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
-      logger.info('🔧 Migrating picture reply columns...');
-      await migratePictureReplyColumns();
-    }
+    // Schema alterations removed - models are the single source of truth
 
-    // Fix cart foreign key constraint
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
-      logger.info('🔧 Fixing cart foreign key constraint...');
-      await fixCartForeignKeyConstraint();
-    }
-
-    // Fix cart product_id column type
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
-      logger.info('🔧 Fixing cart product_id column type...');
-      await fixCartProductIdColumnType();
-    }
-
-    // Update order_reviews status ENUM
-    if (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly) {
-      logger.info('🔧 Updating order_reviews status ENUM...');
-      await updateOrderReviewStatusEnum();
-    }
+    // Schema alterations removed - models are the single source of truth
 
     logger.info('🎉 Database seeding completed successfully!');
     
@@ -285,207 +186,13 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
   }
 }
 
-async function migratePictureReplyColumns(): Promise<void> {
-  try {
-    logger.info('🔄 Adding picture reply columns to order_reviews table...');
-    
-    // Check if columns already exist
-    const [columns] = await sequelize.query(`
-      SELECT COLUMN_NAME 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'order_reviews' 
-      AND COLUMN_NAME IN ('admin_picture_replies', 'customer_confirmations', 'picture_reply_uploaded_at', 'customer_confirmed_at')
-    `);
-    
-    const existingColumns = columns.map((col: any) => col.COLUMN_NAME);
-    logger.info(`📊 Existing columns: ${existingColumns.join(', ') || 'none'}`);
-    
-    // Add missing columns
-    const columnsToAdd = [];
-    
-    if (!existingColumns.includes('admin_picture_replies')) {
-      columnsToAdd.push('ADD COLUMN admin_picture_replies JSON NULL AFTER admin_notes');
-    }
-    
-    if (!existingColumns.includes('customer_confirmations')) {
-      columnsToAdd.push('ADD COLUMN customer_confirmations JSON NULL AFTER admin_picture_replies');
-    }
-    
-    if (!existingColumns.includes('picture_reply_uploaded_at')) {
-      columnsToAdd.push('ADD COLUMN picture_reply_uploaded_at DATETIME NULL AFTER customer_confirmations');
-    }
-    
-    if (!existingColumns.includes('customer_confirmed_at')) {
-      columnsToAdd.push('ADD COLUMN customer_confirmed_at DATETIME NULL AFTER picture_reply_uploaded_at');
-    }
-    
-    if (columnsToAdd.length > 0) {
-      const alterQuery = `ALTER TABLE order_reviews ${columnsToAdd.join(', ')}`;
-      logger.info(`🔧 Executing query: ${alterQuery}`);
-      
-      await sequelize.query(alterQuery);
-      logger.info('✅ Picture reply columns added successfully');
-    } else {
-      logger.info('✅ All picture reply columns already exist');
-    }
-    
-  } catch (error) {
-    logger.error('❌ Error migrating picture reply columns:', error);
-    throw error;
-  }
-}
+// Schema alterations removed - models are the single source of truth
 
-async function fixCartForeignKeyConstraint(): Promise<void> {
-  try {
-    logger.info('🔄 Fixing cart foreign key constraint...');
-    
-    // Check if foreign key constraint exists
-    const [constraints] = await sequelize.query(`
-      SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
-      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-      WHERE TABLE_NAME = 'carts' 
-      AND TABLE_SCHEMA = DATABASE()
-      AND REFERENCED_TABLE_NAME IS NOT NULL
-    `);
-    
-    logger.info(`📊 Existing foreign key constraints: ${constraints.length}`);
-    
-    // Remove foreign key constraint if it exists
-    if (constraints.length > 0) {
-      for (const constraint of constraints) {
-        const constraintData = constraint as any;
-        if (constraintData.REFERENCED_TABLE_NAME === 'products') {
-          logger.info(`🔧 Dropping foreign key constraint: ${constraintData.CONSTRAINT_NAME}`);
-          await sequelize.query(`ALTER TABLE carts DROP FOREIGN KEY ${constraintData.CONSTRAINT_NAME}`);
-          logger.info('✅ Foreign key constraint dropped successfully');
-        }
-      }
-    } else {
-      logger.info('✅ No foreign key constraints found on carts table');
-    }
-    
-    // Verify the fix
-    const [updatedConstraints] = await sequelize.query(`
-      SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
-      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-      WHERE TABLE_NAME = 'carts' 
-      AND TABLE_SCHEMA = DATABASE()
-      AND REFERENCED_TABLE_NAME IS NOT NULL
-    `);
-    
-    logger.info(`📊 Updated constraints: ${updatedConstraints.length} remaining`);
-    
-  } catch (error) {
-    logger.error('❌ Error fixing cart foreign key constraint:', error);
-    throw error;
-  }
-}
+// Schema alterations removed - models are the single source of truth
 
-async function fixCartProductIdColumnType(): Promise<void> {
-  try {
-    logger.info('🔄 Fixing cart product_id column type...');
-    
-    // Check current column type
-    const [columns] = await sequelize.query(`
-      SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'carts' 
-      AND TABLE_SCHEMA = DATABASE()
-      AND COLUMN_NAME = 'product_id'
-    `);
-    
-    if (columns.length > 0) {
-      const columnInfo = columns[0] as any;
-      logger.info(`📊 Current product_id column type: ${columnInfo.COLUMN_TYPE}`);
-      
-      if (columnInfo.DATA_TYPE === 'int') {
-        logger.info('🔧 Converting product_id from INT to VARCHAR...');
-        await sequelize.query(`ALTER TABLE carts MODIFY COLUMN product_id VARCHAR(255) NOT NULL`);
-        logger.info('✅ product_id column converted to VARCHAR successfully');
-      } else {
-        logger.info('✅ product_id column is already VARCHAR type');
-      }
-    } else {
-      logger.warn('⚠️ product_id column not found in carts table');
-    }
-    
-  } catch (error) {
-    logger.error('❌ Error fixing cart product_id column type:', error);
-    throw error;
-  }
-}
+// Schema alterations removed - models are the single source of truth
 
-async function updateOrderReviewStatusEnum(): Promise<void> {
-  try {
-    logger.info('🔄 Updating order_reviews status ENUM...');
-    
-    // Check if the table exists first
-    const [tables] = await sequelize.query(`
-      SELECT TABLE_NAME 
-      FROM INFORMATION_SCHEMA.TABLES 
-      WHERE TABLE_NAME = 'order_reviews' 
-      AND TABLE_SCHEMA = DATABASE()
-    `);
-    
-    if (tables.length === 0) {
-      logger.info('⚠️ order_reviews table does not exist, skipping ENUM update');
-      return;
-    }
-    
-    // Check current ENUM values
-    const [columns] = await sequelize.query(`
-      SELECT COLUMN_TYPE 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'order_reviews' 
-      AND TABLE_SCHEMA = DATABASE()
-      AND COLUMN_NAME = 'status'
-    `);
-    
-    if (columns.length > 0) {
-      const columnInfo = columns[0] as any;
-      logger.info(`📊 Current status column type: ${columnInfo.COLUMN_TYPE}`);
-      
-      // Check if the new values are already present
-      if (columnInfo.COLUMN_TYPE.includes('pending-payment') && columnInfo.COLUMN_TYPE.includes('approved-processing')) {
-        logger.info('✅ Status ENUM already includes new values');
-        return;
-      }
-    }
-    
-    // Update the status column to include new values
-    await sequelize.query(`
-      ALTER TABLE order_reviews 
-      MODIFY COLUMN status ENUM(
-        'pending', 
-        'approved', 
-        'rejected', 
-        'needs-changes', 
-        'pending-payment', 
-        'approved-processing'
-      ) NOT NULL DEFAULT 'pending'
-    `);
-    
-    logger.info('✅ order_reviews status ENUM updated successfully');
-    
-    // Verify the change
-    const [updatedColumns] = await sequelize.query(`
-      SELECT COLUMN_TYPE 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_NAME = 'order_reviews' 
-      AND TABLE_SCHEMA = DATABASE()
-      AND COLUMN_NAME = 'status'
-    `);
-    
-    if (updatedColumns.length > 0) {
-      const updatedColumnInfo = updatedColumns[0] as any;
-      logger.info(`📊 Updated status column type: ${updatedColumnInfo.COLUMN_TYPE}`);
-    }
-    
-  } catch (error) {
-    logger.error('❌ Error updating order_reviews status ENUM:', error);
-    throw error;
-  }
-}
+// Schema alterations removed - models are the single source of truth
 
 export async function clearAllData(): Promise<void> {
   try {
@@ -647,33 +354,8 @@ if (require.main === module) {
           process.exit(1);
         });
         break;
-      case '--update-schema':
-        updateSchema().then(() => {
-          logger.info('✅ Schema updated successfully!');
-          process.exit(0);
-        }).catch((error: unknown) => {
-          logger.error('❌ Schema update failed:', error);
-          process.exit(1);
-        });
-        break;
-      case '--update-products-schema':
-        updateProductsSchema().then(() => {
-          logger.info('✅ Products schema updated successfully!');
-          process.exit(0);
-        }).catch((error: unknown) => {
-          logger.error('❌ Products schema update failed:', error);
-          process.exit(1);
-        });
-        break;
-      case '--update-messages-schema':
-        updateMessagesSchemaForAttachments().then(() => {
-          logger.info('✅ Messages schema updated successfully!');
-          process.exit(0);
-        }).catch((error: unknown) => {
-          logger.error('❌ Messages schema update failed:', error);
-          process.exit(1);
-        });
-        break;
+      // Schema update commands removed - models are the single source of truth
+      // Schema update commands removed - models are the single source of truth
       case '--reset':
         resetDatabase().then(() => process.exit(0)).catch((error: unknown) => {
           logger.error('❌ Reset failed:', error);
