@@ -14,3 +14,12 @@ declare module 'express-session' {
     refreshToken?: string;
   }
 }
+
+// Extend Express Request interface for webhook raw body
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: string;
+    }
+  }
+}

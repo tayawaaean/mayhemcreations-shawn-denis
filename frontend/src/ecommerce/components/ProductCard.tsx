@@ -18,21 +18,9 @@ export default function ProductCard({ product }: { product: Product }) {
   const isOutOfStock = currentStock === 0
   const isLowStock = currentStock !== undefined && currentStock <= 5 && currentStock > 0
 
-  // Debug logging
-  console.log('ProductCard received product:', {
-    id: product.id,
-    title: product.title,
-    image: product.image,
-    images: product.images,
-    primaryImageIndex: product.primaryImageIndex,
-    originalStock: product.stock,
-    realTimeStock: currentStock,
-    hasUpdates
-  })
 
   // Prepare images for slideshow
   const images = getAllProductImages(product)
-  console.log('ProductCard processed images:', images)
 
   return (
     <article

@@ -23,6 +23,9 @@ import Checkout from './ecommerce/routes/Checkout'
 import OrderCheckout from './ecommerce/routes/OrderCheckout'
 import MyOrders from './ecommerce/routes/MyOrders'
 import VerifyEmail from './pages/VerifyEmail'
+import PaymentSuccess from './pages/PaymentSuccess'
+import PaymentCancel from './pages/PaymentCancel'
+import StripeTestSuite from './components/StripeTestSuite'
 
 export default function App() {
   return (
@@ -107,6 +110,11 @@ export default function App() {
               </ProtectedRoute>
             } />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            
+                    {/* Payment Routes */}
+                    <Route path="/payment/success" element={<PaymentSuccess />} />
+                    <Route path="/payment/cancel" element={<PaymentCancel />} />
+                    <Route path="/stripe-test" element={<StripeTestSuite />} />
           </Routes>
             </CustomizationProvider>
           </RealTimeChatProvider>

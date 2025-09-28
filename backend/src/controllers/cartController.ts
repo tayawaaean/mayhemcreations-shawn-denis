@@ -455,7 +455,18 @@ export const syncCart = async (req: AuthenticatedRequest, res: Response, next: N
       return;
     }
 
-    // Clear existing cart
+    // Only sync if there are items to sync
+    if (items.length === 0) {
+      res.status(200).json({
+        success: true,
+        data: [],
+        message: 'No items to sync',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // Clear existing cart only when there are items to sync
     await Cart.destroy({ where: { userId } });
 
     // Add new items

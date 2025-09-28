@@ -27,18 +27,14 @@ interface AuthModalProps {
   onSuccess: (user: User) => void
 }
 
-// Demo customer accounts for testing - using environment configuration
-// Updated to match userSeeder customer data
+// Demo customer accounts for testing - using actual seeded data
 const getDemoCustomers = () => {
-  const demoAccounts = envConfig.getDemoAccounts()
-  if (!demoAccounts) return []
-  
   return [
     {
       id: 1,
       firstName: 'Robert',
       lastName: 'Wilson',
-      email: demoAccounts.customer1,
+      email: 'customer1@example.com',
       password: 'SecureCustomer2024!',
       role: 'customer'
     },
@@ -46,7 +42,7 @@ const getDemoCustomers = () => {
       id: 2,
       firstName: 'Maria',
       lastName: 'Garcia',
-      email: demoAccounts.customer2,
+      email: 'customer2@example.com',
       password: 'SecureCustomer2024!',
       role: 'customer'
     },
@@ -54,7 +50,7 @@ const getDemoCustomers = () => {
       id: 3,
       firstName: 'James',
       lastName: 'Anderson',
-      email: demoAccounts.customer3,
+      email: 'customer3@example.com',
       password: 'SecureCustomer2024!',
       role: 'customer'
     },
@@ -62,7 +58,7 @@ const getDemoCustomers = () => {
       id: 4,
       firstName: 'Sophie',
       lastName: 'Taylor',
-      email: demoAccounts.customer4,
+      email: 'customer4@example.com',
       password: 'SecureCustomer2024!',
       role: 'customer'
     },
@@ -70,7 +66,7 @@ const getDemoCustomers = () => {
       id: 5,
       firstName: 'Kevin',
       lastName: 'Martinez',
-      email: demoAccounts.customer5,
+      email: 'customer5@example.com',
       password: 'SecureCustomer2024!',
       role: 'customer'
     }

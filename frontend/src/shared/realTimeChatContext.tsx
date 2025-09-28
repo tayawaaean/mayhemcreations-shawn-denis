@@ -323,10 +323,12 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   );
 };
 
-export const useRealTimeChat = (): RealTimeChatContextType => {
+const useRealTimeChat = (): RealTimeChatContextType => {
   const context = useContext(RealTimeChatContext);
   if (context === undefined) {
     throw new Error('useRealTimeChat must be used within a RealTimeChatProvider');
   }
   return context;
 };
+
+export { useRealTimeChat };

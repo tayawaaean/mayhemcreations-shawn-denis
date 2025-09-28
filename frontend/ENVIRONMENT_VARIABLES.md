@@ -20,14 +20,19 @@ This document explains all environment variables used in the Mayhem Creations ap
 |----------|---------|---------|
 | `VITE_REACT_APP_API_URL` | API service, all backend communication | Backend API endpoint |
 
-### 3. Application Configuration
+### 3. Payment Configuration
+| Variable | Used By | Purpose |
+|----------|---------|---------|
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe components, payment forms | Stripe publishable key for frontend |
+
+### 4. Application Configuration
 | Variable | Used By | Purpose |
 |----------|---------|---------|
 | `VITE_REACT_APP_APP_NAME` | App title, branding, headers | Application name display |
 | `VITE_REACT_APP_APP_DOMAIN` | Domain validation, CORS | Application domain |
 | `VITE_REACT_APP_APP_ENV` | Environment detection, feature flags | Environment mode (development/production) |
 
-### 4. Contact Information
+### 5. Contact Information
 | Variable | Used By | Purpose |
 |----------|---------|---------|
 | `VITE_REACT_APP_CONTACT_EMAIL` | Contact page, footer, email forms | General contact email |
@@ -35,7 +40,7 @@ This document explains all environment variables used in the Mayhem Creations ap
 | `VITE_REACT_APP_PHONE_1` | Contact page, footer | Primary phone number |
 | `VITE_REACT_APP_PHONE_2` | Contact page, footer | Secondary phone number |
 
-### 5. Business Information
+### 6. Business Information
 | Variable | Used By | Purpose |
 |----------|---------|---------|
 | `VITE_REACT_APP_BUSINESS_ADDRESS_1` | About page, contact page, footer | Business address line 1 |
@@ -44,7 +49,7 @@ This document explains all environment variables used in the Mayhem Creations ap
 | `VITE_REACT_APP_BUSINESS_HOURS_SATURDAY` | Contact page, footer | Saturday business hours |
 | `VITE_REACT_APP_BUSINESS_HOURS_SUNDAY` | Contact page, footer | Sunday business hours |
 
-### 6. Demo Accounts (Development Only)
+### 7. Demo Accounts (Development Only)
 | Variable | Used By | Purpose |
 |----------|---------|---------|
 | `VITE_REACT_APP_DEMO_ADMIN_EMAIL` | Login forms, admin panel | Admin demo account |

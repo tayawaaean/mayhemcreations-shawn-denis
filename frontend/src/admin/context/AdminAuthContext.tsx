@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { loggingService } from '../../shared/loggingService'
 import { apiService } from '../services/apiService'
 
@@ -23,13 +23,15 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined)
 
-export const useAdminAuth = () => {
+const useAdminAuth = () => {
   const context = useContext(AdminAuthContext)
   if (context === undefined) {
     throw new Error('useAdminAuth must be used within an AdminAuthProvider')
   }
   return context
 }
+
+export { useAdminAuth }
 
 interface AdminAuthProviderProps {
   children: React.ReactNode
@@ -38,9 +40,17 @@ interface AdminAuthProviderProps {
 export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<AdminUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const authCheckInProgress = useRef(false)
 
   // Check authentication status using session-based auth
   const checkAuth = async () => {
+    // Prevent multiple simultaneous auth checks
+    if (authCheckInProgress.current) {
+      console.log('🔐 Auth check already in progress, skipping...');
+      return;
+    }
+    
+    authCheckInProgress.current = true;
     try {
       console.log('🔐 Checking admin session authentication...');
       const response = await apiService.getProfile();
@@ -93,9 +103,17 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
         console.log('❌ Admin session not authenticated');
         setUser(null);
       }
-    } catch (error) {
-      console.error('❌ Admin auth check failed:', error);
-      setUser(null);
+    } catch (error: any) {
+      // Handle 401 errors gracefully - they're expected when not authenticated
+      if (error.message === 'Authentication required' || error.message?.includes('401')) {
+        console.log('🔐 No admin session found - user not authenticated');
+        setUser(null);
+      } else {
+        console.error('❌ Admin auth check failed:', error);
+        setUser(null);
+      }
+    } finally {
+      authCheckInProgress.current = false;
     }
   };
 

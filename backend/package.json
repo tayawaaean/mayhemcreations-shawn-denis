@@ -45,6 +45,7 @@
   "license": "MIT",
   "dependencies": {
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/stripe": "^8.0.416",
     "axios": "^1.12.2",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
@@ -68,6 +69,7 @@
     "nodemailer": "^6.9.7",
     "sequelize": "^6.35.0",
     "socket.io": "^4.8.1",
+    "stripe": "^18.5.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
     "winston": "^3.11.0",

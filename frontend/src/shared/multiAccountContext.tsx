@@ -245,4 +245,3 @@ export const useMultiAccount = (): MultiAccountContextType => {
   return context;
 };
 
-export default MultiAccountContext;

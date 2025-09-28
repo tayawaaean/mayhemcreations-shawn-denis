@@ -50,6 +50,10 @@ const loginValidation = [
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
+  body('expectedRole')
+    .optional()
+    .isString()
+    .withMessage('Expected role must be a string'),
 ];
 
 // Auth routes

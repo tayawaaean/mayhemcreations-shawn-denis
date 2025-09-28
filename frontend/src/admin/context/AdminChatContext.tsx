@@ -496,10 +496,12 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 };
 
-export const useAdminChat = (): AdminChatContextType => {
+const useAdminChat = (): AdminChatContextType => {
   const context = useContext(AdminChatContext);
   if (context === undefined) {
     throw new Error('useAdminChat must be used within an AdminChatProvider');
   }
   return context;
 };
+
+export { useAdminChat };

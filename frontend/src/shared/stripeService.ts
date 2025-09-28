@@ -5,6 +5,7 @@
 
 import { loadStripe, Stripe, StripeElements, StripeCardElement } from '@stripe/stripe-js'
 import { paymentConfig } from './paymentConfig'
+import { envConfig } from './envConfig'
 
 export interface StripePaymentData {
   amount: number
@@ -264,3 +265,206 @@ class StripeService {
 // Export singleton instance
 export const stripeService = new StripeService()
 export default stripeService
+
+// =============================================================================
+// API INTEGRATION FUNCTIONS
+// =============================================================================
+
+export interface CreatePaymentIntentData {
+  amount: number; // Amount in dollars
+  currency?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface CreateCheckoutSessionData {
+  lineItems: Array<{
+    price_data: {
+      currency: string;
+      product_data: {
+        name: string;
+        description?: string;
+        images?: string[];
+      };
+      unit_amount: number; // Amount in cents
+    };
+    quantity: number;
+  }>;
+  successUrl?: string;
+  cancelUrl?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface PaymentIntentResult {
+  id: string;
+  client_secret: string;
+  status: string;
+  amount: number;
+  currency: string;
+}
+
+export interface CheckoutSessionResult {
+  id: string;
+  url: string;
+}
+
+/**
+ * Create a Payment Intent
+ */
+export const createPaymentIntent = async (data: CreatePaymentIntentData): Promise<PaymentIntentResult> => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-intent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create payment intent');
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error: any) {
+    console.error('Error creating payment intent:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a Checkout Session
+ */
+export const createCheckoutSession = async (data: CreateCheckoutSessionData): Promise<CheckoutSessionResult> => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create checkout session');
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error: any) {
+    console.error('Error creating checkout session:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get Payment Intent Status
+ */
+export const getPaymentIntentStatus = async (paymentIntentId: string): Promise<PaymentIntentResult> => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/intent/${paymentIntentId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get payment intent status');
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error: any) {
+    console.error('Error getting payment intent status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get Checkout Session Status
+ */
+export const getCheckoutSessionStatus = async (sessionId: string): Promise<CheckoutSessionResult> => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/session/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get checkout session status');
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error: any) {
+    console.error('Error getting checkout session status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create or Retrieve Customer
+ */
+export const createOrRetrieveCustomer = async (email: string, name?: string) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/customer`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ email, name }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create customer');
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error: any) {
+    console.error('Error creating customer:', error);
+    throw error;
+  }
+};

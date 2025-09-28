@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import type { CartItem } from '../types'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import type { CartItem } from '../../types'
 import { productApiService } from '../../shared/productApiService'
 import { cartApiService } from '../../shared/cartApiService'
 import { useAuth } from './AuthContext'
@@ -34,36 +34,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return []
     } catch (e) {
+      console.error('🛒 Error parsing cart from localStorage:', e)
       return []
     }
   })
   const [isLoading, setIsLoading] = useState(false)
   const [isCleared, setIsCleared] = useState(false)
-
-  // Load cart from database when user logs in
-  useEffect(() => {
-    if (isLoggedIn && user && user.id && !isCleared) {
-      console.log('🛒 Loading cart for authenticated user:', user.email)
-      loadCartFromDatabase()
-    } else if (!isLoggedIn) {
-      console.log('🛒 User not authenticated, clearing cart')
-      // Clear cart when user logs out
-      setItems([])
-      setIsCleared(false)
-    }
-  }, [isLoggedIn, user, isCleared])
-
-  // Save to localStorage when items change (for guest users)
-  useEffect(() => {
-    if (!isLoggedIn) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(items))
-    }
-  }, [items, isLoggedIn])
+  const hasSyncedRef = useRef(false) // Track if we've already synced the cart
 
   /**
    * Load cart from database
    */
-  const loadCartFromDatabase = async () => {
+  const loadCartFromDatabase = useCallback(async () => {
     try {
       console.log('🛒 Attempting to load cart from database...')
       setIsLoading(true)
@@ -110,17 +92,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [isLoggedIn])
 
   /**
    * Sync cart with database
    */
-  const syncWithDatabase = async () => {
+  const syncWithDatabase = useCallback(async () => {
     if (!isLoggedIn) return
 
     try {
       setIsLoading(true)
-      const response = await cartApiService.syncCart(items)
+      // Get current items from localStorage instead of state to avoid dependency loop
+      const currentItems = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]')
+      
+      // Only sync if there are items in localStorage
+      if (currentItems.length === 0) {
+        return
+      }
+      
+      const response = await cartApiService.syncCart(currentItems)
       
       if (response.success && response.data) {
         // Update items with database IDs and product data
@@ -141,7 +131,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [isLoggedIn]) // Removed items dependency to prevent infinite loop
+
+  // Load cart from database when user logs in
+  useEffect(() => {
+    if (isLoggedIn && user && user.id && !isCleared && !hasSyncedRef.current) {
+      hasSyncedRef.current = true // Mark as synced to prevent multiple syncs
+      // First sync any localStorage items to database, then load from database
+      syncWithDatabase().then(() => {
+        loadCartFromDatabase()
+      })
+    } else if (!isLoggedIn) {
+      // Clear cart when user logs out
+      setItems([])
+      setIsCleared(false)
+      hasSyncedRef.current = false // Reset sync flag when user logs out
+    }
+  }, [isLoggedIn, user?.id, isCleared]) // Removed function dependencies to prevent infinite loop
+
+  // Save to localStorage when items change (for guest users)
+  useEffect(() => {
+    if (!isLoggedIn) {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(items))
+    }
+  }, [items, isLoggedIn])
 
   const validateStock = async (productId: string, quantity: number): Promise<{ valid: boolean; message?: string }> => {
     try {
@@ -321,8 +334,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }}>{children}</CartContext.Provider>
 }
 
-export const useCart = () => {
+const useCart = () => {
   const ctx = useContext(CartContext)
   if (!ctx) throw new Error('useCart must be used within CartProvider')
   return ctx
 }
+
+export { useCart }

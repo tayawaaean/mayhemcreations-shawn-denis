@@ -41,6 +41,11 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
           role: sessionData.role,
           permissions: sessionData.permissions
         };
+        
+        // Ensure session data is properly set for SessionService checks
+        if (req.session) {
+          (req.session as any).user = sessionData;
+        }
       }
       SessionService.updateActivity(req);
       next();
@@ -87,6 +92,21 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
             accessToken: session.accessToken,
             refreshToken: session.refreshToken,
           };
+
+          // Set session data for SessionService compatibility
+          if (req.session) {
+            (req.session as any).user = {
+              userId: session.user.id,
+              email: session.user.email,
+              role: session.user.role?.name || 'customer',
+              permissions: session.user.role?.permissions || [],
+              sessionId: session.sessionId,
+              accessToken: session.accessToken,
+              refreshToken: session.refreshToken,
+              loginTime: session.createdAt,
+              lastActivity: now,
+            };
+          }
 
           // Update session activity
           await session.update({ 

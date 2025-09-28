@@ -22,6 +22,7 @@ import messageRoute from './routes/messageRoute';
 import materialCostRoute from './routes/materialCostRoute';
 import customEmbroideryRoute from './routes/customEmbroideryRoute';
 import orderReviewRoute from './routes/orderReviewRoute';
+import paymentRoute from './routes/paymentRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -52,8 +53,13 @@ app.use(cors({
 // Compression middleware
 app.use(compression());
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+// Body parsing middleware (exclude webhook routes for raw body handling)
+app.use((req, res, next) => {
+  if (req.path.includes('/webhook')) {
+    return next(); // Skip JSON parsing for webhook routes
+  }
+  express.json({ limit: '10mb' })(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Cookie parser middleware
@@ -135,6 +141,7 @@ app.use('/api/v1/messages', messageRoute);
 app.use('/api/v1/material-costs', materialCostRoute);
 app.use('/api/v1/custom-embroidery', customEmbroideryRoute);
 app.use('/api/v1/orders', orderReviewRoute);
+app.use('/api/v1/payments', paymentRoute);
 
 // 404 handler
 app.use(notFound);

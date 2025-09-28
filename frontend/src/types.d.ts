@@ -100,6 +100,44 @@ export type CartItem = {
   }
 }
 
+// Vite environment variables
+/// <reference types="vite/client" />
+
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_REACT_APP_GOOGLE_CLIENT_ID: string
+    readonly VITE_REACT_APP_GOOGLE_OAUTH_SCRIPT_URL: string
+    readonly VITE_REACT_APP_API_URL: string
+    readonly VITE_REACT_APP_APP_NAME: string
+    readonly VITE_REACT_APP_APP_DOMAIN: string
+    readonly VITE_REACT_APP_APP_ENV: string
+    readonly VITE_REACT_APP_CONTACT_EMAIL: string
+    readonly VITE_REACT_APP_ORDERS_EMAIL: string
+    readonly VITE_REACT_APP_PHONE_1: string
+    readonly VITE_REACT_APP_PHONE_2: string
+    readonly VITE_REACT_APP_BUSINESS_ADDRESS_1: string
+    readonly VITE_REACT_APP_BUSINESS_ADDRESS_2: string
+    readonly VITE_REACT_APP_BUSINESS_HOURS_WEEKDAY: string
+    readonly VITE_REACT_APP_BUSINESS_HOURS_SATURDAY: string
+    readonly VITE_REACT_APP_BUSINESS_HOURS_SUNDAY: string
+    readonly VITE_REACT_APP_DEMO_ADMIN_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_SHAWN_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_MANAGER_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_DESIGNER_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_CUSTOMER1_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_CUSTOMER2_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_CUSTOMER3_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_CUSTOMER4_EMAIL: string
+    readonly VITE_REACT_APP_DEMO_CUSTOMER5_EMAIL: string
+    readonly VITE_REACT_APP_UI_AVATARS_BASE_URL: string
+    readonly VITE_REACT_APP_PLACEHOLDER_IMAGE_URL: string
+    readonly VITE_REACT_APP_UNSPLASH_BASE_URL: string
+  readonly VITE_STRIPE_PUBLISHABLE_KEY: string
+  readonly VITE_PAYPAL_CLIENT_ID: string
+  readonly VITE_PAYPAL_ENVIRONMENT: string
+  }
+}
+
 // Google OAuth types
 declare global {
   interface Window {
