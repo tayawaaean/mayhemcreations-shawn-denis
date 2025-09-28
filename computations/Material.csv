@@ -1,7 +1,7 @@
 ﻿Material,Cost,Width (in),Length (in),Waste Factor
-Fabric,34,30,36,1.5
-Patch Attach,100,9,360,1.5
+Fabric,34.4,30,36,1.5
+Patch Attach,100.8,9,360,1.5
 Thread,4,0,5000,1.2
 Bobbin,50,0,35000,1.2
-Cut-Away Stabilizer,180,18,3600,1.5
+Cut-Away Stabilizer,192,18,3600,1.5
 Wash-Away Stabilizer,60,15,900,1.5

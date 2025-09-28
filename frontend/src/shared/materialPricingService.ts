@@ -17,11 +17,11 @@ export interface CostBreakdown {
 
 export class MaterialPricingService {
   private static materials: MaterialCost[] = [
-    { id: 1, name: 'Fabric', cost: 34, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 2, name: 'Patch Attach', cost: 100, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+    { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+    { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
     { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
     { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 5, name: 'Cut-Away Stabilizer', cost: 180, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+    { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
     { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
   ]
 
@@ -78,11 +78,11 @@ export class MaterialPricingService {
       console.warn('No materials loaded, using default values')
       // Load default materials if none are loaded
       this.materials = [
-        { id: 1, name: 'Fabric', cost: 34, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 2, name: 'Patch Attach', cost: 100, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+        { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+        { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
         { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
         { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 5, name: 'Cut-Away Stabilizer', cost: 180, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+        { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
         { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
       ]
     } else {
@@ -97,11 +97,11 @@ export class MaterialPricingService {
       if (width <= 0 || length <= 0) {
         console.warn('API materials have invalid dimensions, using default values')
         this.materials = [
-          { id: 1, name: 'Fabric', cost: 34, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 2, name: 'Patch Attach', cost: 100, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+          { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+          { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
           { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
           { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 5, name: 'Cut-Away Stabilizer', cost: 180, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
+          { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
           { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
         ]
       }
@@ -201,8 +201,16 @@ export class MaterialPricingService {
     // Bobbin Cost = Length-based calculation (width = 0)
     const bobbinCost = this.roundToTwoDecimals(calculateLengthBasedCost(this.materials[3]))
 
-    // Cut-Away Stabilizer Cost = Set to zero (not calculated based on stitch count)
-    const cutAwayStabilizerCost = 0
+    // Cut-Away Stabilizer Cost = Area-based calculation (width > 0)
+    const cutAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[4]))
+    console.log('Cut-Away Stabilizer calculation:', {
+      material: this.materials[4],
+      hasMaterial: !!this.materials[4],
+      costPerSqIn: this.materials[4] ? (typeof this.materials[4].cost === 'string' ? parseFloat(this.materials[4].cost) : this.materials[4].cost) / 
+                   ((typeof this.materials[4].width === 'string' ? parseFloat(this.materials[4].width) : this.materials[4].width) * 
+                    (typeof this.materials[4].length === 'string' ? parseFloat(this.materials[4].length) : this.materials[4].length)) : 'N/A',
+      result: cutAwayStabilizerCost
+    })
 
     // Wash-Away Stabilizer Cost = Area-based calculation (width > 0)
     const washAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[5]))
