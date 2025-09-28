@@ -11,12 +11,20 @@ export interface ApiRequestOptions extends RequestInit {
   requireAuth?: boolean;
 }
 
+export interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
   errors?: any[];
   timestamp: string;
+  pagination?: PaginationInfo;
 }
 
 class ApiAuthService {
@@ -106,6 +114,7 @@ class ApiAuthService {
         success: true,
         data: data.data || data,
         message: data.message,
+        pagination: data.pagination,
         timestamp: new Date().toISOString(),
       };
     } catch (error: any) {

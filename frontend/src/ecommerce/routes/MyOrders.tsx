@@ -156,7 +156,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
       }
       
       return {
-        id: item.id || item.productId,
+        id: String(item.id || item.productId || ''),
         productId: item.productId,
         productName: (() => {
           // For custom embroidery items - show design name
@@ -1124,20 +1124,24 @@ export default function MyOrders() {
                         // Find replies for this specific item
                         const itemReplies = selectedOrder.adminPictureReplies?.filter(reply => {
                           // Enhanced matching logic to handle various ID formats
+                          const replyItemIdStr = String(reply.itemId || '');
+                          const itemIdStr = String(item.id || '');
+                          const productIdStr = String(item.productId || '');
+                          
                           const matches = 
                             // Exact matches
                             reply.itemId === item.id || 
                             reply.itemId === item.productId ||
-                            String(reply.itemId) === String(item.id) ||
-                            String(reply.itemId) === String(item.productId) ||
+                            replyItemIdStr === itemIdStr ||
+                            replyItemIdStr === productIdStr ||
                             // Handle custom-embroidery-0 vs custom-embroidery mismatch
-                            (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery') ||
-                            (reply.itemId === 'custom-embroidery' && item.id === 'custom-embroidery-0') ||
+                            (replyItemIdStr === 'custom-embroidery-0' && itemIdStr === 'custom-embroidery') ||
+                            (replyItemIdStr === 'custom-embroidery' && itemIdStr === 'custom-embroidery-0') ||
                             // Handle other potential mismatches with startsWith/contains
-                            (reply.itemId && item.id && reply.itemId.startsWith(item.id)) ||
-                            (reply.itemId && item.id && item.id.startsWith(reply.itemId)) ||
-                            (reply.itemId && item.productId && reply.itemId.startsWith(item.productId)) ||
-                            (reply.itemId && item.productId && item.productId.startsWith(reply.itemId));
+                            (replyItemIdStr && itemIdStr && replyItemIdStr.startsWith(itemIdStr)) ||
+                            (replyItemIdStr && itemIdStr && itemIdStr.startsWith(replyItemIdStr)) ||
+                            (replyItemIdStr && productIdStr && replyItemIdStr.startsWith(productIdStr)) ||
+                            (replyItemIdStr && productIdStr && productIdStr.startsWith(replyItemIdStr));
                           
                           console.log('🔍 Item reply matching:', {
                             itemId: item.id,
@@ -1298,16 +1302,20 @@ export default function MyOrders() {
                       {selectedOrder.items.every((item, itemIndex) => {
                         const itemReplies = selectedOrder.adminPictureReplies?.filter(reply => {
                           // Use the same enhanced matching logic
+                          const replyItemIdStr = String(reply.itemId || '');
+                          const itemIdStr = String(item.id || '');
+                          const productIdStr = String(item.productId || '');
+                          
                           return reply.itemId === item.id || 
                             reply.itemId === item.productId ||
-                            String(reply.itemId) === String(item.id) ||
-                            String(reply.itemId) === String(item.productId) ||
-                            (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery') ||
-                            (reply.itemId === 'custom-embroidery' && item.id === 'custom-embroidery-0') ||
-                            (reply.itemId && item.id && reply.itemId.startsWith(item.id)) ||
-                            (reply.itemId && item.id && item.id.startsWith(reply.itemId)) ||
-                            (reply.itemId && item.productId && reply.itemId.startsWith(item.productId)) ||
-                            (reply.itemId && item.productId && item.productId.startsWith(reply.itemId));
+                            replyItemIdStr === itemIdStr ||
+                            replyItemIdStr === productIdStr ||
+                            (replyItemIdStr === 'custom-embroidery-0' && itemIdStr === 'custom-embroidery') ||
+                            (replyItemIdStr === 'custom-embroidery' && itemIdStr === 'custom-embroidery-0') ||
+                            (replyItemIdStr && itemIdStr && replyItemIdStr.startsWith(itemIdStr)) ||
+                            (replyItemIdStr && itemIdStr && itemIdStr.startsWith(replyItemIdStr)) ||
+                            (replyItemIdStr && productIdStr && replyItemIdStr.startsWith(productIdStr)) ||
+                            (replyItemIdStr && productIdStr && productIdStr.startsWith(replyItemIdStr));
                         }) || [];
                         return itemReplies.length === 0;
                       }) && (

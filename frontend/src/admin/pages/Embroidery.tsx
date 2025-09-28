@@ -52,8 +52,16 @@ const Embroidery: React.FC = () => {
         // Ensure we have valid data array
         const options = response.data || []
         setEmbroideryOptions(Array.isArray(options) ? options : [])
-        setTotalPages(1) // Default to 1 page since pagination is not in ApiResponse
-        setTotalItems(options.length)
+        
+        // Use pagination data from API response
+        if (response.pagination) {
+          setTotalPages(response.pagination.pages)
+          setTotalItems(response.pagination.total)
+        } else {
+          // Fallback if pagination data is not available
+          setTotalPages(1)
+          setTotalItems(options.length)
+        }
       } catch (err) {
         setError('Failed to fetch embroidery options')
         console.error('Error fetching embroidery options:', err)
