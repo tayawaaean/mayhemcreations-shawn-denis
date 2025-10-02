@@ -6,6 +6,7 @@
 import AuthStorageService from './authStorage';
 import MultiAccountStorageService from './multiAccountStorage';
 import { envConfig } from './envConfig';
+import { apiClient } from './axiosConfig';
 
 export interface ApiRequestOptions extends RequestInit {
   requireAuth?: boolean;
@@ -31,7 +32,14 @@ class ApiAuthService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = envConfig.getApiBaseUrl();
+    // In development, use relative URL to leverage Vite proxy
+    const apiUrl = envConfig.getApiBaseUrl();
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      // Use relative URL in development to leverage Vite proxy
+      this.baseUrl = '/api/v1';
+    } else {
+      this.baseUrl = apiUrl;
+    }
   }
 
   /**
@@ -57,74 +65,51 @@ class ApiAuthService {
   ): Promise<ApiResponse<T>> {
     const { requireAuth = true, ...requestOptions } = options;
 
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    // If authentication is required, ensure a session exists
-    if (requireAuth) {
-      const isAuthenticated = AuthStorageService.isAuthenticated() || 
-                             MultiAccountStorageService.isAccountAuthenticated('customer');
-      
-      if (!isAuthenticated) {
-        return {
-          success: false,
-          message: 'Authentication required',
-          errors: [{ code: 'AUTH_REQUIRED', message: 'Authentication required' }],
-          timestamp: new Date().toISOString(),
-        };
-      }
-    }
-
-    const config: RequestInit = {
-      ...requestOptions,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...requestOptions.headers,
-      },
-      credentials: 'include', // Include cookies for session management
-    };
-
     try {
-      console.log('Making API request to:', url);
-      console.log('Request config:', config);
-      const response = await fetch(url, config);
-      const data = await response.json();
+      console.log('Making API request to:', endpoint);
+      
+      // Use axios client with automatic token refresh
+      const response = await apiClient.request({
+        url: endpoint,
+        method: requestOptions.method || 'GET',
+        data: requestOptions.body ? JSON.parse(requestOptions.body as string) : undefined,
+        headers: requestOptions.headers,
+        ...requestOptions,
+      });
+
       console.log('API response status:', response.status);
-      console.log('API response data:', data);
-
-      // Handle 401 Unauthorized - session might be expired
-      if (response.status === 401 && requireAuth) {
-        return {
-          success: false,
-          message: 'Authentication required - please login',
-          errors: ['AUTHENTICATION_REQUIRED'],
-          timestamp: new Date().toISOString(),
-        };
-      }
-
-      if (!response.ok) {
-        return {
-          success: false,
-          message: data.message || `HTTP ${response.status}: ${response.statusText}`,
-          errors: data.errors || [],
-          timestamp: new Date().toISOString(),
-        };
-      }
-
-      return {
-        success: true,
-        data: data.data || data,
-        message: data.message,
-        pagination: data.pagination,
-        timestamp: new Date().toISOString(),
-      };
+      console.log('API response data:', response.data);
+      
+      return response.data;
     } catch (error: any) {
-      console.error('API request failed:', error);
-      return {
-        success: false,
-        message: error.message || 'Network error occurred',
-        errors: [error.message],
-        timestamp: new Date().toISOString(),
-      };
+      console.error('API request error:', error);
+      
+      // Handle axios errors
+      if (error.response) {
+        // Server responded with error status
+        return {
+          success: false,
+          message: error.response.data?.message || `HTTP ${error.response.status}: ${error.response.statusText}`,
+          errors: error.response.data?.errors || [error.response.data?.message || 'Request failed'],
+          timestamp: new Date().toISOString(),
+        };
+      } else if (error.request) {
+        // Network error
+        return {
+          success: false,
+          message: 'Network error - please check your connection',
+          errors: ['NETWORK_ERROR'],
+          timestamp: new Date().toISOString(),
+        };
+      } else {
+        // Other error
+        return {
+          success: false,
+          message: error.message || 'An error occurred',
+          errors: [error.message || 'Request failed'],
+          timestamp: new Date().toISOString(),
+        };
+      }
     }
   }
 

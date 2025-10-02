@@ -57,6 +57,10 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      logger.info('🔐 HybridAuth: Attempting Bearer token authentication', { 
+        tokenPrefix: token.substring(0, 10) + '...',
+        url: req.url 
+      });
       
       try {
         // Find session by access token
@@ -66,6 +70,13 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
             { model: User, as: 'user', include: [{ model: Role, as: 'role' }] }
           ]
         }) as any; // Type assertion for association
+
+        logger.info('🔐 HybridAuth: Session lookup result', { 
+          found: !!session,
+          hasUser: !!(session && session.user),
+          sessionId: session?.sessionId,
+          userId: session?.user?.id
+        });
 
         if (session && session.user) {
           // Check if session is expired
@@ -280,10 +291,12 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction): v
   }
 };
 
-// Session validation middleware
+// Session validation middleware - works with both session and Bearer token auth
 export const validateSession = (req: Request, res: Response, next: NextFunction): void => {
   try {
-    if (!SessionService.isAuthenticated(req)) {
+    // Check if user is authenticated (either via session or Bearer token)
+    const user = (req as any).user;
+    if (!user) {
       res.status(401).json({
         success: false,
         message: 'No valid session found',
@@ -292,18 +305,22 @@ export const validateSession = (req: Request, res: Response, next: NextFunction)
       return;
     }
 
-    // Check if session is expired
-    if (SessionService.isSessionExpired(req)) {
-      SessionService.destroySession(req);
-      res.status(401).json({
-        success: false,
-        message: 'Session expired',
-        code: 'SESSION_EXPIRED',
-      });
-      return;
-    }
+    // Only check session expiration if we have session data
+    if (SessionService.isAuthenticated(req)) {
+      // Check if session is expired
+      if (SessionService.isSessionExpired(req)) {
+        SessionService.destroySession(req);
+        res.status(401).json({
+          success: false,
+          message: 'Session expired',
+          code: 'SESSION_EXPIRED',
+        });
+        return;
+      }
 
-    SessionService.updateActivity(req);
+      SessionService.updateActivity(req);
+    }
+    
     next();
   } catch (error) {
     logger.error('Session validation middleware error:', error);

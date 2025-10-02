@@ -5,6 +5,8 @@
 
 import AuthStorageService from '../../shared/authStorage';
 import { envConfig } from '../../shared/envConfig';
+import { apiClient } from '../../shared/axiosConfig';
+import { centralizedAuthService } from '../../shared/centralizedAuthService';
 
 const API_BASE_URL = envConfig.getApiBaseUrl();
 
@@ -90,27 +92,17 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        ...this.getAuthHeaders(),
-        ...options.headers,
-      },
-      credentials: 'include', // Include cookies for session authentication
-    };
-
     try {
-      const response = await fetch(url, config);
-      const data = await response.json();
+      const response = await apiClient.request({
+        url: endpoint,
+        method: options.method || 'GET',
+        data: options.body ? JSON.parse(options.body as string) : undefined,
+        headers: options.headers,
+        ...options,
+      });
 
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
+      return response.data;
+    } catch (error: any) {
       console.error('API request failed:', error);
       throw error;
     }
@@ -118,27 +110,14 @@ class ApiService {
 
   // Authentication methods
   async login(email: string, password: string, expectedRole?: string): Promise<ApiResponse> {
-    const response = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, expectedRole }),
-    });
-
-    // Store auth data in localStorage on successful login
-    if (response.success && response.data) {
-      const { user, sessionId, accessToken, refreshToken } = response.data;
-      AuthStorageService.storeAuthData({
-        user,
-        session: {
-          sessionId,
-          accessToken,
-          refreshToken,
-          loginTime: new Date().toISOString(),
-          lastActivity: new Date().toISOString(),
-        },
-      });
+    // Use centralized auth service for login
+    const success = await centralizedAuthService.login(email, password);
+    
+    if (success) {
+      return { success: true, message: 'Login successful', timestamp: new Date().toISOString() };
+    } else {
+      return { success: false, message: 'Login failed', timestamp: new Date().toISOString() };
     }
-
-    return response;
   }
 
   async register(userData: {
@@ -157,19 +136,16 @@ class ApiService {
 
   async logout(): Promise<ApiResponse> {
     try {
-      // Use secure logout that calls backend and clears localStorage
-      const success = await AuthStorageService.secureLogout();
+      // Use centralized auth service for logout
+      await centralizedAuthService.logout();
       
       return {
-        success,
-        message: success ? 'Logout successful' : 'Logout completed with warnings',
+        success: true,
+        message: 'Logout successful',
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Logout error:', error);
-      // Still clear local storage even if there's an error
-      AuthStorageService.clearAuthData();
-      
       return {
         success: false,
         message: 'Logout failed',

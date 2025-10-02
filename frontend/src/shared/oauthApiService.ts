@@ -4,6 +4,7 @@
  */
 
 import { envConfig } from './envConfig'
+import { apiClient } from './axiosConfig'
 
 export interface OAuthUser {
   id: number
@@ -42,7 +43,14 @@ class OAuthApiService {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = envConfig.getApiBaseUrl()
+    // In development, use relative URL to leverage Vite proxy
+    const apiUrl = envConfig.getApiBaseUrl()
+    if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+      // Use relative URL in development to leverage Vite proxy
+      this.baseUrl = '/api/v1'
+    } else {
+      this.baseUrl = apiUrl
+    }
   }
 
   /**
@@ -53,27 +61,15 @@ class OAuthApiService {
     expectedRole: string = 'customer'
   ): Promise<OAuthResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          idToken,
-          expectedRole
-        })
+      const response = await apiClient.post('/auth/google', {
+        idToken,
+        expectedRole
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      return result
-    } catch (error) {
+      return response.data
+    } catch (error: any) {
       console.error('❌ Google OAuth API error:', error)
-      throw error
+      throw new Error(error.response?.data?.message || error.message || 'An error occurred during Google login')
     }
   }
 
@@ -82,14 +78,8 @@ class OAuthApiService {
    */
   public async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/health`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-
-      return response.ok
+      const response = await apiClient.get('/health')
+      return response.status === 200
     } catch (error) {
       console.error('❌ Backend connection test failed:', error)
       return false
@@ -101,19 +91,8 @@ class OAuthApiService {
    */
   public async getOAuthProviders(): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/auth/oauth/providers`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include' // Include session cookies
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      return await response.json()
+      const response = await apiClient.get('/auth/oauth/providers')
+      return response.data
     } catch (error) {
       console.error('❌ Get OAuth providers error:', error)
       throw error

@@ -4,6 +4,7 @@
  */
 
 import { envConfig } from './envConfig'
+import { apiClient } from './axiosConfig'
 
 const API_BASE_URL = envConfig.getApiBaseUrl()
 
@@ -61,57 +62,41 @@ class CustomerApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`
-    
-    const defaultHeaders: HeadersInit = {
-      'Content-Type': 'application/json',
-    }
-
-    // Add auth token if available
     try {
-      const authData = JSON.parse(localStorage.getItem('mayhem_auth') || '{}')
-      if (authData.session?.accessToken) {
-        defaultHeaders['Authorization'] = `Bearer ${authData.session.accessToken}`
-      }
-    } catch (error) {
-      // Ignore auth token errors for public endpoints
-    }
+      const response = await apiClient.request({
+        url: endpoint,
+        method: options.method || 'GET',
+        data: options.body ? JSON.parse(options.body as string) : undefined,
+        headers: options.headers,
+        ...options,
+      })
 
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
-      credentials: 'include', // Include cookies for session management
-    }
-
-    try {
-      const response = await fetch(url, config)
-      const data = await response.json()
-
-      if (!response.ok) {
-        return {
-          success: false,
-          message: data.message || `HTTP ${response.status}: ${response.statusText}`,
-          errors: data.errors || [],
-          timestamp: new Date().toISOString(),
-        }
-      }
-
-      return {
-        success: true,
-        data: data.data || data,
-        message: data.message,
-        timestamp: new Date().toISOString(),
-      }
+      return response.data
     } catch (error: any) {
       console.error('API request failed:', error)
-      return {
-        success: false,
-        message: error.message || 'Network error occurred',
-        errors: [error.message],
-        timestamp: new Date().toISOString(),
+      
+      // Handle axios errors
+      if (error.response) {
+        return {
+          success: false,
+          message: error.response.data?.message || `HTTP ${error.response.status}: ${error.response.statusText}`,
+          errors: error.response.data?.errors || [error.response.data?.message || 'Request failed'],
+          timestamp: new Date().toISOString(),
+        }
+      } else if (error.request) {
+        return {
+          success: false,
+          message: 'Network error - please check your connection',
+          errors: ['NETWORK_ERROR'],
+          timestamp: new Date().toISOString(),
+        }
+      } else {
+        return {
+          success: false,
+          message: error.message || 'An error occurred',
+          errors: [error.message || 'Request failed'],
+          timestamp: new Date().toISOString(),
+        }
       }
     }
   }
@@ -202,8 +187,8 @@ class CustomerApiService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl.replace('/api/v1', '')}/health`)
-      return response.ok
+      const response = await apiClient.get('/health')
+      return response.status === 200
     } catch (error) {
       return false
     }

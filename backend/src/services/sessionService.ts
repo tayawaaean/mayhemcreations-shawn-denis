@@ -137,7 +137,8 @@ export class SessionService {
         include: [
           {
             model: User,
-            include: [{ model: Role }],
+            as: 'user',
+            include: [{ model: Role, as: 'role' }],
           },
         ],
       });
@@ -185,10 +186,54 @@ export class SessionService {
    */
   static async refreshAccessToken(req: Request): Promise<string | null> {
     try {
-      const sessionData = this.getSession(req);
-      if (!sessionData) return null;
+      let sessionData = this.getSession(req);
+      
+      // If no session data from cookies, try to get from Bearer token
+      if (!sessionData) {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7);
+          
+          // Find session by access token
+          const dbSession = await Session.findOne({
+            where: { 
+              accessToken: token,
+              isActive: true 
+            },
+            include: [
+              {
+                model: User,
+                as: 'user',
+                include: [{ model: Role, as: 'role' }],
+              },
+            ],
+          });
 
-      // Find session in database
+          if (!dbSession || !dbSession.isActiveSession()) {
+            return null;
+          }
+
+          // Generate new access token
+          const newAccessToken = this.generateToken(32);
+
+          // Update database session
+          await dbSession.update({
+            accessToken: newAccessToken,
+            lastActivity: new Date(),
+          });
+
+          logger.info('Access token refreshed via Bearer token', {
+            sessionId: dbSession.sessionId,
+            userId: dbSession.userId,
+          });
+
+          return newAccessToken;
+        }
+        
+        return null;
+      }
+
+      // Original session-based logic
       const dbSession = await Session.findOne({
         where: {
           sessionId: sessionData.sessionId,
@@ -197,7 +242,8 @@ export class SessionService {
         include: [
           {
             model: User,
-            include: [{ model: Role }],
+            as: 'user',
+            include: [{ model: Role, as: 'role' }],
           },
         ],
       });

@@ -62,13 +62,13 @@ router.post('/login', authRateLimit, loginValidation, AuthController.login);
 router.post('/resend-verification', AuthController.resendVerificationEmail);
 router.post('/verify-email', AuthController.verifyEmail);
 router.post('/logout', hybridAuthenticate, AuthController.logout);
-router.get('/profile', authenticate, validateSession, AuthController.getProfile);
-router.post('/refresh', authenticate, validateSession, AuthController.refreshSession);
+router.get('/profile', hybridAuthenticate, validateSession, AuthController.getProfile);
+router.post('/refresh', hybridAuthenticate, validateSession, AuthController.refreshSession);
 
 // OAuth routes
 router.post('/google', authRateLimit, AuthController.googleLogin);
-router.get('/oauth/providers', authenticate, validateSession, AuthController.getOAuthProviders);
-router.post('/oauth/unlink', authenticate, validateSession, AuthController.unlinkOAuthProvider);
+router.get('/oauth/providers', hybridAuthenticate, validateSession, AuthController.getOAuthProviders);
+router.post('/oauth/unlink', hybridAuthenticate, validateSession, AuthController.unlinkOAuthProvider);
 
 /**
  * @swagger

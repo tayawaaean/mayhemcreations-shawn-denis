@@ -48,6 +48,8 @@ class AuthStorageService {
    */
   static storeAuthData(authData: AuthData): void {
     try {
+      console.log('🔐 AuthStorageService: Storing auth data:', authData);
+      
       // Create auth data with all user fields for persistence
       const persistentAuthData: AuthData = {
         user: {
@@ -69,8 +71,13 @@ class AuthStorageService {
         }
       };
       
+      console.log('🔐 AuthStorageService: Storing persistent auth data:', persistentAuthData);
+      console.log('🔐 AuthStorageService: Using key:', this.AUTH_KEY);
+      
       // Store only in single key
       localStorage.setItem(this.AUTH_KEY, JSON.stringify(persistentAuthData));
+      
+      console.log('🔐 AuthStorageService: Data stored successfully');
       
       // Clean up any old redundant keys
       this.cleanupOldKeys();
@@ -85,7 +92,17 @@ class AuthStorageService {
   static getAuthData(): AuthData | null {
     try {
       const authData = localStorage.getItem(this.AUTH_KEY);
-      return authData ? JSON.parse(authData) : null;
+      console.log('🔐 AuthStorageService: Getting auth data from key:', this.AUTH_KEY);
+      console.log('🔐 AuthStorageService: Raw data:', authData);
+      
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        console.log('🔐 AuthStorageService: Parsed data:', parsed);
+        return parsed;
+      } else {
+        console.log('🔐 AuthStorageService: No data found for key:', this.AUTH_KEY);
+        return null;
+      }
     } catch (error) {
       console.error('Error getting auth data:', error);
       return null;
@@ -259,8 +276,19 @@ class AuthStorageService {
     if (!session) return false;
 
     try {
+      // Check if token is a JWT (has 3 parts separated by dots)
+      const tokenParts = session.accessToken.split('.');
+      if (tokenParts.length !== 3) {
+        // Not a JWT, assume it needs refresh based on lastActivity
+        const lastActivity = new Date(session.lastActivity).getTime();
+        const now = Date.now();
+        const fiveMinutes = 5 * 60 * 1000;
+        
+        return (now - lastActivity) > fiveMinutes;
+      }
+
       // Decode JWT to check expiration
-      const payload = JSON.parse(atob(session.accessToken.split('.')[1]));
+      const payload = JSON.parse(atob(tokenParts[1]));
       const exp = payload.exp * 1000; // Convert to milliseconds
       const now = Date.now();
       const fiveMinutes = 5 * 60 * 1000;
@@ -268,7 +296,12 @@ class AuthStorageService {
       return (exp - now) < fiveMinutes;
     } catch (error) {
       console.error('Error checking token expiration:', error);
-      return true; // Assume needs refresh if we can't decode
+      // Fallback to time-based check using lastActivity
+      const lastActivity = new Date(session.lastActivity).getTime();
+      const now = Date.now();
+      const fiveMinutes = 5 * 60 * 1000;
+      
+      return (now - lastActivity) > fiveMinutes;
     }
   }
 

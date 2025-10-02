@@ -784,7 +784,16 @@ export class AuthController {
    */
   static async refreshSession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      if (!SessionService.isAuthenticated(req)) {
+      logger.info('🔄 RefreshSession: Starting refresh', {
+        hasUser: !!(req as any).user,
+        userId: (req as any).user?.id,
+        sessionId: (req as any).user?.sessionId,
+        hasSession: SessionService.isAuthenticated(req)
+      });
+
+      // Check if user is authenticated (either via session or Bearer token)
+      const user = (req as any).user;
+      if (!user) {
         res.status(401).json({
           success: false,
           message: 'Not authenticated',
@@ -802,7 +811,10 @@ export class AuthController {
         return;
       }
 
-      SessionService.updateActivity(req);
+      // Update activity if we have session data
+      if (SessionService.isAuthenticated(req)) {
+        SessionService.updateActivity(req);
+      }
 
       res.json({
         success: true,

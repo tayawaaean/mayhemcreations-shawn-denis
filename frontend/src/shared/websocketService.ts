@@ -51,11 +51,12 @@ class WebSocketService {
     let serverUrl = 'http://localhost:5001';
     
     if (typeof window !== 'undefined') {
-      // Browser environment
+      // Browser environment - always use direct backend URL for WebSocket
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
       
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Use direct backend URL for WebSocket connections
         serverUrl = 'http://localhost:5001';
       } else {
         // Production environment - use same host but different port

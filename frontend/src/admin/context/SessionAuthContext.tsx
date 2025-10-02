@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { apiService } from '../services/apiService';
+import { centralizedAuthService } from '../../shared/centralizedAuthService';
 
 interface SessionAuthContextType {
   isAuthenticated: boolean;
@@ -71,15 +72,15 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
       console.log('🔐 Attempting login...');
       setIsLoading(true);
       
-      const response = await apiService.login(email, password);
+      // Use centralized auth service for login
+      const success = await centralizedAuthService.login(email, password);
       
-      if (response.success && response.data) {
-        console.log('✅ Login successful:', response.data);
-        setUser(response.data.user);
-        setIsAuthenticated(true);
+      if (success) {
+        console.log('✅ Login successful');
+        // The centralized auth service will handle state updates
         return true;
       } else {
-        console.log('❌ Login failed:', response.message);
+        console.log('❌ Login failed');
         setUser(null);
         setIsAuthenticated(false);
         return false;
@@ -97,7 +98,7 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
   const logout = async (): Promise<void> => {
     try {
       console.log('🔐 Logging out...');
-      await apiService.logout();
+      await centralizedAuthService.logout();
     } catch (error) {
       console.error('❌ Logout error:', error);
     } finally {
