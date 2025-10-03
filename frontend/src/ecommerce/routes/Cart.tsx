@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useCart } from '../context/CartContext'
+import { useAuth } from '../context/AuthContext'
 import { products } from '../../data/products'
 import { Link, useNavigate } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Eye, X, CheckCircle } from 'lucide-react'
@@ -11,6 +12,29 @@ export default function Cart() {
   const { items, update, remove, clear } = useCart()
   const [selectedItem, setSelectedItem] = useState<typeof enriched[0] | null>(null)
   const [showFinalProductModal, setShowFinalProductModal] = useState(false)
+  const [showSubmissionSuccessModal, setShowSubmissionSuccessModal] = useState(false)
+  const [submissionData, setSubmissionData] = useState<{orderId: number | string | null}>({orderId: null})
+  
+  // Import useAuth to check login status
+  const { isLoggedIn, user } = useAuth()
+  
+  // Debug logging
+  console.log('🛒 Cart component - Raw items:', items)
+  console.log('🛒 Cart component - Items length:', items.length)
+  console.log('🛒 Cart component - User logged in:', isLoggedIn)
+  console.log('🛒 Cart component - User:', user)
+  
+  // Check localStorage
+  const localStorageCart = localStorage.getItem('mayhem_cart_v1')
+  console.log('🛒 localStorage cart data:', localStorageCart)
+  if (localStorageCart) {
+    try {
+      const parsedCart = JSON.parse(localStorageCart)
+      console.log('🛒 Parsed localStorage cart:', parsedCart)
+    } catch (e) {
+      console.error('🛒 Error parsing localStorage cart:', e)
+    }
+  }
   // Create virtual product for custom embroidery
   const customEmbroideryProduct = {
     id: 'custom-embroidery',
@@ -22,10 +46,42 @@ export default function Cart() {
     category: 'embroidery' as const
   }
 
-  const enriched = items.map((it) => ({ 
-    ...it, 
-    product: it.productId === 'custom-embroidery' ? customEmbroideryProduct : products.find((p) => p.id === it.productId)
-  })).filter(item => item.product) // Filter out items without product data
+  const enriched = items.map((it) => {
+    let product = it.product; // Use product data from cart item
+    
+    console.log('🛒 Processing item:', { 
+      productId: it.productId, 
+      hasProduct: !!it.product,
+      productTitle: it.product?.title || 'No product'
+    })
+    
+    // Handle custom embroidery product
+    if (it.productId === 'custom-embroidery') {
+      product = customEmbroideryProduct;
+      console.log('🛒 Using custom embroidery product')
+    } else if (!product) {
+      // Fallback: try to find product if it's missing from cart item
+      product = products.find((p) => p.id === it.productId);
+      if (product) {
+        console.log('🛒 Found product via fallback lookup:', product.id, product.title)
+      } else {
+        console.log('🛒 No product found for ID:', it.productId)
+        console.log('🛒 Available product IDs:', products.map(p => ({ id: p.id, type: typeof p.id })))
+      }
+    }
+    
+    return {
+      ...it,
+      product
+    };
+  }).filter(item => {
+    const hasProduct = !!item.product;
+    console.log('🛒 Item has product:', hasProduct, item.productId)
+    return hasProduct;
+  }) // Filter out items without product data
+  
+  console.log('🛒 Enriched items after processing:', enriched)
+  console.log('🛒 Enriched items length:', enriched.length)
   
   const calculateItemPrice = (item: typeof enriched[0]) => {
     // For custom embroidery items, use the total price from embroideryData
@@ -38,32 +94,62 @@ export default function Cart() {
     
     // Add customization costs if present
     if (item.customization) {
-        const { selectedStyles } = item.customization
-      if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0
-      if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0
-      if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0
-      if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0
-      if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0
-      
-      if (selectedStyles.threads) {
-          selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => {
-            itemPrice += Number(thread.price) || 0
+        // Handle multiple designs (new format)
+        if (item.customization.designs && item.customization.designs.length > 0) {
+          // Calculate total price for all designs
+          item.customization.designs.forEach((design: any) => {
+            if (design.totalPrice) {
+              itemPrice += Number(design.totalPrice) || 0
+            } else if (design.selectedStyles) {
+              // Calculate design-specific pricing if totalPrice is not available
+              const { selectedStyles } = design
+              if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0
+              if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0
+              if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0
+              if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0
+              if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0
+              
+              if (selectedStyles.threads) {
+                selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => {
+                  itemPrice += Number(thread.price) || 0
+                })
+              }
+              if (selectedStyles.upgrades) {
+                selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => {
+                  itemPrice += Number(upgrade.price) || 0
+                })
+              }
+            }
           })
+        } else {
+          // Handle legacy single design format
+          const { selectedStyles } = item.customization
+          if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0
+          if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0
+          if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0
+          if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0
+          if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0
+          
+          if (selectedStyles.threads) {
+              selectedStyles.threads.forEach((thread: { id: string; name: string; price: number }) => {
+                itemPrice += Number(thread.price) || 0
+              })
+            }
+          if (selectedStyles.upgrades) {
+              selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => {
+                itemPrice += Number(upgrade.price) || 0
+              })
+          }
         }
-      if (selectedStyles.upgrades) {
-          selectedStyles.upgrades.forEach((upgrade: { id: string; name: string; price: number }) => {
-            itemPrice += Number(upgrade.price) || 0
-          })
-      }
     }
     
     return itemPrice
   }
   
   const subtotal = enriched.reduce((s, e) => s + (calculateItemPrice(e) * e.quantity), 0)
-  const shipping = subtotal > 50 ? 0 : 9.99
-  const tax = subtotal * 0.08
-  const total = subtotal + shipping + tax
+  // Shipping will be calculated based on location during checkout
+  const shipping = 0 // Will be calculated in checkout based on location
+  const total = subtotal + shipping
 
   // Helper function to safely format prices
   const formatPrice = (price: number | undefined | null): string => {
@@ -89,11 +175,14 @@ export default function Cart() {
           quantity: item.quantity,
           customization: item.customization,
           reviewStatus: 'pending' as const,
-          product: products.find(p => p.id === item.productId)
+          product: products.find(p => {
+            // Handle both numeric and string product IDs
+            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+            return p.id === item.productId || p.id === numericId;
+          })
         })),
         subtotal: subtotal,
-        shipping: shipping,
-        tax: tax,
+        shipping: shipping, // Will be calculated at checkout
         total: total,
         submittedAt: new Date().toISOString()
       }
@@ -102,17 +191,15 @@ export default function Cart() {
       const response = await orderReviewApiService.submitForReview(orderData)
       
       if (response.success) {
-        // Show success message
-        alert(`Order submitted for review! Order ID: ${response.data?.orderReviewId}. You will be notified once the admin reviews your customized items.`)
+        // Show success modal
+        setSubmissionData({orderId: response.data?.orderReviewId || null})
+        setShowSubmissionSuccessModal(true)
         
         // Clear the cart after successful submission
         await clear()
         
         // Clear localStorage as well to prevent reloading
         localStorage.removeItem('mayhem_cart_v1')
-        
-        // Navigate to orders page
-        window.location.href = '/my-orders'
       } else {
         alert('Failed to submit for review. Please try again.')
       }
@@ -295,13 +382,8 @@ export default function Cart() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-medium">
-                        {shipping === 0 ? 'Free' : `$${formatPrice(shipping)}`}
+                        Calculated at checkout
                       </span>
-                    </div>
-                    
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Tax</span>
-                      <span className="font-medium">${formatPrice(tax)}</span>
                     </div>
                     
                     <div className="border-t border-gray-200 pt-3 sm:pt-4">
@@ -317,7 +399,7 @@ export default function Cart() {
                     <div className="space-y-3">
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p className="text-sm text-blue-800">
-                          Customized items require admin review before processing. 
+                          All items require admin review before processing. 
                           Submit your order for review and approval.
                         </p>
                       </div>
@@ -332,7 +414,7 @@ export default function Cart() {
                     
                     <div className="text-center">
                       <span className="text-xs sm:text-sm text-gray-600">
-                        {shipping === 0 ? 'You qualify for free shipping!' : `Add $${formatPrice(50 - subtotal)} more for free shipping`}
+                        Shipping will be calculated based on your location during checkout
                       </span>
                     </div>
                   </div>
@@ -709,12 +791,63 @@ export default function Cart() {
                     </div>
                     {selectedItem.customization && (
                       <>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Customization Total:</span>
-                          <span className="font-medium">
-                            +${formatPrice(calculateItemPrice(selectedItem) - Number(selectedItem.product?.price || 0))}
-                          </span>
-                        </div>
+                        {/* Multiple Designs Pricing */}
+                        {selectedItem.customization.designs && selectedItem.customization.designs.length > 0 ? (
+                          <>
+                            {selectedItem.customization.designs.map((design: any, index: number) => (
+                              <div key={design.id || index} className="ml-4 space-y-1">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Design {index + 1}: {design.name}</span>
+                                  <span className="font-medium">
+                                    ${formatPrice(design.totalPrice || 0)}
+                                  </span>
+                                </div>
+                                {design.selectedStyles && (
+                                  <div className="ml-4 space-y-1">
+                                    {design.selectedStyles.coverage && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Coverage:</span>
+                                        <span>+${formatPrice(design.selectedStyles.coverage.price)}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.material && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Material:</span>
+                                        <span>+${formatPrice(design.selectedStyles.material.price)}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.threads && design.selectedStyles.threads.length > 0 && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Threads:</span>
+                                        <span>+${formatPrice(design.selectedStyles.threads.reduce((sum: number, thread: any) => sum + (thread.price || 0), 0))}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.upgrades && design.selectedStyles.upgrades.length > 0 && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Upgrades:</span>
+                                        <span>+${formatPrice(design.selectedStyles.upgrades.reduce((sum: number, upgrade: any) => sum + (upgrade.price || 0), 0))}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">All Designs Total:</span>
+                              <span className="font-medium">
+                                ${formatPrice(calculateItemPrice(selectedItem) - Number(selectedItem.product?.price || 0))}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          /* Legacy Single Design Pricing */
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Customization Total:</span>
+                            <span className="font-medium">
+                              +${formatPrice(calculateItemPrice(selectedItem) - Number(selectedItem.product?.price || 0))}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between">
                           <span className="text-gray-600">Per Item Total:</span>
                           <span className="font-medium">${formatPrice(calculateItemPrice(selectedItem))}</span>
@@ -780,35 +913,53 @@ export default function Cart() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
                     {selectedItem.product?.title || ''} - Final Product
                   </h3>
+                  {/* Debug info */}
+                  <div className="text-xs text-gray-500 mb-2 text-center">
+                    {selectedItem.customization?.mockup ? 
+                      `Mockup available (${Math.round(selectedItem.customization.mockup.length / 1024)}KB)` : 
+                      'No mockup available - showing base product'
+                    }
+                  </div>
                   <div className="flex justify-center">
                     <div className="relative max-w-md w-full">
+                      {/* Use mockup image if available (shows final product with design), otherwise show base product */}
+                      {selectedItem.customization?.mockup ? (
+                        <img
+                          src={selectedItem.customization.mockup}
+                          alt={`${selectedItem.product?.title || ''} - Final Product`}
+                          className="w-full h-80 object-contain rounded-lg shadow-lg"
+                        />
+                      ) : (
+                        <>
+                          <img
+                            src={selectedItem.product?.image || ''}
+                            alt={selectedItem.product?.title || ''}
+                            className="w-full h-80 object-cover rounded-lg shadow-lg"
+                          />
+                          {selectedItem.customization?.design && (
+                            <div
+                              className="absolute select-none"
+                              style={{
+                                left: `${selectedItem.customization.designPosition?.x || 150}px`,
+                                top: `${selectedItem.customization.designPosition?.y || 120}px`,
+                                transform: `scale(${selectedItem.customization.designScale || 1}) rotate(${selectedItem.customization.designRotation || 0}deg)`,
+                                transformOrigin: 'center'
+                              }}
+                            >
                               <img
-                                src={selectedItem.product?.image || ''}
-                                alt={selectedItem.product?.title || ''}
-                                className="w-full h-80 object-cover rounded-lg shadow-lg"
+                                src={selectedItem.customization.design.preview || selectedItem.customization.design.base64}
+                                alt="Design preview"
+                                className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
+                                style={{
+                                  width: '60px',
+                                  height: '60px',
+                                  objectFit: 'fill'
+                                }}
                               />
-                              {selectedItem.customization?.design && (
-                                <div
-                                  className="absolute select-none"
-                                  style={{
-                                    left: `${selectedItem.customization.designPosition?.x || 150}px`,
-                                    top: `${selectedItem.customization.designPosition?.y || 120}px`,
-                                    transform: `scale(${selectedItem.customization.designScale || 1}) rotate(${selectedItem.customization.designRotation || 0}deg)`,
-                                    transformOrigin: 'center'
-                                  }}
-                                >
-                                  <img
-                            src={selectedItem.customization.design.preview || selectedItem.customization.design.base64}
-                                    alt="Design preview"
-                                    className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
-                                    style={{
-                                      width: '60px',
-                                      height: '60px',
-                                      objectFit: 'fill'
-                                    }}
-                                  />
-                                </div>
-                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -946,6 +1097,59 @@ export default function Cart() {
                     Close Preview
                   </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Submission Success Modal */}
+      {showSubmissionSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+              
+              <h2 className="text-xl font-bold text-gray-900 text-center mb-2">
+                Order Submitted Successfully!
+              </h2>
+              
+              <p className="text-gray-600 text-center mb-4">
+                Your order has been submitted for review.
+              </p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <p className="text-sm text-blue-800 text-center">
+                  <strong>Order ID:</strong> {submissionData.orderId}
+                </p>
+                <p className="text-sm text-blue-800 text-center mt-1">
+                  You will be notified once the admin reviews your items.
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSubmissionSuccessModal(false)}
+                  className="flex-1"
+                >
+                  Continue Shopping
+                </Button>
+                
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowSubmissionSuccessModal(false)
+                    window.location.href = '/my-orders'
+                  }}
+                  className="flex-1"
+                >
+                  View My Orders
+                </Button>
               </div>
             </div>
           </div>

@@ -74,7 +74,12 @@ export default function Checkout() {
 
   // Helper function to calculate item price including customization costs
   const calculateItemPrice = (item: any) => {
-    const product = products.find(p => p.id === item.productId)
+    // Handle both numeric and string product IDs
+    const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+    const product = products.find(p => {
+      // Check both string and numeric ID matches
+      return p.id === item.productId || p.id === numericId;
+    });
     if (!product) return 0
     
     let itemPrice = product.price
@@ -157,7 +162,12 @@ export default function Checkout() {
           country: formData.country
         },
         items: items.map((item, index) => {
-          const product = products.find(p => p.id === item.productId)
+          // Handle both numeric and string product IDs
+          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+          const product = products.find(p => {
+            // Check both string and numeric ID matches
+            return p.id === item.productId || p.id === numericId;
+          });
           const itemPrice = calculateItemPrice(item)
           
           return {
@@ -677,7 +687,12 @@ export default function Checkout() {
                           customerEmail: formData.email,
                           customerName: `${formData.firstName} ${formData.lastName}`,
                           items: items.map((item, index) => {
-                            const product = products.find(p => p.id === item.productId)
+                            // Handle both numeric and string product IDs
+                            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                            const product = products.find(p => {
+                              // Check both string and numeric ID matches
+                              return p.id === item.productId || p.id === numericId;
+                            });
                             const itemPrice = calculateItemPrice(item)
                             
                             return {
@@ -761,7 +776,12 @@ export default function Checkout() {
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
                     <div className="space-y-4">
                       {items.map((item, index) => {
-                        const product = products.find(p => p.id === item.productId)
+                        // Handle both numeric and string product IDs
+                        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                        const product = products.find(p => {
+                          // Check both string and numeric ID matches
+                          return p.id === item.productId || p.id === numericId;
+                        });
                         if (!product) return null
                         
                         // Calculate item price including customization costs

@@ -132,6 +132,19 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
     }
 
     // Create order review record using raw query with proper insertId handling
+    const replacements = [
+      userId,
+      JSON.stringify(items),
+      subtotal,
+      shipping || 0, // Handle undefined shipping as 0
+      tax || 0, // Handle undefined tax as 0 (column is NOT NULL)
+      total,
+      submittedAt ? new Date(submittedAt) : new Date()
+    ];
+    
+    console.log('🔍 SQL replacements:', replacements);
+    console.log('🔍 Replacement count:', replacements.length);
+    
     const [result] = await sequelize.query(`
       INSERT INTO order_reviews (
         user_id, 
@@ -141,20 +154,12 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         tax, 
         total, 
         status, 
-        submitted_at, 
-        created_at, 
+        submitted_at,
+        created_at,
         updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())
     `, {
-      replacements: [
-        userId,
-        JSON.stringify(items),
-        subtotal,
-        shipping,
-        tax,
-        total,
-        submittedAt ? new Date(submittedAt) : new Date()
-      ]
+      replacements: replacements
     });
 
     // Handle different result formats from Sequelize raw queries

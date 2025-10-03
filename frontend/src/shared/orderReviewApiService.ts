@@ -12,7 +12,7 @@ export interface SubmitForReviewRequest {
   items: OrderReviewItem[];
   subtotal: number;
   shipping: number;
-  tax: number;
+  tax?: number; // Optional - will be calculated at checkout
   total: number;
   submittedAt: string;
 }

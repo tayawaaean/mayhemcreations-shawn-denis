@@ -28,7 +28,8 @@ export default function Customize() {
     removeDesignById,
     updateDesign,
     reorderDesigns,
-    getDesignById
+    getDesignById,
+    resetCustomization
   } = useCustomization()
   const { add: addToCart } = useCart()
   const [currentStep, setCurrentStep] = useState(1)
@@ -607,7 +608,18 @@ export default function Customize() {
   }
 
   const handleAddToCart = async () => {
-    if (!product) return
+    if (!product) {
+      console.error('❌ No product found for adding to cart')
+      return
+    }
+    
+    console.log('🛒 Starting add to cart process:', {
+      productId: product.id,
+      hasCustomization: !!customizationData,
+      designsCount: customizationData.designs.length,
+      hasLegacyDesign: !!customizationData.design,
+      mockupExists: !!customizationData.mockup
+    })
     
     setIsAddingToCart(true)
     
@@ -663,6 +675,16 @@ export default function Customize() {
       }
 
       // Add customized item to cart with stock validation
+      console.log('🛒 Calling addToCart with:', {
+        productId: product.id.toString(),
+        quantity: customizationData.quantity,
+        customization: {
+          designsCount: customizationData.designs.length,
+          hasLegacyDesign: !!customizationData.design,
+          hasMockup: !!mockupBase64
+        }
+      })
+      
       const success = await addToCart(product.id.toString(), customizationData.quantity, {
         // Legacy single design support
         design: customizationData.design ? {
@@ -673,17 +695,42 @@ export default function Customize() {
         } : null,
         
         // Multi-design support
-        designs: customizationData.designs.length > 0 ? customizationData.designs.map(design => ({
-          id: design.id,
-          name: design.name,
-          preview: design.preview,
-          dimensions: design.dimensions,
-          position: design.position,
-          scale: design.scale,
-          rotation: design.rotation,
-          notes: design.notes,
-          selectedStyles: design.selectedStyles
-        })) : null,
+        designs: customizationData.designs.length > 0 ? customizationData.designs.map(design => {
+          // Calculate total price for this design
+          let designTotalPrice = 0
+          if (design.selectedStyles) {
+            const { selectedStyles } = design
+            if (selectedStyles.coverage) designTotalPrice += Number(selectedStyles.coverage.price) || 0
+            if (selectedStyles.material) designTotalPrice += Number(selectedStyles.material.price) || 0
+            if (selectedStyles.border) designTotalPrice += Number(selectedStyles.border.price) || 0
+            if (selectedStyles.backing) designTotalPrice += Number(selectedStyles.backing.price) || 0
+            if (selectedStyles.cutting) designTotalPrice += Number(selectedStyles.cutting.price) || 0
+            
+            if (selectedStyles.threads) {
+              selectedStyles.threads.forEach((thread: any) => {
+                designTotalPrice += Number(thread.price) || 0
+              })
+            }
+            if (selectedStyles.upgrades) {
+              selectedStyles.upgrades.forEach((upgrade: any) => {
+                designTotalPrice += Number(upgrade.price) || 0
+              })
+            }
+          }
+          
+          return {
+            id: design.id,
+            name: design.name,
+            preview: design.preview,
+            dimensions: design.dimensions,
+            position: design.position,
+            scale: design.scale,
+            rotation: design.rotation,
+            notes: design.notes,
+            selectedStyles: design.selectedStyles,
+            totalPrice: designTotalPrice // Include calculated total price
+          }
+        }) : null,
         
         mockup: mockupBase64, // Store mockup image
         selectedStyles: {
@@ -704,8 +751,16 @@ export default function Customize() {
         designRotation: customizationData.designRotation
       })
       
+      console.log('🛒 addToCart result:', success)
+      
       if (success) {
+        console.log('✅ Successfully added to cart, showing confirmation')
         setShowCartConfirmation(true)
+        // Reset customization data after successful add
+        resetCustomization()
+      } else {
+        console.error('❌ Failed to add item to cart')
+        alert('Failed to add item to cart. Please try again.')
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
@@ -714,9 +769,9 @@ export default function Customize() {
     }
   }
 
-  const handleProceedToCheckout = () => {
+  const handleViewCart = () => {
     setShowCartConfirmation(false)
-    navigate('/checkout')
+    navigate('/cart')
   }
 
   const handleContinueShopping = () => {
@@ -742,7 +797,7 @@ export default function Customize() {
       setShowFinalView(false)
       
       // Show the captured image in a modal
-      setShowFinalDesignModal(true)
+    setShowFinalDesignModal(true)
       setFinalDesignImage(mockupBase64)
       
       console.log('✅ Clean design preview captured:', {
@@ -989,10 +1044,10 @@ export default function Customize() {
                                  <span>Drag handles to resize</span>
                                  <span className="text-gray-400">•</span>
                                  <span>Ctrl+scroll to rotate</span>
-                             </div>
+                           </div>
                                  {/* Tooltip Arrow */}
                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                           </div>
+                         </div>
                            )}
                          
                          </>
@@ -1496,12 +1551,12 @@ export default function Customize() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Color</span>
                     <span className="font-semibold text-sm sm:text-base capitalize">{customizationData.color}</span>
-                  </div>
+                    </div>
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Size</span>
                     <span className="font-semibold text-sm sm:text-base uppercase">{customizationData.size}</span>
-                  </div>
+                      </div>
                   
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Quantity</span>
@@ -1513,7 +1568,7 @@ export default function Customize() {
                     <>
                       <div className="border-t pt-4">
                         <h4 className="text-md font-semibold text-gray-900 mb-3">Embroidery Designs</h4>
-                        {customizationData.designs.map((design, index) => (
+                  {customizationData.designs.map((design, index) => (
                           <div key={design.id} className="mb-4 p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-gray-900">
@@ -1522,105 +1577,105 @@ export default function Customize() {
                               <span className="text-sm text-gray-600">
                                 {design.dimensions.width}" × {design.dimensions.height}" @ {Math.round(design.scale * 100)}%
                               </span>
-                            </div>
-                            
+                      </div>
+                  
                             {/* Embroidery Base Cost */}
                             <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-gray-200">
                               <span className="text-gray-600">Embroidery Base Cost</span>
                               <span className="font-medium text-accent">${calculateEmbroideryBaseCost(design).toFixed(2)}</span>
-                            </div>
-                            
+                  </div>
+
                             {/* Individual Design Options */}
-                            {design.selectedStyles.coverage && (
+                        {design.selectedStyles.coverage && (
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{design.selectedStyles.coverage.name}</span>
-                                <span className="font-medium">
+                            <span className="font-medium">
                                   {design.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.coverage.price) || 0).toFixed(2)}`}
-                                </span>
-                              </div>
-                            )}
+                      </span>
+                    </div>
+                  )}
                             
-                            {design.selectedStyles.material && (
+                        {design.selectedStyles.material && (
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{design.selectedStyles.material.name}</span>
-                                <span className="font-medium">
+                            <span className="font-medium">
                                   {design.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.material.price) || 0).toFixed(2)}`}
-                                </span>
-                              </div>
-                            )}
+                      </span>
+                    </div>
+                  )}
                             
-                            {design.selectedStyles.border && (
+                        {design.selectedStyles.border && (
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{design.selectedStyles.border.name}</span>
-                                <span className="font-medium">
+                            <span className="font-medium">
                                   {design.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.border.price) || 0).toFixed(2)}`}
-                                </span>
-                              </div>
-                            )}
+                      </span>
+                    </div>
+                  )}
                             
-                            {design.selectedStyles.threads.map((thread) => (
+                        {design.selectedStyles.threads.map((thread) => (
                               <div key={thread.id} className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{thread.name}</span>
                                 <span className="font-medium">+${(Number(thread.price) || 0).toFixed(2)}</span>
-                              </div>
-                            ))}
+                  </div>
+                        ))}
                             
-                            {design.selectedStyles.backing && (
+                        {design.selectedStyles.backing && (
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{design.selectedStyles.backing.name}</span>
-                                <span className="font-medium">
+                            <span className="font-medium">
                                   {design.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.backing.price) || 0).toFixed(2)}`}
-                                </span>
-                              </div>
-                            )}
+                            </span>
+                          </div>
+                        )}
                             
-                            {design.selectedStyles.upgrades.map((upgrade) => (
+                        {design.selectedStyles.upgrades.map((upgrade) => (
                               <div key={upgrade.id} className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{upgrade.name}</span>
                                 <span className="font-medium">+${(Number(upgrade.price) || 0).toFixed(2)}</span>
-                              </div>
-                            ))}
+                    </div>
+                  ))}
                             
-                            {design.selectedStyles.cutting && (
+                        {design.selectedStyles.cutting && (
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-600">{design.selectedStyles.cutting.name}</span>
-                                <span className="font-medium">
+                            <span className="font-medium">
                                   {design.selectedStyles.cutting.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.cutting.price) || 0).toFixed(2)}`}
-                                </span>
-                              </div>
-                            )}
+                      </span>
+                    </div>
+                  )}
                             
                             <div className="mt-2 pt-2 border-t border-gray-200">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium text-gray-900">Design {index + 1} Total</span>
                                 <span className="font-semibold text-sm text-accent">${calculateDesignPrice(design.id).toFixed(2)}</span>
                               </div>
-                            </div>
-                          </div>
-                        ))}
                       </div>
+                    </div>
+                  ))}
+                    </div>
                     </>
                   )}
-
+                  
                   {/* Legacy Single Design Support */}
                   {customizationData.designs.length === 0 && customizationData.design && (
                     <>
-                      <div className="border-t pt-4">
+                  <div className="border-t pt-4">
                         <h4 className="text-md font-semibold text-gray-900 mb-3">Embroidery Design</h4>
                         
                         {embroideryPricing && (
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth}" × {embroideryHeight}")</span>
                             <span className="font-semibold text-sm sm:text-base text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
-                          </div>
+                    </div>
                         )}
                         
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm sm:text-base text-gray-600">Placement</span>
                           <span className="font-semibold text-sm sm:text-base capitalize">
                             {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
-                          </span>
-                        </div>
+                        </span>
+                      </div>
                         
                         {customizationData.selectedStyles.coverage && (
                           <div className="flex items-center justify-between">
@@ -1628,7 +1683,7 @@ export default function Customize() {
                             <span className="font-semibold text-sm sm:text-base">
                               {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.coverage.price) || 0).toFixed(2)}`}
                             </span>
-                          </div>
+                      </div>
                         )}
                         
                         {customizationData.selectedStyles.material && (
@@ -1636,8 +1691,8 @@ export default function Customize() {
                             <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.material.name}</span>
                             <span className="font-semibold text-sm sm:text-base">
                               {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.material.price) || 0).toFixed(2)}`}
-                            </span>
-                          </div>
+                          </span>
+                        </div>
                         )}
                         
                         {customizationData.selectedStyles.border && (
@@ -1646,14 +1701,14 @@ export default function Customize() {
                             <span className="font-semibold text-sm sm:text-base">
                               {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.border.price) || 0).toFixed(2)}`}
                             </span>
-                          </div>
+                      </div>
                         )}
                         
                         {customizationData.selectedStyles.threads.map((thread) => (
                           <div key={thread.id} className="flex items-center justify-between">
                             <span className="text-sm sm:text-base text-gray-600">{thread.name}</span>
                             <span className="font-semibold text-sm sm:text-base">+${(Number(thread.price) || 0).toFixed(2)}</span>
-                          </div>
+                    </div>
                         ))}
                         
                         {customizationData.selectedStyles.backing && (
@@ -1662,7 +1717,7 @@ export default function Customize() {
                             <span className="font-semibold text-sm sm:text-base">
                               {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.backing.price) || 0).toFixed(2)}`}
                             </span>
-                          </div>
+                  </div>
                         )}
                         
                         {customizationData.selectedStyles.upgrades.map((upgrade) => (
@@ -1864,11 +1919,11 @@ export default function Customize() {
                 
                 <Button
                   variant="add-to-cart"
-                  onClick={handleProceedToCheckout}
+                  onClick={handleViewCart}
                   className="w-full sm:w-auto"
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" />
-                  Proceed to Checkout
+                  View Cart
                 </Button>
               </div>
             </div>
@@ -1928,21 +1983,21 @@ export default function Customize() {
                     </h4>
                     
                     {/* Multi-Design Images */}
-                    {customizationData.designs.length > 0 && (
+                {customizationData.designs.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {customizationData.designs.map((design, index) => (
+                    {customizationData.designs.map((design, index) => (
                           <div key={design.id} className="text-center">
                             <div className="bg-gray-100 rounded-lg p-3 mb-2">
-                              <img
-                                src={design.preview}
+                          <img
+                            src={design.preview}
                                 alt={`Design ${index + 1}`}
                                 className="w-full h-24 object-contain rounded"
-                              />
-                            </div>
+                          />
+                          </div>
                             <div className="text-xs text-gray-600">
                               <div className="font-medium">Design {index + 1}</div>
                               <div className="text-gray-500 truncate">{design.name}</div>
-                            </div>
+                        </div>
                           </div>
                         ))}
                       </div>
@@ -1983,27 +2038,27 @@ export default function Customize() {
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                               <div className="space-y-2">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Dimensions:</span>
-                                  <span className="font-medium">{design.dimensions.width}" × {design.dimensions.height}"</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Scale:</span>
-                                  <span className="font-medium">{Math.round(design.scale * 100)}%</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Rotation:</span>
-                                  <span className="font-medium">{design.rotation}°</span>
-                                </div>
+                        <div className="flex justify-between">
+                                <span className="text-gray-600">Dimensions:</span>
+                                <span className="font-medium">{design.dimensions.width}" × {design.dimensions.height}"</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Scale:</span>
+                                <span className="font-medium">{Math.round(design.scale * 100)}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Rotation:</span>
+                                <span className="font-medium">{design.rotation}°</span>
+                        </div>
                                 <div className="flex justify-between">
                                   <span className="text-gray-600">Placement:</span>
                                   <span className="font-medium capitalize">{design.position.placement}</span>
-                                </div>
-                              </div>
-                              
+                      </div>
+                    </div>
+
                               <div className="space-y-2">
                                 {design.notes && (
-                                  <div>
+                          <div>
                                     <span className="text-gray-600 block mb-1">Notes:</span>
                                     <p className="text-sm bg-gray-50 p-2 rounded border">{design.notes}</p>
                                   </div>
@@ -2013,18 +2068,18 @@ export default function Customize() {
                                 <div>
                                   <span className="text-gray-600 block mb-1">Embroidery Options:</span>
                                   <div className="space-y-1 text-xs">
-                                    {design.selectedStyles.coverage && (
-                                      <div className="flex justify-between">
+                              {design.selectedStyles.coverage && (
+                                <div className="flex justify-between">
                                         <span>Coverage:</span>
                                         <span>{design.selectedStyles.coverage.name}</span>
-                                      </div>
-                                    )}
-                                    {design.selectedStyles.material && (
-                                      <div className="flex justify-between">
+                                </div>
+                              )}
+                              {design.selectedStyles.material && (
+                                <div className="flex justify-between">
                                         <span>Material:</span>
                                         <span>{design.selectedStyles.material.name}</span>
-                                      </div>
-                                    )}
+                                </div>
+                              )}
                                     {design.selectedStyles.threads.map((thread) => (
                                       <div key={thread.id} className="flex justify-between">
                                         <span>Thread:</span>
@@ -2032,19 +2087,19 @@ export default function Customize() {
                                       </div>
                                     ))}
                                     {design.selectedStyles.backing && (
-                                      <div className="flex justify-between">
+                                <div className="flex justify-between">
                                         <span>Backing:</span>
                                         <span>{design.selectedStyles.backing.name}</span>
-                                      </div>
-                                    )}
+                                </div>
+                              )}
                                   </div>
                                 </div>
                               </div>
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
+                                </div>
+                              )}
 
                     {/* Legacy Single Design Support */}
                     {customizationData.designs.length === 0 && customizationData.design && (
@@ -2052,18 +2107,18 @@ export default function Customize() {
                         <div className="bg-white border border-gray-200 rounded-lg p-4">
                           <h4 className="font-semibold text-gray-900 mb-3">Design Information</h4>
                           <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
+                                <div className="flex justify-between">
                               <span className="text-gray-600">Design Name:</span>
                               <span className="font-medium">{customizationData.design.name}</span>
-                            </div>
-                            <div className="flex justify-between">
+                                </div>
+                                <div className="flex justify-between">
                               <span className="text-gray-600">File Size:</span>
                               <span className="font-medium">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</span>
-                            </div>
-                            <div className="flex justify-between">
+                                </div>
+                                <div className="flex justify-between">
                               <span className="text-gray-600">Embroidery Size:</span>
                               <span className="font-medium">{embroideryWidth}" × {embroideryHeight}"</span>
-                            </div>
+                                </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Placement:</span>
                               <span className="font-medium capitalize">
@@ -2073,44 +2128,44 @@ export default function Customize() {
                             <div className="flex justify-between">
                               <span className="text-gray-600">Scale:</span>
                               <span className="font-medium">{Math.round(customizationData.designScale * 100)}%</span>
-                            </div>
+                          </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Rotation:</span>
                               <span className="font-medium">{customizationData.designRotation}°</span>
-                            </div>
-                          </div>
                         </div>
+                          </div>
+                      </div>
 
-                        <div className="bg-white border border-gray-200 rounded-lg p-4">
-                          <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Product:</span>
-                              <span className="font-medium">{product?.title}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Color:</span>
-                              <span className="font-medium capitalize">{customizationData.color}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Size:</span>
-                              <span className="font-medium uppercase">{customizationData.size}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Quantity:</span>
-                              <span className="font-medium">{customizationData.quantity}</span>
-                            </div>
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Product:</span>
+                          <span className="font-medium">{product?.title}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium capitalize">{customizationData.color}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium uppercase">{customizationData.size}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Quantity:</span>
+                          <span className="font-medium">{customizationData.quantity}</span>
+                        </div>
                             {customizationData.notes && (
                               <div className="mt-3">
                                 <span className="text-gray-600 block mb-1">Notes:</span>
                                 <span className="text-sm bg-gray-50 p-2 rounded block">{customizationData.notes}</span>
-                              </div>
+                        </div>
                             )}
                           </div>
                         </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
                 )}
 
                 {/* Total Cost Summary */}
@@ -2123,7 +2178,7 @@ export default function Customize() {
                     <div className="text-right">
                       <div className="text-2xl font-bold text-green-900">
                         ${calculateTotalPrice().toFixed(2)}
-                      </div>
+                  </div>
                       <div className="text-sm text-green-600">
                         {customizationData.quantity} item{customizationData.quantity !== 1 ? 's' : ''}
                       </div>

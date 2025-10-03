@@ -321,6 +321,10 @@ export default function Navbar() {
     support: false
   })
   const count = items.reduce((s, i) => s + i.quantity, 0)
+  
+  // Debug logging
+  console.log('🛒 Navbar - Cart items:', items)
+  console.log('🛒 Navbar - Cart count:', count)
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({

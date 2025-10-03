@@ -29,11 +29,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const raw = localStorage.getItem(LOCAL_KEY)
       if (raw) {
         const items = JSON.parse(raw)
-        // Ensure all items have reviewStatus
-        const validItems = items.map((item: any) => ({
-          ...item,
-          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
-        }))
+        // Ensure all items have reviewStatus and product data
+        const validItems = items.map((item: any) => {
+          // Find the product data if it's missing
+          let product = item.product
+          if (!product && item.productId) {
+            product = products.find(p => p.id === item.productId)
+          }
+          
+          return {
+            ...item,
+            reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
+            product: product // Ensure product data is included
+          }
+        })
         
         // Log cart loading for debugging
         console.log('🛒 Loading cart from localStorage:', validItems.length, 'items')
@@ -63,14 +72,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success && response.data) {
         // Transform backend cart items to frontend format
-        const transformedItems = response.data.map(item => ({
-          id: item.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          customization: item.customization,
-          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
-          product: item.product, // Include the full product data from database
-        }))
+        const transformedItems = response.data.map(item => {
+          // Find the product data if it's missing from the response
+          let product = item.product
+          if (!product && item.productId) {
+            product = products.find(p => p.id === item.productId)
+          }
+          
+          return {
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            customization: item.customization,
+            reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
+            product: product, // Include the full product data
+          }
+        })
         
         console.log('🛒 Transformed cart items:', transformedItems)
         setItems(transformedItems)
@@ -127,14 +144,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success && response.data) {
         // Update items with database IDs and product data
-        const updatedItems = response.data.map(item => ({
-          id: item.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          customization: item.customization,
-          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
-          product: item.product, // Include the full product data from database
-        }))
+        const updatedItems = response.data.map(item => {
+          // Find the product data if it's missing from the response
+          let product = item.product
+          if (!product && item.productId) {
+            product = products.find(p => p.id === item.productId)
+          }
+          
+          return {
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            customization: item.customization,
+            reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
+            product: product, // Include the full product data
+          }
+        })
         
         setItems(updatedItems)
         try {
@@ -181,6 +206,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         productId: item.productId,
         quantity: item.quantity,
         reviewStatus: item.reviewStatus,
+        product: item.product, // Keep essential product data for display
         customization: item.customization ? {
           // Keep all customization data - it's essential for cart functionality
           ...item.customization,
@@ -198,7 +224,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             selectedStyles: design.selectedStyles,
             // Keep preview and file data but limit size
             preview: design.preview && design.preview.length < 50000 ? design.preview : undefined, // Limit to ~50KB
-            file: design.file && typeof design.file === 'string' && design.file.length < 50000 ? design.file : undefined, // Limit base64 strings
             totalPrice: design.totalPrice,
             materialCosts: design.materialCosts
           })),
@@ -206,18 +231,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           design: item.customization.design ? {
             ...item.customization.design,
             preview: item.customization.design.preview && item.customization.design.preview.length < 50000 ? item.customization.design.preview : undefined,
-            file: item.customization.design.file && typeof item.customization.design.file === 'string' && item.customization.design.file.length < 50000 ? item.customization.design.file : undefined,
           } : undefined,
           // Keep embroidery data with size limits
           embroideryData: item.customization.embroideryData ? {
             ...item.customization.embroideryData,
-            designImage: item.customization.embroideryData.designImage && item.customization.embroideryData.designImage.length < 50000 ? item.customization.embroideryData.designImage : undefined,
           } : undefined
         } : undefined
       }
-      
-      // Remove the product object which can be large (this gets re-added from products array)
-      delete (compressedItem as any).product
       
       return compressedItem
     })
@@ -256,7 +276,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const product = response.data
       
       // Calculate total stock from variants
-      const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
+      const totalStock = product?.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
       
       if (totalStock === 0) {
         return { valid: false, message: 'This product is out of stock' }
@@ -274,6 +294,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const add = async (productId: string, qty = 1, customization?: CartItem['customization']): Promise<boolean> => {
+    console.log('🛒 CartContext.add called:', {
+      productId,
+      qty,
+      hasCustomization: !!customization,
+      isLoggedIn,
+      currentItemsCount: items.length
+    })
+
     // Skip stock validation for customized items (made-to-order)
     if (!customization) {
       const validation = await validateStock(productId, qty)
@@ -283,10 +311,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Find the product to include in cart item
+    const product = products.find(p => p.id === productId)
+    console.log('🛒 Found product for cart:', product ? { id: product.id, title: product.title } : 'No product found')
+
     if (isLoggedIn) {
+      console.log('🛒 User is logged in, adding to database...')
       // Add to database
       try {
         const response = await cartApiService.addToCart(productId, qty, customization)
+        console.log('🛒 Database API response:', response)
+        
         if (response.success && response.data) {
           console.log('🛒 Database response for addToCart:', {
             productId: response.data.productId,
@@ -298,33 +333,60 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Update local state with database response
           setItems((prev) => {
+            console.log('🛒 Updating local state with database response:', {
+              prevItemsCount: prev.length,
+              hasCustomization: !!customization,
+              newItemData: response.data
+            })
+            
+            // For customized items, always add as new item (don't merge with existing)
+            if (customization) {
+              const newItem = {
+                id: response.data!.id,
+                productId: response.data!.productId,
+                quantity: response.data!.quantity,
+                customization: response.data!.customization,
+                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+                product: product // Include the full product data
+              }
+              console.log('🛒 Adding new customized item:', newItem)
+              return [...prev, newItem]
+            }
+            
+            // For regular items, find existing item without customization
             const existingIndex = prev.findIndex((p) => p.productId === productId && !p.customization)
             if (existingIndex >= 0) {
               // Update existing item
               const updated = [...prev]
               updated[existingIndex] = {
+                id: response.data!.id,
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
                 reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+                product: product // Include the full product data
               }
               return updated
             } else {
               // Add new item
               return [...prev, {
+                id: response.data!.id,
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
                 reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+                product: product // Include the full product data
               }]
             }
           })
           setIsCleared(false) // Reset cleared flag when adding items
+          console.log('🛒 Successfully added item to cart, returning true')
           return true
         }
+        console.log('🛒 Database response failed or no data:', response)
         return false
       } catch (error) {
-        console.error('Error adding to cart:', error)
+        console.error('❌ Error adding to cart:', error)
         return false
       }
     } else {
@@ -336,7 +398,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             productId, 
             quantity: qty, 
             customization,
-            reviewStatus: 'pending' as const // Customized items are always pending for guest users
+            reviewStatus: 'pending' as const, // Customized items are always pending for guest users
+            product: product // Include the full product data
           }]
         }
         
@@ -346,7 +409,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...prev, { 
           productId, 
           quantity: qty,
-          reviewStatus: 'approved' as const // Regular items are approved for guest users
+          reviewStatus: 'approved' as const, // Regular items are approved for guest users
+          product: product // Include the full product data
         }]
       })
       setIsCleared(false) // Reset cleared flag when adding items
@@ -363,7 +427,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (item && item.id) {
         try {
           console.log('🗑️ Removing from database:', item.id)
-          await cartApiService.removeFromCart(item.id)
+          await cartApiService.removeFromCart(typeof item.id === 'string' ? parseInt(item.id) : item.id)
           console.log('✅ Successfully removed from database')
         } catch (error) {
           console.error('❌ Error removing from cart:', error)
@@ -404,7 +468,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const item = items.find((p) => p.productId === productId)
         if (item && item.id) {
-          const response = await cartApiService.updateCartItem(item.id, qty, item.customization)
+          const response = await cartApiService.updateCartItem(typeof item.id === 'string' ? parseInt(item.id) : item.id, qty, item.customization)
           if (response.success && response.data) {
             setItems((prev) => prev.map((p) => p.productId === productId ? {
               ...p,

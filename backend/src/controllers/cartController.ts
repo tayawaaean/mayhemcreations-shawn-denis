@@ -152,11 +152,12 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
       }
     }
 
-    // Check if item already exists in cart
+    // Check if item already exists in cart with same customization
     const existingItem = await Cart.findOne({
       where: { 
         userId,
         productId: actualProductId,
+        customization: customization ? JSON.stringify(customization) : null,
       },
     });
 

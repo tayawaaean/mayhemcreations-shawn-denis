@@ -48,9 +48,11 @@ export type ProductReview = {
 }
 
 export type CartItem = {
+  id?: string | number
   productId: string
   quantity: number
   reviewStatus: 'pending' | 'approved' | 'rejected' | 'needs-changes'
+  product?: Product // Include full product data for display
   customization?: {
     design: {
       name: string

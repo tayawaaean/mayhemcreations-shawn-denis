@@ -1198,6 +1198,32 @@ const PendingReview: React.FC = () => {
                                     {/* Product/Design Image */}
                                     <div className="flex-shrink-0">
                                       {(() => {
+                                        // For multiple designs - show first design preview
+                                        if (item.customization?.designs && item.customization.designs.length > 0) {
+                                          const firstDesign = item.customization.designs[0];
+                                          return (
+                                            <div className="relative">
+                                              <img
+                                                src={firstDesign.preview}
+                                                alt={`Design: ${firstDesign.name || 'Design 1'}`}
+                                                className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                                onClick={() => handleImageClick(
+                                                  firstDesign.preview,
+                                                  `Design: ${firstDesign.name || 'Design 1'}`,
+                                                  'design'
+                                                )}
+                                                onError={(e) => {
+                                                  e.currentTarget.style.display = 'none';
+                                                }}
+                                              />
+                                              {item.customization.designs.length > 1 && (
+                                                <div className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                                  +{item.customization.designs.length - 1}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        }
                                         // For custom embroidery items - show uploaded design
                                         if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
                                           return (
@@ -1284,10 +1310,26 @@ const PendingReview: React.FC = () => {
                                           <p className="text-sm text-blue-600">
                                             {item.productId === 'custom-embroidery' ? 'Custom Design' : 'Customized'}
                                           </p>
-                                          {item.productId === 'custom-embroidery' && item.customization.embroideryData && (
+                                          
+                                          {/* Multiple Designs Support */}
+                                          {item.customization.designs && item.customization.designs.length > 0 ? (
+                                            <div className="text-xs text-gray-500 mt-1">
+                                              <p><strong>Designs:</strong> {item.customization.designs.length} uploaded</p>
+                                              {item.customization.designs.map((design: any, index: number) => (
+                                                <p key={design.id || index} className="ml-2">
+                                                  • {design.name || `Design ${index + 1}`} ({design.dimensions?.width}" × {design.dimensions?.height}")
+                                                </p>
+                                              ))}
+                                            </div>
+                                          ) : item.productId === 'custom-embroidery' && item.customization.embroideryData ? (
                                             <div className="text-xs text-gray-500 mt-1">
                                               <p>Size: {item.customization.embroideryData.dimensions?.width}" × {item.customization.embroideryData.dimensions?.height}"</p>
                                               <p>Material: {item.customization.embroideryData.materialCosts?.selectedMaterial?.name}</p>
+                                            </div>
+                                          ) : item.customization.design && (
+                                            <div className="text-xs text-gray-500 mt-1">
+                                              <p>Design: {item.customization.design.name}</p>
+                                              <p>Placement: {item.customization.placement} • Size: {item.customization.size} • Color: {item.customization.color}</p>
                                             </div>
                                           )}
                                         </div>
@@ -1469,6 +1511,32 @@ const PendingReview: React.FC = () => {
                                 {/* Item Image */}
                                 <div className="flex-shrink-0">
                                   {(() => {
+                                    // For multiple designs - show first design preview
+                                    if (item.customization?.designs && item.customization.designs.length > 0) {
+                                      const firstDesign = item.customization.designs[0];
+                                      return (
+                                        <div className="relative">
+                                          <img
+                                            src={firstDesign.preview}
+                                            alt={`Design: ${firstDesign.name || 'Design 1'}`}
+                                            className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                            onClick={() => handleImageClick(
+                                              firstDesign.preview,
+                                              `Design: ${firstDesign.name || 'Design 1'}`,
+                                              'design'
+                                            )}
+                                            onError={(e) => {
+                                              e.currentTarget.style.display = 'none';
+                                            }}
+                                          />
+                                          {item.customization.designs.length > 1 && (
+                                            <div className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                              +{item.customization.designs.length - 1}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    }
                                     // For custom embroidery items - show uploaded design
                                     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designImage) {
                                       return (
@@ -1553,18 +1621,22 @@ const PendingReview: React.FC = () => {
                                 {/* Item Details and Picture Reply */}
                                 <div className="flex-1">
                                   <h5 className="font-medium text-gray-900 mb-1">
-                                    {(() => {
-                                      // For custom embroidery items - show design name
-                                      if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designName) {
-                                        return `Custom Embroidery: ${item.customization.embroideryData.designName}`;
-                                      }
-                                      // For custom embroidery items with design name in customization
-                                      if (item.productId === 'custom-embroidery' && item.customization?.design?.name) {
-                                        return `Custom Embroidery: ${item.customization.design.name}`;
-                                      }
-                                      // For regular products
-                                      return item.product?.title || 'Custom Product';
-                                    })()}
+                                  {(() => {
+                                    // For multiple designs - show design count
+                                    if (item.customization?.designs && item.customization.designs.length > 0) {
+                                      return `${item.product?.title || 'Custom Product'} (${item.customization.designs.length} designs)`;
+                                    }
+                                    // For custom embroidery items - show design name
+                                    if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designName) {
+                                      return `Custom Embroidery: ${item.customization.embroideryData.designName}`;
+                                    }
+                                    // For custom embroidery items with design name in customization
+                                    if (item.productId === 'custom-embroidery' && item.customization?.design?.name) {
+                                      return `Custom Embroidery: ${item.customization.design.name}`;
+                                    }
+                                    // For regular products
+                                    return item.product?.title || 'Custom Product';
+                                  })()}
                                   </h5>
                                   <p className="text-sm text-gray-500 mb-3">Qty: {item.quantity || 1}</p>
                                   

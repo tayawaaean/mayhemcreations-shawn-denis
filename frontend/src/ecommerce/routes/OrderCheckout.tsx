@@ -145,7 +145,12 @@ export default function OrderCheckout() {
 
   // Helper function to calculate item price including customization costs
   const calculateItemPrice = (item: OrderItem) => {
-    const product = products.find(p => p.id === item.productId)
+    // Handle both numeric and string product IDs
+    const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+    const product = products.find(p => {
+      // Check both string and numeric ID matches
+      return p.id === item.productId || p.id === numericId;
+    });
     if (!product) return item.price // Use stored price if product not found
     
     let itemPrice = product.price
@@ -229,7 +234,12 @@ export default function OrderCheckout() {
             country: formData.country
           },
           items: order.items.map((item) => {
-            const product = products.find(p => p.id === item.productId)
+            // Handle both numeric and string product IDs
+            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+            const product = products.find(p => {
+              // Check both string and numeric ID matches
+              return p.id === item.productId || p.id === numericId;
+            });
             const itemPrice = calculateItemPrice(item)
             
             return {
@@ -270,7 +280,12 @@ export default function OrderCheckout() {
     try {
       // Build Stripe Checkout line items
       const lineItems = order.items.map((item) => {
-        const product = products.find(p => p.id === item.productId)
+        // Handle both numeric and string product IDs
+        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+        const product = products.find(p => {
+          // Check both string and numeric ID matches
+          return p.id === item.productId || p.id === numericId;
+        });
         const itemPrice = calculateItemPrice(item)
         return {
           price_data: {
@@ -702,7 +717,12 @@ export default function OrderCheckout() {
                           customerEmail: formData.email,
                           customerName: `${formData.firstName} ${formData.lastName}`,
                           items: order.items.map((item) => {
-                            const product = products.find(p => p.id === item.productId)
+                            // Handle both numeric and string product IDs
+                            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                            const product = products.find(p => {
+                              // Check both string and numeric ID matches
+                              return p.id === item.productId || p.id === numericId;
+                            });
                             const itemPrice = calculateItemPrice(item)
                             
                             return {
@@ -773,7 +793,12 @@ export default function OrderCheckout() {
                       {console.log('🔍 Order items for summary:', order?.items)}
                       {order?.items?.length > 0 ? (
                         order.items.map((item, index) => {
-                          const product = products.find(p => p.id === item.productId)
+                          // Handle both numeric and string product IDs
+                          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                          const product = products.find(p => {
+                            // Check both string and numeric ID matches
+                            return p.id === item.productId || p.id === numericId;
+                          });
                           console.log('🔍 Item details:', { item, product })
                           if (!product) {
                             console.log('❌ Product not found for item:', item.productId)

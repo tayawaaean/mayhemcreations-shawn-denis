@@ -145,8 +145,8 @@ Cart.init(
       },
       {
         unique: true,
-        fields: ['user_id', 'product_id'],
-        name: 'unique_user_product',
+        fields: ['user_id', 'product_id', 'customization'],
+        name: 'unique_user_product_customization',
       },
     ],
   }
