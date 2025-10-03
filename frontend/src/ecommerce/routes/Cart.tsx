@@ -170,17 +170,31 @@ export default function Cart() {
 
       // Create order data for admin review
       const orderData = {
-        items: pendingItems.map(item => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          customization: item.customization,
-          reviewStatus: 'pending' as const,
-          product: products.find(p => {
-            // Handle both numeric and string product IDs
-            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-            return p.id === item.productId || p.id === numericId;
-          })
-        })),
+        items: pendingItems.map(item => {
+          // Debug: Log the customization data being submitted
+          console.log('🔍 Cart submission - Item customization data:', {
+            productId: item.productId,
+            hasCustomization: !!item.customization,
+            hasDesigns: !!item.customization?.designs?.length,
+            designsCount: item.customization?.designs?.length || 0,
+            firstDesignKeys: item.customization?.designs?.[0] ? Object.keys(item.customization.designs[0]) : [],
+            firstDesignPreview: item.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none',
+            hasMockup: !!item.customization?.mockup,
+            mockupLength: item.customization?.mockup?.length || 0
+          });
+          
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            customization: item.customization,
+            reviewStatus: 'pending' as const,
+            product: products.find(p => {
+              // Handle both numeric and string product IDs
+              const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+              return p.id === item.productId || p.id === numericId;
+            })
+          };
+        }),
         subtotal: subtotal,
         shipping: shipping, // Will be calculated at checkout
         total: total,

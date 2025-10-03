@@ -39,6 +39,7 @@ const PendingReview: React.FC = () => {
   const itemsPerPage = 10
   const [pictureReplies, setPictureReplies] = useState<{[itemId: string]: {image: string, notes: string}}>({})
   const [uploadingPictures, setUploadingPictures] = useState(false)
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useAdminWebSocket()
@@ -632,6 +633,101 @@ const PendingReview: React.FC = () => {
     setIsImageModalOpen(true)
   }
 
+  // Function to handle image loading errors
+  const handleImageError = (src: string, event: React.SyntheticEvent<HTMLImageElement>) => {
+    setImageErrors(prev => new Set([...prev, src]))
+    event.currentTarget.style.display = 'none'
+  }
+
+  // Function to check if image has errored
+  const hasImageError = (src: string) => {
+    return imageErrors.has(src)
+  }
+
+  // Function to render image with fallback
+  const renderImageWithFallback = (
+    src: string, 
+    alt: string, 
+    className: string, 
+    onClick?: () => void,
+    size: 'small' | 'medium' | 'large' = 'medium'
+  ) => {
+    if (hasImageError(src)) {
+      return (
+        <div className={`${className} bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center`}>
+          <div className="text-center">
+            <ImageIcon className={`${size === 'small' ? 'w-4 h-4' : size === 'large' ? 'w-8 h-8' : 'w-6 h-6'} text-gray-400 mx-auto`} />
+            <span className={`${size === 'small' ? 'text-xs' : 'text-sm'} text-gray-500 block mt-1`}>
+              {size === 'small' ? 'No Image' : 'Image Failed'}
+            </span>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        onClick={onClick}
+        onError={(e) => handleImageError(src, e)}
+        loading="lazy"
+      />
+    )
+  }
+
+  // Safely parse order_data into an array of items
+  const parseOrderItems = (orderData: OrderReview['order_data']): any[] => {
+    try {
+      const parsed = typeof orderData === 'string' ? JSON.parse(orderData) : orderData
+      // Some payloads store as { items: [...] }
+      if (parsed && !Array.isArray(parsed) && (parsed as any).items) {
+        return (parsed as any).items
+      }
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  // Derive a human-friendly order name from the first item
+  const getOrderName = (review: OrderReview): string => {
+    const items = parseOrderItems(review.order_data)
+    if (items.length === 0) return 'Order'
+    const first = items[0]
+    // Prefer product.title or name if present
+    const productTitle = first?.product?.title || first?.product?.name || first?.productName
+    if (first?.productId === 'custom-embroidery') {
+      const designName = first?.customization?.embroideryData?.designName || first?.customization?.design?.name
+      if (designName) return `Custom Embroidery: ${designName}`
+      return 'Custom Embroidery'
+    }
+    if (productTitle) return productTitle
+    return `Product ${first?.productId ?? ''}`.trim()
+  }
+
+  // Choose the most relevant thumbnail: user design preview, mockup, or product image
+  const getOrderThumbnailSrc = (review: OrderReview): string | null => {
+    const items = parseOrderItems(review.order_data)
+    if (items.length === 0) return null
+    const first = items[0]
+    // Multiple designs (array)
+    if (first?.customization?.designs?.length > 0) {
+      const d = first.customization.designs[0]
+      return d?.preview || d?.base64 || d?.file || null
+    }
+    // Single design
+    if (first?.productId === 'custom-embroidery' && first?.customization?.design) {
+      return first.customization.design.preview || first.customization.design.base64 || first.customization.design.file || null
+    }
+    // Final mockup
+    if (first?.customization?.mockup) return first.customization.mockup
+    // Fallback to product image
+    if (first?.product?.image) return first.product.image
+    return null
+  }
+
   // Helper function to calculate item price including customization costs
   const calculateItemPrice = (item: any) => {
     // For custom embroidery items, use the total price from embroideryData
@@ -820,7 +916,7 @@ const PendingReview: React.FC = () => {
                   Order ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
+                  Order
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Items
@@ -858,14 +954,33 @@ const PendingReview: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-gray-600" />
-                      </div>
+                      {(() => {
+                        const src = getOrderThumbnailSrc(review)
+                        if (src) {
+                          return (
+                            <img
+                              src={src}
+                              alt={getOrderName(review)}
+                              className="h-10 w-10 rounded object-cover border"
+                              onError={(e) => {
+                                ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          )
+                        }
+                        return (
+                          <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-gray-500" />
+                          </div>
+                        )
+                      })()}
                       <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900">
-                          {review.first_name} {review.last_name}
+                          {getOrderName(review)}
                         </div>
-                        <div className="text-sm text-gray-500">{review.user_email}</div>
+                        <div className="text-xs text-gray-500">
+                          {review.first_name} {review.last_name} • {review.user_email}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -1188,7 +1303,13 @@ const PendingReview: React.FC = () => {
                         ? JSON.parse(selectedReview.order_data) 
                         : selectedReview.order_data;
                       
+                      // Debug: Log the actual order data structure
+                      console.log('🔍 OrderReview Modal - Raw order data:', orderData);
                       if (Array.isArray(orderData)) {
+                        console.log('🔍 OrderReview Modal - First item customization:', orderData[0]?.customization);
+                        console.log('🔍 OrderReview Modal - First item designs:', orderData[0]?.customization?.designs);
+                        console.log('🔍 OrderReview Modal - First item design:', orderData[0]?.customization?.design);
+                        console.log('🔍 OrderReview Modal - First item mockup:', orderData[0]?.customization?.mockup);
                         return (
                           <div className="space-y-2">
                             {orderData.map((item: any, index: number) => (
@@ -1198,24 +1319,37 @@ const PendingReview: React.FC = () => {
                                     {/* Product/Design Image */}
                                     <div className="flex-shrink-0">
                                       {(() => {
-                                        // For multiple designs - show first design preview
+                                        // Debug: Log item data for image rendering
+                                        console.log('🔍 OrderReview Modal - Item data for image rendering:', {
+                                          productId: item.productId,
+                                          hasCustomization: !!item.customization,
+                                          hasDesigns: !!item.customization?.designs?.length,
+                                          designsCount: item.customization?.designs?.length || 0,
+                                          hasDesign: !!item.customization?.design,
+                                          hasMockup: !!item.customization?.mockup,
+                                          firstDesign: item.customization?.designs?.[0],
+                                          singleDesign: item.customization?.design,
+                                          mockup: item.customization?.mockup?.substring(0, 50) + '...'
+                                        });
+
+                                        // For multiple designs - show first design preview/base64/file
                                         if (item.customization?.designs && item.customization.designs.length > 0) {
                                           const firstDesign = item.customization.designs[0];
+                                          const imageSrc = firstDesign.preview || firstDesign.base64 || firstDesign.file;
+                                          console.log('🔍 OrderReview Modal - Multiple designs image src:', imageSrc?.substring(0, 50) + '...');
                                           return (
                                             <div className="relative">
-                                              <img
-                                                src={firstDesign.preview}
-                                                alt={`Design: ${firstDesign.name || 'Design 1'}`}
-                                                className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                                onClick={() => handleImageClick(
-                                                  firstDesign.preview,
+                                              {renderImageWithFallback(
+                                                imageSrc,
+                                                `Design: ${firstDesign.name || 'Design 1'}`,
+                                                "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                                () => handleImageClick(
+                                                  imageSrc,
                                                   `Design: ${firstDesign.name || 'Design 1'}`,
                                                   'design'
-                                                )}
-                                                onError={(e) => {
-                                                  e.currentTarget.style.display = 'none';
-                                                }}
-                                              />
+                                                ),
+                                                'large'
+                                              )}
                                               {item.customization.designs.length > 1 && (
                                                 <div className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                                                   +{item.customization.designs.length - 1}
@@ -1224,64 +1358,69 @@ const PendingReview: React.FC = () => {
                                             </div>
                                           );
                                         }
-                                        // For custom embroidery items - show uploaded design
-                                        if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
-                                          return (
-                                            <img
-                                              src={item.customization.design.preview}
-                                              alt="Uploaded Design"
-                                              className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                              onClick={() => handleImageClick(
-                                                item.customization.design.preview,
-                                                'Uploaded Design',
-                                                'design'
-                                              )}
-                                              onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                              }}
-                                            />
-                                          );
+                                        // For custom embroidery items - show final product mockup/preview
+                                        if (item.productId === 'custom-embroidery') {
+                                          // Try multiple sources for the final product image
+                                          const finalImageSrc = 
+                                            item.customization?.mockup || 
+                                            item.customization?.design?.preview || 
+                                            item.customization?.design?.base64 || 
+                                            item.customization?.design?.file;
+                                          
+                                          console.log('🔍 OrderReview Modal - Custom embroidery image sources:', {
+                                            mockup: item.customization?.mockup?.substring(0, 50) + '...',
+                                            designPreview: item.customization?.design?.preview?.substring(0, 50) + '...',
+                                            designBase64: item.customization?.design?.base64?.substring(0, 50) + '...',
+                                            designFile: item.customization?.design?.file?.substring(0, 50) + '...',
+                                            finalImageSrc: finalImageSrc?.substring(0, 50) + '...'
+                                          });
+                                          
+                                          if (finalImageSrc) {
+                                            return renderImageWithFallback(
+                                              finalImageSrc,
+                                              "Final Product",
+                                              "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                              () => handleImageClick(
+                                                finalImageSrc,
+                                                'Final Product',
+                                                'mockup'
+                                              ),
+                                              'large'
+                                            );
+                                          }
                                         }
                                         // For regular products with customization - show final product mockup
                                         if (item.customization?.mockup) {
-                                          return (
-                                            <img
-                                              src={item.customization.mockup}
-                                              alt="Final Product"
-                                              className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                              onClick={() => handleImageClick(
-                                                item.customization.mockup,
-                                                'Final Product',
-                                                'mockup'
-                                              )}
-                                              onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                              }}
-                                            />
+                                          return renderImageWithFallback(
+                                            item.customization.mockup,
+                                            "Final Product",
+                                            "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                            () => handleImageClick(
+                                              item.customization.mockup,
+                                              'Final Product',
+                                              'mockup'
+                                            ),
+                                            'large'
                                           );
                                         }
                                         // For regular products without customization - show product image
                                         if (item.product?.image) {
-                                          return (
-                                            <img
-                                              src={item.product.image}
-                                              alt={item.product.title}
-                                              className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                              onClick={() => handleImageClick(
-                                                item.product.image,
-                                                item.product.title,
-                                                'product'
-                                              )}
-                                              onError={(e) => {
-                                                e.currentTarget.style.display = 'none';
-                                              }}
-                                            />
+                                          return renderImageWithFallback(
+                                            item.product.image,
+                                            item.product.title,
+                                            "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                            () => handleImageClick(
+                                              item.product.image,
+                                              item.product.title,
+                                              'product'
+                                            ),
+                                            'large'
                                           );
                                         }
                                         // Default placeholder
                                         return (
                                           <div className="w-16 h-16 bg-gray-200 rounded border flex items-center justify-center">
-                                            <span className="text-xs text-gray-500">No Image</span>
+                                            <ImageIcon className="w-6 h-6 text-gray-400" />
                                           </div>
                                         );
                                       })()}
@@ -1313,13 +1452,45 @@ const PendingReview: React.FC = () => {
                                           
                                           {/* Multiple Designs Support */}
                                           {item.customization.designs && item.customization.designs.length > 0 ? (
-                                            <div className="text-xs text-gray-500 mt-1">
-                                              <p><strong>Designs:</strong> {item.customization.designs.length} uploaded</p>
-                                              {item.customization.designs.map((design: any, index: number) => (
-                                                <p key={design.id || index} className="ml-2">
-                                                  • {design.name || `Design ${index + 1}`} ({design.dimensions?.width}" × {design.dimensions?.height}")
-                                                </p>
-                                              ))}
+                                            <div className="mt-2">
+                                              <p className="text-xs text-gray-500"><strong>Designs:</strong> {item.customization.designs.length} uploaded</p>
+                                              <div className="flex flex-wrap gap-2 mt-1">
+                                                {item.customization.designs.map((design: any, index: number) => (
+                                                  <div key={design.id || index} className="relative">
+                                                    {renderImageWithFallback(
+                                                      design.preview || design.base64 || design.file,
+                                                      `Design: ${design.name || `Design ${index + 1}`}`,
+                                                      "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                                      () => handleImageClick(
+                                                        design.preview || design.base64 || design.file,
+                                                        `Design: ${design.name || `Design ${index + 1}`}`,
+                                                        'design'
+                                                      ),
+                                                      'small'
+                                                    )}
+                                                    <div className="absolute -bottom-1 -right-1 bg-white text-xs px-1 rounded text-gray-600 border">
+                                                      {design.dimensions?.width}" × {design.dimensions?.height}"
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : item.productId === 'custom-embroidery' && item.customization.design ? (
+                                            <div className="mt-2">
+                                              <p className="text-xs text-gray-500"><strong>Design:</strong> {item.customization.design.name}</p>
+                                              <div className="flex flex-wrap gap-2 mt-1">
+                                                {renderImageWithFallback(
+                                                  item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
+                                                  `Design: ${item.customization.design.name}`,
+                                                  "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
+                                                  () => handleImageClick(
+                                                    item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
+                                                    `Design: ${item.customization.design.name}`,
+                                                    'design'
+                                                  ),
+                                                  'small'
+                                                )}
+                                              </div>
                                             </div>
                                           ) : item.productId === 'custom-embroidery' && item.customization.embroideryData ? (
                                             <div className="text-xs text-gray-500 mt-1">

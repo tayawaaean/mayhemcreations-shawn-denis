@@ -132,15 +132,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       setIsLoading(true)
-      // Get current items from localStorage instead of state to avoid dependency loop
-      const currentItems = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]')
+      // Use the current items from state instead of compressed localStorage data
+      // This ensures we sync the full customization data including preview images
+      const currentItems = items
       
-      // Only sync if there are items in localStorage
+      // Only sync if there are items
       if (currentItems.length === 0) {
         return
       }
       
-      const response = await cartApiService.syncCart(currentItems)
+      console.log('🛒 Syncing cart to database with', currentItems.length, 'items')
+      console.log('🛒 First item customization data:', {
+        hasCustomization: !!currentItems[0]?.customization,
+        hasDesigns: !!currentItems[0]?.customization?.designs?.length,
+        firstDesignPreview: currentItems[0]?.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none'
+      });
+      
+      const response = await cartApiService.syncCart(currentItems as any)
       
       if (response.success && response.data) {
         // Update items with database IDs and product data
@@ -174,7 +182,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn]) // Removed items dependency to prevent infinite loop
+  }, [isLoggedIn, items]) // Include items dependency to sync full data
 
   // Load cart from database when user logs in
   useEffect(() => {
