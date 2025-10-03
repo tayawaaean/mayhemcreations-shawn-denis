@@ -99,7 +99,8 @@ class OrderReviewApiService {
    * Customer confirm picture replies
    */
   async confirmPictureReplies(orderId: number, confirmations: CustomerConfirmation[]) {
-    return apiAuthService.post<{ id: number; confirmations: CustomerConfirmation[]; confirmedAt: string }>(`/orders/review-orders/${orderId}/confirm-pictures`, { confirmations }, true);
+    // Backend also returns status (e.g., 'pending-payment') after confirmation
+    return apiAuthService.post<{ id: number; confirmations: CustomerConfirmation[]; status?: string; confirmedAt: string }>(`/orders/review-orders/${orderId}/confirm-pictures`, { confirmations }, true);
   }
 }
 

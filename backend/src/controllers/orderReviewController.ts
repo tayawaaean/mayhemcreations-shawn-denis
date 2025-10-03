@@ -30,7 +30,7 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
         shipping DECIMAL(10,2) NOT NULL,
         tax DECIMAL(10,2) NOT NULL,
         total DECIMAL(10,2) NOT NULL,
-        status ENUM('pending', 'approved', 'rejected', 'needs-changes') NOT NULL DEFAULT 'pending',
+        status ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing') NOT NULL DEFAULT 'pending',
         submitted_at DATETIME NOT NULL,
         reviewed_at DATETIME NULL,
         admin_notes TEXT NULL,
@@ -98,7 +98,14 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       items: items?.map((item: any) => ({
         id: item.id,
         productId: item.productId,
-        hasCustomization: !!item.customization
+        hasCustomization: !!item.customization,
+        customizationKeys: item.customization ? Object.keys(item.customization) : [],
+        hasDesigns: !!item.customization?.designs?.length,
+        designsCount: item.customization?.designs?.length || 0,
+        hasMockup: !!item.customization?.mockup,
+        mockupLength: item.customization?.mockup?.length || 0,
+        firstDesignPreview: item.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none',
+        firstDesignFile: item.customization?.designs?.[0]?.file?.substring(0, 50) + '...' || 'none'
       })),
       subtotal,
       shipping,
@@ -281,6 +288,25 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
       replacements: [userId]
     });
 
+    // Debug: Log order data structure
+    console.log('🔍 Retrieved orders for user:', {
+      userId,
+      ordersCount: (orders as any[]).length,
+      firstOrderData: (orders as any[])[0] ? {
+        id: (orders as any[])[0].id,
+        orderDataKeys: (orders as any[])[0].order_data ? Object.keys((orders as any[])[0].order_data) : [],
+        orderDataLength: (orders as any[])[0].order_data ? JSON.stringify((orders as any[])[0].order_data).length : 0,
+        firstItemCustomization: (orders as any[])[0].order_data?.[0]?.customization ? {
+          hasDesigns: !!((orders as any[])[0].order_data[0].customization.designs?.length),
+          designsCount: ((orders as any[])[0].order_data[0].customization.designs?.length) || 0,
+          hasMockup: !!((orders as any[])[0].order_data[0].customization.mockup),
+          mockupLength: ((orders as any[])[0].order_data[0].customization.mockup?.length) || 0,
+          firstDesignPreview: ((orders as any[])[0].order_data[0].customization.designs?.[0]?.preview?.substring(0, 50)) + '...' || 'none',
+          firstDesignFile: ((orders as any[])[0].order_data[0].customization.designs?.[0]?.file?.substring(0, 50)) + '...' || 'none'
+        } : null
+      } : null
+    });
+
     res.status(200).json({
       success: true,
       data: orders,
@@ -375,6 +401,9 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // If admin approves, automatically set status to pending-payment
+    const finalStatus = status === 'approved' ? 'pending-payment' : status;
+    
     const [result] = await sequelize.query(`
       UPDATE order_reviews 
       SET status = ?, 
@@ -383,7 +412,7 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
           updated_at = NOW()
       WHERE id = ?
     `, {
-      replacements: [status, adminNotes || null, id]
+      replacements: [finalStatus, adminNotes || null, id]
     });
 
     if ((result as any).affectedRows === 0) {
@@ -420,11 +449,14 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       success: true,
       data: {
         id: parseInt(id),
-        status,
+        status: finalStatus,
+        originalStatus: status,
         adminNotes,
         reviewedAt: new Date().toISOString()
       },
-      message: 'Order review status updated successfully',
+      message: status === 'approved' 
+        ? 'Order approved! Status automatically updated to pending payment.' 
+        : 'Order review status updated successfully',
       timestamp: new Date().toISOString(),
     });
 
@@ -433,7 +465,8 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     if (webSocketService && userId) {
       webSocketService.emitOrderStatusChange(parseInt(id), {
         userId,
-        status,
+        status: finalStatus,
+        originalStatus: status,
         adminNotes,
         reviewedAt: new Date().toISOString()
       });
@@ -587,14 +620,62 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
       });
     }
 
+    // Automatically move order to pending-payment upon confirmation
+    await sequelize.query(`
+      UPDATE order_reviews 
+      SET status = 'pending-payment',
+          reviewed_at = COALESCE(reviewed_at, NOW()),
+          updated_at = NOW()
+      WHERE id = ?
+    `, { replacements: [id] });
+
+    // Mark related cart items as approved
+    try {
+      await sequelize.query(`
+        UPDATE carts 
+        SET review_status = 'approved',
+            updated_at = NOW()
+        WHERE order_review_id = ?
+      `, { replacements: [id] });
+    } catch (e: any) {
+      // Fallback if order_review_id column doesn't exist
+      if (typeof e?.message === 'string' && e.message.includes("Unknown column 'order_review_id'")) {
+        // Retrieve order_data to get cart item IDs
+        const [orderDataResult] = await sequelize.query(`
+          SELECT order_data FROM order_reviews WHERE id = ?
+        `, { replacements: [id] });
+        const orderDataRow: any = Array.isArray(orderDataResult) ? orderDataResult[0] : orderDataResult;
+        let itemIds: number[] = [];
+        try {
+          const orderItems = Array.isArray(orderDataRow?.order_data)
+            ? orderDataRow.order_data
+            : JSON.parse(orderDataRow?.order_data || '[]');
+          itemIds = orderItems.map((it: any) => it.id).filter((v: any) => typeof v === 'number');
+        } catch {}
+
+        if (itemIds.length > 0) {
+          const placeholders = itemIds.map(() => '?').join(',');
+          await sequelize.query(`
+            UPDATE carts 
+            SET review_status = 'approved',
+                updated_at = NOW()
+            WHERE id IN (${placeholders})
+          `, { replacements: itemIds });
+        }
+      } else {
+        throw e;
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
         id: parseInt(id),
         confirmations,
+        status: 'pending-payment',
         confirmedAt: new Date().toISOString()
       },
-      message: 'Picture confirmations submitted successfully',
+      message: 'Picture confirmations submitted successfully. Status updated to pending payment.',
       timestamp: new Date().toISOString(),
     });
 
@@ -605,6 +686,12 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
         userId: req.user.id,
         confirmations,
         confirmedAt: new Date().toISOString()
+      });
+      webSocketService.emitOrderStatusChange(parseInt(id), {
+        userId: req.user.id,
+        status: 'pending-payment',
+        originalStatus: 'picture-reply-approved',
+        reviewedAt: new Date().toISOString()
       });
     }
 

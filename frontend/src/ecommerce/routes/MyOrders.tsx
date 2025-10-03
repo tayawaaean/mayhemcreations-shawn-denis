@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User } from 'lucide-react'
+import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User, Calendar } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
@@ -19,12 +19,22 @@ interface OrderItem {
       name: string
       preview: string
     }
+    designs?: Array<{
+      id: string
+      name: string
+      preview: string
+      file: string
+    }>
     mockup?: string
     selectedStyles?: any
     placement?: string
     size?: string
     color?: string
     notes?: string
+    embroideryData?: {
+      designImage: string
+      designName?: string
+    }
   }
 }
 
@@ -118,10 +128,15 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
         embroideryData: item.customization?.embroideryData
       });
       
-      // For custom embroidery items, use the embroidery total price
-      if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.totalPrice) {
-        itemPrice = Number(item.customization.embroideryData.totalPrice) || 0;
+      // For custom embroidery items, use the total price from customization
+      if (item.productId === 'custom-embroidery' && item.customization?.totalPrice) {
+        itemPrice = Number(item.customization.totalPrice) || 0;
         console.log('💰 Custom embroidery price:', itemPrice);
+      }
+      // For custom embroidery items with legacy embroideryData structure
+      else if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.totalPrice) {
+        itemPrice = Number(item.customization.embroideryData.totalPrice) || 0;
+        console.log('💰 Custom embroidery price (legacy):', itemPrice);
       }
       // For regular products with customization, calculate total price including customization costs
       else if (item.customization?.selectedStyles) {
@@ -159,11 +174,21 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
         id: String(item.id || item.productId || ''),
         productId: item.productId,
         productName: (() => {
-          // For custom embroidery items - show design name
+          // For custom embroidery items with multiple designs
+          if (item.productId === 'custom-embroidery' && item.customization?.designs?.length > 0) {
+            const designCount = item.customization.designs.length;
+            const firstDesignName = item.customization.designs[0].name;
+            if (designCount === 1) {
+              return `Custom Embroidery: ${firstDesignName}`;
+            } else {
+              return `Custom Embroidery: ${firstDesignName} + ${designCount - 1} more design${designCount > 2 ? 's' : ''}`;
+            }
+          }
+          // For custom embroidery items - show design name (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designName) {
             return `Custom Embroidery: ${item.customization.embroideryData.designName}`;
           }
-          // For custom embroidery items with design name in customization
+          // For custom embroidery items with design name in customization (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.design?.name) {
             return `Custom Embroidery: ${item.customization.design.name}`;
           }
@@ -171,23 +196,63 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
           return item.product?.title || item.productName || 'Custom Product';
         })(),
         productImage: (() => {
-          // For custom embroidery items - show uploaded design
+          // Debug logging for mockup data
+          console.log('🖼️ Order item productImage debug:', {
+            productId: item.productId,
+            hasCustomization: !!item.customization,
+            hasMockup: !!item.customization?.mockup,
+            mockupLength: item.customization?.mockup?.length,
+            hasDesigns: !!item.customization?.designs?.length,
+            hasEmbroideryData: !!item.customization?.embroideryData,
+            hasLegacyDesign: !!item.customization?.design,
+            designsData: item.customization?.designs ? {
+              count: item.customization.designs.length,
+              firstDesign: item.customization.designs[0] ? {
+                id: item.customization.designs[0].id,
+                name: item.customization.designs[0].name,
+                hasPreview: !!item.customization.designs[0].preview,
+                previewLength: item.customization.designs[0].preview?.length,
+                previewStart: item.customization.designs[0].preview?.substring(0, 50),
+                hasFile: !!item.customization.designs[0].file,
+                fileLength: item.customization.designs[0].file?.length,
+                fileStart: item.customization.designs[0].file?.substring(0, 50)
+              } : null
+            } : null
+          });
+
+          // For custom embroidery items with multiple designs - show mockup or first design
+          if (item.productId === 'custom-embroidery' && item.customization?.designs?.length > 0) {
+            // Show mockup if available (final product preview)
+            if (item.customization.mockup) {
+              console.log('🖼️ Using mockup for custom embroidery with designs');
+              return item.customization.mockup;
+            }
+            // Otherwise show first design
+            console.log('🖼️ Using first design for custom embroidery (no mockup)');
+            return item.customization.designs[0].preview || item.customization.designs[0].file;
+          }
+          // For custom embroidery items - show uploaded design (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designImage) {
+            console.log('🖼️ Using embroidery data design image (legacy)');
             return item.customization.embroideryData.designImage;
           }
-          // For custom embroidery items with design preview
+          // For custom embroidery items with design preview (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
+            console.log('🖼️ Using legacy design preview');
             return item.customization.design.preview;
           }
           // For regular products with customization - show final product mockup
           if (item.customization?.mockup) {
+            console.log('🖼️ Using mockup for regular product with customization');
             return item.customization.mockup;
           }
           // For regular products without customization - show product image
           if (item.product?.image) {
+            console.log('🖼️ Using base product image');
             return item.product.image;
           }
           // Default placeholder
+          console.log('🖼️ Using default placeholder image');
           return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI0MCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
         })(),
         quantity: item.quantity || 1,
@@ -610,6 +675,15 @@ export default function MyOrders() {
         const allApproved = confirmationData.every(conf => conf.confirmed === true)
         const anyRejected = confirmationData.some(conf => conf.confirmed === false)
         
+        // Immediately update the order status in UI based on backend response
+        if (response.data?.status === 'pending-payment' && !anyRejected) {
+          setOrders(prev => prev.map(order => 
+            order.id === selectedOrder.id 
+              ? { ...order, status: 'pending-payment' }
+              : order
+          ))
+        }
+
         if (allApproved) {
           alert('All pictures approved! Order is ready for production.')
         } else if (anyRejected) {
@@ -617,6 +691,9 @@ export default function MyOrders() {
         }
         
         setPictureConfirmations({})
+        // Close the details modal after successful submission
+        setShowOrderDetails(false)
+        setSelectedOrder(null)
         // Reload orders to get updated data
         loadOrders()
       } else {
@@ -820,143 +897,291 @@ export default function MyOrders() {
           </div>
         ) : (
           filteredOrders.map((order) => (
-            <div key={order.id} className="bg-white border border-gray-200 rounded-lg shadow-sm">
+            <div key={order.id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
               {/* Order Header */}
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      {getStatusIcon(order.status)}
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+              <div className="px-6 py-5 border-b border-gray-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                  {/* Left Section - Order Info */}
+                  <div className="flex items-start space-x-4">
+                    {/* Status Badge */}
+                    <div className="flex flex-col items-center space-y-2">
+                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gray-50 border-2 border-gray-200">
+                        {getStatusIcon(order.status)}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
                       </span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Order #{order.orderNumber}</p>
-                      <p className="text-sm text-gray-500">Placed on {new Date(order.orderDate).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-900">${(Number(order.total) || 0).toFixed(2)}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Submitted: {new Date(order.orderDate).toLocaleDateString()}
-                    </p>
-                    {order.reviewedAt && (
-                      <p className="text-sm text-gray-500">
-                        Reviewed: {new Date(order.reviewedAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                </div>
-
-                {/* Status Message */}
-                {selectedOrder && selectedOrder.status === 'pending-payment' && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <CreditCard className="h-6 w-6 text-orange-600" />
-                      <div>
-                        <h3 className="text-lg font-medium text-orange-800">Payment Required</h3>
-                        <p className="text-sm text-orange-700 mt-1">
-                          Your design has been approved! Please proceed to checkout to complete your payment and begin processing.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {selectedOrder && selectedOrder.status === 'approved-processing' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                      <div>
-                        <h3 className="text-lg font-medium text-green-800">Design Approved!</h3>
-                        <p className="text-sm text-green-700 mt-1">
-                          Your design has been approved and is being processed. You can now proceed to checkout to complete your order.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Order Items */}
-              <div className="px-6 py-4">
-                <div className="space-y-4">
-                  {order.items.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4">
-                      <img
-                        src={item.productImage}
-                        alt={item.productName}
-                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
-                        }}
-                      />
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-900">{item.productName}</h4>
-                        <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                        {item.customization && (
-                          <div className="mt-1 text-xs text-gray-600">
-                            {item.customization.design && (
-                              <p>Design: {item.customization.design.name}</p>
-                            )}
-                            {item.customization.placement && (
-                              <p>Placement: {item.customization.placement}</p>
-                            )}
-                            {item.customization.size && (
-                              <p>Size: {item.customization.size}</p>
-                            )}
-                            {item.customization.color && (
-                              <p>Color: {item.customization.color}</p>
-                            )}
-                            {item.customization.notes && (
-                              <p>Notes: {item.customization.notes}</p>
-                            )}
+                    
+                    {/* Order Details */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                        Order #{order.orderNumber}
+                      </h3>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-600">
+                        <div className="flex items-center space-x-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>Placed {new Date(order.orderDate).toLocaleDateString()}</span>
+                        </div>
+                        {order.reviewedAt && (
+                          <div className="flex items-center space-x-1">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span>Reviewed {new Date(order.reviewedAt).toLocaleDateString()}</span>
                           </div>
                         )}
-                        
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-gray-900">${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Order Actions */}
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    <p>Submitted: {new Date(order.orderDate).toLocaleDateString()}</p>
-                    {order.reviewedAt && (
-                      <p>Reviewed: {new Date(order.reviewedAt).toLocaleDateString()}</p>
-                    )}
-                    {order.adminNotes && (
-                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                        <div className="flex items-start space-x-2">
-                          <MessageSquare className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="text-xs font-medium text-blue-800">Admin Notes:</p>
-                            <p className="text-xs text-blue-700">{order.adminNotes}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                  <div className="flex space-x-2">
+
+                  {/* Right Section - Total & Actions */}
+                  <div className="flex flex-col sm:items-end space-y-3">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-gray-900">${(Number(order.total) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-500">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                    </div>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => handleViewDetails(order)}
+                      className="w-full sm:w-auto"
                     >
-                      <Eye className="w-4 h-4 mr-1" />
+                      <Eye className="w-4 h-4 mr-2" />
                       View Details
                     </Button>
                   </div>
                 </div>
               </div>
+
+              {/* Order Items Preview */}
+              <div className="px-6 py-4">
+                <div className="space-y-4">
+                  {order.items.slice(0, 2).map((item) => (
+                    <div key={item.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="relative flex space-x-2">
+                        {/* Final Product Image (with design overlays) */}
+                        <div className="relative">
+                          <img
+                            src={item.customization?.mockup || item.productImage}
+                            alt={`Final ${item.productName}`}
+                            className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                            }}
+                          />
+                          <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                            Final
+                          </div>
+                        </div>
+                        
+                        {/* Uploaded Design Image(s) */}
+                        {item.customization && (
+                          <div className="flex space-x-1">
+                            {/* Show multiple designs if available */}
+                            {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
+                              (item.customization as any).designs.slice(0, 2).map((design: any, index: number) => {
+                                // Debug logging for order preview
+                                console.log('🔍 Order preview design data:', {
+                                  itemId: item.id,
+                                  itemName: item.productName,
+                                  designId: design.id,
+                                  designName: design.name,
+                                  hasPreview: !!design.preview,
+                                  previewLength: design.preview?.length,
+                                  previewStart: design.preview?.substring(0, 50),
+                                  hasFile: !!design.file,
+                                  fileLength: design.file?.length,
+                                  fileStart: design.file?.substring(0, 50)
+                                });
+                                
+                                // Check if it's a blob URL (temporary) or base64 (persistent)
+                                const imageSrc = design.preview || design.file;
+                                const isBlobUrl = imageSrc && imageSrc.startsWith('blob:');
+                                
+                                console.log('🖼️ Order preview using image source:', {
+                                  imageSrc: imageSrc?.substring(0, 50) + '...',
+                                  imageSrcLength: imageSrc?.length,
+                                  isBlobUrl: isBlobUrl,
+                                  isBase64: imageSrc && imageSrc.startsWith('data:image/')
+                                });
+                                
+                                return (
+                                  <div key={design.id || index} className="relative">
+                                    {isBlobUrl ? (
+                                      // Show placeholder for blob URLs (temporary images)
+                                      <div className="w-16 h-16 bg-gray-100 rounded-lg border-2 border-white shadow-sm flex flex-col items-center justify-center">
+                                        <span className="text-xs text-gray-500 text-center px-1">
+                                          {design.name}
+                                        </span>
+                                        <span className="text-xs text-red-500 mt-1">
+                                          Lost
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      // Show actual image for base64 URLs
+                                      <img
+                                        src={imageSrc}
+                                        alt={`Design ${index + 1}`}
+                                        className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                        onError={(e) => {
+                                          console.error('❌ Order preview image failed to load:', {
+                                            designName: design.name,
+                                            imageSrc: imageSrc?.substring(0, 50) + '...',
+                                            error: e
+                                          });
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSIzMiIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                                        }}
+                                        onLoad={() => {
+                                          console.log('✅ Order preview image loaded successfully:', design.name);
+                                        }}
+                                      />
+                                    )}
+                                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                      D{index + 1}
+                                    </div>
+                                    {(item.customization as any).designs.length > 2 && index === 1 && (
+                                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
+                                        <span className="text-white text-xs font-bold">
+                                          +{(item.customization as any).designs.length - 2}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : item.customization.design ? (
+                              <div className="relative">
+                                <img
+                                  src={item.customization.design.preview}
+                                  alt="Design"
+                                  className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                                  }}
+                                />
+                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                  Design
+                                </div>
+                              </div>
+                            ) : item.customization.embroideryData?.designImage ? (
+                              <div className="relative">
+                                <img
+                                  src={item.customization.embroideryData.designImage}
+                                  alt="Design"
+                                  className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                                  }}
+                                />
+                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                  Design
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+                        
+                        <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                          {item.quantity}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">{item.productName}</h4>
+                        <p className="text-xs text-gray-500 mb-2">${item.price.toFixed(2)} each</p>
+                        
+                        {/* Simplified Customization Display */}
+                        {item.customization && (
+                          <div className="flex flex-wrap gap-1">
+                            {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {(item.customization as any).designs.length} Design{(item.customization as any).designs.length !== 1 ? 's' : ''}
+                              </span>
+                            ) : item.customization.design ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Custom Design
+                              </span>
+                            ) : null}
+                            
+                            {item.customization.placement && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {item.customization.placement.replace('-', ' ')}
+                              </span>
+                            )}
+                            
+                            {item.customization.size && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                {item.customization.size}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-gray-900">
+                          ${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Show more items indicator */}
+                  {order.items.length > 2 && (
+                    <div className="text-center py-2">
+                      <span className="text-sm text-gray-500 font-medium">
+                        +{order.items.length - 2} more item{order.items.length - 2 !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Admin Notes */}
+              {order.adminNotes && (
+                <div className="px-6 py-3 bg-blue-50 border-t border-blue-100">
+                  <div className="flex items-start space-x-3">
+                    <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-blue-800 mb-1">Admin Message</p>
+                      <p className="text-sm text-blue-700">{order.adminNotes}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Status-specific Actions */}
+              {order.status === 'pending-payment' && (
+                <div className="px-6 py-4 bg-orange-50 border-t border-orange-100">
+                  <div className="flex items-center space-x-3">
+                    <CreditCard className="w-6 h-6 text-orange-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-orange-800">Ready for Payment</p>
+                      <p className="text-sm text-orange-700 mt-1">
+                        Your design has been approved! Complete your payment to begin processing.
+                      </p>
+                    </div>
+                    <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => handleProceedToCheckout(order)}>
+                      Proceed to Checkout
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {order.status === 'in-production' && (
+                <div className="px-6 py-4 bg-blue-50 border-t border-blue-100">
+                  <div className="flex items-center space-x-3">
+                    <Truck className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-blue-800">In Production</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Your order is being processed. We'll notify you when it's ready for shipping.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -1057,42 +1282,181 @@ export default function MyOrders() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Order Items</h3>
                   <div className="space-y-4">
                     {selectedOrder.items.map((item) => (
-                      <div key={item.id} className="flex items-center space-x-4 p-4 border border-gray-200 rounded-lg">
-                        <img
-                          src={item.productImage}
-                          alt={item.productName}
-                          className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
-                          }}
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{item.productName}</h4>
-                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
-                          <p className="text-sm text-gray-500">Price: ${(Number(item.price) || 0).toFixed(2)} each</p>
-                          {item.customization && (
-                            <div className="mt-2 text-sm text-gray-600">
-                              {item.customization.design && (
-                                <p><strong>Design:</strong> {item.customization.design.name}</p>
-                              )}
-                              {item.customization.placement && (
-                                <p><strong>Placement:</strong> {item.customization.placement}</p>
-                              )}
-                              {item.customization.size && (
-                                <p><strong>Size:</strong> {item.customization.size}</p>
-                              )}
-                              {item.customization.color && (
-                              <p><strong>Color:</strong> {item.customization.color}</p>
-                              )}
-                              {item.customization.notes && (
-                                <p><strong>Notes:</strong> {item.customization.notes}</p>
-                              )}
+                      <div key={item.id} className="p-4 border border-gray-200 rounded-lg">
+                        <div className="flex items-start space-x-4">
+                          {/* Images Section */}
+                          <div className="flex flex-col space-y-3">
+                            {/* Final Product Image */}
+                            <div className="relative">
+                              <img
+                                src={item.customization?.mockup || item.productImage}
+                                alt={`Final ${item.productName}`}
+                                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                                }}
+                              />
+                              <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-1 rounded font-medium">
+                                Final Product
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}</p>
+                            
+                            {/* Uploaded Design Images */}
+                            {item.customization && (
+                              <div className="space-y-2">
+                                <h5 className="text-xs font-medium text-gray-700 uppercase tracking-wide">Uploaded Designs</h5>
+                                <div className="flex flex-wrap gap-2">
+                                  {/* Show multiple designs if available */}
+                                  {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
+                                    (item.customization as any).designs.map((design: any, index: number) => {
+                                      // Debug logging
+                                      console.log('🔍 Design data for display:', {
+                                        designId: design.id,
+                                        designName: design.name,
+                                        hasPreview: !!design.preview,
+                                        previewLength: design.preview?.length,
+                                        previewStart: design.preview?.substring(0, 50),
+                                        hasFile: !!design.file,
+                                        fileLength: design.file?.length,
+                                        fileStart: design.file?.substring(0, 50),
+                                        designObject: design
+                                      });
+                                      
+                                      // Check if it's a blob URL (temporary) or base64 (persistent)
+                                      const imageSrc = design.preview || design.file;
+                                      const isBlobUrl = imageSrc && imageSrc.startsWith('blob:');
+                                      
+                                      console.log('🖼️ Using image source:', {
+                                        imageSrc: imageSrc?.substring(0, 50) + '...',
+                                        imageSrcLength: imageSrc?.length,
+                                        isBlobUrl: isBlobUrl,
+                                        isBase64: imageSrc && imageSrc.startsWith('data:image/')
+                                      });
+                                      
+                                      // If it's a blob URL, show a placeholder with a note
+                                      const displaySrc = isBlobUrl ? null : imageSrc;
+                                      
+                                      return (
+                                        <div key={design.id || index} className="relative">
+                                          {isBlobUrl ? (
+                                            // Show placeholder for blob URLs (temporary images)
+                                            <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex flex-col items-center justify-center">
+                                              <span className="text-xs text-gray-500 text-center px-1">
+                                                {design.name}
+                                              </span>
+                                              <span className="text-xs text-red-500 mt-1">
+                                                Preview Lost
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            // Show actual image for base64 URLs
+                                            <img
+                                              src={imageSrc}
+                                              alt={`Design ${index + 1}`}
+                                              className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                              onError={(e) => {
+                                                console.error('❌ Image failed to load:', {
+                                                  designName: design.name,
+                                                  imageSrc: imageSrc?.substring(0, 50) + '...',
+                                                  error: e
+                                                });
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSIzMiIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                                              }}
+                                              onLoad={() => {
+                                                console.log('✅ Image loaded successfully:', design.name);
+                                              }}
+                                            />
+                                          )}
+                                          <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                            {index + 1}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  ) : item.customization.design ? (
+                                    <div className="relative">
+                                      <img
+                                        src={item.customization.design.preview}
+                                        alt="Design"
+                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                                        }}
+                                      />
+                                      <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                        1
+                                      </div>
+                                    </div>
+                                  ) : item.customization.embroideryData?.designImage ? (
+                                    <div className="relative">
+                                      <img
+                                        src={item.customization.embroideryData.designImage}
+                                        alt="Design"
+                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
+                                        }}
+                                      />
+                                      <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                        1
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                      <span className="text-xs text-gray-500">No Design</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Product Details Section */}
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 mb-2">{item.productName}</h4>
+                            <div className="space-y-1 text-sm text-gray-600">
+                              <p><strong>Quantity:</strong> {item.quantity}</p>
+                              <p><strong>Price:</strong> ${(Number(item.price) || 0).toFixed(2)} each</p>
+                              <p><strong>Total:</strong> <span className="font-semibold text-gray-900">${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}</span></p>
+                            </div>
+                            
+                            {item.customization && (
+                              <div className="mt-3 pt-3 border-t border-gray-100">
+                                <h5 className="text-sm font-medium text-gray-700 mb-2">Customization Details</h5>
+                                <div className="space-y-1 text-sm text-gray-600">
+                                  {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
+                                    <div>
+                                      <p><strong>Designs:</strong> {(item.customization as any).designs.length} uploaded</p>
+                                      {(item.customization as any).designs.map((design: any, index: number) => (
+                                        <p key={design.id || index} className="ml-4 text-xs">
+                                          • {design.name || `Design ${index + 1}`}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  ) : item.customization.design && (
+                                    <p><strong>Design:</strong> {item.customization.design.name}</p>
+                                  )}
+                                  
+                                  {item.customization.placement && (
+                                    <p><strong>Placement:</strong> {item.customization.placement.replace('-', ' ')}</p>
+                                  )}
+                                  {item.customization.size && (
+                                    <p><strong>Size:</strong> {item.customization.size}</p>
+                                  )}
+                                  {item.customization.color && (
+                                    <p><strong>Color:</strong> {item.customization.color}</p>
+                                  )}
+                                  {item.customization.notes && (
+                                    <p><strong>Notes:</strong> {item.customization.notes}</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1393,25 +1757,7 @@ export default function MyOrders() {
                     </Button>
                   )}
                   
-                  {/* Checkout Button for pending-payment */}
-                  {selectedOrder && selectedOrder.status === 'pending-payment' && (
-                    <Button 
-                      onClick={() => handleProceedToCheckout(selectedOrder)}
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                    >
-                      Proceed to Checkout
-                    </Button>
-                  )}
                   
-                  {/* Proceed to Checkout Button */}
-                  {selectedOrder.status === 'ready-for-checkout' && (
-                    <Button 
-                      onClick={() => handleProceedToCheckout(selectedOrder)}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                    >
-                      Proceed to Checkout
-                    </Button>
-                  )}
                 </div>
               </div>
             </div>

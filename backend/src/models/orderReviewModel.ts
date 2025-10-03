@@ -14,7 +14,7 @@ export interface OrderReviewAttributes {
   shipping: number;
   tax: number;
   total: number;
-  status: 'pending' | 'approved' | 'rejected' | 'needs-changes';
+  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing';
   submittedAt: Date;
   reviewedAt?: Date | null;
   adminNotes?: string | null;

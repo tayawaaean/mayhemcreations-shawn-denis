@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator, Eye } from 'lucide-react'
-import { useCustomization } from '../context/CustomizationContext'
+import { useCustomization, EmbroideryDesignData } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
@@ -9,21 +9,44 @@ import { MaterialPricingService, InputParameters, CostBreakdown } from '../../sh
 import { fileToBase64, captureElementAsBase64 } from '../../shared/fileUtils'
 import Button from '../../components/Button'
 import StepByStepCustomization from '../components/StepByStepCustomization'
+import MultiEmbroideryManager from '../components/MultiEmbroideryManager'
+import DesignPositioningManager from '../components/DesignPositioningManager'
+import PerDesignCustomization from '../components/PerDesignCustomization'
 import ChatWidget from '../components/ChatWidget'
 
 export default function Customize() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { customizationData, setCustomizationData, uploadDesign, removeDesign, calculateTotalPrice } = useCustomization()
+  const { 
+    customizationData, 
+    setCustomizationData, 
+    uploadDesign, 
+    removeDesign, 
+    calculateTotalPrice,
+    calculateDesignPrice,
+    addDesign,
+    removeDesignById,
+    updateDesign,
+    reorderDesigns,
+    getDesignById
+  } = useCustomization()
   const { add: addToCart } = useCart()
   const [currentStep, setCurrentStep] = useState(1)
   const [dragActive, setDragActive] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 })
+  // Multi-design drag state
+  const [draggedDesignId, setDraggedDesignId] = useState<string | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  // Resize state
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null)
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
   const [showGuidelines, setShowGuidelines] = useState(false)
   const [showFinalView, setShowFinalView] = useState(false)
   const [showFinalDesignModal, setShowFinalDesignModal] = useState(false)
+  const [finalDesignImage, setFinalDesignImage] = useState<string | null>(null)
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,19 +85,96 @@ export default function Customize() {
 
   const initializeProduct = useCallback(() => {
     if (product && !initializedRef.current) {
+      // Check if we're switching to a different product
+      if (customizationData.productId && customizationData.productId !== product.id.toString()) {
+        console.log('🔄 Switching to different product, clearing previous customization data')
+        setCustomizationData({
+          productId: product.id.toString(),
+          productName: product.title,
+          productImage: product.image,
+          basePrice: product.price,
+          design: null, // Clear previous design
+          designs: [], // Clear previous designs
+          mockup: undefined, // Clear previous mockup
+          selectedStyles: {
+            coverage: null,
+            material: null,
+            border: null,
+            backing: null,
+            threads: [],
+            upgrades: [],
+            cutting: null
+          }
+        })
+      } else {
+        // Same product or first time, just update basic info
       setCustomizationData({
         productId: product.id.toString(),
         productName: product.title,
         productImage: product.image,
         basePrice: product.price
       })
+      }
       initializedRef.current = true
     }
-  }, [product, setCustomizationData])
+  }, [product, setCustomizationData, customizationData.productId])
 
   useEffect(() => {
     initializeProduct()
   }, [initializeProduct])
+
+  // Global drag and resize event listeners for multi-design interactions
+  useEffect(() => {
+    if ((isDragging || isResizing) && draggedDesignId) {
+      const handleGlobalMouseMove = (e: MouseEvent) => {
+        if (draggedDesignId) {
+          if (isDragging) {
+            handleMultiDesignMove(e as any)
+          } else if (isResizing) {
+            handleResizeMove(e as any)
+          }
+        }
+      }
+
+      const handleGlobalMouseUp = () => {
+        if (isDragging) {
+          handleMultiDesignEnd()
+        } else if (isResizing) {
+          handleResizeEnd()
+        }
+      }
+
+      const handleGlobalTouchMove = (e: TouchEvent) => {
+        if (draggedDesignId) {
+          if (isDragging) {
+            handleMultiDesignMove(e as any)
+          } else if (isResizing) {
+            handleResizeMove(e as any)
+          }
+        }
+      }
+
+      const handleGlobalTouchEnd = () => {
+        if (isDragging) {
+          handleMultiDesignEnd()
+        } else if (isResizing) {
+          handleResizeEnd()
+        }
+      }
+
+      document.addEventListener('mousemove', handleGlobalMouseMove)
+      document.addEventListener('mouseup', handleGlobalMouseUp)
+      document.addEventListener('touchmove', handleGlobalTouchMove)
+      document.addEventListener('touchend', handleGlobalTouchEnd)
+
+      return () => {
+        document.removeEventListener('mousemove', handleGlobalMouseMove)
+        document.removeEventListener('mouseup', handleGlobalMouseUp)
+        document.removeEventListener('touchmove', handleGlobalTouchMove)
+        document.removeEventListener('touchend', handleGlobalTouchEnd)
+      }
+    }
+  }, [isDragging, isResizing, draggedDesignId])
 
   // Calculate embroidery pricing when dimensions change
   useEffect(() => {
@@ -133,7 +233,8 @@ export default function Customize() {
         }
         return customizationData.color !== '' && customizationData.size !== ''
       case 2:
-        return customizationData.design !== null
+        // Allow proceeding if there are designs uploaded (either multi-design or legacy single design)
+        return customizationData.designs.length > 0 || customizationData.design !== null
       case 3:
         return true // Customize position step
       case 4:
@@ -304,11 +405,172 @@ export default function Customize() {
     }
   }
 
+  // Multi-design drag handlers
+  const handleMultiDesignStart = (e: React.MouseEvent | React.TouchEvent, designId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!productRef.current) return
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const rect = productRef.current.getBoundingClientRect()
+    
+    const design = getDesignById(designId)
+    if (!design) return
+    
+    setDraggedDesignId(designId)
+    setIsDragging(true)
+    setDragStart({ x: clientX, y: clientY })
+    setDragOffset({
+      x: clientX - rect.left - design.position.x,
+      y: clientY - rect.top - design.position.y
+    })
+  }
+
+  const handleMultiDesignMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDragging || !draggedDesignId || !productRef.current) return
+
+    e.preventDefault()
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    const rect = productRef.current.getBoundingClientRect()
+    const newX = Math.max(0, Math.min(rect.width - 100, clientX - rect.left - dragOffset.x))
+    const newY = Math.max(0, Math.min(rect.height - 100, clientY - rect.top - dragOffset.y))
+
+    // Update the design position immediately for visual feedback
+    const currentDesign = getDesignById(draggedDesignId)
+    if (currentDesign) {
+    updateDesign(draggedDesignId, {
+      position: {
+          ...currentDesign.position, 
+          x: newX, 
+          y: newY,
+          placement: currentDesign.position.placement || 'front'
+        }
+      })
+    }
+  }
+
+  const handleMultiDesignEnd = () => {
+    setIsDragging(false)
+    setDraggedDesignId(null)
+    setDragOffset({ x: 0, y: 0 })
+  }
+
+  const handleMultiDesignWheel = (e: React.WheelEvent, designId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const design = getDesignById(designId)
+    if (!design) return
+    
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+scroll for rotation
+      const rotationChange = e.deltaY > 0 ? -15 : 15
+      const newRotation = (design.rotation + rotationChange) % 360
+      updateDesign(designId, { 
+        rotation: newRotation < 0 ? 360 + newRotation : newRotation 
+      })
+    } else {
+      // Regular scroll for scaling
+      const scaleChange = e.deltaY > 0 ? -0.1 : 0.1
+      const newScale = Math.max(0.5, Math.min(2, design.scale + scaleChange))
+      updateDesign(designId, { scale: newScale })
+    }
+  }
+
+  // Resize handlers
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent, designId: string, handle: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const design = getDesignById(designId)
+    if (!design || !productRef.current) return
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
+    setDraggedDesignId(designId)
+    setIsResizing(true)
+    setResizeHandle(handle)
+    setResizeStart({
+      x: clientX,
+      y: clientY,
+      width: design.dimensions.width,
+      height: design.dimensions.height
+    })
+  }
+
+  const handleResizeMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isResizing || !draggedDesignId || !resizeHandle) return
+
+    e.preventDefault()
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    const deltaX = clientX - resizeStart.x
+    const deltaY = clientY - resizeStart.y
+    const scaleFactor = 0.02 // Increased sensitivity for easier control
+
+    const design = getDesignById(draggedDesignId)
+    if (!design) return
+
+    let newWidth = design.dimensions.width
+    let newHeight = design.dimensions.height
+
+    // Calculate new dimensions based on resize handle
+    switch (resizeHandle) {
+      case 'se': // Southeast (bottom-right)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width + deltaX * scaleFactor))
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height + deltaY * scaleFactor))
+        break
+      case 'sw': // Southwest (bottom-left)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width - deltaX * scaleFactor))
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height + deltaY * scaleFactor))
+        break
+      case 'ne': // Northeast (top-right)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width + deltaX * scaleFactor))
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height - deltaY * scaleFactor))
+        break
+      case 'nw': // Northwest (top-left)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width - deltaX * scaleFactor))
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height - deltaY * scaleFactor))
+        break
+      case 'e': // East (right edge)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width + deltaX * scaleFactor))
+        break
+      case 'w': // West (left edge)
+        newWidth = Math.max(0.5, Math.min(12, resizeStart.width - deltaX * scaleFactor))
+        break
+      case 's': // South (bottom edge)
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height + deltaY * scaleFactor))
+        break
+      case 'n': // North (top edge)
+        newHeight = Math.max(0.5, Math.min(12, resizeStart.height - deltaY * scaleFactor))
+        break
+    }
+
+    // Update design dimensions
+    updateDesign(draggedDesignId, {
+      dimensions: { width: newWidth, height: newHeight }
+    })
+  }
+
+  const handleResizeEnd = () => {
+    setIsResizing(false)
+    setResizeHandle(null)
+    setDraggedDesignId(null)
+    setResizeStart({ x: 0, y: 0, width: 0, height: 0 })
+  }
+
+
   const steps = [
     { number: 1, title: 'Choose Color & Size', description: 'Select color and size' },
-    { number: 2, title: 'Upload Design', description: 'Upload your design file' },
-    { number: 3, title: 'Customize Position', description: 'Position and adjust your design' },
-    { number: 4, title: 'Choose Embroidery', description: 'Select embroidery options' },
+    { number: 2, title: 'Upload Designs', description: 'Upload your design files' },
+    { number: 3, title: 'Position & Notes', description: 'Position designs and add notes' },
+    { number: 4, title: 'Embroidery Options', description: 'Choose options for each design' },
     { number: 5, title: 'Review', description: 'Review and checkout' }
   ]
 
@@ -316,7 +578,23 @@ export default function Customize() {
     return ((currentStep - 1) / (steps.length - 1)) * 100
   }
 
-  const nextStep = () => {
+  const nextStep = async () => {
+    // When leaving step 3, capture and save a high-quality mockup once
+    if (currentStep === 3 && productRef.current) {
+      try {
+        // Show final view for clean capture
+        const wasInFinalView = showFinalView
+        if (!wasInFinalView) setShowFinalView(true)
+        await new Promise(resolve => setTimeout(resolve, 100))
+        const mockupBase64 = await captureElementAsBase64(productRef.current, { backgroundColor: '#ffffff' })
+        setCustomizationData({ mockup: mockupBase64 })
+        if (!wasInFinalView) setShowFinalView(false)
+        console.log('💾 Mockup captured and saved to localStorage')
+      } catch (e) {
+        console.error('Failed to capture mockup at step 3:', e)
+      }
+    }
+
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
     }
@@ -346,10 +624,12 @@ export default function Customize() {
         }
       }
 
-      // Capture mockup image if design exists
-      let mockupBase64 = null
-      if (customizationData.design && productRef.current) {
+      // Use saved mockup from step 3 if available, otherwise capture new one
+      let mockupBase64 = customizationData.mockup // Use saved mockup from step 3
+      
+      if (!mockupBase64 && customizationData.design && productRef.current) {
         try {
+          console.log('🛒 No saved mockup found, capturing new mockup image...')
           // Ensure we're in final view for clean capture
           const wasInFinalView = showFinalView
           if (!wasInFinalView) {
@@ -366,19 +646,45 @@ export default function Customize() {
           if (!wasInFinalView) {
             setShowFinalView(false)
           }
+          console.log('🛒 New mockup captured successfully:', {
+            hasMockup: !!mockupBase64,
+            mockupLength: mockupBase64?.length,
+            mockupSizeKB: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
+          })
         } catch (error) {
-          console.error('Error capturing mockup:', error)
+          console.error('❌ Error capturing mockup:', error)
         }
+      } else if (mockupBase64) {
+        console.log('🛒 Using saved mockup from step 3:', {
+          hasMockup: !!mockupBase64,
+          mockupLength: mockupBase64?.length,
+          mockupSizeKB: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
+        })
       }
 
       // Add customized item to cart with stock validation
       const success = await addToCart(product.id.toString(), customizationData.quantity, {
+        // Legacy single design support
         design: customizationData.design ? {
           name: customizationData.design.name,
           size: customizationData.design.size,
           preview: designBase64 || customizationData.design.preview,
-          base64: designBase64 // Store base64 for persistence
+          base64: designBase64 || undefined // Store base64 for persistence
         } : null,
+        
+        // Multi-design support
+        designs: customizationData.designs.length > 0 ? customizationData.designs.map(design => ({
+          id: design.id,
+          name: design.name,
+          preview: design.preview,
+          dimensions: design.dimensions,
+          position: design.position,
+          scale: design.scale,
+          rotation: design.rotation,
+          notes: design.notes,
+          selectedStyles: design.selectedStyles
+        })) : null,
+        
         mockup: mockupBase64, // Store mockup image
         selectedStyles: {
           coverage: customizationData.selectedStyles.coverage,
@@ -419,12 +725,53 @@ export default function Customize() {
     navigate('/products')
   }
 
-  const handleViewFinalDesign = () => {
-    setShowFinalDesignModal(true)
+  const handleViewFinalDesign = async () => {
+    if (!productRef.current) return
+
+    try {
+      // Show final view for clean capture (this hides all numbers, handles, and info)
+      setShowFinalView(true)
+      // Wait for UI to update
+      await new Promise(resolve => setTimeout(resolve, 200))
+      
+      const mockupBase64 = await captureElementAsBase64(productRef.current, {
+        backgroundColor: '#ffffff'
+      })
+      
+      // Restore editing state
+      setShowFinalView(false)
+      
+      // Show the captured image in a modal
+      setShowFinalDesignModal(true)
+      setFinalDesignImage(mockupBase64)
+      
+      console.log('✅ Clean design preview captured:', {
+        hasImage: !!mockupBase64,
+        imageSize: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
+      })
+    } catch (error) {
+      console.error('❌ Error capturing design:', error)
+      // Make sure to restore editing state even on error
+      setShowFinalView(false)
+    }
   }
 
   const handleBackToEditing = () => {
     setShowFinalView(false)
+  }
+
+  // Calculate embroidery base cost for a design
+  const calculateEmbroideryBaseCost = (design: EmbroideryDesignData) => {
+    try {
+      const pricing = MaterialPricingService.calculateMaterialCosts({
+        patchWidth: design.dimensions.width * design.scale,
+        patchHeight: design.dimensions.height * design.scale
+      })
+      return pricing.totalCost
+    } catch (error) {
+      console.error('Error calculating embroidery base cost:', error)
+      return 0
+    }
   }
 
   return (
@@ -530,10 +877,135 @@ export default function Customize() {
                   alt={product.title}
                   className="w-full h-64 sm:h-80 lg:h-96 object-cover rounded-lg"
                 />
+                 {/* Render Multiple Designs */}
+                 {customizationData.designs.map((design, index) => (
+                   <div
+                     key={design.id}
+                     className={`absolute select-none ${
+                       showFinalView || currentStep >= 4
+                         ? 'cursor-default' 
+                         : draggedDesignId === design.id
+                           ? 'cursor-grabbing scale-105 z-20'
+                           : 'cursor-grab hover:scale-105 transition-all duration-200'
+                     }`}
+                     style={{
+                       left: `${design.position.x}px`,
+                       top: `${design.position.y}px`,
+                       transform: `scale(${design.scale}) rotate(${design.rotation}deg)`,
+                       transformOrigin: 'center',
+                       zIndex: draggedDesignId === design.id ? 20 : (10 + index)
+                     }}
+                     onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleMultiDesignStart(e, design.id) : undefined}
+                     onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleMultiDesignStart(e, design.id) : undefined}
+                   >
+                     {/* Design Image with Enhanced Styling */}
+                     <div className="relative group">
+                       {/* Hover Background Highlight */}
+                       {currentStep < 4 && (
+                         <div className="absolute inset-0 bg-accent/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"></div>
+                       )}
+                       <img
+                         src={design.preview}
+                         alt={`Design ${index + 1} preview`}
+                         className="drop-shadow-2xl rounded-lg transition-all duration-200"
+                         style={{
+                           width: `${design.dimensions.width * 20}px`,
+                           height: `${design.dimensions.height * 20}px`,
+                           objectFit: 'fill',
+                           filter: showFinalView ? 'none' : 'none'
+                         }}
+                       />
+                       
+                       {/* Design Number Badge */}
+                       <div className="absolute -top-2 -left-2 bg-accent text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
+                         {index + 1}
+                       </div>
+                       
+                       {/* Design Controls - Only show when not in final view */}
+                       {!showFinalView && (
+                         <>
+                           {/* Drag Handle */}
+                           <div className="absolute -top-2 -left-8 bg-gray-600 text-white p-1 rounded-full shadow-lg opacity-80 group-hover:opacity-100 transition-all duration-200">
+                             <Grip className="w-3 h-3" />
+                           </div>
+                       
+                       
+                           {/* Large Corner Resize Handles */}
+                           <div 
+                             className="absolute -top-2 -left-2 w-6 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-nw-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'nw') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'nw') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -top-2 -right-2 w-6 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-ne-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'ne') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'ne') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -bottom-2 -left-2 w-6 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-sw-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'sw') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'sw') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -bottom-2 -right-2 w-6 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-se-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'se') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'se') : undefined}
+                           ></div>
+                           
+                           {/* Large Edge Resize Handles */}
+                           <div 
+                             className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-6 h-4 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-n-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'n') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'n') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-6 h-4 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-s-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 's') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 's') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-w-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'w') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'w') : undefined}
+                           ></div>
+                           <div 
+                             className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-6 bg-accent rounded-full border-3 border-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-e-resize hover:scale-110"
+                             onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'e') : undefined}
+                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'e') : undefined}
+                           ></div>
+                       
+                           {/* Rotation Handle */}
+                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-accent rounded-full border border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                           
+                           {/* Enhanced Tooltip */}
+                           {currentStep < 4 && (
+                             <div className={`absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap transition-all duration-200 ${
+                               isDragging || isResizing ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'
+                             }`}>
+                               <div className="flex items-center space-x-2">
+                                 <Grip className="w-3 h-3" />
+                                 <span>Drag to move</span>
+                                 <span className="text-gray-400">•</span>
+                                 <span>Drag handles to resize</span>
+                                 <span className="text-gray-400">•</span>
+                                 <span>Ctrl+scroll to rotate</span>
+                             </div>
+                                 {/* Tooltip Arrow */}
+                                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                           </div>
+                           )}
+                         
+                         </>
+                       )}
+                     </div>
+                   </div>
+                 ))}
+
+                 {/* Legacy Single Design Support */}
                  {customizationData.design && (
                    <div
                      className={`absolute select-none ${
-                       showFinalView 
+                       showFinalView || currentStep >= 4
                          ? 'cursor-default' 
                          : isDragging 
                            ? 'cursor-grabbing scale-105 z-10' 
@@ -541,76 +1013,49 @@ export default function Customize() {
                              ? 'cursor-grab hover:scale-105 transition-all duration-200'
                              : 'cursor-default'
                      }`}
-                     style={{
+                           style={{
                        left: `${isDragging ? dragPosition.x : (customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x)}px`,
                        top: `${isDragging ? dragPosition.y : (customizationData.placement === 'manual' ? customizationData.designPosition.y : getAutomaticPosition(customizationData.placement).y)}px`,
                        transform: `scale(${customizationData.designScale}) rotate(${customizationData.designRotation}deg)`,
-                       transformOrigin: 'center'
+                       transformOrigin: 'center',
+                       zIndex: 5
                      }}
-                     onMouseDown={!showFinalView ? handleDesignStart : undefined}
-                     onMouseMove={!showFinalView ? handleDesignMove : undefined}
-                     onMouseUp={!showFinalView ? handleDesignEnd : undefined}
-                     onMouseLeave={!showFinalView ? handleDesignEnd : undefined}
-                     onTouchStart={!showFinalView ? handleDesignStart : undefined}
-                     onTouchMove={!showFinalView ? handleDesignMove : undefined}
-                     onTouchEnd={!showFinalView ? handleDesignEnd : undefined}
-                     onWheel={!showFinalView ? handleDesignWheel : undefined}
+                     onMouseDown={!showFinalView && currentStep < 4 ? handleDesignStart : undefined}
+                     onMouseMove={!showFinalView && currentStep < 4 ? handleDesignMove : undefined}
+                     onMouseUp={!showFinalView && currentStep < 4 ? handleDesignEnd : undefined}
+                     onMouseLeave={!showFinalView && currentStep < 4 ? handleDesignEnd : undefined}
+                     onTouchStart={!showFinalView && currentStep < 4 ? handleDesignStart : undefined}
+                     onTouchMove={!showFinalView && currentStep < 4 ? handleDesignMove : undefined}
+                     onTouchEnd={!showFinalView && currentStep < 4 ? handleDesignEnd : undefined}
+                     onWheel={!showFinalView && currentStep < 4 ? handleDesignWheel : undefined}
                    >
-                     {/* Design Image with Enhanced Styling */}
+                     {/* Legacy Design Image */}
                      <div className="relative group">
-                       <img
-                         src={customizationData.design.preview}
-                         alt="Design preview"
-                         className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
-                         style={{
-                           width: `${embroideryWidth * 20}px`,
-                           height: `${embroideryHeight * 20}px`,
-                           objectFit: 'fill',
-                           filter: showFinalView ? 'none' : (isDragging ? 'brightness(1.1) contrast(1.1)' : 'none')
-                         }}
-                       />
+                         <img
+                           src={customizationData.design.preview}
+                           alt="Design preview"
+                           className="drop-shadow-2xl rounded-lg"
+                           style={{
+                             width: `${embroideryWidth * 20}px`,
+                             height: `${embroideryHeight * 20}px`,
+                             objectFit: 'fill',
+                             filter: showFinalView ? 'none' : (isDragging ? 'brightness(1.1) contrast(1.1)' : 'none')
+                           }}
+                         />
                        
-                       {/* Design Controls - Only show when not in final view */}
+                       {/* Legacy Design Number Badge */}
+                       <div className="absolute -top-2 -left-2 bg-blue-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
+                         L
+                       </div>
+                       
+                       {/* Legacy Design Controls - Only show when not in final view */}
                        {!showFinalView && (
                          <>
-                           {/* Drag Handle - Always Visible */}
-                           <div className={`absolute -top-2 -left-2 bg-accent text-white p-1 rounded-full shadow-lg transition-all duration-200 ${
-                             isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                           }`}>
+                           {/* Drag Handle */}
+                           <div className="absolute -top-2 -left-8 bg-gray-600 text-white p-1 rounded-full shadow-lg opacity-80 group-hover:opacity-100 transition-all duration-200">
                              <Grip className="w-3 h-3" />
                            </div>
                        
-                           {/* Close/Remove Button */}
-                           <button
-                             className={`absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-red-600 ${
-                               isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                             }`}
-                             onClick={(e) => {
-                               e.stopPropagation()
-                               removeDesign()
-                             }}
-                             title="Remove design"
-                           >
-                             <X className="w-3 h-3" />
-                           </button>
-                       
-                           {/* Replace Design Button */}
-                           <button
-                             className={`absolute -bottom-2 -right-2 bg-blue-500 text-white p-1 rounded-full shadow-lg transition-all duration-200 hover:bg-blue-600 ${
-                               isDragging ? 'scale-110 opacity-100' : 'opacity-80 group-hover:opacity-100 group-hover:scale-110'
-                             }`}
-                             onClick={(e) => {
-                               e.stopPropagation()
-                               const input = document.getElementById('design-upload') as HTMLInputElement
-                               if (input) {
-                                 input.value = ''
-                                 input.click()
-                               }
-                             }}
-                             title="Replace design"
-                           >
-                             <Upload className="w-3 h-3" />
-                           </button>
                        
                            {/* Corner Resize Handles */}
                            <div className="absolute -top-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
@@ -633,16 +1078,12 @@ export default function Customize() {
                                  <span>Scroll to resize</span>
                                  <span className="text-gray-400">•</span>
                                  <span>Ctrl+scroll to rotate</span>
-                               </div>
+                           </div>
                                {/* Tooltip Arrow */}
                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
                              </div>
                            )}
                      
-                           {/* Scale Indicator */}
-                           <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded-full">
-                             {Math.round(customizationData.designScale * 100)}%
-                           </div>
                          </>
                        )}
                      </div>
@@ -723,20 +1164,20 @@ export default function Customize() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                       Rotation: {customizationData.designRotation}°
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="15"
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        step="15"
                       value={customizationData.designRotation}
-                      onChange={(e) => setCustomizationData({ designRotation: parseInt(e.target.value) })}
-                      className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
+                        onChange={(e) => setCustomizationData({ designRotation: parseInt(e.target.value) })}
+                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                    </div>
                   <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
                       variant="outline"
@@ -755,8 +1196,8 @@ export default function Customize() {
                       Reset Position
                     </Button>
                   </div>
-                </div>
-              </div>
+                  </div>
+                 </div>
             )}
           </div>
 
@@ -856,7 +1297,7 @@ export default function Customize() {
                    </Button>
                  </div>
                </div>
-             )}
+            )}
 
              {/* Step 1: Skip Color & Size for Non-Sizing Products */}
              {currentStep === 1 && !product?.hasSizing && (
@@ -881,100 +1322,8 @@ export default function Customize() {
              {/* Step 2: Upload Design */}
              {currentStep === 2 && (
                <div className="space-y-4 sm:space-y-6">
-                 {/* Upload Section */}
-                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
-                   <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                     <h3 className="text-lg font-semibold text-gray-900">Upload Your Design</h3>
-                     <button
-                       onClick={() => setShowGuidelines(true)}
-                       className="flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium self-start sm:self-auto"
-                     >
-                       <Info className="w-4 h-4 mr-1" />
-                       Design Guidelines
-                     </button>
-                   </div>
-                
-                {!customizationData.design ? (
-                  <div
-                    className={`border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-colors ${
-                      dragActive ? 'border-accent bg-accent/5' : 'border-gray-300'
-                    }`}
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                  >
-                    <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-base sm:text-lg font-medium text-gray-900 mb-2">
-                      Drag and drop your design here
-                    </p>
-                    <p className="text-sm sm:text-base text-gray-600 mb-4">
-                      or click to browse files
-                    </p>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileInput}
-                      className="hidden"
-                      id="design-upload"
-                    />
-                    <label
-                      htmlFor="design-upload"
-                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
-                    >
-                      Choose File
-                    </label>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Supports PNG, JPG, SVG up to 10MB
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
-                      <img
-                        src={customizationData.design.preview}
-                        alt="Design preview"
-                        className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{customizationData.design.name}</p>
-                        <p className="text-xs sm:text-sm text-gray-600">
-                          {(customizationData.design.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <button
-                        onClick={removeDesign}
-                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </button>
-                    </div>
-                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                       <Button
-                         variant="outline"
-                         onClick={() => {
-                           const input = document.getElementById('design-upload') as HTMLInputElement
-                           if (input) {
-                             input.value = '' // Reset input to allow same file selection
-                             input.click()
-                           }
-                         }}
-                         className="w-full sm:w-auto"
-                       >
-                         Replace Design
-                       </Button>
-                       <Button
-                         onClick={nextStep}
-                         disabled={!canProceed()}
-                         className="w-full sm:w-auto"
-                       >
-                         Continue
-                         <ArrowRight className="w-4 h-4 ml-2" />
-                       </Button>
-                     </div>
-                   </div>
-                )}
-                 </div>
+                 {/* Multi-Design Upload Section */}
+                 <MultiEmbroideryManager />
 
                  {/* Embroidery Dimensions & Pricing */}
                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -1089,92 +1438,36 @@ export default function Customize() {
                      </div>
                    )}
                  </div>
-               </div>
+                 
+                 {/* Navigation Buttons */}
+                 <div className="flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                   <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
+                     <ArrowLeft className="w-4 h-4 mr-2" />
+                     Previous
+                         </Button>
+                         <Button
+                     onClick={nextStep} 
+                     disabled={!canProceed()} 
+                     className="w-full sm:w-auto"
+                   >
+                     Continue to Positioning
+                     <ArrowRight className="w-4 h-4 ml-2" />
+                         </Button>
+                       </div>
+                     </div>
              )}
 
               {/* Step 3: Customize Position */}
               {currentStep === 3 && (
-               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
-                 <h3 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Customize Your Design</h3>
-                 
-                 <div className="space-y-4 sm:space-y-6">
-                   {/* Placement Selection */}
-                   <div>
-                     <h4 className="text-md font-medium text-gray-900 mb-4">Choose Placement</h4>
-                     <p className="text-sm text-gray-600 mb-4">Select automatic positioning or choose manual for custom placement</p>
-                     
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                       {[
-                         { value: 'front', label: 'Front Center', description: 'Center of the chest' },
-                         { value: 'back', label: 'Back Center', description: 'Center of the back' },
-                         { value: 'left-chest', label: 'Left Chest', description: 'Left side of chest' },
-                         { value: 'right-chest', label: 'Right Chest', description: 'Right side of chest' },
-                         { value: 'sleeve', label: 'Sleeve', description: 'On the sleeve' },
-                         { value: 'manual', label: 'Manual', description: 'Drag to position anywhere' }
-                       ].map((option) => (
-                         <div
-                           key={option.value}
-                           className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all relative ${
-                             customizationData.placement === option.value
-                               ? 'border-accent bg-accent/5'
-                               : 'border-gray-200 hover:border-gray-300'
-                           }`}
-                           onClick={() => setCustomizationData({ placement: option.value as any })}
-                         >
-                           <div className="text-center">
-                             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-2 sm:mb-3">
-                               {option.value === 'manual' ? (
-                                 <Move className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
-                               ) : (
-                                 <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-300 rounded"></div>
-                               )}
-                             </div>
-                             <h4 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">{option.label}</h4>
-                             <p className="text-xs sm:text-sm text-gray-600">{option.description}</p>
-                           </div>
-                           {customizationData.placement === option.value && (
-                             <div className="absolute top-2 right-2 w-5 h-5 sm:w-6 sm:h-6 bg-accent rounded-full flex items-center justify-center">
-                               <Check className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-                             </div>
-                           )}
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-
-                   {/* Quantity and Notes */}
-                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
-                       <input
-                         type="number"
-                         min="1"
-                         max="100"
-                         value={customizationData.quantity}
-                         onChange={(e) => setCustomizationData({ quantity: parseInt(e.target.value) })}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                       />
-                     </div>
-                     
-                     <div>
-                       <label className="block text-sm font-medium text-gray-700 mb-2">Notes (Optional)</label>
-                       <textarea
-                         value={customizationData.notes}
-                         onChange={(e) => setCustomizationData({ notes: e.target.value })}
-                         placeholder="Any special instructions or requirements..."
-                         rows={3}
-                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
-                       />
-                     </div>
-                   </div>
-                 </div>
-
-                 <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                <div className="space-y-6">
+                  <DesignPositioningManager showFinalView={showFinalView} />
+                  
+                  <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
                    <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
                    </Button>
                    <Button onClick={nextStep} disabled={!canProceed()} className="w-full sm:w-auto">
-                     Continue
+                      Continue to Embroidery Options
                      <ArrowRight className="w-4 h-4 ml-2" />
                    </Button>
                  </div>
@@ -1183,10 +1476,10 @@ export default function Customize() {
 
             {/* Step 4: Choose Embroidery */}
             {currentStep === 4 && (
-              <StepByStepCustomization 
-                onComplete={nextStep} 
-                onBackToDesign={() => setCurrentStep(2)}
-              />
+                <PerDesignCustomization 
+                  onComplete={nextStep} 
+                onBack={() => setCurrentStep(3)}
+                />
             )}
 
             {/* Step 5: Review */}
@@ -1200,13 +1493,6 @@ export default function Customize() {
                     <span className="font-semibold text-sm sm:text-base">${(Number(customizationData.basePrice) || 0).toFixed(2)}</span>
                   </div>
                   
-                  {embroideryPricing && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth}" × {embroideryHeight}")</span>
-                      <span className="font-semibold text-sm sm:text-base text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
-                    </div>
-                  )}
-                  
                   <div className="flex items-center justify-between">
                     <span className="text-sm sm:text-base text-gray-600">Color</span>
                     <span className="font-semibold text-sm sm:text-base capitalize">{customizationData.color}</span>
@@ -1217,76 +1503,191 @@ export default function Customize() {
                     <span className="font-semibold text-sm sm:text-base uppercase">{customizationData.size}</span>
                   </div>
                   
-                  {customizationData.selectedStyles.coverage && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.coverage.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.coverage.price) || 0).toFixed(2)}`}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {customizationData.selectedStyles.material && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.material.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.material.price) || 0).toFixed(2)}`}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {customizationData.selectedStyles.border && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.border.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.border.price) || 0).toFixed(2)}`}
-                      </span>
-                    </div>
-                  )}
-                  
                   <div className="flex items-center justify-between">
-                    <span className="text-sm sm:text-base text-gray-600">Placement</span>
-                    <span className="font-semibold text-sm sm:text-base capitalize">
-                      {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
-                    </span>
+                    <span className="text-sm sm:text-base text-gray-600">Quantity</span>
+                    <span className="font-semibold text-sm sm:text-base">{customizationData.quantity}</span>
                   </div>
-                  
-                  {customizationData.selectedStyles.threads.map((thread) => (
-                    <div key={thread.id} className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{thread.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">+${(Number(thread.price) || 0).toFixed(2)}</span>
-                    </div>
-                  ))}
-                  
-                  {customizationData.selectedStyles.backing && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.backing.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.backing.price) || 0).toFixed(2)}`}
-                      </span>
-                    </div>
+
+                  {/* Multi-Design Embroidery Options */}
+                  {customizationData.designs.length > 0 && (
+                    <>
+                      <div className="border-t pt-4">
+                        <h4 className="text-md font-semibold text-gray-900 mb-3">Embroidery Designs</h4>
+                        {customizationData.designs.map((design, index) => (
+                          <div key={design.id} className="mb-4 p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                Design {index + 1}: {design.name}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {design.dimensions.width}" × {design.dimensions.height}" @ {Math.round(design.scale * 100)}%
+                              </span>
+                            </div>
+                            
+                            {/* Embroidery Base Cost */}
+                            <div className="flex items-center justify-between text-xs mb-2 pb-2 border-b border-gray-200">
+                              <span className="text-gray-600">Embroidery Base Cost</span>
+                              <span className="font-medium text-accent">${calculateEmbroideryBaseCost(design).toFixed(2)}</span>
+                            </div>
+                            
+                            {/* Individual Design Options */}
+                            {design.selectedStyles.coverage && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{design.selectedStyles.coverage.name}</span>
+                                <span className="font-medium">
+                                  {design.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.coverage.price) || 0).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {design.selectedStyles.material && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{design.selectedStyles.material.name}</span>
+                                <span className="font-medium">
+                                  {design.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.material.price) || 0).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {design.selectedStyles.border && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{design.selectedStyles.border.name}</span>
+                                <span className="font-medium">
+                                  {design.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.border.price) || 0).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {design.selectedStyles.threads.map((thread) => (
+                              <div key={thread.id} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{thread.name}</span>
+                                <span className="font-medium">+${(Number(thread.price) || 0).toFixed(2)}</span>
+                              </div>
+                            ))}
+                            
+                            {design.selectedStyles.backing && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{design.selectedStyles.backing.name}</span>
+                                <span className="font-medium">
+                                  {design.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.backing.price) || 0).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {design.selectedStyles.upgrades.map((upgrade) => (
+                              <div key={upgrade.id} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{upgrade.name}</span>
+                                <span className="font-medium">+${(Number(upgrade.price) || 0).toFixed(2)}</span>
+                              </div>
+                            ))}
+                            
+                            {design.selectedStyles.cutting && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-600">{design.selectedStyles.cutting.name}</span>
+                                <span className="font-medium">
+                                  {design.selectedStyles.cutting.price === 0 ? 'Free' : `+$${(Number(design.selectedStyles.cutting.price) || 0).toFixed(2)}`}
+                                </span>
+                              </div>
+                            )}
+                            
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-900">Design {index + 1} Total</span>
+                                <span className="font-semibold text-sm text-accent">${calculateDesignPrice(design.id).toFixed(2)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
-                  
-                  {customizationData.selectedStyles.upgrades.map((upgrade) => (
-                    <div key={upgrade.id} className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{upgrade.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">+${(Number(upgrade.price) || 0).toFixed(2)}</span>
-                    </div>
-                  ))}
-                  
-                  {customizationData.selectedStyles.cutting && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.cutting.name}</span>
-                      <span className="font-semibold text-sm sm:text-base">
-                        {customizationData.selectedStyles.cutting.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.cutting.price) || 0).toFixed(2)}`}
-                      </span>
-                    </div>
+
+                  {/* Legacy Single Design Support */}
+                  {customizationData.designs.length === 0 && customizationData.design && (
+                    <>
+                      <div className="border-t pt-4">
+                        <h4 className="text-md font-semibold text-gray-900 mb-3">Embroidery Design</h4>
+                        
+                        {embroideryPricing && (
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth}" × {embroideryHeight}")</span>
+                            <span className="font-semibold text-sm sm:text-base text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm sm:text-base text-gray-600">Placement</span>
+                          <span className="font-semibold text-sm sm:text-base capitalize">
+                            {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
+                          </span>
+                        </div>
+                        
+                        {customizationData.selectedStyles.coverage && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.coverage.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">
+                              {customizationData.selectedStyles.coverage.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.coverage.price) || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {customizationData.selectedStyles.material && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.material.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">
+                              {customizationData.selectedStyles.material.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.material.price) || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {customizationData.selectedStyles.border && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.border.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">
+                              {customizationData.selectedStyles.border.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.border.price) || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {customizationData.selectedStyles.threads.map((thread) => (
+                          <div key={thread.id} className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{thread.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">+${(Number(thread.price) || 0).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        
+                        {customizationData.selectedStyles.backing && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.backing.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">
+                              {customizationData.selectedStyles.backing.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.backing.price) || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {customizationData.selectedStyles.upgrades.map((upgrade) => (
+                          <div key={upgrade.id} className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{upgrade.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">+${(Number(upgrade.price) || 0).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        
+                        {customizationData.selectedStyles.cutting && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm sm:text-base text-gray-600">{customizationData.selectedStyles.cutting.name}</span>
+                            <span className="font-semibold text-sm sm:text-base">
+                              {customizationData.selectedStyles.cutting.price === 0 ? 'Free' : `+$${(Number(customizationData.selectedStyles.cutting.price) || 0).toFixed(2)}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                   
                   <div className="border-t pt-4">
                     <div className="flex items-center justify-between text-base sm:text-lg font-bold">
                       <span>Total</span>
-                      <span>${((Number(calculateTotalPrice()) || 0) + (Number(embroideryPricing?.totalCost) || 0)).toFixed(2)}</span>
+                      <span>${calculateTotalPrice().toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -1316,7 +1717,7 @@ export default function Customize() {
                       <Button 
                         variant="primary" 
                         onClick={handleViewFinalDesign} 
-                        disabled={!customizationData.design}
+                        disabled={customizationData.designs.length === 0 && !customizationData.design}
                         className="w-full sm:w-auto"
                       >
                         <Eye className="w-4 h-4 mr-2" />
@@ -1501,101 +1902,234 @@ export default function Customize() {
                   </h3>
                   <div className="flex justify-center">
                     <div className="relative max-w-md w-full">
-                      <img
-                        src={product?.image}
-                        alt={product?.title}
-                        className="w-full h-80 object-cover rounded-lg shadow-lg"
-                      />
-                      {customizationData.design && (
-                        <div
-                          className="absolute select-none"
-                          style={{
-                            left: `${customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x}px`,
-                            top: `${customizationData.placement === 'manual' ? customizationData.designPosition.y : getAutomaticPosition(customizationData.placement).y}px`,
-                            transform: `scale(${customizationData.designScale}) rotate(${customizationData.designRotation}deg)`,
-                            transformOrigin: 'center'
-                          }}
-                        >
-                          <img
-                            src={customizationData.design.preview}
-                            alt="Design preview"
-                            className="drop-shadow-2xl border-2 border-white/50 rounded-lg"
-                            style={{
-                              width: `${embroideryWidth * 20}px`,
-                              height: `${embroideryHeight * 20}px`,
-                              objectFit: 'fill'
-                            }}
-                          />
-                        </div>
+                      {finalDesignImage ? (
+                        <img
+                          src={finalDesignImage}
+                          alt="Final design preview"
+                          className="w-full h-auto object-contain rounded-lg shadow-lg"
+                        />
+                      ) : (
+                        <img
+                          src={product?.image}
+                          alt={product?.title}
+                          className="w-full h-80 object-cover rounded-lg shadow-lg"
+                        />
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Design Details */}
-                {customizationData.design && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Design Information</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Design Name:</span>
-                          <span className="font-medium">{customizationData.design.name}</span>
+                {/* Uploaded Design Images */}
+                {(customizationData.designs.length > 0 || customizationData.design) && (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                      <Upload className="w-5 h-5 mr-2 text-accent" />
+                      Uploaded Design Files
+                    </h4>
+                    
+                    {/* Multi-Design Images */}
+                    {customizationData.designs.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {customizationData.designs.map((design, index) => (
+                          <div key={design.id} className="text-center">
+                            <div className="bg-gray-100 rounded-lg p-3 mb-2">
+                              <img
+                                src={design.preview}
+                                alt={`Design ${index + 1}`}
+                                className="w-full h-24 object-contain rounded"
+                              />
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              <div className="font-medium">Design {index + 1}</div>
+                              <div className="text-gray-500 truncate">{design.name}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Legacy Single Design Image */}
+                    {customizationData.designs.length === 0 && customizationData.design && (
+                      <div className="text-center">
+                        <div className="bg-gray-100 rounded-lg p-4 mb-3 max-w-xs mx-auto">
+                          <img
+                            src={customizationData.design.preview}
+                            alt="Design"
+                            className="w-full h-32 object-contain rounded"
+                          />
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">File Size:</span>
-                          <span className="font-medium">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Embroidery Size:</span>
-                          <span className="font-medium">{embroideryWidth}" × {embroideryHeight}"</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Placement:</span>
-                          <span className="font-medium capitalize">
-                            {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Scale:</span>
-                          <span className="font-medium">{Math.round(customizationData.designScale * 100)}%</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Rotation:</span>
-                          <span className="font-medium">{customizationData.designRotation}°</span>
+                        <div className="text-sm text-gray-600">
+                          <div className="font-medium">{customizationData.design.name}</div>
+                          <div className="text-gray-500">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</div>
                         </div>
                       </div>
-                    </div>
+                    )}
+                  </div>
+                )}
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Product:</span>
-                          <span className="font-medium">{product?.title}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Color:</span>
-                          <span className="font-medium capitalize">{customizationData.color}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Size:</span>
-                          <span className="font-medium uppercase">{customizationData.size}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Quantity:</span>
-                          <span className="font-medium">{customizationData.quantity}</span>
-                        </div>
-                        {customizationData.notes && (
-                          <div className="mt-3">
-                            <span className="text-gray-600 block mb-1">Notes:</span>
-                            <span className="text-sm bg-gray-50 p-2 rounded block">{customizationData.notes}</span>
+                {/* Design Details */}
+                {(customizationData.designs.length > 0 || customizationData.design) && (
+                  <div className="space-y-6">
+                    {/* Multi-Design Details */}
+                    {customizationData.designs.length > 0 && (
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-gray-900 text-lg">Custom Design Details</h4>
+                        {customizationData.designs.map((design, index) => (
+                          <div key={design.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-medium text-gray-900">Design {index + 1}: {design.name}</h5>
+                              <span className="text-sm text-gray-500">${calculateDesignPrice(design.id).toFixed(2)}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div className="space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Dimensions:</span>
+                                  <span className="font-medium">{design.dimensions.width}" × {design.dimensions.height}"</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Scale:</span>
+                                  <span className="font-medium">{Math.round(design.scale * 100)}%</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Rotation:</span>
+                                  <span className="font-medium">{design.rotation}°</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">Placement:</span>
+                                  <span className="font-medium capitalize">{design.position.placement}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {design.notes && (
+                                  <div>
+                                    <span className="text-gray-600 block mb-1">Notes:</span>
+                                    <p className="text-sm bg-gray-50 p-2 rounded border">{design.notes}</p>
+                                  </div>
+                                )}
+                                
+                                {/* Selected Embroidery Options */}
+                                <div>
+                                  <span className="text-gray-600 block mb-1">Embroidery Options:</span>
+                                  <div className="space-y-1 text-xs">
+                                    {design.selectedStyles.coverage && (
+                                      <div className="flex justify-between">
+                                        <span>Coverage:</span>
+                                        <span>{design.selectedStyles.coverage.name}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.material && (
+                                      <div className="flex justify-between">
+                                        <span>Material:</span>
+                                        <span>{design.selectedStyles.material.name}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.threads.map((thread) => (
+                                      <div key={thread.id} className="flex justify-between">
+                                        <span>Thread:</span>
+                                        <span>{thread.name}</span>
+                                      </div>
+                                    ))}
+                                    {design.selectedStyles.backing && (
+                                      <div className="flex justify-between">
+                                        <span>Backing:</span>
+                                        <span>{design.selectedStyles.backing.name}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )}
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Legacy Single Design Support */}
+                    {customizationData.designs.length === 0 && customizationData.design && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">Design Information</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Design Name:</span>
+                              <span className="font-medium">{customizationData.design.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">File Size:</span>
+                              <span className="font-medium">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Embroidery Size:</span>
+                              <span className="font-medium">{embroideryWidth}" × {embroideryHeight}"</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Placement:</span>
+                              <span className="font-medium capitalize">
+                                {customizationData.placement === 'manual' ? 'Manual Position' : customizationData.placement.replace('-', ' ')}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Scale:</span>
+                              <span className="font-medium">{Math.round(customizationData.designScale * 100)}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Rotation:</span>
+                              <span className="font-medium">{customizationData.designRotation}°</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">Product Details</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Product:</span>
+                              <span className="font-medium">{product?.title}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Color:</span>
+                              <span className="font-medium capitalize">{customizationData.color}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Size:</span>
+                              <span className="font-medium uppercase">{customizationData.size}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Quantity:</span>
+                              <span className="font-medium">{customizationData.quantity}</span>
+                            </div>
+                            {customizationData.notes && (
+                              <div className="mt-3">
+                                <span className="text-gray-600 block mb-1">Notes:</span>
+                                <span className="text-sm bg-gray-50 p-2 rounded block">{customizationData.notes}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Total Cost Summary */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Calculator className="w-5 h-5 text-green-600" />
+                      <span className="text-lg font-semibold text-green-900">Total Order Cost</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-green-900">
+                        ${calculateTotalPrice().toFixed(2)}
+                      </div>
+                      <div className="text-sm text-green-600">
+                        {customizationData.quantity} item{customizationData.quantity !== 1 ? 's' : ''}
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 pt-4">

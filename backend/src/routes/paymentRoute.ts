@@ -12,7 +12,7 @@ import {
   createOrRetrieveCustomer
 } from '../controllers/paymentController';
 import { handleStripeWebhook } from '../controllers/webhookController';
-import { authenticate } from '../middlewares/auth';
+import { hybridAuthenticate } from '../middlewares/auth';
 import { webhookBodyParser } from '../middlewares/webhookMiddleware';
 
 const router = Router();
@@ -20,8 +20,8 @@ const router = Router();
 // Webhook route (no authentication required - called by Stripe)
 router.post('/webhook', webhookBodyParser, handleStripeWebhook);
 
-// All other payment routes require authentication
-router.use(authenticate);
+// All other payment routes require authentication (supports session or bearer)
+router.use(hybridAuthenticate);
 
 /**
  * @route POST /api/v1/payments/create-intent

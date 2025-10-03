@@ -8,6 +8,37 @@ export interface DesignUpload {
   size: number
 }
 
+export interface EmbroideryDesignData {
+  id: string
+  name: string
+  file: File
+  preview: string
+  dimensions: {
+    width: number
+    height: number
+  }
+  position: {
+    x: number
+    y: number
+    // Store the container size when the position was recorded so we can scale
+    containerWidth?: number
+    containerHeight?: number
+    placement: 'front' | 'back' | 'left-chest' | 'right-chest' | 'sleeve' | 'custom'
+  }
+  scale: number
+  rotation: number
+  notes: string
+  selectedStyles: {
+    coverage: EmbroideryStyle | null
+    material: EmbroideryStyle | null
+    border: EmbroideryStyle | null
+    threads: EmbroideryStyle[]
+    backing: EmbroideryStyle | null
+    upgrades: EmbroideryStyle[]
+    cutting: EmbroideryStyle | null
+  }
+}
+
 export interface EmbroideryStyle {
   id: string
   name: string
@@ -28,6 +59,12 @@ export interface CustomizationData {
   productName: string
   productImage: string
   basePrice: number
+  // Multi-embroidery support
+  designs: EmbroideryDesignData[]
+  maxDesigns: number
+  // Saved high-quality mockup captured at the end of step 3
+  mockup?: string
+  // Legacy single design support (for backward compatibility)
   design: DesignUpload | null
   selectedStyles: {
     coverage: EmbroideryStyle | null
@@ -55,11 +92,24 @@ interface CustomizationContextType {
   customizationData: CustomizationData
   setCustomizationData: (data: Partial<CustomizationData>) => void
   resetCustomization: () => void
+  // Legacy methods (for backward compatibility)
   uploadDesign: (file: File) => void
   removeDesign: () => void
   selectStyle: (category: keyof CustomizationData['selectedStyles'], style: EmbroideryStyle) => void
   toggleStyle: (category: 'threads' | 'upgrades', style: EmbroideryStyle) => void
+  // New multi-embroidery methods
+  addDesign: (file: File) => void
+  removeDesignById: (designId: string) => void
+  updateDesign: (designId: string, updates: Partial<EmbroideryDesignData>) => void
+  reorderDesigns: (fromIndex: number, toIndex: number) => void
+  getDesignById: (designId: string) => EmbroideryDesignData | undefined
+  selectStyleForDesign: (designId: string, category: keyof EmbroideryDesignData['selectedStyles'], style: EmbroideryStyle) => void
+  toggleStyleForDesign: (designId: string, category: 'threads' | 'upgrades', style: EmbroideryStyle) => void
+  copyEmbroideryOptions: (fromDesignId: string, toDesignId: string) => void
+  // Pricing
   calculateTotalPrice: () => number
+  calculateDesignPrice: (designId: string) => number
+  // Data
   embroideryStyles: EmbroideryStyle[]
   loading: boolean
 }
@@ -460,30 +510,78 @@ const defaultCustomizationData: CustomizationData = {
   productName: '',
   productImage: '',
   basePrice: 0,
+  quantity: 1,
+  color: '#000000',
+  size: '',
+  notes: '',
+  // Multi-embroidery support
+  designs: [],
+  maxDesigns: 5, // Maximum number of designs per product
+  mockup: undefined,
+  // Legacy single design support (for backward compatibility)
   design: null,
   selectedStyles: {
     coverage: null,
     material: null,
     border: null,
-    threads: [],
     backing: null,
+    threads: [],
     upgrades: [],
     cutting: null
   },
   placement: 'manual',
-  size: '',
-  color: '#000000',
-  quantity: 1,
-  notes: '',
   designPosition: { x: 50, y: 50 },
   designScale: 1,
   designRotation: 0
 }
 
+const CUSTOMIZATION_STORAGE_KEY = 'mayhem_customization_v1'
+
 export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [embroideryStyles, setEmbroideryStyles] = useState<EmbroideryStyle[]>(defaultEmbroideryStyles)
   const [loading, setLoading] = useState(true)
-  const [customizationData, setCustomizationDataState] = useState<CustomizationData>(defaultCustomizationData)
+  
+  // Initialize customization data from localStorage if available
+  const [customizationData, setCustomizationDataState] = useState<CustomizationData>(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOMIZATION_STORAGE_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Merge with default to ensure all required fields exist
+        const loadedData = { ...defaultCustomizationData, ...parsed }
+        
+        // Handle design File object restoration
+        if (loadedData.design) {
+          loadedData.design = {
+            ...loadedData.design,
+            // File objects are lost on reload, create dummy File for preview
+            file: new File([], loadedData.design.name || 'design', { type: 'image/png' })
+          }
+        }
+        
+        // Restore designs with proper File handling
+        if (loadedData.designs && loadedData.designs.length > 0) {
+          loadedData.designs = loadedData.designs.map((design: any) => ({
+            ...design,
+            // File objects are lost on reload, but we keep the preview and other data
+            file: new File([], design.name || 'design', { type: 'image/png' }) // Create dummy File
+          }))
+        }
+        
+        console.log('📱 Loaded customization data from localStorage:', {
+          designsCount: loadedData.designs?.length || 0,
+          hasDesign: !!loadedData.design,
+          hasMockup: !!loadedData.mockup,
+          mockupSize: loadedData.mockup ? Math.round(loadedData.mockup.length / 1024) : 0
+        })
+        
+        return loadedData
+      }
+    } catch (error) {
+      console.warn('Failed to load customization data from localStorage:', error)
+    }
+    return defaultCustomizationData
+  })
 
   // Fetch embroidery options from API
   useEffect(() => {
@@ -491,7 +589,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         setLoading(true)
         const response = await embroideryOptionApiService.getActiveEmbroideryOptions()
-        const convertedOptions = response.data.map(convertApiToContext)
+        const convertedOptions = response.data?.map(convertApiToContext) || []
         setEmbroideryStyles(convertedOptions)
       } catch (error) {
         console.error('Failed to fetch embroidery options, using defaults:', error)
@@ -505,26 +603,81 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [])
 
   const setCustomizationData = (data: Partial<CustomizationData>) => {
-    setCustomizationDataState(prev => ({ ...prev, ...data }))
+    setCustomizationDataState(prev => {
+      const newState = { ...prev, ...data }
+      
+      // Save to localStorage (excluding File objects which can't be serialized)
+      try {
+        const serializableState = {
+          ...newState,
+          design: newState.design ? {
+            ...newState.design,
+            file: undefined, // Remove File object, keep other data
+            preview: newState.design.preview // Keep preview URL or base64
+          } : null,
+          designs: newState.designs.map(design => ({
+            ...design,
+            file: undefined, // Remove File object, keep other data
+            preview: design.preview // Keep base64 preview
+          }))
+        }
+        localStorage.setItem(CUSTOMIZATION_STORAGE_KEY, JSON.stringify(serializableState))
+        console.log('💾 Customization data saved to localStorage')
+      } catch (error) {
+        console.warn('Failed to save customization data to localStorage:', error)
+      }
+      
+      return newState
+    })
   }
 
   const resetCustomization = () => {
     setCustomizationDataState(defaultCustomizationData)
+    // Clear localStorage when resetting
+    try {
+      localStorage.removeItem(CUSTOMIZATION_STORAGE_KEY)
+      console.log('🗑️ Customization data cleared from localStorage')
+    } catch (error) {
+      console.warn('Failed to clear customization data from localStorage:', error)
+    }
   }
 
-  const uploadDesign = (file: File) => {
-    const designUpload: DesignUpload = {
-      file,
-      preview: URL.createObjectURL(file),
-      name: file.name,
-      size: file.size
+  const uploadDesign = async (file: File) => {
+    try {
+      // Convert file to base64 for persistent preview
+      const reader = new FileReader()
+      const preview = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      
+      const designUpload: DesignUpload = {
+        file,
+        preview,
+        name: file.name,
+        size: file.size
+      }
+      setCustomizationData({ design: designUpload })
+    } catch (error) {
+      console.error('Error converting file to base64:', error)
+      // Fallback to blob URL if base64 conversion fails
+      const designUpload: DesignUpload = {
+        file,
+        preview: URL.createObjectURL(file),
+        name: file.name,
+        size: file.size
+      }
+      setCustomizationData({ design: designUpload })
     }
-    setCustomizationData({ design: designUpload })
   }
 
   const removeDesign = () => {
     if (customizationData.design) {
-      URL.revokeObjectURL(customizationData.design.preview)
+      // Only revoke blob URLs, not base64 data URLs
+      if (customizationData.design.preview.startsWith('blob:')) {
+        URL.revokeObjectURL(customizationData.design.preview)
+      }
     }
     setCustomizationData({ design: null })
   }
@@ -566,6 +719,17 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const calculateTotalPrice = () => {
     const basePrice = Number(customizationData.basePrice) || 0
+    
+    // Calculate price for multi-embroidery designs
+    if (customizationData.designs.length > 0) {
+      const totalDesignPrice = customizationData.designs.reduce((sum, design) => {
+        return sum + calculateDesignPrice(design.id)
+      }, 0)
+      const quantity = Number(customizationData.quantity) || 1
+      return (basePrice + totalDesignPrice) * quantity
+    }
+    
+    // Legacy single design calculation
     const { selectedStyles } = customizationData
     
     let totalStylePrice = 0
@@ -582,16 +746,216 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     return (basePrice + totalStylePrice) * quantity
   }
 
+  // Multi-embroidery methods
+  const addDesign = async (file: File) => {
+    console.log('addDesign called with file:', file.name, 'Current designs:', customizationData.designs.length, 'Max designs:', customizationData.maxDesigns)
+    console.log('Current designs array:', customizationData.designs.map(d => d.name))
+    
+    if (customizationData.designs.length >= customizationData.maxDesigns) {
+      console.warn(`Maximum ${customizationData.maxDesigns} designs allowed`)
+      return
+    }
+
+    const designId = `design_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    console.log('Creating new design with ID:', designId)
+    
+    try {
+      // Convert file to base64 for persistent preview
+      const reader = new FileReader()
+      const preview = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      
+      const newDesign: EmbroideryDesignData = {
+        id: designId,
+        name: file.name,
+        file,
+        preview,
+        dimensions: { width: 3, height: 3 }, // Default dimensions
+        position: { x: 50, y: 50, placement: 'front' },
+        scale: 1,
+        rotation: 0,
+        notes: '',
+        selectedStyles: {
+          coverage: null,
+          material: null,
+          border: null,
+          threads: [],
+          backing: null,
+          upgrades: [],
+          cutting: null
+        }
+      }
+
+      const newDesignsArray = [...customizationData.designs, newDesign]
+      console.log('Setting new designs array with', newDesignsArray.length, 'designs:', newDesignsArray.map(d => d.name))
+      
+      setCustomizationData({
+        designs: newDesignsArray
+      })
+      
+      console.log('Design added successfully. New count should be:', newDesignsArray.length)
+      console.log('Current designs array after add:', newDesignsArray.map(d => ({ id: d.id, name: d.name })))
+    } catch (error) {
+      console.error('Error converting file to base64:', error)
+      // Fallback to blob URL if base64 conversion fails
+      const newDesign: EmbroideryDesignData = {
+        id: designId,
+        name: file.name,
+        file,
+        preview: URL.createObjectURL(file),
+        dimensions: { width: 3, height: 3 }, // Default dimensions
+        position: { x: 50, y: 50, placement: 'front' },
+        scale: 1,
+        rotation: 0,
+        notes: '',
+        selectedStyles: {
+          coverage: null,
+          material: null,
+          border: null,
+          threads: [],
+          backing: null,
+          upgrades: [],
+          cutting: null
+        }
+      }
+
+      const newDesignsArray = [...customizationData.designs, newDesign]
+      console.log('Setting new designs array with fallback blob URL')
+      
+      setCustomizationData({
+        designs: newDesignsArray
+      })
+    }
+  }
+
+  const removeDesignById = (designId: string) => {
+    const designToRemove = customizationData.designs.find(d => d.id === designId)
+    if (designToRemove) {
+      URL.revokeObjectURL(designToRemove.preview)
+    }
+
+    setCustomizationData({
+      designs: customizationData.designs.filter(d => d.id !== designId)
+    })
+  }
+
+  const updateDesign = (designId: string, updates: Partial<EmbroideryDesignData>) => {
+    setCustomizationData({
+      designs: customizationData.designs.map(design =>
+        design.id === designId ? { ...design, ...updates } : design
+      )
+    })
+  }
+
+  const reorderDesigns = (fromIndex: number, toIndex: number) => {
+    const newDesigns = [...customizationData.designs]
+    const [movedDesign] = newDesigns.splice(fromIndex, 1)
+    newDesigns.splice(toIndex, 0, movedDesign)
+    
+    setCustomizationData({ designs: newDesigns })
+  }
+
+  const getDesignById = (designId: string) => {
+    return customizationData.designs.find(d => d.id === designId)
+  }
+
+  const selectStyleForDesign = (designId: string, category: keyof EmbroideryDesignData['selectedStyles'], style: EmbroideryStyle) => {
+    if (category === 'threads' || category === 'upgrades') {
+      // These are arrays, handled by toggleStyleForDesign
+      return
+    }
+
+    const design = getDesignById(designId)
+    if (design) {
+      updateDesign(designId, {
+        selectedStyles: {
+          ...design.selectedStyles,
+          [category]: style
+        }
+      })
+    }
+  }
+
+  const toggleStyleForDesign = (designId: string, category: 'threads' | 'upgrades', style: EmbroideryStyle) => {
+    const design = getDesignById(designId)
+    if (!design) return
+
+    const currentStyles = design.selectedStyles[category]
+    const isSelected = currentStyles.some(s => s.id === style.id)
+    
+    const newStyles = isSelected
+      ? currentStyles.filter(s => s.id !== style.id)
+      : [...currentStyles, style]
+
+    updateDesign(designId, {
+      selectedStyles: {
+        ...design.selectedStyles,
+        [category]: newStyles
+      }
+    })
+  }
+
+  const copyEmbroideryOptions = (fromDesignId: string, toDesignId: string) => {
+    const fromDesign = customizationData.designs.find(d => d.id === fromDesignId)
+    const toDesign = customizationData.designs.find(d => d.id === toDesignId)
+    
+    if (!fromDesign || !toDesign) {
+      console.warn('Design not found for copying embroidery options')
+      return
+    }
+
+    console.log(`Copying embroidery options from ${fromDesign.name} to ${toDesign.name}`)
+    
+    updateDesign(toDesignId, {
+      selectedStyles: { ...fromDesign.selectedStyles }
+    })
+  }
+
+  const calculateDesignPrice = (designId: string) => {
+    const design = getDesignById(designId)
+    if (!design) return 0
+
+    // Calculate options price
+    const { selectedStyles } = design
+    let optionsPrice = 0
+    if (selectedStyles.coverage) optionsPrice += Number(selectedStyles.coverage.price) || 0
+    if (selectedStyles.material) optionsPrice += Number(selectedStyles.material.price) || 0
+    if (selectedStyles.border) optionsPrice += Number(selectedStyles.border.price) || 0
+    if (selectedStyles.backing) optionsPrice += Number(selectedStyles.backing.price) || 0
+    if (selectedStyles.cutting) optionsPrice += Number(selectedStyles.cutting.price) || 0
+    
+    selectedStyles.threads.forEach(thread => optionsPrice += Number(thread.price) || 0)
+    selectedStyles.upgrades.forEach(upgrade => optionsPrice += Number(upgrade.price) || 0)
+
+    return optionsPrice
+  }
+
   return (
     <CustomizationContext.Provider value={{
       customizationData,
       setCustomizationData,
       resetCustomization,
+      // Legacy methods (for backward compatibility)
       uploadDesign,
       removeDesign,
       selectStyle,
       toggleStyle,
+      // New multi-embroidery methods
+      addDesign,
+      removeDesignById,
+      updateDesign,
+      reorderDesigns,
+      getDesignById,
+      selectStyleForDesign,
+      toggleStyleForDesign,
+      copyEmbroideryOptions,
+      // Pricing
       calculateTotalPrice,
+      calculateDesignPrice,
+      // Data
       embroideryStyles,
       loading
     }}>

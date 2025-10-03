@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Mockup Restoration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .mockup-preview {
+            max-width: 300px;
+            max-height: 300px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        .test-steps {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .test-steps ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .test-steps li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔄 Mockup Persistence Test</h1>
+    
+    <div class="test-container">
+        <h3>Test localStorage Mockup Persistence</h3>
+        <p>This test verifies that the mockup captured in step 3 persists across page refreshes.</p>
+        
+        <div id="status" class="status info">
+            Ready to test mockup persistence...
+        </div>
+        
+        <div>
+            <button onclick="simulateStep3Capture()">🎯 Simulate Step 3 Mockup Capture</button>
+            <button onclick="checkMockupPersistence()">🔍 Check Mockup Status</button>
+            <button onclick="clearAllData()">🗑️ Clear All Data</button>
+        </div>
+        
+        <div id="mockupPreview"></div>
+    </div>
+
+    <div class="test-container">
+        <h3>Test Instructions</h3>
+        <div class="test-steps">
+            <ol>
+                <li><strong>Click "Simulate Step 3 Mockup Capture"</strong> - This simulates capturing a mockup when leaving step 3</li>
+                <li><strong>Click "Check Mockup Status"</strong> - Verify the mockup is saved</li>
+                <li><strong>Refresh the page (F5)</strong> - This simulates a page refresh</li>
+                <li><strong>Click "Check Mockup Status" again</strong> - The mockup should still be there!</li>
+                <li><strong>View the mockup preview</strong> - You should see the captured image</li>
+            </ol>
+        </div>
+        
+        <div class="status warning">
+            <strong>Expected Result:</strong> The mockup should persist across page refreshes, and you should see the same image before and after refreshing.
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h3>Real Application Test</h3>
+        <p>After verifying this test works, try the real application:</p>
+        <div class="test-steps">
+            <ol>
+                <li>Go to the customization page for any product</li>
+                <li>Upload a design and position it in step 3</li>
+                <li>Click "Continue" to go to step 4 (this captures the mockup)</li>
+                <li>Refresh the page</li>
+                <li>Go back to step 3 - your design should still be there</li>
+                <li>Add to cart - it should use the saved mockup from step 3</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'mayhem_customization_v1';
+        
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        function simulateStep3Capture() {
+            try {
+                // Create a mock mockup (1x1 red pixel)
+                const mockMockup = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                
+                // Simulate the customization data structure
+                const customizationData = {
+                    productId: '1',
+                    productName: 'Test Product',
+                    productImage: 'test-image.jpg',
+                    basePrice: 29.99,
+                    design: {
+                        name: 'test-design.png',
+                        size: 1024,
+                        preview: 'data:image/png;base64,test-preview-data'
+                    },
+                    selectedStyles: {
+                        coverage: null,
+                        material: null,
+                        border: null,
+                        backing: null,
+                        threads: [],
+                        upgrades: [],
+                        cutting: null
+                    },
+                    placement: 'front',
+                    size: 'medium',
+                    color: '#000000',
+                    quantity: 1,
+                    notes: 'Test customization',
+                    designPosition: { x: 50, y: 50 },
+                    designScale: 1,
+                    designRotation: 0,
+                    mockup: mockMockup // This is the key - the mockup from step 3
+                };
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(customizationData));
+                updateStatus('✅ Step 3 mockup captured and saved to localStorage!', 'success');
+                
+                // Show the mockup preview
+                showMockupPreview(mockMockup);
+                
+            } catch (error) {
+                updateStatus('❌ Failed to capture mockup: ' + error.message, 'error');
+            }
+        }
+        
+        function checkMockupPersistence() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    const hasMockup = !!data.mockup;
+                    const mockupSize = data.mockup ? Math.round(data.mockup.length / 1024) : 0;
+                    
+                    if (hasMockup) {
+                        updateStatus(
+                            `✅ Mockup found and persisted! Size: ${mockupSize}KB, Product: ${data.productName}`, 
+                            'success'
+                        );
+                        showMockupPreview(data.mockup);
+                    } else {
+                        updateStatus('⚠️ Customization data found but no mockup', 'warning');
+                    }
+                } else {
+                    updateStatus('❌ No customization data found in localStorage', 'error');
+                }
+            } catch (error) {
+                updateStatus('❌ Failed to check mockup: ' + error.message, 'error');
+            }
+        }
+        
+        function showMockupPreview(mockupData) {
+            const previewDiv = document.getElementById('mockupPreview');
+            if (mockupData) {
+                previewDiv.innerHTML = `
+                    <h4>Captured Mockup Preview:</h4>
+                    <img src="${mockupData}" class="mockup-preview" alt="Mockup Preview" />
+                    <p><small>This mockup should persist across page refreshes</small></p>
+                `;
+            } else {
+                previewDiv.innerHTML = '';
+            }
+        }
+        
+        function clearAllData() {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+                updateStatus('🗑️ All customization data cleared from localStorage', 'info');
+                document.getElementById('mockupPreview').innerHTML = '';
+            } catch (error) {
+                updateStatus('❌ Failed to clear data: ' + error.message, 'error');
+            }
+        }
+        
+        // Auto-check on page load
+        window.onload = function() {
+            checkMockupPersistence();
+        };
+    </script>
+</body>
+</html>

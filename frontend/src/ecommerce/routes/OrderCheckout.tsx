@@ -21,9 +21,10 @@ import {
 } from 'lucide-react'
 import { products } from '../../data/products'
 import Button from '../../components/Button'
-import StripePaymentForm from '../../components/StripePaymentForm'
+// StripePaymentForm removed for hosted Checkout flow
 import PayPalButton from '../../components/PayPalButton'
 import { paymentService, PaymentData, PaymentResult } from '../../shared/paymentService'
+import { paymentsApiService } from '../../shared/paymentsApiService'
 
 interface OrderItem {
   id: string
@@ -267,51 +268,44 @@ export default function OrderCheckout() {
 
   const handleStripeCheckout = async () => {
     try {
-      // For now, use the existing Stripe service as a fallback
-      // TODO: Implement proper Stripe Checkout session creation on backend
-      const paymentData: PaymentData = {
-        amount: Math.round(calculateTotal() * 100), // Convert to cents
-        currency: 'usd',
-        customerEmail: formData.email,
-        customerName: `${formData.firstName} ${formData.lastName}`,
-        description: `Order ${order.id} - ${order.items.length} item(s)`,
-        billingAddress: {
-          line1: formData.address,
-          line2: formData.apartment,
-          city: formData.city,
-          state: formData.state,
-          postal_code: formData.zipCode,
-          country: formData.country
-        },
-        items: order.items.map((item) => {
-          const product = products.find(p => p.id === item.productId)
-          const itemPrice = calculateItemPrice(item)
-          
-          return {
-            name: product?.name || item.productName,
-            quantity: item.quantity,
-            price: itemPrice,
-            currency: 'usd'
-          }
-        }),
-        metadata: {
-          orderId: order.id,
-          customerPhone: formData.phone,
-          notes: formData.notes
+      // Build Stripe Checkout line items
+      const lineItems = order.items.map((item) => {
+        const product = products.find(p => p.id === item.productId)
+        const itemPrice = calculateItemPrice(item)
+        return {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: product?.title || item.productName,
+              description: `Qty ${item.quantity}`,
+              images: product?.image ? [product.image] : undefined,
+            },
+            unit_amount: Math.round(itemPrice * 100),
+          },
+          quantity: item.quantity,
         }
+      })
+
+      const successUrl = `${window.location.origin}/order-checkout?success=true&orderId=${order.id}`
+      const cancelUrl = `${window.location.origin}/order-checkout?canceled=true`
+
+      const response = await paymentsApiService.createCheckoutSession({
+        lineItems,
+        successUrl,
+        cancelUrl,
+        metadata: {
+          orderId: String(order.id),
+          customerEmail: formData.email,
+        },
+      })
+
+      if (response.success && response.data?.url) {
+        // Redirect to hosted Stripe Checkout
+        window.location.href = response.data.url
+        return
       }
 
-      // Process payment using existing Stripe service
-      const result = await paymentService.processPayment('stripe', paymentData)
-      setPaymentResult(result)
-
-      if (result.success) {
-        setIsComplete(true)
-        // Clear sessionStorage after successful payment
-        sessionStorage.removeItem('checkoutOrder')
-      } else {
-        setPaymentError(result.error || 'Payment failed')
-      }
+      setPaymentError(response.message || 'Failed to create checkout session')
     } catch (error) {
       console.error('Stripe payment error:', error)
       setPaymentError('Failed to process payment. Please try again.')
@@ -687,34 +681,13 @@ export default function OrderCheckout() {
                     </div>
                   </div>
 
-                  {/* Payment Forms */}
+                  {/* Hosted Checkout notice for Stripe */}
                   {paymentMethod === 'stripe' && (
                     <div className="border-t pt-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Card Details</h3>
-                      <StripePaymentForm
-                        paymentData={{
-                          amount: Math.round(calculateTotal() * 100),
-                          currency: 'usd',
-                          customerEmail: formData.email,
-                          customerName: `${formData.firstName} ${formData.lastName}`,
-                          billingAddress: {
-                            line1: formData.address,
-                            line2: formData.apartment,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zipCode,
-                            country: formData.country
-                          },
-                          metadata: {
-                            orderId: order.id,
-                            customerPhone: formData.phone,
-                            notes: formData.notes
-                          }
-                        }}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                        disabled={isProcessing}
-                      />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Stripe Checkout</h3>
+                      <p className="text-sm text-gray-600">
+                        You’ll securely complete your payment on Stripe’s hosted checkout page after the review step.
+                      </p>
                     </div>
                   )}
 
@@ -915,12 +888,12 @@ export default function OrderCheckout() {
                   {isProcessing ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {paymentMethod === 'stripe' ? 'Processing with Stripe...' : 'Processing...'}
+                      Processing...
                     </>
                   ) : (
                     <>
                       <Lock className="w-4 h-4 mr-2" />
-                      {paymentMethod === 'stripe' ? 'Pay with Stripe' : 'Complete Order'}
+                      Complete Payment
                     </>
                   )}
                 </Button>

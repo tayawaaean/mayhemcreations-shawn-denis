@@ -3,6 +3,7 @@ import type { CartItem } from '../../types'
 import { productApiService } from '../../shared/productApiService'
 import { cartApiService } from '../../shared/cartApiService'
 import { useAuth } from './AuthContext'
+import { products } from '../../data/products'
 
 type CartContextType = {
   items: CartItem[]
@@ -13,6 +14,8 @@ type CartContextType = {
   validateStock: (productId: string, quantity: number) => Promise<{ valid: boolean; message?: string }>
   isLoading: boolean
   syncWithDatabase: () => Promise<void>
+  cleanupInvalidItems: () => void
+  clearLocalStorageIfNeeded: () => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -27,10 +30,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (raw) {
         const items = JSON.parse(raw)
         // Ensure all items have reviewStatus
-        return items.map((item: any) => ({
+        const validItems = items.map((item: any) => ({
           ...item,
           reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
         }))
+        
+        // Log cart loading for debugging
+        console.log('🛒 Loading cart from localStorage:', validItems.length, 'items')
+        console.log('🛒 Note: Large files/previews not loaded from localStorage to prevent quota issues')
+        return validItems
       }
       return []
     } catch (e) {
@@ -60,7 +68,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           productId: item.productId,
           quantity: item.quantity,
           customization: item.customization,
-          reviewStatus: item.reviewStatus || 'approved',
+          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
           product: item.product, // Include the full product data from database
         }))
         
@@ -68,7 +76,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setItems(transformedItems)
         
         // Also save to localStorage for offline access
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(transformedItems))
+        try {
+          const compressedItems = compressCartData(transformedItems)
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+        } catch (error) {
+          console.warn('🛒 Could not save to localStorage:', error)
+        }
       } else {
         console.log('🛒 Cart API failed:', response.message)
       }
@@ -119,12 +132,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           productId: item.productId,
           quantity: item.quantity,
           customization: item.customization,
-          reviewStatus: item.reviewStatus || 'approved',
+          reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
           product: item.product, // Include the full product data from database
         }))
         
         setItems(updatedItems)
-        localStorage.setItem(LOCAL_KEY, JSON.stringify(updatedItems))
+        try {
+          const compressedItems = compressCartData(updatedItems)
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+        } catch (error) {
+          console.warn('🛒 Could not save to localStorage:', error)
+        }
       }
     } catch (error) {
       console.error('Error syncing cart with database:', error)
@@ -149,12 +167,88 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [isLoggedIn, user?.id, isCleared]) // Removed function dependencies to prevent infinite loop
 
-  // Save to localStorage when items change (for guest users)
+  // Check localStorage usage on mount
   useEffect(() => {
-    if (!isLoggedIn) {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(items))
+    clearLocalStorageIfNeeded()
+  }, [])
+
+  // Helper function to compress cart data for localStorage
+  const compressCartData = (cartItems: CartItem[]) => {
+    return cartItems.map(item => {
+      // Create a compressed version of the item
+      const compressedItem = {
+        id: item.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        reviewStatus: item.reviewStatus,
+        customization: item.customization ? {
+          // Keep all customization data - it's essential for cart functionality
+          ...item.customization,
+          // Keep mockup data with size limits (important for order display)
+          mockup: item.customization.mockup && item.customization.mockup.length < 200000 ? item.customization.mockup : undefined,
+          // For designs, keep essential data but limit file size
+          designs: item.customization.designs?.map((design: any) => ({
+            id: design.id,
+            name: design.name,
+            dimensions: design.dimensions,
+            position: design.position,
+            scale: design.scale,
+            rotation: design.rotation,
+            notes: design.notes,
+            selectedStyles: design.selectedStyles,
+            // Keep preview and file data but limit size
+            preview: design.preview && design.preview.length < 50000 ? design.preview : undefined, // Limit to ~50KB
+            file: design.file && typeof design.file === 'string' && design.file.length < 50000 ? design.file : undefined, // Limit base64 strings
+            totalPrice: design.totalPrice,
+            materialCosts: design.materialCosts
+          })),
+          // Keep legacy design data with size limits
+          design: item.customization.design ? {
+            ...item.customization.design,
+            preview: item.customization.design.preview && item.customization.design.preview.length < 50000 ? item.customization.design.preview : undefined,
+            file: item.customization.design.file && typeof item.customization.design.file === 'string' && item.customization.design.file.length < 50000 ? item.customization.design.file : undefined,
+          } : undefined,
+          // Keep embroidery data with size limits
+          embroideryData: item.customization.embroideryData ? {
+            ...item.customization.embroideryData,
+            designImage: item.customization.embroideryData.designImage && item.customization.embroideryData.designImage.length < 50000 ? item.customization.embroideryData.designImage : undefined,
+          } : undefined
+        } : undefined
+      }
+      
+      // Remove the product object which can be large (this gets re-added from products array)
+      delete (compressedItem as any).product
+      
+      return compressedItem
+    })
+  }
+
+  // Save to localStorage when items change (for both guest and logged-in users)
+  useEffect(() => {
+    try {
+      const compressedItems = compressCartData(items)
+      const cartData = JSON.stringify(compressedItems)
+      
+      // Check if data is too large (localStorage has ~5-10MB limit)
+      if (cartData.length > 4 * 1024 * 1024) { // 4MB limit
+        console.warn('🛒 Cart data too large for localStorage, skipping save')
+        console.warn('🛒 Cart data size:', (cartData.length / 1024 / 1024).toFixed(2), 'MB')
+        return
+      }
+      
+      localStorage.setItem(LOCAL_KEY, cartData)
+      console.log('🛒 Saved items to localStorage:', items.length, 'items, size:', (cartData.length / 1024).toFixed(2), 'KB')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.error('🛒 localStorage quota exceeded, cart data too large')
+        console.error('🛒 Cart items:', items.length, 'items')
+        // Optionally clear old data or show warning to user
+        alert('Cart data is too large to save locally. Some items may not persist after refresh.')
+      } else {
+        console.error('🛒 Error saving cart to localStorage:', error)
+      }
     }
-  }, [items, isLoggedIn])
+  }, [items])
 
   const validateStock = async (productId: string, quantity: number): Promise<{ valid: boolean; message?: string }> => {
     try {
@@ -194,6 +288,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const response = await cartApiService.addToCart(productId, qty, customization)
         if (response.success && response.data) {
+          console.log('🛒 Database response for addToCart:', {
+            productId: response.data.productId,
+            hasCustomization: !!response.data.customization,
+            hasMockup: !!response.data.customization?.mockup,
+            mockupSize: response.data.customization?.mockup ? Math.round(response.data.customization.mockup.length / 1024) : 0,
+            customizationKeys: response.data.customization ? Object.keys(response.data.customization) : []
+          })
+          
           // Update local state with database response
           setItems((prev) => {
             const existingIndex = prev.findIndex((p) => p.productId === productId && !p.customization)
@@ -204,7 +306,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
-                reviewStatus: response.data!.reviewStatus || 'approved',
+                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
               }
               return updated
             } else {
@@ -213,7 +315,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 productId: response.data!.productId,
                 quantity: response.data!.quantity,
                 customization: response.data!.customization,
-                reviewStatus: response.data!.reviewStatus || 'approved',
+                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
               }]
             }
           })
@@ -253,19 +355,35 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const remove = async (productId: string) => {
+    console.log('🗑️ Removing item:', productId)
+    
     if (isLoggedIn) {
       // Find the cart item ID for database removal
       const item = items.find((p) => p.productId === productId)
       if (item && item.id) {
         try {
+          console.log('🗑️ Removing from database:', item.id)
           await cartApiService.removeFromCart(item.id)
+          console.log('✅ Successfully removed from database')
         } catch (error) {
-          console.error('Error removing from cart:', error)
+          console.error('❌ Error removing from cart:', error)
         }
       }
     }
     
-    setItems((prev) => prev.filter((p) => p.productId !== productId))
+    const updatedItems = items.filter((p) => p.productId !== productId)
+    console.log('🗑️ Updated items:', updatedItems.length)
+    
+    setItems(updatedItems)
+    
+    // Update localStorage for both logged-in and guest users
+    try {
+      const compressedItems = compressCartData(updatedItems)
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+      console.log('🗑️ Updated localStorage')
+    } catch (error) {
+      console.warn('🛒 Could not save to localStorage:', error)
+    }
   }
   
   const update = async (productId: string, qty: number): Promise<boolean> => {
@@ -310,16 +428,82 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
   
   const clear = async () => {
+    console.log('🧹 Clearing cart...')
+    
     if (isLoggedIn) {
       try {
+        console.log('🧹 Clearing database cart...')
         await cartApiService.clearCart()
+        console.log('✅ Successfully cleared database cart')
       } catch (error) {
-        console.error('Error clearing cart:', error)
+        console.error('❌ Error clearing cart:', error)
       }
     }
     
     setItems([])
     setIsCleared(true)
+    
+    // Clear localStorage for both logged-in and guest users
+    localStorage.removeItem(LOCAL_KEY)
+    console.log('🧹 Cleared localStorage and state')
+  }
+
+  const clearLocalStorageIfNeeded = () => {
+    try {
+      // Check localStorage usage
+      let totalSize = 0
+      for (let key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+          totalSize += localStorage[key].length
+        }
+      }
+      
+      const sizeInMB = totalSize / 1024 / 1024
+      console.log('🛒 Current localStorage usage:', sizeInMB.toFixed(2), 'MB')
+      
+      // If localStorage is getting full (>3MB), clear some old data
+      if (sizeInMB > 3) {
+        console.warn('🛒 localStorage getting full, clearing old cart data')
+        localStorage.removeItem(LOCAL_KEY)
+        // Could also clear other old data here
+      }
+    } catch (error) {
+      console.warn('🛒 Could not check localStorage usage:', error)
+    }
+  }
+
+  const cleanupInvalidItems = () => {
+    console.log('🧹 Cleaning up invalid cart items...')
+    setItems(prevItems => {
+      const validItems = prevItems.filter(item => {
+        // Keep custom embroidery items
+        if (item.productId === 'custom-embroidery') {
+          return true;
+        }
+        
+        // For other items, we need to validate they exist in products
+        const productExists = products.some((p: any) => p.id === item.productId);
+        
+        if (!productExists) {
+          console.warn(`🧹 Removing invalid item with productId: ${item.productId}`);
+        }
+        
+        return productExists;
+      });
+      
+      if (validItems.length !== prevItems.length) {
+        console.log(`🧹 Cleaned up ${prevItems.length - validItems.length} invalid items`);
+        // Update localStorage with cleaned items
+        try {
+          const compressedItems = compressCartData(validItems)
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems));
+        } catch (error) {
+          console.warn('🛒 Could not save to localStorage:', error)
+        }
+      }
+      
+      return validItems;
+    });
   }
 
   return <CartContext.Provider value={{ 
@@ -330,7 +514,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clear, 
     validateStock, 
     isLoading, 
-    syncWithDatabase 
+    syncWithDatabase,
+    cleanupInvalidItems,
+    clearLocalStorageIfNeeded
   }}>{children}</CartContext.Provider>
 }
 

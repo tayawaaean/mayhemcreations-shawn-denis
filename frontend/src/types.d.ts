@@ -58,6 +58,32 @@ export type CartItem = {
       preview: string
       base64?: string
     } | null
+    designs?: {
+      id: string
+      name: string
+      preview: string
+      dimensions: {
+        width: number
+        height: number
+      }
+      position: {
+        x: number
+        y: number
+        placement: string
+      }
+      scale: number
+      rotation: number
+      notes: string
+      selectedStyles: {
+        coverage: { id: string; name: string; price: number } | null
+        material: { id: string; name: string; price: number } | null
+        border: { id: string; name: string; price: number } | null
+        threads: { id: string; name: string; price: number }[]
+        backing: { id: string; name: string; price: number } | null
+        upgrades: { id: string; name: string; price: number }[]
+        cutting: { id: string; name: string; price: number } | null
+      }
+    }[] | null
     mockup?: string
     selectedStyles: {
       coverage: { id: string; name: string; price: number } | null
