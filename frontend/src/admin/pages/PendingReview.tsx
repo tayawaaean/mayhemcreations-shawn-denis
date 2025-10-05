@@ -17,9 +17,14 @@ import {
   Image as ImageIcon,
   Check,
   XCircle,
-  CreditCard
+  CreditCard,
+  Download,
+  Layers,
+  MousePointer,
+  Maximize2
 } from 'lucide-react'
 import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiService' // Updated with new status types
+import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useAdminWebSocket } from '../../hooks/useWebSocket'
 
 const PendingReview: React.FC = () => {
@@ -383,7 +388,18 @@ const PendingReview: React.FC = () => {
       return 'Custom Embroidery';
     }
     // For regular products
-    return item?.product?.title || 'Custom Product';
+    // Try multiple fallbacks for product name
+    if (item?.product?.title) {
+      return item.product.title;
+    }
+    if (item?.productName) {
+      return item.productName;
+    }
+    // If we have a productId but no product data, show the ID
+    if (item?.productId && item.productId !== 'custom-embroidery') {
+      return `Product #${item.productId}`;
+    }
+    return 'Custom Product';
   };
 
   const getPictureReplyStatus = (review: OrderReview) => {
@@ -633,6 +649,40 @@ const PendingReview: React.FC = () => {
     setIsImageModalOpen(true)
   }
 
+  // Function to download image
+  const downloadImage = (src: string, filename: string) => {
+    try {
+      // Create a temporary link element
+      const link = document.createElement('a')
+      link.href = src
+      
+      // If it's a base64 image, convert it to a blob
+      if (src.startsWith('data:')) {
+        fetch(src)
+          .then(res => res.blob())
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob)
+            link.href = url
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+          })
+          .catch(err => console.error('Error downloading image:', err))
+      } else {
+        // For regular URLs
+        link.download = filename
+        link.target = '_blank'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      }
+    } catch (error) {
+      console.error('Error downloading image:', error)
+    }
+  }
+
   // Function to handle image loading errors
   const handleImageError = (src: string, event: React.SyntheticEvent<HTMLImageElement>) => {
     setImageErrors(prev => new Set([...prev, src]))
@@ -713,18 +763,22 @@ const PendingReview: React.FC = () => {
     const items = parseOrderItems(review.order_data)
     if (items.length === 0) return null
     const first = items[0]
-    // Multiple designs (array)
+    
+    // PRIORITY 1: Final mockup (show final product with design overlay)
+    if (first?.customization?.mockup) return first.customization.mockup
+    
+    // PRIORITY 2: Multiple designs (fallback to first design preview when no mockup)
     if (first?.customization?.designs?.length > 0) {
       const d = first.customization.designs[0]
       return d?.preview || d?.base64 || d?.file || null
     }
-    // Single design
+    
+    // PRIORITY 3: Single design (fallback when no mockup)
     if (first?.productId === 'custom-embroidery' && first?.customization?.design) {
       return first.customization.design.preview || first.customization.design.base64 || first.customization.design.file || null
     }
-    // Final mockup
-    if (first?.customization?.mockup) return first.customization.mockup
-    // Fallback to product image
+    
+    // PRIORITY 4: Fallback to product image
     if (first?.product?.image) return first.product.image
     return null
   }
@@ -767,12 +821,12 @@ const PendingReview: React.FC = () => {
     return itemPrice;
   }
 
-  // Helper function to get pricing breakdown for display
+  // Helper function to get pricing breakdown for display (matches cart structure)
   const getPricingBreakdown = (item: any): {
-    baseProduct: number;
-    embroideryBase: number;
-    options: number;
-    total: number;
+    baseProductPrice: number;
+    embroideryPrice: number;
+    embroideryOptionsPrice: number;
+    totalPrice: number;
     designBreakdown?: Array<{
       designName: string;
       designOptions: number;
@@ -797,13 +851,13 @@ const PendingReview: React.FC = () => {
       selectedStyles: item.customization?.selectedStyles
     });
 
-    // Use stored pricing breakdown if available
+    // Use stored pricing breakdown if available (matches cart structure)
     if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
       const result = {
-        baseProduct: Number(item.pricingBreakdown.baseProductPrice) || 0,
-        embroideryBase: Number(item.pricingBreakdown.embroideryPrice) || 0,
-        options: Number(item.pricingBreakdown.embroideryOptionsPrice) || 0,
-        total: Number(item.pricingBreakdown.totalPrice) || 0
+        baseProductPrice: Number(item.pricingBreakdown.baseProductPrice) || 0,
+        embroideryPrice: Number(item.pricingBreakdown.embroideryPrice) || 0,
+        embroideryOptionsPrice: Number(item.pricingBreakdown.embroideryOptionsPrice) || 0,
+        totalPrice: Number(item.pricingBreakdown.totalPrice) || 0
       };
       console.log('🔍 getPricingBreakdown - Using stored pricingBreakdown:', result);
       return result;
@@ -812,15 +866,16 @@ const PendingReview: React.FC = () => {
     // Fallback calculation for custom embroidery items
     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
       return {
-        baseProduct: 0,
-        embroideryBase: Number(item.customization.embroideryData.materialCosts?.totalCost) || 0,
-        options: Number(item.customization.embroideryData.optionsPrice) || 0,
-        total: Number(item.customization.embroideryData.totalPrice) || 0
+        baseProductPrice: 0,
+        embroideryPrice: Number(item.customization.embroideryData.materialCosts?.totalCost) || 0,
+        embroideryOptionsPrice: Number(item.customization.embroideryData.optionsPrice) || 0,
+        totalPrice: Number(item.customization.embroideryData.totalPrice) || 0
       };
     }
 
     // Calculate pricing for multiple designs with individual embroidery options
     let baseProduct = Number(item.product?.price) || 0;
+    let totalEmbroideryPrice = 0;
     let totalOptions = 0;
     let designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> = [];
 
@@ -830,6 +885,7 @@ const PendingReview: React.FC = () => {
       
       item.customization.designs.forEach((design: any, index: number) => {
         let designOptions = 0;
+        let designMaterialCost = 0;
         const designName = design.name || `Design ${index + 1}`;
         const designDetails: any = {
           coverage: 0,
@@ -841,10 +897,30 @@ const PendingReview: React.FC = () => {
           upgrades: 0
         };
         
+        // Calculate material costs for this design if dimensions are available
+        if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+          try {
+            const materialCosts = MaterialPricingService.calculateMaterialCosts({
+              patchWidth: design.dimensions.width,
+              patchHeight: design.dimensions.height
+            });
+            designMaterialCost = materialCosts.totalCost;
+            totalEmbroideryPrice += designMaterialCost;
+            console.log('🔧 Admin: Calculated material cost for design:', {
+              designName,
+              dimensions: design.dimensions,
+              materialCost: designMaterialCost
+            });
+          } catch (error) {
+            console.warn('Failed to calculate material costs for design:', designName, error);
+          }
+        }
+        
         if (design.selectedStyles) {
           const { selectedStyles } = design;
           
           // Calculate options for this specific design
+          // NOTE: coverage and material are embroidery style options, not material costs
           if (selectedStyles.coverage) {
             designDetails.coverage = Number(selectedStyles.coverage.price) || 0;
             designOptions += designDetails.coverage;
@@ -945,10 +1021,10 @@ const PendingReview: React.FC = () => {
     }
 
     const result = {
-      baseProduct,
-      embroideryBase: 0,
-      options: totalOptions,
-      total: baseProduct + totalOptions,
+      baseProductPrice: baseProduct,
+      embroideryPrice: totalEmbroideryPrice,
+      embroideryOptionsPrice: totalOptions,
+      totalPrice: baseProduct + totalEmbroideryPrice + totalOptions,
       designBreakdown: designBreakdown.length > 0 ? designBreakdown : undefined
     };
     
@@ -1527,21 +1603,24 @@ const PendingReview: React.FC = () => {
                                           mockup: item.customization?.mockup?.substring(0, 50) + '...'
                                         });
 
-                                        // For multiple designs - show first design preview/base64/file
+                                        // For multiple designs - show final product mockup as main image
                                         if (item.customization?.designs && item.customization.designs.length > 0) {
-                                          const firstDesign = item.customization.designs[0];
-                                          const imageSrc = firstDesign.preview || firstDesign.base64 || firstDesign.file;
-                                          console.log('🔍 OrderReview Modal - Multiple designs image src:', imageSrc?.substring(0, 50) + '...');
+                                          // Use final mockup as main image if available, otherwise fallback to first design
+                                          const finalImageSrc = item.customization?.mockup || item.customization.designs[0].preview || item.customization.designs[0].base64 || item.customization.designs[0].file;
+                                          const imageType = item.customization?.mockup ? 'mockup' : 'design';
+                                          const imageAlt = item.customization?.mockup ? 'Final Product with Design Overlay' : `Design: ${item.customization.designs[0].name || 'Design 1'}`;
+                                          
+                                          console.log('🔍 OrderReview Modal - Multiple designs main image src:', finalImageSrc?.substring(0, 50) + '...');
                                           return (
                                             <div className="relative">
                                               {renderImageWithFallback(
-                                                imageSrc,
-                                                `Design: ${firstDesign.name || 'Design 1'}`,
+                                                finalImageSrc,
+                                                imageAlt,
                                                 "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
                                                 () => handleImageClick(
-                                                  imageSrc,
-                                                  `Design: ${firstDesign.name || 'Design 1'}`,
-                                                  'design'
+                                                  finalImageSrc,
+                                                  imageAlt,
+                                                  imageType
                                                 ),
                                                 'large'
                                               )}
@@ -1555,12 +1634,15 @@ const PendingReview: React.FC = () => {
                                         }
                                         // For custom embroidery items - show final product mockup/preview
                                         if (item.productId === 'custom-embroidery') {
-                                          // Try multiple sources for the final product image
+                                          // Try multiple sources for the final product image, prioritizing mockup
                                           const finalImageSrc = 
                                             item.customization?.mockup || 
                                             item.customization?.design?.preview || 
                                             item.customization?.design?.base64 || 
                                             item.customization?.design?.file;
+                                          
+                                          const imageType = item.customization?.mockup ? 'mockup' : 'design';
+                                          const imageAlt = item.customization?.mockup ? 'Final Product with Design Overlay' : 'Original Design';
                                           
                                           console.log('🔍 OrderReview Modal - Custom embroidery image sources:', {
                                             mockup: item.customization?.mockup?.substring(0, 50) + '...',
@@ -1573,12 +1655,12 @@ const PendingReview: React.FC = () => {
                                           if (finalImageSrc) {
                                             return renderImageWithFallback(
                                               finalImageSrc,
-                                              "Final Product",
+                                              imageAlt,
                                               "w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
                                               () => handleImageClick(
                                                 finalImageSrc,
-                                                'Final Product',
-                                                'mockup'
+                                                imageAlt,
+                                                imageType
                                               ),
                                               'large'
                                             );
@@ -1638,44 +1720,103 @@ const PendingReview: React.FC = () => {
                                           
                                           {/* Multiple Designs Support */}
                                           {item.customization.designs && item.customization.designs.length > 0 ? (
-                                            <div className="mt-2">
-                                              <p className="text-xs text-gray-500"><strong>Designs:</strong> {item.customization.designs.length} uploaded</p>
-                                              <div className="flex flex-wrap gap-2 mt-1">
-                                                {item.customization.designs.map((design: any, index: number) => (
-                                                  <div key={design.id || index} className="relative">
-                                                    {renderImageWithFallback(
-                                                      design.preview || design.base64 || design.file,
-                                                      `Design: ${design.name || 'Design ' + (index + 1)}`,
-                                                      "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
-                                                      () => handleImageClick(
+                                            <div className="mt-2 space-y-3">
+                                              <div className="flex items-center justify-between">
+                                                <p className="text-xs text-gray-500"><strong>Uploaded Designs:</strong> {item.customization.designs.length} files</p>
+                                                <button
+                                                  onClick={() => {
+                                                    // Download all designs as a zip or show all in modal
+                                                    console.log('Download all designs');
+                                                  }}
+                                                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                                                >
+                                                  <Download className="h-3 w-3" />
+                                                  <span>Download All</span>
+                                                </button>
+                                              </div>
+                                              
+                                              {/* Original Uploaded Designs */}
+                                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                                                <div className="flex items-center space-x-2 mb-2">
+                                                  <MousePointer className="h-4 w-4 text-blue-600" />
+                                                  <span className="text-xs font-medium text-blue-800">Original Uploaded Design Files</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                  {item.customization.designs.map((design: any, index: number) => (
+                                                    <div key={design.id || index} className="relative group">
+                                                      {renderImageWithFallback(
                                                         design.preview || design.base64 || design.file,
                                                         `Design: ${design.name || 'Design ' + (index + 1)}`,
-                                                        'design'
-                                                      ),
-                                                      'small'
-                                                    )}
-                                                    <div className="absolute -bottom-1 -right-1 bg-white text-xs px-1 rounded text-gray-600 border">
-                                                      {design.dimensions?.width}" × {design.dimensions?.height}"
+                                                        "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity border-blue-300",
+                                                        () => handleImageClick(
+                                                          design.preview || design.base64 || design.file,
+                                                          `Design: ${design.name || 'Design ' + (index + 1)}`,
+                                                          'design'
+                                                        ),
+                                                        'small'
+                                                      )}
+                                                      <div className="absolute -bottom-1 -right-1 bg-white text-xs px-1 rounded text-gray-600 border shadow-sm">
+                                                        {design.dimensions?.width}" × {design.dimensions?.height}"
+                                                      </div>
+                                                      {/* Download button on hover */}
+                                                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const filename = `design-${index + 1}-${design.name || 'design'}.png`;
+                                                            downloadImage(design.preview || design.base64 || design.file, filename);
+                                                          }}
+                                                          className="bg-white text-gray-800 p-1 rounded hover:bg-gray-100 transition-colors"
+                                                          title="Download this design"
+                                                        >
+                                                          <Download className="h-3 w-3" />
+                                                        </button>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                ))}
+                                                  ))}
+                                                </div>
                                               </div>
                                             </div>
                                           ) : item.productId === 'custom-embroidery' && item.customization.design ? (
-                                            <div className="mt-2">
-                                              <p className="text-xs text-gray-500"><strong>Design:</strong> {item.customization.design.name}</p>
-                                              <div className="flex flex-wrap gap-2 mt-1">
-                                                {renderImageWithFallback(
-                                                  item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
-                                                  `Design: ${item.customization.design.name}`,
-                                                  "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
-                                                  () => handleImageClick(
+                                            <div className="mt-2 space-y-3">
+                                              {/* Original Uploaded Design */}
+                                              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <div className="flex items-center space-x-2">
+                                                    <MousePointer className="h-4 w-4 text-blue-600" />
+                                                    <span className="text-xs font-medium text-blue-800">Original Uploaded Design</span>
+                                                  </div>
+                                                  <button
+                                                    onClick={() => {
+                                                      const filename = `${item.customization.design.name || 'design'}.png`;
+                                                      downloadImage(
+                                                        item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
+                                                        filename
+                                                      );
+                                                    }}
+                                                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                                                  >
+                                                    <Download className="h-3 w-3" />
+                                                    <span>Download</span>
+                                                  </button>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                  {renderImageWithFallback(
                                                     item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
                                                     `Design: ${item.customization.design.name}`,
-                                                    'design'
-                                                  ),
-                                                  'small'
-                                                )}
+                                                    "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity border-blue-300",
+                                                    () => handleImageClick(
+                                                      item.customization.design.preview || item.customization.design.base64 || item.customization.design.file,
+                                                      `Design: ${item.customization.design.name}`,
+                                                      'design'
+                                                    ),
+                                                    'small'
+                                                  )}
+                                                  <div className="flex-1">
+                                                    <p className="text-xs text-blue-700 font-medium">{item.customization.design.name}</p>
+                                                    <p className="text-xs text-blue-600">Original design file</p>
+                                                  </div>
+                                                </div>
                                               </div>
                                             </div>
                                           ) : item.productId === 'custom-embroidery' && item.customization.embroideryData ? (
@@ -1767,23 +1908,23 @@ const PendingReview: React.FC = () => {
                                   {(() => {
                                     const pricing = getPricingBreakdown(item);
                                     
-                                    if (pricing.options > 0 || pricing.embroideryBase > 0) {
+                                    if (pricing.embroideryOptionsPrice > 0 || pricing.embroideryPrice > 0) {
                                       return (
                                         <div className="mt-2 text-xs text-gray-600">
                                           <div className="flex justify-between">
-                                            <span>Base Product:</span>
-                                            <span>${pricing.baseProduct.toFixed(2)}</span>
+                                            <span>Base Product Price:</span>
+                                            <span>${pricing.baseProductPrice.toFixed(2)}</span>
                                           </div>
-                                          {pricing.embroideryBase > 0 && (
+                                          {pricing.embroideryPrice > 0 && (
                                             <div className="flex justify-between">
-                                              <span>Embroidery Base:</span>
-                                              <span>${pricing.embroideryBase.toFixed(2)}</span>
+                                              <span>Embroidery Price:</span>
+                                              <span>${pricing.embroideryPrice.toFixed(2)}</span>
                                             </div>
                                           )}
-                                          {pricing.options > 0 && (
+                                          {pricing.embroideryOptionsPrice > 0 && (
                                             <div className="flex justify-between">
                                               <span>Embroidery Options:</span>
-                                              <span>${pricing.options.toFixed(2)}</span>
+                                              <span>${pricing.embroideryOptionsPrice.toFixed(2)}</span>
                                             </div>
                                           )}
                                           
@@ -1849,7 +1990,7 @@ const PendingReview: React.FC = () => {
                                           
                                           <div className="flex justify-between font-medium border-t border-gray-300 pt-1 mt-1">
                                             <span>Total:</span>
-                                            <span>${pricing.total.toFixed(2)}</span>
+                                            <span>${pricing.totalPrice.toFixed(2)}</span>
                                           </div>
                                         </div>
                                       );
@@ -1907,137 +2048,212 @@ const PendingReview: React.FC = () => {
                         console.log('🔍 Order Summary - Item pricing:', {
                           productId: item.productId,
                           pricing,
-                          hasOptions: pricing.options > 0,
-                          hasEmbroideryBase: pricing.embroideryBase > 0,
+                          hasOptions: pricing.embroideryOptionsPrice > 0,
+                          hasEmbroideryPrice: pricing.embroideryPrice > 0,
                           isCustomEmbroidery: item.productId === 'custom-embroidery' && item.customization?.embroideryData
                         });
-                        return pricing.options > 0 || pricing.embroideryBase > 0 || 
+                        return pricing.embroideryOptionsPrice > 0 || pricing.embroideryPrice > 0 || 
                                (item.productId === 'custom-embroidery' && item.customization?.embroideryData);
                       });
                       
                       console.log('🔍 Order Summary - Items with options:', itemsWithOptions.length);
                       
                       if (itemsWithOptions.length > 0) {
+                        // Calculate totals for summary (excluding tax and shipping)
+                        const totalBaseProduct = itemsWithOptions.reduce((sum: number, item: any) => {
+                          const pricing = getPricingBreakdown(item);
+                          return sum + pricing.baseProductPrice;
+                        }, 0);
+                        
+                        const totalEmbroideryPrice = itemsWithOptions.reduce((sum: number, item: any) => {
+                          const pricing = getPricingBreakdown(item);
+                          return sum + pricing.embroideryPrice;
+                        }, 0);
+                        
+                        const totalEmbroideryOptions = itemsWithOptions.reduce((sum: number, item: any) => {
+                          const pricing = getPricingBreakdown(item);
+                          return sum + pricing.embroideryOptionsPrice;
+                        }, 0);
+                        
+                        // Subtotal only (no tax or shipping)
+                        const subtotal = totalBaseProduct + totalEmbroideryPrice + totalEmbroideryOptions;
+                        
                         return (
                           <div className="mt-4 pt-4 border-t border-gray-300">
-                            <h5 className="font-medium text-gray-900 mb-2">Detailed Pricing Breakdown</h5>
+                            {/* Pricing Summary */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
+                              <h5 className="font-semibold text-blue-900 mb-3 flex items-center">
+                                <DollarSign className="h-5 w-5 mr-2" />
+                                Pricing Summary
+                              </h5>
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-2">
+                                  <div className="flex justify-between">
+                                    <span className="text-blue-700">Base Product Price:</span>
+                                    <span className="font-medium text-blue-900">${totalBaseProduct.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-blue-700">Embroidery Price:</span>
+                                    <span className="font-medium text-blue-900">${totalEmbroideryPrice.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between">
+                                    <span className="text-blue-700">Embroidery Options:</span>
+                                    <span className="font-medium text-blue-900">${totalEmbroideryOptions.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-blue-300 pt-2">
+                                    <span className="font-semibold text-blue-800">Subtotal:</span>
+                                    <span className="font-bold text-blue-900">${subtotal.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <h5 className="font-medium text-gray-900 mb-2">Detailed Item Breakdown</h5>
                             {itemsWithOptions.map((item: any, index: number) => {
                               const pricing = getPricingBreakdown(item);
                               const itemName = getItemName(item);
                               
                               return (
-                                <div key={index} className="text-sm space-y-1 mb-3">
-                                  <div className="font-medium text-gray-800">{itemName}</div>
+                                <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 mb-3">
+                                  <div className="font-medium text-gray-800 mb-2 flex items-center">
+                                    <Package className="h-4 w-4 mr-2 text-gray-600" />
+                                    {itemName}
+                                  </div>
+                                  <div className="text-sm space-y-1">
                                   
                                   {/* Custom Embroidery Items */}
                                   {item.productId === 'custom-embroidery' && item.customization?.embroideryData ? (
                                     <>
-                                      <div className="flex justify-between">
-                                        <span>Base Material Cost:</span>
-                                        <span>{formatPrice(item.customization.embroideryData.materialCosts.totalCost)}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span>Embroidery Options:</span>
-                                        <span>{formatPrice(item.customization.embroideryData.optionsPrice)}</span>
-                                      </div>
-                                      <div className="flex justify-between font-medium border-t pt-1">
-                                        <span>Item Total:</span>
-                                        <span>{formatPrice(item.customization.embroideryData.totalPrice)}</span>
+                                      <div className="bg-gray-50 rounded-lg p-2 space-y-1">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600">Base Material Cost:</span>
+                                          <span className="font-medium">{formatPrice(item.customization.embroideryData.materialCosts.totalCost)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600">Embroidery Options:</span>
+                                          <span className="font-medium">{formatPrice(item.customization.embroideryData.optionsPrice)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-semibold border-t border-gray-300 pt-1">
+                                          <span>Item Total:</span>
+                                          <span className="text-blue-600">{formatPrice(item.customization.embroideryData.totalPrice)}</span>
+                                        </div>
                                       </div>
                                     </>
                                   ) : (
                                     /* Regular Items with Options */
                                     <>
-                                      <div className="flex justify-between">
-                                        <span>Base Product:</span>
-                                        <span>${pricing.baseProduct.toFixed(2)}</span>
-                                      </div>
-                                      {pricing.embroideryBase > 0 && (
+                                      <div className="bg-gray-50 rounded-lg p-2 space-y-1">
                                         <div className="flex justify-between">
-                                          <span>Embroidery Base:</span>
-                                          <span>${pricing.embroideryBase.toFixed(2)}</span>
+                                          <span className="text-gray-600">Base Product Price:</span>
+                                          <span className="font-medium">${pricing.baseProductPrice.toFixed(2)}</span>
                                         </div>
-                                      )}
-                                      {pricing.options > 0 && (
-                                        <div className="flex justify-between">
-                                          <span>Embroidery Options:</span>
-                                          <span>${pricing.options.toFixed(2)}</span>
-                                        </div>
-                                      )}
-                                      
-                                      {/* Per-Design Breakdown in Order Summary */}
-                                      {pricing.designBreakdown && pricing.designBreakdown.length > 0 && (
-                                        <div className="ml-4 mt-2 pt-2 border-t border-gray-200">
-                                          <div className="text-xs font-medium text-gray-600 mb-1">Per Design Details:</div>
-                                          {pricing.designBreakdown.map((design: any, designIndex: number) => (
-                                            <div key={designIndex} className="ml-2 mb-1">
-                                              <div className="text-xs font-medium text-gray-500">{design.designName}:</div>
-                                              <div className="ml-2 text-xs space-y-1">
-                                                {design.designDetails.coverage > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Coverage:</span>
-                                                    <span>${design.designDetails.coverage.toFixed(2)}</span>
+                                        {pricing.embroideryPrice > 0 && (
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Embroidery Price:</span>
+                                            <span className="font-medium">${pricing.embroideryPrice.toFixed(2)}</span>
+                                          </div>
+                                        )}
+                                        {pricing.embroideryOptionsPrice > 0 && (
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Embroidery Options:</span>
+                                            <span className="font-medium">${pricing.embroideryOptionsPrice.toFixed(2)}</span>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Per-Design Breakdown in Order Summary */}
+                                        {pricing.designBreakdown && pricing.designBreakdown.length > 0 && (
+                                          <div className="mt-3 pt-2 border-t border-gray-300">
+                                            <div className="text-xs font-medium text-gray-600 mb-2">Per Design Details:</div>
+                                            {pricing.designBreakdown.map((design: any, designIndex: number) => (
+                                              <div key={designIndex} className="ml-2 mb-2 bg-white rounded p-2 border border-gray-200">
+                                                <div className="text-xs font-medium text-gray-500 mb-1">{design.designName}:</div>
+                                                <div className="ml-2 text-xs space-y-1">
+                                                  {design.designDetails.coverage > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Coverage:</span>
+                                                      <span>${design.designDetails.coverage.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.material > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Material:</span>
+                                                      <span>${design.designDetails.material.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.border > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Border:</span>
+                                                      <span>${design.designDetails.border.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.backing > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Backing:</span>
+                                                      <span>${design.designDetails.backing.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.cutting > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Cutting:</span>
+                                                      <span>${design.designDetails.cutting.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.threads > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Threads:</span>
+                                                      <span>${design.designDetails.threads.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  {design.designDetails.upgrades > 0 && (
+                                                    <div className="flex justify-between">
+                                                      <span>Upgrades:</span>
+                                                      <span>${design.designDetails.upgrades.toFixed(2)}</span>
+                                                    </div>
+                                                  )}
+                                                  <div className="flex justify-between font-medium border-t border-gray-100 pt-1">
+                                                    <span>Design Total:</span>
+                                                    <span className="text-blue-600">${design.designOptions.toFixed(2)}</span>
                                                   </div>
-                                                )}
-                                                {design.designDetails.material > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Material:</span>
-                                                    <span>${design.designDetails.material.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                {design.designDetails.border > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Border:</span>
-                                                    <span>${design.designDetails.border.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                {design.designDetails.backing > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Backing:</span>
-                                                    <span>${design.designDetails.backing.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                {design.designDetails.cutting > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Cutting:</span>
-                                                    <span>${design.designDetails.cutting.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                {design.designDetails.threads > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Threads:</span>
-                                                    <span>${design.designDetails.threads.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                {design.designDetails.upgrades > 0 && (
-                                                  <div className="flex justify-between">
-                                                    <span>Upgrades:</span>
-                                                    <span>${design.designDetails.upgrades.toFixed(2)}</span>
-                                                  </div>
-                                                )}
-                                                <div className="flex justify-between font-medium border-t border-gray-100 pt-1">
-                                                  <span>Design Total:</span>
-                                                  <span>${design.designOptions.toFixed(2)}</span>
                                                 </div>
                                               </div>
-                                            </div>
-                                          ))}
+                                            ))}
+                                          </div>
+                                        )}
+                                        
+                                        <div className="flex justify-between font-semibold border-t border-gray-300 pt-2">
+                                          <span>Item Total:</span>
+                                          <span className="text-blue-600">${pricing.totalPrice.toFixed(2)}</span>
                                         </div>
-                                      )}
-                                      
-                                      <div className="flex justify-between font-medium border-t pt-1">
-                                        <span>Item Total:</span>
-                                        <span>${pricing.total.toFixed(2)}</span>
                                       </div>
                                     </>
                                   )}
+                                  </div>
                                 </div>
                               );
                             })}
                           </div>
                         );
                       }
-                      return null;
+                      
+                      // Show basic pricing info even if no detailed breakdown
+                      return (
+                        <div className="mt-4 pt-4 border-t border-gray-300">
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <h5 className="font-medium text-gray-700 mb-2 flex items-center">
+                              <DollarSign className="h-4 w-4 mr-2" />
+                              Order Subtotal
+                            </h5>
+                            <div className="text-lg font-semibold text-gray-900">
+                              {formatPrice(selectedReview.subtotal)}
+                            </div>
+                            <div className="text-sm text-gray-600 mt-1">
+                              Product costs and customization only (excludes tax & shipping)
+                            </div>
+                          </div>
+                        </div>
+                      );
                     } catch (e) {
                       console.error('Error generating pricing breakdown:', e);
                       return null;
@@ -2074,7 +2290,26 @@ const PendingReview: React.FC = () => {
                                 {/* Item Image */}
                                 <div className="flex-shrink-0">
                                   {(() => {
-                                    // For multiple designs - show first design preview
+                                    // PRIORITY 1: Show final product mockup if available (for any item with customization)
+                                    if (item.customization?.mockup) {
+                                      return (
+                                        <img
+                                          src={item.customization.mockup}
+                                          alt="Final Product"
+                                          className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={() => handleImageClick(
+                                            item.customization.mockup,
+                                            'Final Product',
+                                            'mockup'
+                                          )}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                        />
+                                      );
+                                    }
+                                    
+                                    // PRIORITY 2: For multiple designs - show first design preview (fallback when no mockup)
                                     if (item.customization?.designs && item.customization.designs.length > 0) {
                                       const firstDesign = item.customization.designs[0];
                                       return (
@@ -2100,7 +2335,8 @@ const PendingReview: React.FC = () => {
                                         </div>
                                       );
                                     }
-                                    // For custom embroidery items - show uploaded design
+                                    
+                                    // PRIORITY 3: For custom embroidery items - show uploaded design
                                     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designImage) {
                                       return (
                                         <img
@@ -2118,7 +2354,8 @@ const PendingReview: React.FC = () => {
                                         />
                                       );
                                     }
-                                    // For custom embroidery items with design preview
+                                    
+                                    // PRIORITY 4: For custom embroidery items with design preview (fallback)
                                     if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
                                       return (
                                         <img
@@ -2129,24 +2366,6 @@ const PendingReview: React.FC = () => {
                                             item.customization.design.preview,
                                             'Uploaded Design',
                                             'design'
-                                          )}
-                                          onError={(e) => {
-                                            e.currentTarget.style.display = 'none';
-                                          }}
-                                        />
-                                      );
-                                    }
-                                    // For regular products with customization - show final product mockup
-                                    if (item.customization?.mockup) {
-                                      return (
-                                        <img
-                                          src={item.customization.mockup}
-                                          alt="Final Product"
-                                          className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                          onClick={() => handleImageClick(
-                                            item.customization.mockup,
-                                            'Final Product',
-                                            'mockup'
                                           )}
                                           onError={(e) => {
                                             e.currentTarget.style.display = 'none';
@@ -2187,7 +2406,9 @@ const PendingReview: React.FC = () => {
                                   {(() => {
                                     // For multiple designs - show design count
                                     if (item.customization?.designs && item.customization.designs.length > 0) {
-                                      return `${item.product?.title || 'Custom Product'} (${item.customization.designs.length} designs)`;
+                                      // Try multiple fallbacks for product name
+                                      const productName = item.product?.title || item.productName || (item.productId && item.productId !== 'custom-embroidery' ? `Product #${item.productId}` : 'Custom Product');
+                                      return `${productName} (${item.customization.designs.length} designs)`;
                                     }
                                     // For custom embroidery items - show design name
                                     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designName) {
@@ -2198,7 +2419,17 @@ const PendingReview: React.FC = () => {
                                       return `Custom Embroidery: ${item.customization.design.name}`;
                                     }
                                     // For regular products
-                                    return item.product?.title || 'Custom Product';
+                                    // Try multiple fallbacks for product name
+                                    if (item.product?.title) {
+                                      return item.product.title;
+                                    }
+                                    if (item.productName) {
+                                      return item.productName;
+                                    }
+                                    if (item.productId && item.productId !== 'custom-embroidery') {
+                                      return `Product #${item.productId}`;
+                                    }
+                                    return 'Custom Product';
                                   })()}
                                   </h5>
                                   <p className="text-sm text-gray-500 mb-3">Qty: {item.quantity || 1}</p>
@@ -2702,18 +2933,27 @@ const PendingReview: React.FC = () => {
         </div>
       )}
 
-      {/* Image Preview Modal */}
+      {/* Enhanced Image Preview Modal */}
       {isImageModalOpen && selectedImage && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black bg-opacity-75" onClick={() => setIsImageModalOpen(false)}></div>
-            <div className="relative bg-white rounded-xl shadow-2xl max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="relative bg-white rounded-xl shadow-2xl max-w-6xl max-h-[90vh] overflow-hidden">
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {selectedImage.type === 'design' ? 'Uploaded Design - Custom Embroidery' : 
-                   selectedImage.type === 'mockup' ? 'Final Product - Customized Item' : 
-                   'Product Image'}
-                </h2>
+                <div className="flex items-center space-x-3">
+                  {selectedImage.type === 'design' ? (
+                    <MousePointer className="h-6 w-6 text-blue-600" />
+                  ) : selectedImage.type === 'mockup' ? (
+                    <Layers className="h-6 w-6 text-green-600" />
+                  ) : (
+                    <Package className="h-6 w-6 text-gray-600" />
+                  )}
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {selectedImage.type === 'design' ? 'Uploaded Design - Custom Embroidery' : 
+                     selectedImage.type === 'mockup' ? 'Final Product with Design Overlay' : 
+                     'Product Image'}
+                  </h2>
+                </div>
                 <button
                   onClick={() => setIsImageModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -2722,24 +2962,68 @@ const PendingReview: React.FC = () => {
                 </button>
               </div>
               
-              <div className="p-6 flex justify-center">
-                <img
-                  src={selectedImage.src}
-                  alt={selectedImage.alt}
-                  className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
-                  onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
-                  }}
-                />
+              <div className="p-6 flex justify-center bg-gray-50">
+                <div className="relative max-w-full max-h-[70vh]">
+                  <img
+                    src={selectedImage.src}
+                    alt={selectedImage.alt}
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg bg-white"
+                    onError={(e) => {
+                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4=';
+                    }}
+                  />
+                  {/* Image type indicator overlay */}
+                  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md">
+                    <div className="flex items-center space-x-2">
+                      {selectedImage.type === 'design' ? (
+                        <>
+                          <MousePointer className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-600">Uploaded Design</span>
+                        </>
+                      ) : selectedImage.type === 'mockup' ? (
+                        <>
+                          <Layers className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium text-green-600">Final Product</span>
+                        </>
+                      ) : (
+                        <>
+                          <Package className="h-4 w-4 text-gray-600" />
+                          <span className="text-sm font-medium text-gray-600">Product Image</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               
-              <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
-                <button
-                  onClick={() => setIsImageModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
+              <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
+                <div className="text-sm text-gray-600">
+                  <strong>Image Type:</strong> {selectedImage.type === 'design' ? 'Original uploaded design file' : 
+                                                  selectedImage.type === 'mockup' ? 'Final product with design overlay' : 
+                                                  'Product reference image'}
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      const filename = selectedImage.type === 'design' ? 
+                        `uploaded-design-${Date.now()}.png` :
+                        selectedImage.type === 'mockup' ?
+                        `final-product-${Date.now()}.png` :
+                        `product-image-${Date.now()}.png`;
+                      downloadImage(selectedImage.src, filename);
+                    }}
+                    className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Download</span>
+                  </button>
+                  <button
+                    onClick={() => setIsImageModalOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Eye, X, CheckCircle } from 'lucide-react'
 import Button from '../../components/Button'
 import { orderReviewApiService } from '../../shared/orderReviewApiService'
+import { MaterialPricingService } from '../../shared/materialPricingService'
 
 export default function Cart() {
   const navigate = useNavigate()
@@ -101,8 +102,22 @@ export default function Cart() {
             if (design.totalPrice) {
               itemPrice += Number(design.totalPrice) || 0
             } else if (design.selectedStyles) {
+              // Calculate material costs for this design if dimensions are available
+              if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+                try {
+                  const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                    patchWidth: design.dimensions.width,
+                    patchHeight: design.dimensions.height
+                  });
+                  itemPrice += materialCosts.totalCost;
+                } catch (error) {
+                  console.warn('Failed to calculate material costs for design:', design.name, error);
+                }
+              }
+              
               // Calculate design-specific pricing if totalPrice is not available
               const { selectedStyles } = design
+              // All selected styles are embroidery options, not material costs
               if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0
               if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0
               if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0
@@ -181,7 +196,53 @@ export default function Cart() {
             embroideryPrice = Number(item.customization.embroideryData.materialCosts?.totalCost) || 0;
             embroideryOptionsPrice = Number(item.customization.embroideryData.optionsPrice) || 0;
           }
-          // Regular embroidery pricing
+          // Multi-design pricing (new format)
+          else if (item.customization?.designs && item.customization.designs.length > 0) {
+            // Calculate total embroidery price and options from all designs
+            item.customization.designs.forEach((design: any) => {
+              // Calculate material costs for this design if dimensions are available
+              if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+                try {
+                  const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                    patchWidth: design.dimensions.width,
+                    patchHeight: design.dimensions.height
+                  });
+                  embroideryPrice += materialCosts.totalCost;
+                  console.log('🔧 Cart: Calculated material cost for design:', {
+                    designName: design.name,
+                    dimensions: design.dimensions,
+                    materialCost: materialCosts.totalCost
+                  });
+                } catch (error) {
+                  console.warn('Failed to calculate material costs for design:', design.name, error);
+                }
+              }
+              
+              if (design.selectedStyles) {
+                const { selectedStyles } = design;
+                // All selected styles are embroidery options, not material costs
+                if (selectedStyles.coverage) embroideryOptionsPrice += Number(selectedStyles.coverage.price) || 0;
+                if (selectedStyles.material) embroideryOptionsPrice += Number(selectedStyles.material.price) || 0;
+                
+                // Embroidery options: border, backing, cutting, threads, upgrades
+                if (selectedStyles.border) embroideryOptionsPrice += Number(selectedStyles.border.price) || 0;
+                if (selectedStyles.backing) embroideryOptionsPrice += Number(selectedStyles.backing.price) || 0;
+                if (selectedStyles.cutting) embroideryOptionsPrice += Number(selectedStyles.cutting.price) || 0;
+                
+                if (selectedStyles.threads) {
+                  selectedStyles.threads.forEach((thread: any) => {
+                    embroideryOptionsPrice += Number(thread.price) || 0;
+                  });
+                }
+                if (selectedStyles.upgrades) {
+                  selectedStyles.upgrades.forEach((upgrade: any) => {
+                    embroideryOptionsPrice += Number(upgrade.price) || 0;
+                  });
+                }
+              }
+            });
+          }
+          // Regular embroidery pricing (legacy single design)
           else if (item.customization?.selectedStyles) {
             const { selectedStyles } = item.customization;
             // Embroidery base: coverage + material

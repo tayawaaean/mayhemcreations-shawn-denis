@@ -20,6 +20,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { products } from '../../data/products'
+import { MaterialPricingService } from '../../shared/materialPricingService'
 import Button from '../../components/Button'
 // StripePaymentForm removed for hosted Checkout flow
 import PayPalButton from '../../components/PayPalButton'
@@ -157,15 +158,47 @@ export default function OrderCheckout() {
     
     // Add customization costs if present
     if (item.customization) {
-      const { selectedStyles } = item.customization
-      if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price
-      if (selectedStyles.material) itemPrice += selectedStyles.material.price
-      if (selectedStyles.border) itemPrice += selectedStyles.border.price
-      if (selectedStyles.backing) itemPrice += selectedStyles.backing.price
-      if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price
-      
-      selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price)
-      selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price)
+      // Handle multiple designs (new format)
+      if (item.customization.designs && item.customization.designs.length > 0) {
+        item.customization.designs.forEach((design: any) => {
+          // Calculate material costs for this design if dimensions are available
+          if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+            try {
+              const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                patchWidth: design.dimensions.width,
+                patchHeight: design.dimensions.height
+              });
+              itemPrice += materialCosts.totalCost;
+            } catch (error) {
+              console.warn('Failed to calculate material costs for design:', design.name, error);
+            }
+          }
+          
+          if (design.selectedStyles) {
+            const { selectedStyles } = design;
+            // All selected styles are embroidery options, not material costs
+            if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price;
+            if (selectedStyles.material) itemPrice += selectedStyles.material.price;
+            if (selectedStyles.border) itemPrice += selectedStyles.border.price;
+            if (selectedStyles.backing) itemPrice += selectedStyles.backing.price;
+            if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price;
+            
+            selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price);
+            selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price);
+          }
+        });
+      } else {
+        // Legacy single design format
+        const { selectedStyles } = item.customization;
+        if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price;
+        if (selectedStyles.material) itemPrice += selectedStyles.material.price;
+        if (selectedStyles.border) itemPrice += selectedStyles.border.price;
+        if (selectedStyles.backing) itemPrice += selectedStyles.backing.price;
+        if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price;
+        
+        selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price);
+        selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price);
+      }
     }
     
     return itemPrice
@@ -937,28 +970,10 @@ export default function OrderCheckout() {
                   <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                 </div>
                 
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
-                  <span className="font-medium">${calculateTax().toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-medium">
-                    {calculateShipping() === 0 ? 'Free' : `$${calculateShipping().toFixed(2)}`}
-                  </span>
-                </div>
-                
-                {calculateShipping() > 0 && (
-                  <div className="text-sm text-accent">
-                    Add ${(50 - calculateSubtotal()).toFixed(2)} more for free shipping
-                  </div>
-                )}
-                
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
+                    <span>${calculateSubtotal().toFixed(2)}</span>
                   </div>
                 </div>
               </div>

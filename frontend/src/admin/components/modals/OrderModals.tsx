@@ -260,14 +260,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                   <span className="text-gray-600">Subtotal</span>
                   <span className="text-gray-900">${order.total.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="text-gray-900">$0.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
-                  <span className="text-gray-900">$0.00</span>
-                </div>
                 <div className="flex justify-between text-lg font-semibold border-t border-gray-200 pt-2">
                   <span className="text-gray-900">Total</span>
                   <span className="text-gray-900">${order.total.toFixed(2)}</span>
