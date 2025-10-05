@@ -105,12 +105,29 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         hasMockup: !!item.customization?.mockup,
         mockupLength: item.customization?.mockup?.length || 0,
         firstDesignPreview: item.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none',
-        firstDesignFile: item.customization?.designs?.[0]?.file?.substring(0, 50) + '...' || 'none'
+        firstDesignFile: item.customization?.designs?.[0]?.file?.substring(0, 50) + '...' || 'none',
+        // 🎯 NEW: Check pricing breakdown
+        pricingBreakdown: item.pricingBreakdown,
+        productPrice: item.product?.price,
+        quantity: item.quantity
       })),
       subtotal,
       shipping,
       tax,
       total
+    });
+
+    // Debug detailed item data being saved
+    console.log('🔍 DETAILED ITEMS DATA BEING SAVED:');
+    items?.forEach((item: any, index: number) => {
+      console.log(`🔍 Item ${index + 1} full data:`, {
+        productId: item.productId,
+        quantity: item.quantity,
+        product: item.product,
+        customization: item.customization,
+        pricingBreakdown: item.pricingBreakdown,
+        reviewStatus: item.reviewStatus
+      });
     });
 
     if (!userId) {
@@ -368,6 +385,35 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
     `);
 
     console.log('📊 Found orders:', orders);
+
+    // 🎯 NEW: Debug the order_data being returned
+    console.log('🔍 ADMIN RETRIEVAL - ORDER DATA BEING RETURNED:');
+    (orders as any[]).forEach((order, index) => {
+      console.log(`🔍 Order ${index + 1} (ID: ${order.id}) data:`);
+      console.log(`🔍 - Subtotal: ${order.subtotal}`);
+      console.log(`🔍 - Shipping: ${order.shipping}`);
+      console.log(`🔍 - Tax: ${order.tax}`);
+      console.log(`🔍 - Total: ${order.total}`);
+      console.log(`🔍 - Order data type: ${typeof order.order_data}`);
+      console.log(`🔍 - Order data value: ${order.order_data}`);
+      
+      try {
+        const parsedData = typeof order.order_data === 'string' ? JSON.parse(order.order_data) : order.order_data;
+        if (Array.isArray(parsedData)) {
+          parsedData.forEach((item: any, itemIndex: number) => {
+            console.log(`🔍   Item ${itemIndex + 1}:`, {
+              productId: item.productId,
+              quantity: item.quantity,
+              pricingBreakdown: item.pricingBreakdown,
+              productPrice: item.product?.price,
+              customization: item.customization ? 'EXISTS' : 'MISSING'
+            });
+          });
+        }
+      } catch (e) {
+        console.log(`🔍   Parse error: ${e}`);
+      }
+    });
 
     res.status(200).json({
       success: true,

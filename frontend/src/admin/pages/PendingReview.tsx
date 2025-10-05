@@ -686,7 +686,8 @@ const PendingReview: React.FC = () => {
         return (parsed as any).items
       }
       return Array.isArray(parsed) ? parsed : []
-    } catch {
+    } catch (error) {
+      console.error('Error parsing order data:', error);
       return []
     }
   }
@@ -730,12 +731,17 @@ const PendingReview: React.FC = () => {
 
   // Helper function to calculate item price including customization costs
   const calculateItemPrice = (item: any) => {
+    // Use stored pricing breakdown if available (preferred method)
+    if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
+      return Number(item.pricingBreakdown.totalPrice) || 0;
+    }
+
     // For custom embroidery items, use the total price from embroideryData
     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
       return Number(item.customization.embroideryData.totalPrice) || 0;
     }
     
-    // For regular items, calculate base price + customization costs
+    // For regular items, calculate base price + customization costs (fallback method)
     let itemPrice = Number(item.product?.price) || 0;
     
     if (item.customization?.selectedStyles) {
@@ -759,6 +765,195 @@ const PendingReview: React.FC = () => {
     }
     
     return itemPrice;
+  }
+
+  // Helper function to get pricing breakdown for display
+  const getPricingBreakdown = (item: any): {
+    baseProduct: number;
+    embroideryBase: number;
+    options: number;
+    total: number;
+    designBreakdown?: Array<{
+      designName: string;
+      designOptions: number;
+      designDetails: {
+        coverage: number;
+        material: number;
+        border: number;
+        backing: number;
+        cutting: number;
+        threads: number;
+        upgrades: number;
+      };
+    }>;
+  } => {
+    console.log('🔍 getPricingBreakdown - Item data:', {
+      productId: item.productId,
+      pricingBreakdown: item.pricingBreakdown,
+      customization: item.customization,
+      hasSelectedStyles: !!item.customization?.selectedStyles,
+      hasDesigns: !!item.customization?.designs?.length,
+      designsCount: item.customization?.designs?.length || 0,
+      selectedStyles: item.customization?.selectedStyles
+    });
+
+    // Use stored pricing breakdown if available
+    if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
+      const result = {
+        baseProduct: Number(item.pricingBreakdown.baseProductPrice) || 0,
+        embroideryBase: Number(item.pricingBreakdown.embroideryPrice) || 0,
+        options: Number(item.pricingBreakdown.embroideryOptionsPrice) || 0,
+        total: Number(item.pricingBreakdown.totalPrice) || 0
+      };
+      console.log('🔍 getPricingBreakdown - Using stored pricingBreakdown:', result);
+      return result;
+    }
+
+    // Fallback calculation for custom embroidery items
+    if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+      return {
+        baseProduct: 0,
+        embroideryBase: Number(item.customization.embroideryData.materialCosts?.totalCost) || 0,
+        options: Number(item.customization.embroideryData.optionsPrice) || 0,
+        total: Number(item.customization.embroideryData.totalPrice) || 0
+      };
+    }
+
+    // Calculate pricing for multiple designs with individual embroidery options
+    let baseProduct = Number(item.product?.price) || 0;
+    let totalOptions = 0;
+    let designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> = [];
+
+    // Handle multiple designs with individual embroidery options
+    if (item.customization?.designs && item.customization.designs.length > 0) {
+      console.log('🔍 getPricingBreakdown - Processing multiple designs:', item.customization.designs.length);
+      
+      item.customization.designs.forEach((design: any, index: number) => {
+        let designOptions = 0;
+        const designName = design.name || `Design ${index + 1}`;
+        const designDetails: any = {
+          coverage: 0,
+          material: 0,
+          border: 0,
+          backing: 0,
+          cutting: 0,
+          threads: 0,
+          upgrades: 0
+        };
+        
+        if (design.selectedStyles) {
+          const { selectedStyles } = design;
+          
+          // Calculate options for this specific design
+          if (selectedStyles.coverage) {
+            designDetails.coverage = Number(selectedStyles.coverage.price) || 0;
+            designOptions += designDetails.coverage;
+          }
+          if (selectedStyles.material) {
+            designDetails.material = Number(selectedStyles.material.price) || 0;
+            designOptions += designDetails.material;
+          }
+          if (selectedStyles.border) {
+            designDetails.border = Number(selectedStyles.border.price) || 0;
+            designOptions += designDetails.border;
+          }
+          if (selectedStyles.backing) {
+            designDetails.backing = Number(selectedStyles.backing.price) || 0;
+            designOptions += designDetails.backing;
+          }
+          if (selectedStyles.cutting) {
+            designDetails.cutting = Number(selectedStyles.cutting.price) || 0;
+            designOptions += designDetails.cutting;
+          }
+          
+          if (selectedStyles.threads && selectedStyles.threads.length > 0) {
+            selectedStyles.threads.forEach((thread: any) => {
+              const threadPrice = Number(thread.price) || 0;
+              designDetails.threads += threadPrice;
+              designOptions += threadPrice;
+            });
+          }
+          
+          if (selectedStyles.upgrades && selectedStyles.upgrades.length > 0) {
+            selectedStyles.upgrades.forEach((upgrade: any) => {
+              const upgradePrice = Number(upgrade.price) || 0;
+              designDetails.upgrades += upgradePrice;
+              designOptions += upgradePrice;
+            });
+          }
+          
+          console.log(`🔍 getPricingBreakdown - Design ${index + 1} (${designName}) options:`, {
+            ...designDetails,
+            designTotal: designOptions
+          });
+        }
+        
+        totalOptions += designOptions;
+        designBreakdown.push({ designName, designOptions, designDetails });
+      });
+      
+      console.log('🔍 getPricingBreakdown - Total options from all designs:', totalOptions);
+      console.log('🔍 getPricingBreakdown - Design breakdown:', designBreakdown);
+    }
+    // Fallback calculation for single design or legacy selectedStyles
+    else if (item.customization?.selectedStyles) {
+      const { selectedStyles } = item.customization;
+      
+      // Check if selectedStyles actually has any non-null/non-empty values
+      const hasActualStyles = selectedStyles.coverage || 
+                             selectedStyles.material || 
+                             selectedStyles.border || 
+                             selectedStyles.backing || 
+                             selectedStyles.cutting ||
+                             (selectedStyles.threads && selectedStyles.threads.length > 0) ||
+                             (selectedStyles.upgrades && selectedStyles.upgrades.length > 0);
+      
+      console.log('🔍 getPricingBreakdown - selectedStyles check:', {
+        hasSelectedStyles: !!selectedStyles,
+        hasActualStyles,
+        selectedStylesValues: {
+          coverage: !!selectedStyles.coverage,
+          material: !!selectedStyles.material,
+          border: !!selectedStyles.border,
+          backing: !!selectedStyles.backing,
+          cutting: !!selectedStyles.cutting,
+          threadsCount: selectedStyles.threads?.length || 0,
+          upgradesCount: selectedStyles.upgrades?.length || 0
+        }
+      });
+      
+      if (hasActualStyles) {
+        if (selectedStyles.coverage) totalOptions += Number(selectedStyles.coverage.price) || 0;
+        if (selectedStyles.material) totalOptions += Number(selectedStyles.material.price) || 0;
+        if (selectedStyles.border) totalOptions += Number(selectedStyles.border.price) || 0;
+        if (selectedStyles.backing) totalOptions += Number(selectedStyles.backing.price) || 0;
+        if (selectedStyles.cutting) totalOptions += Number(selectedStyles.cutting.price) || 0;
+        
+        if (selectedStyles.threads) {
+          selectedStyles.threads.forEach((thread: any) => {
+            totalOptions += Number(thread.price) || 0;
+          });
+        }
+        if (selectedStyles.upgrades) {
+          selectedStyles.upgrades.forEach((upgrade: any) => {
+            totalOptions += Number(upgrade.price) || 0;
+          });
+        }
+      } else {
+        console.log('🔍 getPricingBreakdown - selectedStyles exists but is empty, using pricingBreakdown fallback');
+      }
+    }
+
+    const result = {
+      baseProduct,
+      embroideryBase: 0,
+      options: totalOptions,
+      total: baseProduct + totalOptions,
+      designBreakdown: designBreakdown.length > 0 ? designBreakdown : undefined
+    };
+    
+    console.log('🔍 getPricingBreakdown - Final result:', result);
+    return result;
   }
 
   if (loading) {
@@ -1430,16 +1625,7 @@ const PendingReview: React.FC = () => {
                                       <div className="flex-1 min-w-0">
                                         <p className="font-medium text-gray-900 truncate">
                                          {(() => {
-                                           // Debug logging for Order Items section
-                                           console.log('Order Items - Item data:', {
-                                             itemId: item.id,
-                                             productId: item?.productId,
-                                             customization: item?.customization,
-                                             embroideryData: item?.customization?.embroideryData,
-                                             design: item?.customization?.design
-                                           });
                                            const name = getItemName(item);
-                                           console.log('Order Items - Item name:', name);
                                            return name;
                                          })()}
                                         </p>
@@ -1459,11 +1645,11 @@ const PendingReview: React.FC = () => {
                                                   <div key={design.id || index} className="relative">
                                                     {renderImageWithFallback(
                                                       design.preview || design.base64 || design.file,
-                                                      `Design: ${design.name || `Design ${index + 1}`}`,
+                                                      `Design: ${design.name || 'Design ' + (index + 1)}`,
                                                       "w-12 h-12 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity",
                                                       () => handleImageClick(
                                                         design.preview || design.base64 || design.file,
-                                                        `Design: ${design.name || `Design ${index + 1}`}`,
+                                                        `Design: ${design.name || 'Design ' + (index + 1)}`,
                                                         'design'
                                                       ),
                                                       'small'
@@ -1576,6 +1762,100 @@ const PendingReview: React.FC = () => {
                                       {item.productId === 'custom-embroidery' ? 'Custom pricing' : 'Includes customization'}
                                     </p>
                                   )}
+                                  
+                                  {/* Detailed Pricing Breakdown */}
+                                  {(() => {
+                                    const pricing = getPricingBreakdown(item);
+                                    
+                                    if (pricing.options > 0 || pricing.embroideryBase > 0) {
+                                      return (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                          <div className="flex justify-between">
+                                            <span>Base Product:</span>
+                                            <span>${pricing.baseProduct.toFixed(2)}</span>
+                                          </div>
+                                          {pricing.embroideryBase > 0 && (
+                                            <div className="flex justify-between">
+                                              <span>Embroidery Base:</span>
+                                              <span>${pricing.embroideryBase.toFixed(2)}</span>
+                                            </div>
+                                          )}
+                                          {pricing.options > 0 && (
+                                            <div className="flex justify-between">
+                                              <span>Embroidery Options:</span>
+                                              <span>${pricing.options.toFixed(2)}</span>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Per-Design Breakdown */}
+                                          {pricing.designBreakdown && pricing.designBreakdown.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t border-gray-200">
+                                              <div className="font-medium text-gray-700 mb-1">Per Design Breakdown:</div>
+                                              {pricing.designBreakdown.map((design: any, index: number) => (
+                                                <div key={index} className="ml-2 mb-2">
+                                                  <div className="font-medium text-gray-600">{design.designName}:</div>
+                                                  <div className="ml-2 space-y-1">
+                                                    {design.designDetails.coverage > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Coverage:</span>
+                                                        <span>${design.designDetails.coverage.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.material > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Material:</span>
+                                                        <span>${design.designDetails.material.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.border > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Border:</span>
+                                                        <span>${design.designDetails.border.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.backing > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Backing:</span>
+                                                        <span>${design.designDetails.backing.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.cutting > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Cutting:</span>
+                                                        <span>${design.designDetails.cutting.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.threads > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Threads:</span>
+                                                        <span>${design.designDetails.threads.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    {design.designDetails.upgrades > 0 && (
+                                                      <div className="flex justify-between">
+                                                        <span>Upgrades:</span>
+                                                        <span>${design.designDetails.upgrades.toFixed(2)}</span>
+                                                      </div>
+                                                    )}
+                                                    <div className="flex justify-between font-medium border-t border-gray-200 pt-1 mt-1">
+                                                      <span>Design Total:</span>
+                                                      <span>${design.designOptions.toFixed(2)}</span>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          
+                                          <div className="flex justify-between font-medium border-t border-gray-300 pt-1 mt-1">
+                                            <span>Total:</span>
+                                            <span>${pricing.total.toFixed(2)}</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
                               </div>
                             ))}
@@ -1612,42 +1892,154 @@ const PendingReview: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* Pricing Breakdown for Custom Embroidery */}
+                  {/* Detailed Pricing Breakdown for All Items */}
                   {(() => {
                     try {
                       const orderData = typeof selectedReview.order_data === 'string' 
                         ? JSON.parse(selectedReview.order_data) 
                         : selectedReview.order_data;
                       
-                      const customEmbroideryItems = orderData.filter((item: any) => 
-                        item.productId === 'custom-embroidery' && item.customization?.embroideryData
-                      );
+                      console.log('🔍 Order Summary - Raw order data:', orderData);
                       
-                      if (customEmbroideryItems.length > 0) {
+                      // Get all items that have embroidery options or custom pricing
+                      const itemsWithOptions = orderData.filter((item: any) => {
+                        const pricing = getPricingBreakdown(item);
+                        console.log('🔍 Order Summary - Item pricing:', {
+                          productId: item.productId,
+                          pricing,
+                          hasOptions: pricing.options > 0,
+                          hasEmbroideryBase: pricing.embroideryBase > 0,
+                          isCustomEmbroidery: item.productId === 'custom-embroidery' && item.customization?.embroideryData
+                        });
+                        return pricing.options > 0 || pricing.embroideryBase > 0 || 
+                               (item.productId === 'custom-embroidery' && item.customization?.embroideryData);
+                      });
+                      
+                      console.log('🔍 Order Summary - Items with options:', itemsWithOptions.length);
+                      
+                      if (itemsWithOptions.length > 0) {
                         return (
                           <div className="mt-4 pt-4 border-t border-gray-300">
-                            <h5 className="font-medium text-gray-900 mb-2">Custom Embroidery Pricing Breakdown</h5>
-                            {customEmbroideryItems.map((item: any, index: number) => (
-                              <div key={index} className="text-sm space-y-1">
-                                <div className="flex justify-between">
-                                  <span>Base Material Cost:</span>
-                                  <span>{formatPrice(item.customization.embroideryData.materialCosts.totalCost)}</span>
+                            <h5 className="font-medium text-gray-900 mb-2">Detailed Pricing Breakdown</h5>
+                            {itemsWithOptions.map((item: any, index: number) => {
+                              const pricing = getPricingBreakdown(item);
+                              const itemName = getItemName(item);
+                              
+                              return (
+                                <div key={index} className="text-sm space-y-1 mb-3">
+                                  <div className="font-medium text-gray-800">{itemName}</div>
+                                  
+                                  {/* Custom Embroidery Items */}
+                                  {item.productId === 'custom-embroidery' && item.customization?.embroideryData ? (
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span>Base Material Cost:</span>
+                                        <span>{formatPrice(item.customization.embroideryData.materialCosts.totalCost)}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span>Embroidery Options:</span>
+                                        <span>{formatPrice(item.customization.embroideryData.optionsPrice)}</span>
+                                      </div>
+                                      <div className="flex justify-between font-medium border-t pt-1">
+                                        <span>Item Total:</span>
+                                        <span>{formatPrice(item.customization.embroideryData.totalPrice)}</span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    /* Regular Items with Options */
+                                    <>
+                                      <div className="flex justify-between">
+                                        <span>Base Product:</span>
+                                        <span>${pricing.baseProduct.toFixed(2)}</span>
+                                      </div>
+                                      {pricing.embroideryBase > 0 && (
+                                        <div className="flex justify-between">
+                                          <span>Embroidery Base:</span>
+                                          <span>${pricing.embroideryBase.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      {pricing.options > 0 && (
+                                        <div className="flex justify-between">
+                                          <span>Embroidery Options:</span>
+                                          <span>${pricing.options.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Per-Design Breakdown in Order Summary */}
+                                      {pricing.designBreakdown && pricing.designBreakdown.length > 0 && (
+                                        <div className="ml-4 mt-2 pt-2 border-t border-gray-200">
+                                          <div className="text-xs font-medium text-gray-600 mb-1">Per Design Details:</div>
+                                          {pricing.designBreakdown.map((design: any, designIndex: number) => (
+                                            <div key={designIndex} className="ml-2 mb-1">
+                                              <div className="text-xs font-medium text-gray-500">{design.designName}:</div>
+                                              <div className="ml-2 text-xs space-y-1">
+                                                {design.designDetails.coverage > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Coverage:</span>
+                                                    <span>${design.designDetails.coverage.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.material > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Material:</span>
+                                                    <span>${design.designDetails.material.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.border > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Border:</span>
+                                                    <span>${design.designDetails.border.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.backing > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Backing:</span>
+                                                    <span>${design.designDetails.backing.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.cutting > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Cutting:</span>
+                                                    <span>${design.designDetails.cutting.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.threads > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Threads:</span>
+                                                    <span>${design.designDetails.threads.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {design.designDetails.upgrades > 0 && (
+                                                  <div className="flex justify-between">
+                                                    <span>Upgrades:</span>
+                                                    <span>${design.designDetails.upgrades.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                <div className="flex justify-between font-medium border-t border-gray-100 pt-1">
+                                                  <span>Design Total:</span>
+                                                  <span>${design.designOptions.toFixed(2)}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex justify-between font-medium border-t pt-1">
+                                        <span>Item Total:</span>
+                                        <span>${pricing.total.toFixed(2)}</span>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Embroidery Options:</span>
-                                  <span>{formatPrice(item.customization.embroideryData.optionsPrice)}</span>
-                                </div>
-                                <div className="flex justify-between font-medium border-t pt-1">
-                                  <span>Item Total:</span>
-                                  <span>{formatPrice(item.customization.embroideryData.totalPrice)}</span>
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         );
                       }
                       return null;
                     } catch (e) {
+                      console.error('Error generating pricing breakdown:', e);
                       return null;
                     }
                   })()}

@@ -171,19 +171,43 @@ export default function Cart() {
       // Create order data for admin review
       const orderData = {
         items: pendingItems.map(item => {
-          // Debug: Log the customization data being submitted
-          console.log('🔍 Cart submission - Item customization data:', {
-            productId: item.productId,
-            hasCustomization: !!item.customization,
-            hasDesigns: !!item.customization?.designs?.length,
-            designsCount: item.customization?.designs?.length || 0,
-            firstDesignKeys: item.customization?.designs?.[0] ? Object.keys(item.customization.designs[0]) : [],
-            firstDesignPreview: item.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none',
-            hasMockup: !!item.customization?.mockup,
-            mockupLength: item.customization?.mockup?.length || 0
-          });
+          // Calculate pricing breakdown for this item
+          const baseProductPrice = Number(item.product?.price) || 0;
+          let embroideryPrice = 0;
+          let embroideryOptionsPrice = 0;
           
-          return {
+          // Custom embroidery pricing
+          if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+            embroideryPrice = Number(item.customization.embroideryData.materialCosts?.totalCost) || 0;
+            embroideryOptionsPrice = Number(item.customization.embroideryData.optionsPrice) || 0;
+          }
+          // Regular embroidery pricing
+          else if (item.customization?.selectedStyles) {
+            const { selectedStyles } = item.customization;
+            // Embroidery base: coverage + material
+            if (selectedStyles.coverage) embroideryPrice += Number(selectedStyles.coverage.price) || 0;
+            if (selectedStyles.material) embroideryPrice += Number(selectedStyles.material.price) || 0;
+            
+            // Embroidery options: border, backing, cutting, threads, upgrades
+            if (selectedStyles.border) embroideryOptionsPrice += Number(selectedStyles.border.price) || 0;
+            if (selectedStyles.backing) embroideryOptionsPrice += Number(selectedStyles.backing.price) || 0;
+            if (selectedStyles.cutting) embroideryOptionsPrice += Number(selectedStyles.cutting.price) || 0;
+            
+            if (selectedStyles.threads) {
+              selectedStyles.threads.forEach((thread: any) => {
+                embroideryOptionsPrice += Number(thread.price) || 0;
+              });
+            }
+            if (selectedStyles.upgrades) {
+              selectedStyles.upgrades.forEach((upgrade: any) => {
+                embroideryOptionsPrice += Number(upgrade.price) || 0;
+              });
+            }
+          }
+          
+          const totalItemPrice = baseProductPrice + embroideryPrice + embroideryOptionsPrice;
+          
+          const enrichedItem = {
             productId: item.productId,
             quantity: item.quantity,
             customization: item.customization,
@@ -192,14 +216,124 @@ export default function Cart() {
               // Handle both numeric and string product IDs
               const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
               return p.id === item.productId || p.id === numericId;
-            })
+            }),
+            // Explicit pricing breakdown
+            pricingBreakdown: {
+              baseProductPrice,
+              embroideryPrice,
+              embroideryOptionsPrice,
+              totalPrice: totalItemPrice
+            }
           };
+
+          // Debug: Log the COMPLETE item data being submitted
+          console.log('🔍 Cart submission - COMPLETE ITEM DATA:', {
+            // Raw cart item
+            rawCartItem: item,
+            
+            // Enriched item being sent
+            enrichedItem: enrichedItem,
+            
+            // Check selectedStyles data specifically
+            selectedStyles: item.customization?.selectedStyles,
+            hasSelectedStyles: !!item.customization?.selectedStyles,
+            selectedStylesKeys: item.customization?.selectedStyles ? Object.keys(item.customization.selectedStyles) : [],
+            
+            // Explicit pricing breakdown
+            pricingBreakdown: {
+              baseProductPrice: enrichedItem.pricingBreakdown.baseProductPrice,
+              embroideryPrice: enrichedItem.pricingBreakdown.embroideryPrice,
+              embroideryOptionsPrice: enrichedItem.pricingBreakdown.embroideryOptionsPrice,
+              totalPrice: enrichedItem.pricingBreakdown.totalPrice,
+              calculationMethod: item.productId === 'custom-embroidery' ? 'custom-embroidery' : 'regular-embroidery'
+            },
+            
+            // Product data
+            productData: {
+              found: !!enrichedItem.product,
+              product: enrichedItem.product,
+              productPrice: enrichedItem.product?.price,
+              productTitle: enrichedItem.product?.title
+            },
+            
+            // Customization data
+            customizationData: {
+              hasCustomization: !!item.customization,
+              customizationKeys: item.customization ? Object.keys(item.customization) : [],
+              
+              // Design data
+              hasDesigns: !!item.customization?.designs?.length,
+              designsCount: item.customization?.designs?.length || 0,
+              designsData: item.customization?.designs?.map((design, index) => ({
+                index,
+                name: design.name,
+                hasPreview: !!design.preview,
+                hasFile: !!(design as any).file,
+                previewLength: design.preview?.length || 0,
+                dimensions: design.dimensions
+              })) || [],
+              
+              // Single design data (custom embroidery)
+              hasSingleDesign: !!item.customization?.design,
+              singleDesign: item.customization?.design ? {
+                name: item.customization.design.name,
+                hasPreview: !!item.customization.design.preview,
+                previewLength: item.customization.design.preview?.length || 0,
+                size: item.customization.design.size
+              } : null,
+              
+              // Mockup data
+              hasMockup: !!item.customization?.mockup,
+              mockupLength: item.customization?.mockup?.length || 0,
+              mockupPreview: item.customization?.mockup?.substring(0, 100) + '...' || 'none',
+              
+              // Selected styles for pricing
+              selectedStyles: item.customization?.selectedStyles ? {
+                coverage: item.customization.selectedStyles.coverage,
+                material: item.customization.selectedStyles.material,
+                border: item.customization.selectedStyles.border,
+                backing: item.customization.selectedStyles.backing,
+                cutting: item.customization.selectedStyles.cutting,
+                threads: item.customization.selectedStyles.threads?.length || 0,
+                upgrades: item.customization.selectedStyles.upgrades?.length || 0
+              } : null,
+              
+              // Embroidery data
+              embroideryData: item.customization?.embroideryData ? {
+                optionsPrice: item.customization.embroideryData.optionsPrice,
+                totalPrice: item.customization.embroideryData.totalPrice,
+                dimensions: item.customization.embroideryData.dimensions,
+                materialCosts: item.customization.embroideryData.materialCosts
+              } : null
+            }
+          });
+          
+          return enrichedItem;
         }),
         subtotal: subtotal,
         shipping: shipping, // Will be calculated at checkout
         total: total,
         submittedAt: new Date().toISOString()
       }
+
+      // Debug: Log the COMPLETE order data being submitted
+      console.log('🔍 Cart submission - COMPLETE ORDER DATA:', {
+        orderData,
+        orderDataKeys: Object.keys(orderData),
+        itemsCount: orderData.items.length,
+        totals: {
+          subtotal,
+          shipping,
+          total,
+          calculatedSubtotal: orderData.items.reduce((sum, item) => {
+            const itemPrice = calculateItemPrice({
+              ...item,
+              product: item.product
+            });
+            return sum + (itemPrice * item.quantity);
+          }, 0)
+        }
+      });
 
       // Submit for review via API
       const response = await orderReviewApiService.submitForReview(orderData)
