@@ -225,6 +225,66 @@ export default function Customize() {
     return sizes
   }
 
+  // Helper function to check if all designs have required embroidery options
+  const allDesignsHaveRequiredOptions = () => {
+    if (customizationData.designs.length === 0) return false
+    
+    return customizationData.designs.every(design => {
+      if (!design.selectedStyles) return false
+      
+      const { selectedStyles } = design
+      // Check if required options are selected
+      const hasRequiredOptions = selectedStyles.coverage !== null && 
+                                selectedStyles.material !== null && 
+                                selectedStyles.border !== null
+      
+      return hasRequiredOptions
+    })
+  }
+
+  // Helper function to check if all designs have notes
+  const allDesignsHaveNotes = () => {
+    if (customizationData.designs.length === 0) return false
+    
+    return customizationData.designs.every(design => {
+      return design.notes && design.notes.trim().length > 0
+    })
+  }
+
+  // Helper function to get validation messages
+  const getValidationMessage = () => {
+    switch (currentStep) {
+      case 1:
+        if (!product?.hasSizing) return null
+        if (customizationData.color === '') return "Please select a color"
+        if (customizationData.size === '') return "Please select a size"
+        return null
+      case 2:
+        if (customizationData.designs.length === 0 && customizationData.design === null) {
+          return "Please upload at least one design file"
+        }
+        return null
+      case 3:
+        if (!allDesignsHaveNotes()) {
+          const missingNotes = customizationData.designs.filter(design => !design.notes || design.notes.trim().length === 0)
+          return `Please add notes for ${missingNotes.length} design${missingNotes.length > 1 ? 's' : ''} (e.g., "Place on front left chest")`
+        }
+        return null
+      case 4:
+        if (!allDesignsHaveRequiredOptions()) {
+          const incompleteDesigns = customizationData.designs.filter(design => {
+            if (!design.selectedStyles) return true
+            const { selectedStyles } = design
+            return !selectedStyles.coverage || !selectedStyles.material || !selectedStyles.border
+          })
+          return `Please select embroidery options for ${incompleteDesigns.length} design${incompleteDesigns.length > 1 ? 's' : ''}`
+        }
+        return null
+      default:
+        return null
+    }
+  }
+
   const canProceed = () => {
     switch (currentStep) {
       case 1:
@@ -237,10 +297,11 @@ export default function Customize() {
         // Allow proceeding if there are designs uploaded (either multi-design or legacy single design)
         return customizationData.designs.length > 0 || customizationData.design !== null
       case 3:
-        return true // Customize position step
+        // Step 3: Position & Notes - require notes for all designs
+        return allDesignsHaveNotes()
       case 4:
-        // Step 4 is handled by StepByStepCustomization component
-        return true
+        // Step 4: Embroidery Options - require all designs to have required options
+        return allDesignsHaveRequiredOptions()
       case 5:
         return true // Review step
       default:
@@ -568,11 +629,11 @@ export default function Customize() {
 
 
   const steps = [
-    { number: 1, title: 'Choose Color & Size', description: 'Select color and size' },
-    { number: 2, title: 'Upload Designs', description: 'Upload your design files' },
-    { number: 3, title: 'Position & Notes', description: 'Position designs and add notes' },
-    { number: 4, title: 'Embroidery Options', description: 'Choose options for each design' },
-    { number: 5, title: 'Review', description: 'Review and checkout' }
+    { number: 1, title: 'Choose Color & Size', description: 'Pick your favorite color and size', icon: '🎨' },
+    { number: 2, title: 'Upload Your Designs', description: 'Add your design files (PNG, JPG, etc.)', icon: '📁' },
+    { number: 3, title: 'Add Design Notes', description: 'Tell us where to place each design', icon: '📝' },
+    { number: 4, title: 'Choose Embroidery Style', description: 'Select how you want each design embroidered', icon: '🧵' },
+    { number: 5, title: 'Review & Order', description: 'Check everything and place your order', icon: '✅' }
   ]
 
   const getStepProgress = () => {
@@ -857,17 +918,24 @@ export default function Customize() {
             <div className="flex items-center space-x-4 overflow-x-auto pb-2">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex-shrink-0 text-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold mx-auto mb-2 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold mx-auto mb-2 ${
                     currentStep >= step.number
                       ? 'bg-accent text-white'
                       : 'bg-gray-200 text-gray-600'
                   }`}>
-                    {currentStep > step.number ? <Check className="w-4 h-4" /> : step.number}
+                    {currentStep > step.number ? <Check className="w-4 h-4" /> : (
+                      <span className="text-sm">{step.icon}</span>
+                    )}
                   </div>
                   <p className={`text-xs font-medium ${
                     currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
                   }`}>
                     {step.title}
+                  </p>
+                  <p className={`text-xs ${
+                    currentStep >= step.number ? 'text-gray-600' : 'text-gray-400'
+                  }`}>
+                    {step.description}
                   </p>
                 </div>
               ))}
@@ -885,12 +953,14 @@ export default function Customize() {
             <div className="flex items-center justify-between mb-4">
               {steps.map((step, index) => (
                 <div key={step.number} className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-semibold ${
                     currentStep >= step.number
                       ? 'bg-accent text-white'
                       : 'bg-gray-200 text-gray-600'
                   }`}>
-                    {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
+                    {currentStep > step.number ? <Check className="w-5 h-5" /> : (
+                      <span className="text-lg">{step.icon}</span>
+                    )}
                   </div>
                   <div className="ml-3">
                     <p className={`text-sm font-medium ${
@@ -898,7 +968,11 @@ export default function Customize() {
                     }`}>
                       {step.title}
                     </p>
-                    <p className="text-xs text-gray-500">{step.description}</p>
+                    <p className={`text-xs ${
+                      currentStep >= step.number ? 'text-gray-600' : 'text-gray-400'
+                    }`}>
+                      {step.description}
+                    </p>
                   </div>
                   {index < steps.length - 1 && (
                     <div className={`w-16 h-0.5 mx-4 ${
@@ -1342,6 +1416,16 @@ export default function Customize() {
                    )}
                  </div>
 
+                 {/* Validation Message */}
+                 {getValidationMessage() && (
+                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                     <div className="flex items-center">
+                       <Info className="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" />
+                       <p className="text-sm text-amber-800">{getValidationMessage()}</p>
+                     </div>
+                   </div>
+                 )}
+                 
                  <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
                    <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
@@ -1362,11 +1446,21 @@ export default function Customize() {
                    This product doesn't require color or size selection. You can proceed to upload your design.
                  </p>
                  
+                 {/* Validation Message */}
+                 {getValidationMessage() && (
+                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                     <div className="flex items-center">
+                       <Info className="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" />
+                       <p className="text-sm text-amber-800">{getValidationMessage()}</p>
+                     </div>
+                   </div>
+                 )}
+                 
                  <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
                    <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      Previous
                    </Button>
-                   <Button onClick={nextStep} className="w-full sm:w-auto">
+                   <Button onClick={nextStep} disabled={!canProceed()} className="w-full sm:w-auto">
                      Continue
                      <ArrowRight className="w-4 h-4 ml-2" />
                    </Button>
@@ -1495,6 +1589,16 @@ export default function Customize() {
                  </div>
                  
                  {/* Navigation Buttons */}
+                 {/* Validation Message */}
+                 {getValidationMessage() && (
+                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                     <div className="flex items-center">
+                       <Info className="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" />
+                       <p className="text-sm text-amber-800">{getValidationMessage()}</p>
+                     </div>
+                   </div>
+                 )}
+                 
                  <div className="flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
                    <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">
                      <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1505,7 +1609,7 @@ export default function Customize() {
                      disabled={!canProceed()} 
                      className="w-full sm:w-auto"
                    >
-                     Continue to Positioning
+                     Continue to Design Notes
                      <ArrowRight className="w-4 h-4 ml-2" />
                          </Button>
                        </div>
@@ -1516,6 +1620,16 @@ export default function Customize() {
               {currentStep === 3 && (
                 <div className="space-y-6">
                   <DesignPositioningManager showFinalView={showFinalView} />
+                  
+                  {/* Validation Message */}
+                  {getValidationMessage() && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <div className="flex items-center">
+                        <Info className="w-5 h-5 text-amber-600 mr-2 flex-shrink-0" />
+                        <p className="text-sm text-amber-800">{getValidationMessage()}</p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
                    <Button variant="outline" onClick={prevStep} className="w-full sm:w-auto">

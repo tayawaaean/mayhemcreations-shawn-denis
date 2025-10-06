@@ -7,6 +7,7 @@ import RefundRequestModal, { RefundRequest } from '../components/RefundRequestMo
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useWebSocket } from '../../hooks/useWebSocket'
+import { products } from '../../data/products'
 
 interface OrderItem {
   id: string
@@ -120,6 +121,10 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
     orderDate: orderReview.submitted_at,
     total: Number(orderReview.total) || 0,
     items: orderData.map((item: any) => {
+      const resolvedProduct = (() => {
+        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
+        return products.find((p: any) => p.id === item.productId || p.id === numericId)
+      })()
       let itemPrice = 0;
       
       console.log('🔍 Processing item:', {
@@ -148,7 +153,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
       }
       // PRIORITY 4: For multiple designs with individual pricing (new format)
       else if (item.customization?.designs && item.customization.designs.length > 0) {
-        let basePrice = Number(item.product?.price) || 0;
+        let basePrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
         let totalCustomizationCost = 0;
         
         item.customization.designs.forEach((design: any) => {
@@ -180,7 +185,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
       }
       // PRIORITY 5: For regular products with customization, calculate total price including customization costs (legacy)
       else if (item.customization?.selectedStyles) {
-        let basePrice = Number(item.product?.price) || 0;
+        let basePrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
         let customizationCost = 0;
         
         // Add costs from selected styles
@@ -206,7 +211,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
       }
       // PRIORITY 6: For regular products without customization, use base price
       else {
-        itemPrice = Number(item.product?.price) || 0;
+        itemPrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
         console.log('💰 Regular product without customization:', itemPrice);
       }
       
@@ -238,6 +243,9 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
           }
           if (item.productName) {
             return item.productName;
+          }
+          if (resolvedProduct?.title) {
+            return (resolvedProduct as any).title as string;
           }
           // If we have a productId but no product data, try to fetch it
           if (item.productId && item.productId !== 'custom-embroidery') {
@@ -297,9 +305,9 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
             return item.customization.mockup;
           }
           // For regular products without customization - show product image
-          if (item.product?.image) {
+          if (item.product?.image || resolvedProduct?.image) {
             console.log('🖼️ Using base product image');
-            return item.product.image;
+            return (item.product?.image ?? (resolvedProduct as any)?.image) as string;
           }
           // Default placeholder
           console.log('🖼️ Using default placeholder image');
@@ -652,7 +660,7 @@ export default function MyOrders() {
   } => {
     // Use stored pricing breakdown if available (matches cart structure)
     if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
-      const storedBasePrice = Number(item.pricingBreakdown.baseProductPrice) || 0;
+      let storedBasePrice = Number(item.pricingBreakdown.baseProductPrice) || 0;
       const storedEmbroideryPrice = Number(item.pricingBreakdown.embroideryPrice) || 0;
       const storedOptionsPrice = Number(item.pricingBreakdown.embroideryOptionsPrice) || 0;
       const storedTotalPrice = Number(item.pricingBreakdown.totalPrice) || 0;
@@ -668,6 +676,14 @@ export default function MyOrders() {
           options: storedOptionsPrice,
           calculatedBase: baseProductPrice
         });
+        // If still not positive, fallback to catalog base price
+        if (!(baseProductPrice > 0)) {
+          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
+          const catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId)
+          if (catalogProduct?.price) {
+            baseProductPrice = Number((catalogProduct as any).price) || 0
+          }
+        }
       }
       
       return {

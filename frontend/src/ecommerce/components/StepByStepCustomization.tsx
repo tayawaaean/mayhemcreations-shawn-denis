@@ -9,13 +9,62 @@ interface StepByStepCustomizationProps {
 }
 
 const stepCategories = [
-  { key: 'coverage', title: 'Coverage Level', description: 'Select one option', required: true },
-  { key: 'material', title: 'Base Material', description: 'Select one option', required: true },
-  { key: 'border', title: 'Border & Edge', description: 'Select one option', required: true },
-  { key: 'threads', title: 'Thread Options', description: 'Select as many as needed (optional)', required: false },
-  { key: 'backing', title: 'Backing', description: 'Select one option (optional)', required: false },
-  { key: 'upgrades', title: 'Upgrades', description: 'Select as many as needed (optional)', required: false },
-  { key: 'cutting', title: 'Cut to Shape Method', description: 'Select one option (optional)', required: false }
+  { 
+    key: 'coverage', 
+    title: 'How Much Coverage?', 
+    description: 'How much of your design should be embroidered?', 
+    required: true,
+    icon: '🎯',
+    examples: ['Text only (50%)', 'Mostly text (75%)', 'Full design (100%)']
+  },
+  { 
+    key: 'material', 
+    title: 'Base Material Type', 
+    description: 'What type of material should we use?', 
+    required: true,
+    icon: '🧵',
+    examples: ['Cotton', 'Polyester', 'Premium blend']
+  },
+  { 
+    key: 'border', 
+    title: 'Border Style', 
+    description: 'How should the edges look?', 
+    required: true,
+    icon: '🖼️',
+    examples: ['Clean edges', 'Decorative border', 'No border']
+  },
+  { 
+    key: 'threads', 
+    title: 'Special Thread Colors', 
+    description: 'Any special thread colors? (Optional)', 
+    required: false,
+    icon: '🌈',
+    examples: ['Metallic threads', 'Glow-in-dark', 'Standard colors']
+  },
+  { 
+    key: 'backing', 
+    title: 'Backing Support', 
+    description: 'Extra support for the embroidery? (Optional)', 
+    required: false,
+    icon: '🛡️',
+    examples: ['Standard backing', 'Heavy-duty', 'No backing']
+  },
+  { 
+    key: 'upgrades', 
+    title: 'Special Upgrades', 
+    description: 'Any special effects? (Optional)', 
+    required: false,
+    icon: '✨',
+    examples: ['3D effect', 'Glow effect', 'No upgrades']
+  },
+  { 
+    key: 'cutting', 
+    title: 'Cutting Method', 
+    description: 'How should we cut the shape? (Optional)', 
+    required: false,
+    icon: '✂️',
+    examples: ['Laser cut', 'Hand cut', 'Hot cut edge']
+  }
 ] as const
 
 export default function StepByStepCustomization({ onComplete, onBackToDesign }: StepByStepCustomizationProps) {
@@ -166,10 +215,22 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
       {/* Progress Bar */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Step {currentStep + 1} of {stepCategories.length}: {currentCategory.title}
-          </h3>
-          <span className="text-sm text-gray-500">{currentCategory.description}</span>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-accent rounded-full flex items-center justify-center">
+              <span className="text-lg">{currentCategory.icon}</span>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Step {currentStep + 1} of {stepCategories.length}: {currentCategory.title}
+              </h3>
+              <p className="text-sm text-gray-600">{currentCategory.description}</p>
+            </div>
+          </div>
+          {currentCategory.required && (
+            <span className="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+              Required
+            </span>
+          )}
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
@@ -178,6 +239,20 @@ export default function StepByStepCustomization({ onComplete, onBackToDesign }: 
           />
         </div>
       </div>
+
+      {/* Examples */}
+      {currentCategory.examples && currentCategory.examples.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="font-medium text-blue-900 mb-2">Examples:</h4>
+          <div className="flex flex-wrap gap-2">
+            {currentCategory.examples.map((example, index) => (
+              <span key={index} className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                {example}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Style Selection */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">

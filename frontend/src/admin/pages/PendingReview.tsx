@@ -26,6 +26,7 @@ import {
 import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiService' // Updated with new status types
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useAdminWebSocket } from '../../hooks/useWebSocket'
+import { products } from '../../data/products'
 
 const PendingReview: React.FC = () => {
   const [reviews, setReviews] = useState<OrderReview[]>([])
@@ -395,6 +396,14 @@ const PendingReview: React.FC = () => {
     if (item?.productName) {
       return item.productName;
     }
+    // Fallback: look up in catalog by id (handles string or numeric ids)
+    if (item?.productId) {
+      const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
+      const catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId)
+      if (catalogProduct?.title) {
+        return catalogProduct.title as string
+      }
+    }
     // If we have a productId but no product data, show the ID
     if (item?.productId && item.productId !== 'custom-embroidery') {
       return `Product #${item.productId}`;
@@ -748,7 +757,14 @@ const PendingReview: React.FC = () => {
     if (items.length === 0) return 'Order'
     const first = items[0]
     // Prefer product.title or name if present
-    const productTitle = first?.product?.title || first?.product?.name || first?.productName
+    const productTitle = first?.product?.title || first?.product?.name || first?.productName || (() => {
+      if (first?.productId) {
+        const numericId = typeof first.productId === 'string' && !isNaN(Number(first.productId)) ? Number(first.productId) : first.productId
+        const catalogProduct = products.find((p: any) => p.id === first.productId || p.id === numericId)
+        return (catalogProduct as any)?.title
+      }
+      return undefined
+    })()
     if (first?.productId === 'custom-embroidery') {
       const designName = first?.customization?.embroideryData?.designName || first?.customization?.design?.name
       if (designName) return `Custom Embroidery: ${designName}`
@@ -1895,109 +1911,7 @@ const PendingReview: React.FC = () => {
                                   </div>
                                 </div>
                                 
-                                {/* Price */}
-                                <div className="text-right ml-4">
-                                  <p className="font-medium">{formatPrice(calculateItemPrice(item))}</p>
-                                  {item.customization && (
-                                    <p className="text-xs text-gray-500">
-                                      {item.productId === 'custom-embroidery' ? 'Custom pricing' : 'Includes customization'}
-                                    </p>
-                                  )}
-                                  
-                                  {/* Detailed Pricing Breakdown */}
-                                  {(() => {
-                                    const pricing = getPricingBreakdown(item);
-                                    
-                                    if (pricing.embroideryOptionsPrice > 0 || pricing.embroideryPrice > 0) {
-                                      return (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                          <div className="flex justify-between">
-                                            <span>Base Product Price:</span>
-                                            <span>${pricing.baseProductPrice.toFixed(2)}</span>
-                                          </div>
-                                          {pricing.embroideryPrice > 0 && (
-                                            <div className="flex justify-between">
-                                              <span>Embroidery Price:</span>
-                                              <span>${pricing.embroideryPrice.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          {pricing.embroideryOptionsPrice > 0 && (
-                                            <div className="flex justify-between">
-                                              <span>Embroidery Options:</span>
-                                              <span>${pricing.embroideryOptionsPrice.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          
-                                          {/* Per-Design Breakdown */}
-                                          {pricing.designBreakdown && pricing.designBreakdown.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t border-gray-200">
-                                              <div className="font-medium text-gray-700 mb-1">Per Design Breakdown:</div>
-                                              {pricing.designBreakdown.map((design: any, index: number) => (
-                                                <div key={index} className="ml-2 mb-2">
-                                                  <div className="font-medium text-gray-600">{design.designName}:</div>
-                                                  <div className="ml-2 space-y-1">
-                                                    {design.designDetails.coverage > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Coverage:</span>
-                                                        <span>${design.designDetails.coverage.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.material > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Material:</span>
-                                                        <span>${design.designDetails.material.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.border > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Border:</span>
-                                                        <span>${design.designDetails.border.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.backing > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Backing:</span>
-                                                        <span>${design.designDetails.backing.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.cutting > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Cutting:</span>
-                                                        <span>${design.designDetails.cutting.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.threads > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Threads:</span>
-                                                        <span>${design.designDetails.threads.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    {design.designDetails.upgrades > 0 && (
-                                                      <div className="flex justify-between">
-                                                        <span>Upgrades:</span>
-                                                        <span>${design.designDetails.upgrades.toFixed(2)}</span>
-                                                      </div>
-                                                    )}
-                                                    <div className="flex justify-between font-medium border-t border-gray-200 pt-1 mt-1">
-                                                      <span>Design Total:</span>
-                                                      <span>${design.designOptions.toFixed(2)}</span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
-                                          
-                                          <div className="flex justify-between font-medium border-t border-gray-300 pt-1 mt-1">
-                                            <span>Total:</span>
-                                            <span>${pricing.totalPrice.toFixed(2)}</span>
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
+                                {/* Price - removed to avoid duplicate breakdown */}
                               </div>
                             ))}
                           </div>
@@ -2011,28 +1925,9 @@ const PendingReview: React.FC = () => {
                   })()}
                 </div>
 
-                {/* Order Summary */}
+                {/* Order Pricing */}
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">Order Summary</h4>
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>{formatPrice(selectedReview.subtotal)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Shipping:</span>
-                      <span>{formatPrice(selectedReview.shipping)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span>{formatPrice(selectedReview.tax)}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
-                      <span>Total:</span>
-                      <span>{formatPrice(selectedReview.total)}</span>
-                    </div>
-                  </div>
-                  
+                  <h4 className="font-medium text-gray-900 mb-2">Order Pricing</h4>
                   {/* Detailed Pricing Breakdown for All Items */}
                   {(() => {
                     try {
@@ -2079,7 +1974,7 @@ const PendingReview: React.FC = () => {
                         const subtotal = totalBaseProduct + totalEmbroideryPrice + totalEmbroideryOptions;
                         
                         return (
-                          <div className="mt-4 pt-4 border-t border-gray-300">
+                          <div className="mt-4">
                             {/* Pricing Summary */}
                             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
                               <h5 className="font-semibold text-blue-900 mb-3 flex items-center">
@@ -2221,7 +2116,123 @@ const PendingReview: React.FC = () => {
                                             ))}
                                           </div>
                                         )}
-                                        
+
+                                        {/* Selected Embroidery Options (names + prices) */}
+                                        {(() => {
+                                          // Multi-design selections
+                                          if (item.customization?.designs && item.customization.designs.length > 0) {
+                                            return (
+                                              <div className="mt-3 pt-2 border-t border-gray-300">
+                                                <div className="text-xs font-medium text-gray-600 mb-2">Selected Embroidery Options:</div>
+                                                {item.customization.designs.map((design: any, dIdx: number) => (
+                                                  <div key={dIdx} className="ml-2 mb-2 bg-white rounded p-2 border border-gray-200">
+                                                    <div className="text-xs font-medium text-gray-500 mb-1">{design.name || `Design ${dIdx + 1}`}:</div>
+                                                    {design.selectedStyles && (
+                                                      <div className="ml-2 text-xs space-y-1">
+                                                        {design.selectedStyles.coverage && (
+                                                          <div className="flex justify-between items-center p-1 bg-blue-50 rounded">
+                                                            <span className="text-blue-700">{design.selectedStyles.coverage.name}</span>
+                                                            <span className="font-semibold text-blue-900">+{formatPrice(design.selectedStyles.coverage.price)}</span>
+                                                          </div>
+                                                        )}
+                                                        {design.selectedStyles.material && (
+                                                          <div className="flex justify-between items-center p-1 bg-purple-50 rounded">
+                                                            <span className="text-purple-700">{design.selectedStyles.material.name}</span>
+                                                            <span className="font-semibold text-purple-900">+{formatPrice(design.selectedStyles.material.price)}</span>
+                                                          </div>
+                                                        )}
+                                                        {design.selectedStyles.border && (
+                                                          <div className="flex justify-between items-center p-1 bg-purple-50 rounded">
+                                                            <span className="text-purple-700">{design.selectedStyles.border.name}</span>
+                                                            <span className="font-semibold text-purple-900">+{formatPrice(design.selectedStyles.border.price)}</span>
+                                                          </div>
+                                                        )}
+                                                        {design.selectedStyles.backing && (
+                                                          <div className="flex justify-between items-center p-1 bg-green-50 rounded">
+                                                            <span className="text-green-700">{design.selectedStyles.backing.name}</span>
+                                                            <span className="font-semibold text-green-900">+{formatPrice(design.selectedStyles.backing.price)}</span>
+                                                          </div>
+                                                        )}
+                                                        {design.selectedStyles.cutting && (
+                                                          <div className="flex justify-between items-center p-1 bg-rose-50 rounded">
+                                                            <span className="text-rose-700">{design.selectedStyles.cutting.name}</span>
+                                                            <span className="font-semibold text-rose-900">+{formatPrice(design.selectedStyles.cutting.price)}</span>
+                                                          </div>
+                                                        )}
+                                                        {Array.isArray(design.selectedStyles.threads) && design.selectedStyles.threads.map((thread: any, tIdx: number) => (
+                                                          <div key={tIdx} className="flex justify-between items-center p-1 bg-yellow-50 rounded">
+                                                            <span className="text-yellow-700">{thread.name}</span>
+                                                            <span className="font-semibold text-yellow-900">+{formatPrice(thread.price)}</span>
+                                                          </div>
+                                                        ))}
+                                                        {Array.isArray(design.selectedStyles.upgrades) && design.selectedStyles.upgrades.map((up: any, uIdx: number) => (
+                                                          <div key={uIdx} className="flex justify-between items-center p-1 bg-orange-50 rounded">
+                                                            <span className="text-orange-700">{up.name}</span>
+                                                            <span className="font-semibold text-orange-900">+{formatPrice(up.price)}</span>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+                                          // Single selection
+                                          if (item.customization?.selectedStyles) {
+                                            const s = item.customization.selectedStyles;
+                                            return (
+                                              <div className="mt-3 pt-2 border-t border-gray-300">
+                                                <div className="text-xs font-medium text-gray-600 mb-2">Selected Embroidery Options:</div>
+                                                <div className="ml-2 text-xs space-y-1">
+                                                  {s.coverage && (
+                                                    <div className="flex justify-between items-center p-1 bg-blue-50 rounded">
+                                                      <span className="text-blue-700">{s.coverage.name}</span>
+                                                      <span className="font-semibold text-blue-900">+{formatPrice(s.coverage.price)}</span>
+                                                    </div>
+                                                  )}
+                                                  {s.material && (
+                                                    <div className="flex justify-between items-center p-1 bg-purple-50 rounded">
+                                                      <span className="text-purple-700">{s.material.name}</span>
+                                                      <span className="font-semibold text-purple-900">+{formatPrice(s.material.price)}</span>
+                                                    </div>
+                                                  )}
+                                                  {s.border && (
+                                                    <div className="flex justify-between items-center p-1 bg-purple-50 rounded">
+                                                      <span className="text-purple-700">{s.border.name}</span>
+                                                      <span className="font-semibold text-purple-900">+{formatPrice(s.border.price)}</span>
+                                                    </div>
+                                                  )}
+                                                  {s.backing && (
+                                                    <div className="flex justify-between items-center p-1 bg-green-50 rounded">
+                                                      <span className="text-green-700">{s.backing.name}</span>
+                                                      <span className="font-semibold text-green-900">+{formatPrice(s.backing.price)}</span>
+                                                    </div>
+                                                  )}
+                                                  {s.cutting && (
+                                                    <div className="flex justify-between items-center p-1 bg-rose-50 rounded">
+                                                      <span className="text-rose-700">{s.cutting.name}</span>
+                                                      <span className="font-semibold text-rose-900">+{formatPrice(s.cutting.price)}</span>
+                                                    </div>
+                                                  )}
+                                                  {Array.isArray(s.threads) && s.threads.map((thread: any, tIdx: number) => (
+                                                    <div key={tIdx} className="flex justify-between items-center p-1 bg-yellow-50 rounded">
+                                                      <span className="text-yellow-700">{thread.name}</span>
+                                                      <span className="font-semibold text-yellow-900">+{formatPrice(thread.price)}</span>
+                                                    </div>
+                                                  ))}
+                                                  {Array.isArray(s.upgrades) && s.upgrades.map((up: any, uIdx: number) => (
+                                                    <div key={uIdx} className="flex justify-between items-center p-1 bg-orange-50 rounded">
+                                                      <span className="text-orange-700">{up.name}</span>
+                                                      <span className="font-semibold text-orange-900">+{formatPrice(up.price)}</span>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
                                         <div className="flex justify-between font-semibold border-t border-gray-300 pt-2">
                                           <span>Item Total:</span>
                                           <span className="text-blue-600">${pricing.totalPrice.toFixed(2)}</span>

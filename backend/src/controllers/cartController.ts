@@ -4,7 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { Cart, Product } from '../models';
+import { Cart, Product, User } from '../models';
 import { logger } from '../utils/logger';
 import { sequelize } from '../config/database';
 
@@ -113,6 +113,17 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
         success: false,
         message: 'Authentication required',
         code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    // Verify user exists to avoid FK violation
+    const userExists = await User.findByPk(userId as any);
+    if (!userExists) {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid user session',
+        code: 'INVALID_USER',
       });
       return;
     }
@@ -443,6 +454,17 @@ export const syncCart = async (req: AuthenticatedRequest, res: Response, next: N
         success: false,
         message: 'Authentication required',
         code: 'AUTH_REQUIRED',
+      });
+      return;
+    }
+
+    // Verify user exists to avoid FK violation during bulk create
+    const userExists = await User.findByPk(userId as any);
+    if (!userExists) {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid user session',
+        code: 'INVALID_USER',
       });
       return;
     }
