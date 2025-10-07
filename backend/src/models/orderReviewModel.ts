@@ -14,7 +14,7 @@ export interface OrderReviewAttributes {
   shipping: number;
   tax: number;
   total: number;
-  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing';
+  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout';
   submittedAt: Date;
   reviewedAt?: Date | null;
   adminNotes?: string | null;
@@ -36,7 +36,7 @@ export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreatio
   public shipping!: number;
   public tax!: number;
   public total!: number;
-  public status!: 'pending' | 'approved' | 'rejected' | 'needs-changes';
+  public status!: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout';
   public submittedAt!: Date;
   public reviewedAt?: Date | null;
   public adminNotes?: string | null;
@@ -158,7 +158,7 @@ OrderReview.init(
       comment: 'Total order amount',
     },
     status: {
-      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes'),
+      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout'),
       allowNull: false,
       defaultValue: 'pending',
       field: 'status',

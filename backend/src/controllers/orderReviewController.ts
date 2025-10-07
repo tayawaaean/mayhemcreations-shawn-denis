@@ -30,7 +30,7 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
         shipping DECIMAL(10,2) NOT NULL,
         tax DECIMAL(10,2) NOT NULL,
         total DECIMAL(10,2) NOT NULL,
-        status ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing') NOT NULL DEFAULT 'pending',
+        status ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout') NOT NULL DEFAULT 'pending',
         submitted_at DATETIME NOT NULL,
         reviewed_at DATETIME NULL,
         admin_notes TEXT NULL,
@@ -109,6 +109,8 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         // 🎯 NEW: Check pricing breakdown
         pricingBreakdown: item.pricingBreakdown,
         productPrice: item.product?.price,
+        productName: item.productName,
+        productSnapshot: item.productSnapshot,
         quantity: item.quantity
       })),
       subtotal,
@@ -124,6 +126,8 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         productId: item.productId,
         quantity: item.quantity,
         product: item.product,
+        productName: item.productName,
+        productSnapshot: item.productSnapshot,
         customization: item.customization,
         pricingBreakdown: item.pricingBreakdown,
         reviewStatus: item.reviewStatus
@@ -548,7 +552,7 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
 export const uploadPictureReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { pictureReplies } = req.body; // Array of { itemId, image, notes }
+    const { pictureReplies } = req.body; // Array of { itemId, designId?, image, notes }
 
     if (!pictureReplies || !Array.isArray(pictureReplies)) {
       return res.status(400).json({
@@ -559,10 +563,14 @@ export const uploadPictureReply = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
-    // Add uploadedAt to each picture reply
+    // Enhanced picture reply structure for multi-design support
     const pictureRepliesWithTimestamp = pictureReplies.map((reply: any) => ({
       ...reply,
-      uploadedAt: new Date().toISOString()
+      uploadedAt: new Date().toISOString(),
+      // Support for design-specific replies (same productId, different designs)
+      designId: reply.designId || null, // Optional design ID for multi-design items
+      designName: reply.designName || null, // Optional design name for reference
+      embroideryStyle: reply.embroideryStyle || null // Optional embroidery style info
     }));
 
     // Update the order review with picture replies
@@ -640,7 +648,7 @@ export const uploadPictureReply = async (req: AuthenticatedRequest, res: Respons
 export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { confirmations } = req.body; // Array of { itemId, confirmed, notes }
+    const { confirmations } = req.body; // Array of { itemId, designId?, confirmed, notes }
 
     if (!confirmations || !Array.isArray(confirmations)) {
       return res.status(400).json({
@@ -651,6 +659,16 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
       });
     }
 
+    // Enhanced confirmation structure for multi-design support
+    const enhancedConfirmations = confirmations.map((conf: any) => ({
+      ...conf,
+      confirmedAt: new Date().toISOString(),
+      // Support for design-specific confirmations (same productId, different designs)
+      designId: conf.designId || null, // Optional design ID for multi-design items
+      designName: conf.designName || null, // Optional design name for reference
+      embroideryStyle: conf.embroideryStyle || null // Optional embroidery style info
+    }));
+
     // Update the order review with customer confirmations
     const [result] = await sequelize.query(`
       UPDATE order_reviews 
@@ -659,7 +677,7 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
           updated_at = NOW()
       WHERE id = ? AND user_id = ?
     `, {
-      replacements: [JSON.stringify(confirmations), id, req.user?.id]
+      replacements: [JSON.stringify(enhancedConfirmations), id, req.user?.id]
     });
 
     if ((result as any).affectedRows === 0) {
@@ -672,13 +690,25 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
     }
 
     // Automatically move order to pending-payment upon confirmation
+    // Check if all confirmations are approved
+    const allApproved = enhancedConfirmations.every(conf => conf.confirmed === true);
+    const anyRejected = enhancedConfirmations.some(conf => conf.confirmed === false);
+    
+    let newStatus = 'needs-changes'; // Default status
+    
+    if (allApproved) {
+      newStatus = 'pending-payment';
+    } else if (anyRejected) {
+      newStatus = 'picture-reply-rejected';
+    }
+    
     await sequelize.query(`
       UPDATE order_reviews 
-      SET status = 'pending-payment',
+      SET status = ?,
           reviewed_at = COALESCE(reviewed_at, NOW()),
           updated_at = NOW()
       WHERE id = ?
-    `, { replacements: [id] });
+    `, { replacements: [newStatus, id] });
 
     // Mark related cart items as approved
     try {
@@ -722,11 +752,15 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
       success: true,
       data: {
         id: parseInt(id),
-        confirmations,
-        status: 'pending-payment',
+        confirmations: enhancedConfirmations,
+        status: newStatus,
         confirmedAt: new Date().toISOString()
       },
-      message: 'Picture confirmations submitted successfully. Status updated to pending payment.',
+      message: allApproved 
+        ? 'Picture confirmations submitted successfully. Status updated to pending payment.'
+        : anyRejected 
+          ? 'Some pictures were rejected. Admin will upload new designs.'
+          : 'Picture confirmations submitted successfully.',
       timestamp: new Date().toISOString(),
     });
 
@@ -735,12 +769,12 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
     if (webSocketService && req.user?.id) {
       webSocketService.emitCustomerConfirmation(parseInt(id), {
         userId: req.user.id,
-        confirmations,
+        confirmations: enhancedConfirmations,
         confirmedAt: new Date().toISOString()
       });
       webSocketService.emitOrderStatusChange(parseInt(id), {
         userId: req.user.id,
-        status: 'pending-payment',
+        status: newStatus,
         originalStatus: 'picture-reply-approved',
         reviewedAt: new Date().toISOString()
       });

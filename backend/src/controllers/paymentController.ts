@@ -13,12 +13,15 @@ import {
   CreatePaymentIntentData,
   CreateCheckoutSessionData
 } from '../services/stripeService';
+import stripe from '../config/stripe';
 import { logger } from '../utils/logger';
 
 interface AuthenticatedRequest extends Request {
   user?: {
     id: number;
     email: string;
+    firstName?: string;
+    lastName?: string;
     role: string;
   };
 }
@@ -58,10 +61,49 @@ export const createPaymentIntentHandler = async (
     // Convert amount to cents
     const amountInCents = Math.round(amount * 100);
 
+    // Create or retrieve customer first
+    let customerId: string | undefined;
+    
+    try {
+      // Try to find existing customer by email
+      const existingCustomers = await stripe.customers.list({
+        email: req.user?.email,
+        limit: 1,
+      });
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id;
+        logger.info('Using existing Stripe customer for payment intent', {
+          customerId,
+          email: req.user?.email,
+        });
+      } else {
+        // Create new customer
+        const customer = await createCustomer(
+          req.user?.email || '',
+          `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
+          {
+            userId: userId.toString(),
+          }
+        );
+        customerId = customer.id;
+        logger.info('Created new Stripe customer for payment intent', {
+          customerId,
+          email: req.user?.email,
+        });
+      }
+    } catch (customerError: any) {
+      logger.warn('Customer creation/retrieval failed for payment intent, proceeding without customer', {
+        error: customerError.message,
+        email: req.user?.email,
+      });
+      // Continue without customer
+    }
+
     const paymentData: CreatePaymentIntentData = {
       amount: amountInCents,
       currency: currency || 'usd',
-      customerId: req.user?.email, // Use email as customer identifier
+      customerId,
       metadata: {
         userId: userId.toString(),
         ...metadata,
@@ -137,9 +179,48 @@ export const createCheckoutSessionHandler = async (
       }
     }
 
+    // Create or retrieve customer first
+    let customerId: string | undefined;
+    
+    try {
+      // Try to find existing customer by email
+      const existingCustomers = await stripe.customers.list({
+        email: req.user?.email,
+        limit: 1,
+      });
+      
+      if (existingCustomers.data.length > 0) {
+        customerId = existingCustomers.data[0].id;
+        logger.info('Using existing Stripe customer', {
+          customerId,
+          email: req.user?.email,
+        });
+      } else {
+        // Create new customer
+        const customer = await createCustomer(
+          req.user?.email || '',
+          `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
+          {
+            userId: userId.toString(),
+          }
+        );
+        customerId = customer.id;
+        logger.info('Created new Stripe customer', {
+          customerId,
+          email: req.user?.email,
+        });
+      }
+    } catch (customerError: any) {
+      logger.warn('Customer creation/retrieval failed, proceeding without customer', {
+        error: customerError.message,
+        email: req.user?.email,
+      });
+      // Continue without customer - Stripe will collect customer info during checkout
+    }
+
     const checkoutData: CreateCheckoutSessionData = {
       lineItems,
-      customerId: req.user?.email,
+      customerId,
       successUrl: successUrl || `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
       metadata: {

@@ -161,17 +161,80 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
       customerId: paymentIntent.customer,
     });
 
-    // TODO: Add your business logic here
-    // - Update order status in database
-    // - Send confirmation email
-    // - Update inventory
-    // - Create order record
+    // Extract userId from metadata
+    const userId = paymentIntent.metadata?.userId;
+    if (!userId) {
+      logger.warn('No userId found in payment intent metadata', {
+        paymentIntentId: paymentIntent.id,
+        metadata: paymentIntent.metadata,
+      });
+      return;
+    }
+
+    // Update order status to approved
+    const { sequelize } = await import('../config/database');
     
-    console.log('✅ Payment successful:', {
-      id: paymentIntent.id,
-      amount: paymentIntent.amount / 100, // Convert from cents
-      currency: paymentIntent.currency,
+    // Find the most recent order review for this user that's in pending-payment status
+    const [orderResult] = await sequelize.query(`
+      SELECT id, user_id, status, total 
+      FROM order_reviews 
+      WHERE user_id = ? AND status = 'pending-payment'
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, {
+      replacements: [userId]
     });
+
+    if (Array.isArray(orderResult) && orderResult.length > 0) {
+      const order = orderResult[0] as any;
+      
+      // Update order status to approved-processing (payment completed, ready for design processing)
+      await sequelize.query(`
+        UPDATE order_reviews 
+        SET status = 'approved-processing',
+            reviewed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = ?
+      `, {
+        replacements: [order.id]
+      });
+
+      logger.info('Order status updated to approved-processing after payment success', {
+        orderId: order.id,
+        userId: userId,
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount / 100,
+      });
+
+      // Emit WebSocket event for real-time updates
+      try {
+        const { getWebSocketService } = await import('../services/websocketService');
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitOrderStatusChange(order.id, {
+            userId: parseInt(userId),
+            status: 'approved-processing',
+            originalStatus: 'pending-payment',
+            reviewedAt: new Date().toISOString(),
+            paymentIntentId: paymentIntent.id
+          });
+        }
+      } catch (wsError) {
+        logger.error('Error emitting WebSocket event:', wsError);
+      }
+
+      console.log('✅ Payment successful and order approved for processing:', {
+        orderId: order.id,
+        paymentIntentId: paymentIntent.id,
+        amount: paymentIntent.amount / 100,
+        currency: paymentIntent.currency,
+      });
+    } else {
+      logger.warn('No pending-payment order found for user after payment success', {
+        userId: userId,
+        paymentIntentId: paymentIntent.id,
+      });
+    }
 
   } catch (error: any) {
     logger.error('Error handling payment success:', error);
@@ -220,18 +283,81 @@ const handleCheckoutSessionCompleted = async (session: any) => {
       customerEmail: session.customer_details?.email,
     });
 
-    // TODO: Add your business logic here
-    // - Create order from session data
-    // - Send order confirmation email
-    // - Update inventory
-    // - Process the order
+    // Extract userId from metadata
+    const userId = session.metadata?.userId;
+    if (!userId) {
+      logger.warn('No userId found in checkout session metadata', {
+        sessionId: session.id,
+        metadata: session.metadata,
+      });
+      return;
+    }
+
+    // Update order status to approved
+    const { sequelize } = await import('../config/database');
     
-    console.log('✅ Checkout completed:', {
-      sessionId: session.id,
-      amount: session.amount_total / 100,
-      currency: session.currency,
-      email: session.customer_details?.email,
+    // Find the most recent order review for this user that's in pending-payment status
+    const [orderResult] = await sequelize.query(`
+      SELECT id, user_id, status, total 
+      FROM order_reviews 
+      WHERE user_id = ? AND status = 'pending-payment'
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, {
+      replacements: [userId]
     });
+
+    if (Array.isArray(orderResult) && orderResult.length > 0) {
+      const order = orderResult[0] as any;
+      
+      // Update order status to approved-processing (payment completed, ready for design processing)
+      await sequelize.query(`
+        UPDATE order_reviews 
+        SET status = 'approved-processing',
+            reviewed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = ?
+      `, {
+        replacements: [order.id]
+      });
+
+      logger.info('Order status updated to approved-processing after checkout completion', {
+        orderId: order.id,
+        userId: userId,
+        sessionId: session.id,
+        amount: session.amount_total / 100,
+      });
+
+      // Emit WebSocket event for real-time updates
+      try {
+        const { getWebSocketService } = await import('../services/websocketService');
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitOrderStatusChange(order.id, {
+            userId: parseInt(userId),
+            status: 'approved-processing',
+            originalStatus: 'pending-payment',
+            reviewedAt: new Date().toISOString(),
+            sessionId: session.id
+          });
+        }
+      } catch (wsError) {
+        logger.error('Error emitting WebSocket event:', wsError);
+      }
+
+      console.log('✅ Checkout completed and order approved for processing:', {
+        orderId: order.id,
+        sessionId: session.id,
+        amount: session.amount_total / 100,
+        currency: session.currency,
+        email: session.customer_details?.email,
+      });
+    } else {
+      logger.warn('No pending-payment order found for user after checkout completion', {
+        userId: userId,
+        sessionId: session.id,
+      });
+    }
 
   } catch (error: any) {
     logger.error('Error handling checkout completion:', error);

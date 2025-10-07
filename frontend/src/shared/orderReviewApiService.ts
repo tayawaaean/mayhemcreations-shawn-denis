@@ -45,6 +45,10 @@ export interface PictureReply {
   image: string; // Base64 encoded image
   notes?: string;
   uploadedAt?: string;
+  // Enhanced fields for multi-design support
+  designId?: string; // Optional design ID for multi-design items
+  designName?: string; // Optional design name for reference
+  embroideryStyle?: string; // Optional embroidery style info
 }
 
 export interface CustomerConfirmation {
@@ -52,6 +56,10 @@ export interface CustomerConfirmation {
   confirmed: boolean;
   notes?: string;
   confirmedAt?: string;
+  // Enhanced fields for multi-design support
+  designId?: string; // Optional design ID for multi-design items
+  designName?: string; // Optional design name for reference
+  embroideryStyle?: string; // Optional embroidery style info
 }
 
 export interface UpdateReviewStatusRequest {

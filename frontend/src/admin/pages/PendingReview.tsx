@@ -27,6 +27,7 @@ import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiS
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useAdminWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
+import { productApiService } from '../../shared/productApiService'
 
 const PendingReview: React.FC = () => {
   const [reviews, setReviews] = useState<OrderReview[]>([])
@@ -43,16 +44,31 @@ const PendingReview: React.FC = () => {
   const [adminNotes, setAdminNotes] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
-  const [pictureReplies, setPictureReplies] = useState<{[itemId: string]: {image: string, notes: string}}>({})
+  const [pictureReplies, setPictureReplies] = useState<{[itemId: string]: {image: string, notes: string, designId?: string, designName?: string, embroideryStyle?: string}}>({})
   const [uploadingPictures, setUploadingPictures] = useState(false)
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
+  const [backendProducts, setBackendProducts] = useState<any[]>([])
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useAdminWebSocket()
 
+  // Load backend products
+  const loadBackendProducts = async () => {
+    try {
+      const response = await productApiService.getProducts({ status: 'active', limit: 100 })
+      if (response.success && response.data) {
+        setBackendProducts(response.data)
+        console.log('📦 Loaded backend products for admin:', response.data.length)
+      }
+    } catch (error) {
+      console.error('Error loading backend products:', error)
+    }
+  }
+
   // Load reviews on component mount
   useEffect(() => {
     loadReviews()
+    loadBackendProducts()
   }, [])
 
   // WebSocket event listeners for real-time updates
@@ -317,10 +333,15 @@ const PendingReview: React.FC = () => {
         
         console.log('🔍 Mapping item:', { itemKey, item, reply });
         
+        // Enhanced structure for multi-design support
         return {
           itemId: item?.id || itemKey, // Use the actual item ID if available, otherwise use the key
-        image: reply.image,
-        notes: reply.notes || ''
+          image: reply.image,
+          notes: reply.notes || '',
+          // Enhanced fields for multi-design support
+          designId: reply.designId || undefined, // Optional design ID for multi-design items
+          designName: reply.designName || undefined, // Optional design name for reference
+          embroideryStyle: reply.embroideryStyle || undefined // Optional embroidery style info
         };
       });
 
@@ -396,10 +417,18 @@ const PendingReview: React.FC = () => {
     if (item?.productName) {
       return item.productName;
     }
-    // Fallback: look up in catalog by id (handles string or numeric ids)
+    // Fallback: look up in backend products first, then frontend catalog
     if (item?.productId) {
       const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
-      const catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId)
+      
+      // First try backend products
+      let catalogProduct = backendProducts.find((p: any) => p.id === numericId)
+      
+      // If not found in backend products, try frontend products as fallback
+      if (!catalogProduct) {
+        catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId)
+      }
+      
       if (catalogProduct?.title) {
         return catalogProduct.title as string
       }
@@ -760,7 +789,15 @@ const PendingReview: React.FC = () => {
     const productTitle = first?.product?.title || first?.product?.name || first?.productName || (() => {
       if (first?.productId) {
         const numericId = typeof first.productId === 'string' && !isNaN(Number(first.productId)) ? Number(first.productId) : first.productId
-        const catalogProduct = products.find((p: any) => p.id === first.productId || p.id === numericId)
+        
+        // First try backend products
+        let catalogProduct = backendProducts.find((p: any) => p.id === numericId)
+        
+        // If not found in backend products, try frontend products as fallback
+        if (!catalogProduct) {
+          catalogProduct = products.find((p: any) => p.id === first.productId || p.id === numericId)
+        }
+        
         return (catalogProduct as any)?.title
       }
       return undefined

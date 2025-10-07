@@ -278,6 +278,21 @@ export default function Cart() {
               const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
               return p.id === item.productId || p.id === numericId;
             }),
+            // Snapshot key product info for backend persistence and later display
+            productName: (() => {
+              const p = products.find(p => {
+                const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                return p.id === item.productId || p.id === numericId;
+              });
+              return p?.title || null;
+            })(),
+            productSnapshot: (() => {
+              const p = products.find(p => {
+                const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+                return p.id === item.productId || p.id === numericId;
+              }) as any;
+              return p ? { id: p.id, title: p.title, price: p.price, image: p.image } : null;
+            })(),
             // Explicit pricing breakdown
             pricingBreakdown: {
               baseProductPrice,

@@ -8,6 +8,7 @@ import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation 
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
+import { productApiService } from '../../shared/productApiService'
 
 interface OrderItem {
   id: string
@@ -57,7 +58,7 @@ interface Order {
 }
 
 // Helper function to convert OrderReview to Order
-const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
+const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: any[]): Order => {
   const orderData = Array.isArray(orderReview.order_data) 
     ? orderReview.order_data 
     : JSON.parse(orderReview.order_data as string);
@@ -94,7 +95,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
       case 'pending':
         return 'pending-review'
       case 'approved':
-        return 'pending-payment' // After customer approves, goes to pending payment
+        return 'approved-processing' // After payment, goes to approved-processing
       case 'rejected':
         return 'rejected-needs-upload'
       case 'needs-changes':
@@ -114,16 +115,27 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
     }
   }
 
-  const convertedOrder = {
-    id: orderReview.id,
-    orderNumber: `MC-${orderReview.id}`,
-    status: mapStatus(orderReview.status),
-    orderDate: orderReview.submitted_at,
-    total: Number(orderReview.total) || 0,
-    items: orderData.map((item: any) => {
+  const convertedItems = orderData.map((item: any) => {
       const resolvedProduct = (() => {
+        // First try to find in backend products by numeric ID
         const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
-        return products.find((p: any) => p.id === item.productId || p.id === numericId)
+        let product = backendProducts.find((p: any) => p.id === numericId)
+        
+        // If not found in backend products, try frontend products as fallback
+        if (!product) {
+          product = products.find((p: any) => p.id === item.productId || p.id === numericId)
+        }
+        
+        console.log('🔍 Product lookup debug:', {
+          productId: item.productId,
+          numericId: numericId,
+          foundInBackend: !!product,
+          backendProductsCount: backendProducts.length,
+          productTitle: product?.title,
+          foundProductId: product?.id
+        });
+        
+        return product
       })()
       let itemPrice = 0;
       
@@ -239,18 +251,23 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
           }
           // For regular products - try multiple fallbacks
           if (item.product?.title) {
+            console.log('🔍 Using item.product.title:', item.product.title);
             return item.product.title;
           }
           if (item.productName) {
+            console.log('🔍 Using item.productName:', item.productName);
             return item.productName;
           }
           if (resolvedProduct?.title) {
+            console.log('🔍 Using resolvedProduct.title:', resolvedProduct.title);
             return (resolvedProduct as any).title as string;
           }
           // If we have a productId but no product data, try to fetch it
           if (item.productId && item.productId !== 'custom-embroidery') {
+            console.log('🔍 Falling back to Product #', item.productId);
             return `Product #${item.productId}`;
           }
+          console.log('🔍 Using Custom Product fallback');
           return 'Custom Product';
         })(),
         productImage: (() => {
@@ -315,9 +332,37 @@ const convertOrderReviewToOrder = (orderReview: OrderReview): Order => {
         })(),
         quantity: item.quantity || 1,
         price: itemPrice,
-        customization: item.customization
+        customization: item.customization,
+        product: resolvedProduct // Include the full product data for pricing calculations
       };
-    }),
+    });
+
+  // Calculate total from items to ensure consistency
+  const calculatedTotal = convertedItems.reduce((total: number, item: any) => {
+    return total + (item.price * item.quantity);
+  }, 0);
+
+  console.log('💰 Order pricing consistency check:', {
+    orderId: orderReview.id,
+    storedTotal: Number(orderReview.total) || 0,
+    calculatedTotal: calculatedTotal,
+    discrepancy: Math.abs((Number(orderReview.total) || 0) - calculatedTotal),
+    itemsBreakdown: convertedItems.map((item: any) => ({
+      productId: item.productId,
+      productName: item.productName,
+      price: item.price,
+      quantity: item.quantity,
+      subtotal: item.price * item.quantity
+    }))
+  });
+
+  const convertedOrder = {
+    id: orderReview.id,
+    orderNumber: `MC-${orderReview.id}`,
+    status: mapStatus(orderReview.status),
+    orderDate: orderReview.submitted_at,
+    total: calculatedTotal, // Use calculated total instead of stored total
+    items: convertedItems,
     adminNotes: orderReview.admin_notes,
     reviewedAt: orderReview.reviewed_at,
     adminPictureReplies: orderReview.admin_picture_replies ? 
@@ -543,19 +588,34 @@ export default function MyOrders() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
-  const [pictureConfirmations, setPictureConfirmations] = useState<{[itemId: string]: {confirmed: boolean | null, notes: string}}>({})
+  const [pictureConfirmations, setPictureConfirmations] = useState<{[itemId: string]: {confirmed: boolean | null, notes: string, designId?: string, designName?: string, embroideryStyle?: string}}>({})
   const [submittingConfirmations, setSubmittingConfirmations] = useState(false)
   const [showReuploadModal, setShowReuploadModal] = useState(false)
   const [reuploadFiles, setReuploadFiles] = useState<{[itemId: string]: File | null}>({})
   const [submittingReupload, setSubmittingReupload] = useState(false)
+  const [backendProducts, setBackendProducts] = useState<any[]>([])
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useWebSocket()
+
+  // Load backend products
+  const loadBackendProducts = async () => {
+    try {
+      const response = await productApiService.getProducts({ status: 'active', limit: 100 })
+      if (response.success && response.data) {
+        setBackendProducts(response.data)
+        console.log('📦 Loaded backend products:', response.data.length)
+      }
+    } catch (error) {
+      console.error('Error loading backend products:', error)
+    }
+  }
 
   // Load orders on component mount
   useEffect(() => {
     if (isLoggedIn) {
       loadOrders()
+      loadBackendProducts()
     }
   }, [isLoggedIn])
 
@@ -623,7 +683,7 @@ export default function MyOrders() {
       console.log('📊 Orders API response:', response)
       
       if (response.success && response.data) {
-        const convertedOrders = response.data.map(convertOrderReviewToOrder)
+        const convertedOrders = response.data.map((orderReview: OrderReview) => convertOrderReviewToOrder(orderReview, backendProducts))
         console.log('✅ Orders loaded:', convertedOrders)
         setOrders(convertedOrders)
       } else {
@@ -639,7 +699,7 @@ export default function MyOrders() {
   }
 
   // Helper function to get pricing breakdown for display (matches admin panel structure)
-  const getPricingBreakdown = (item: any): {
+  const getPricingBreakdown = (item: any, backendProducts: any[]): {
     baseProductPrice: number;
     embroideryPrice: number;
     embroideryOptionsPrice: number;
@@ -706,6 +766,26 @@ export default function MyOrders() {
 
     // Calculate pricing for multiple designs with individual embroidery options
     let baseProduct = Number(item.product?.price) || 0;
+    
+    // If base product price is not available from item.product, try to get it from backend products
+    if (baseProduct === 0) {
+      const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
+      let catalogProduct = backendProducts.find((p: any) => p.id === numericId)
+      
+      // If not found in backend products, try frontend products as fallback
+      if (!catalogProduct) {
+        catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId)
+      }
+      
+      if (catalogProduct?.price) {
+        baseProduct = Number(catalogProduct.price) || 0
+        console.log('🔧 Retrieved base product price from catalog:', {
+          productId: item.productId,
+          catalogPrice: baseProduct,
+          catalogTitle: catalogProduct.title
+        })
+      }
+    }
     let totalEmbroideryPrice = 0;
     let totalOptionsPrice = 0;
     let designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> = [];
@@ -950,7 +1030,11 @@ export default function MyOrders() {
         .map(([itemId, data]) => ({
           itemId,
           confirmed: data.confirmed!,
-          notes: data.notes || undefined
+          notes: data.notes || undefined,
+          // Enhanced fields for multi-design support
+          designId: data.designId || undefined, // Optional design ID for multi-design items
+          designName: data.designName || undefined, // Optional design name for reference
+          embroideryStyle: data.embroideryStyle || undefined // Optional embroidery style info
         }))
 
       const response = await orderReviewApiService.confirmPictureReplies(selectedOrder.id, confirmationData)
@@ -1710,7 +1794,7 @@ export default function MyOrders() {
                               
                               {/* Detailed Pricing Breakdown */}
                               {(() => {
-                                const pricing = getPricingBreakdown(item);
+                                const pricing = getPricingBreakdown(item, backendProducts);
                                 return (
                                   <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                                     <h6 className="text-sm font-semibold text-gray-800 mb-2">Price Breakdown</h6>
