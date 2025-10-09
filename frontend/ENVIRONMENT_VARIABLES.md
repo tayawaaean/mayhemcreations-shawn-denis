@@ -24,6 +24,8 @@ This document explains all environment variables used in the Mayhem Creations ap
 | Variable | Used By | Purpose |
 |----------|---------|---------|
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe components, payment forms | Stripe publishable key for frontend |
+| `VITE_PAYPAL_CLIENT_ID` | PayPal components, payment forms | PayPal client ID for frontend |
+| `VITE_PAYPAL_ENVIRONMENT` | PayPal components | PayPal environment (sandbox/production) |
 
 ### 4. Application Configuration
 | Variable | Used By | Purpose |

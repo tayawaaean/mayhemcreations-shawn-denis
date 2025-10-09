@@ -4,6 +4,7 @@
  */
 
 import { paymentConfig } from './paymentConfig'
+import { paymentApiService } from './paymentApiService'
 
 export interface PayPalPaymentData {
   amount: number
@@ -116,42 +117,65 @@ class PayPalService {
   }
 
   private async createOrder(paymentData: PayPalPaymentData): Promise<{ id: string }> {
-    // Simulate API call to backend to create PayPal order
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      // Use the payment API service to create PayPal order
+      const result = await paymentApiService.createPayPalOrder({
+        amount: paymentData.amount,
+        currency: paymentData.currency,
+        description: paymentData.description,
+        items: paymentData.items,
+        metadata: {
+          customerEmail: paymentData.customerEmail,
+          customerName: paymentData.customerName,
+        },
+      });
 
-    // In a real implementation, this would call your backend API
-    // which would then call PayPal's Orders API to create an order
-    
-    const orderId = `paypal_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
-    return {
-      id: orderId
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create PayPal order');
+      }
+
+      return {
+        id: result.data.id
+      };
+    } catch (error) {
+      console.error('Error creating PayPal order:', error);
+      throw error;
     }
   }
 
   private async capturePayment(orderId: string, paymentData: PayPalPaymentData): Promise<PayPalPaymentResult> {
-    // Simulate API call to backend to capture the payment
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    try {
+      // Use the payment API service to capture PayPal payment
+      const result = await paymentApiService.capturePayPalOrder({
+        orderId: orderId,
+        metadata: {
+          customerEmail: paymentData.customerEmail,
+          customerName: paymentData.customerName,
+        },
+      });
 
-    // In a real implementation, this would call your backend API
-    // which would then call PayPal's Orders API to capture the payment
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'PayPal payment capture failed'
+        };
+      }
 
-    // Simulate 90% success rate
-    const success = Math.random() > 0.1
-
-    if (success) {
       return {
         success: true,
-        paymentId: `paypal_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        paymentId: result.data.id,
         orderId: orderId,
-        payerEmail: paymentData.customerEmail,
-        payerName: paymentData.customerName
-      }
-    } else {
+        payerEmail: result.data.payer?.email_address || paymentData.customerEmail,
+        payerName: result.data.payer?.name ? 
+          `${result.data.payer.name.given_name || ''} ${result.data.payer.name.surname || ''}`.trim() : 
+          paymentData.customerName
+      };
+    } catch (error) {
+      console.error('Error capturing PayPal payment:', error);
       return {
         success: false,
-        error: 'Payment was declined by PayPal'
-      }
+        error: error instanceof Error ? error.message : 'PayPal payment capture failed'
+      };
     }
   }
 
