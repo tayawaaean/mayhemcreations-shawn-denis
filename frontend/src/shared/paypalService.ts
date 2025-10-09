@@ -118,6 +118,8 @@ class PayPalService {
 
   private async createOrder(paymentData: PayPalPaymentData): Promise<{ id: string }> {
     try {
+      console.log('🔍 PayPal createOrder - paymentData:', paymentData);
+      
       // Use the payment API service to create PayPal order
       const result = await paymentApiService.createPayPalOrder({
         amount: paymentData.amount,
@@ -129,6 +131,8 @@ class PayPalService {
           customerName: paymentData.customerName,
         },
       });
+
+      console.log('🔍 PayPal createOrder - API result:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to create PayPal order');
@@ -152,6 +156,7 @@ class PayPalService {
           customerEmail: paymentData.customerEmail,
           customerName: paymentData.customerName,
         },
+        // No need to send orderData since we're updating existing order
       });
 
       if (!result.success) {

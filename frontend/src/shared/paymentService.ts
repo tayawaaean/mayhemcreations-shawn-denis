@@ -128,7 +128,12 @@ class PaymentService {
       description: paymentData.description,
       customerEmail: paymentData.customerEmail,
       customerName: paymentData.customerName,
-      items: paymentData.items
+      items: paymentData.items?.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitAmount: item.price, // Map price to unitAmount
+        currency: item.currency
+      }))
     }
 
     const result = await paypalService.processPayment(paypalData)

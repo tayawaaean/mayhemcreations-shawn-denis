@@ -1,17 +1,10 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react'
 import { AdminProduct, Order, Customer, Category, FAQ, Message, EmbroideryOption, Analytics, Review, AdminUser } from '../types'
-import { 
-  mockProducts, 
-  mockOrders, 
-  mockCustomers, 
-  mockFAQs, 
-  mockMessages, 
-  mockAnalytics,
-  mockReviews,
-  mockAdminUsers
-} from '../data/mockData'
 import { embroideryOptionApiService } from '../../shared/embroideryOptionApiService'
 import { adminAnalyticsApiService } from '../../shared/adminAnalyticsApiService'
+import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
+import { adminOrderApiService } from '../../shared/adminOrderApiService'
+import { adminCustomerApiService } from '../../shared/adminCustomerApiService'
 
 type AdminState = {
   products: AdminProduct[]
@@ -66,15 +59,28 @@ type AdminAction =
   | { type: 'SET_ANALYTICS'; payload: Analytics }
 
 const initialState: AdminState = {
-  products: mockProducts,
-  orders: mockOrders,
-  customers: mockCustomers,
-  users: mockAdminUsers,
-  faqs: mockFAQs,
-  messages: mockMessages,
+  products: [],
+  orders: [],
+  customers: [],
+  users: [],
+  faqs: [],
+  messages: [],
   embroideryOptions: [],
-  reviews: mockReviews,
-  analytics: mockAnalytics,
+  reviews: [],
+  analytics: {
+    totalSales: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalCustomers: 0,
+    salesGrowth: 0,
+    ordersGrowth: 0,
+    customersGrowth: 0,
+    revenueChart: [],
+    topProducts: [],
+    recentOrders: [],
+    lowStockProducts: [],
+    lowStockCount: 0
+  },
   selectedProduct: null,
   selectedOrder: null,
   selectedCustomer: null,
@@ -231,16 +237,16 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           
           // Convert the API data to match the Analytics type
           const analyticsData: Analytics = {
-            totalSales: mockAnalytics.totalSales, // Keep mock for now, can be replaced later
-            totalOrders: mockAnalytics.totalOrders, // Keep mock for now, can be replaced later
+            totalSales: 0, // Will be calculated from orders
+            totalOrders: response.data.totalOrders || 0,
             totalProducts: response.data.totalProducts,
             totalCustomers: response.data.totalCustomers,
-            salesGrowth: mockAnalytics.salesGrowth, // Keep mock for now
-            ordersGrowth: mockAnalytics.ordersGrowth, // Keep mock for now
-            customersGrowth: mockAnalytics.customersGrowth, // Keep mock for now
-            revenueChart: mockAnalytics.revenueChart, // Keep mock for now
-            topProducts: mockAnalytics.topProducts, // Keep mock for now
-            recentOrders: mockAnalytics.recentOrders, // Keep mock for now
+            salesGrowth: 0, // Will be calculated
+            ordersGrowth: 0, // Will be calculated
+            customersGrowth: 0, // Will be calculated
+            revenueChart: [], // Will be calculated
+            topProducts: [], // Will be calculated
+            recentOrders: [], // Will be calculated
             lowStockProducts: response.data.lowStockVariants.map(variant => ({
               id: variant.id.toString(),
               title: variant.product?.title || variant.name || 'Unknown Product',
@@ -297,6 +303,47 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     }
 
     fetchAnalytics()
+  }, [])
+
+  // Fetch orders and customers data
+  useEffect(() => {
+    const fetchOrdersAndCustomers = async () => {
+      try {
+        dispatch({ type: 'SET_LOADING', payload: true })
+        
+        // Fetch orders and customers in parallel
+        const [ordersResponse, customersResponse] = await Promise.allSettled([
+          adminOrderApiService.getOrders({ limit: 100 }),
+          adminCustomerApiService.getCustomers({ limit: 100 })
+        ])
+
+        // Handle orders
+        if (ordersResponse.status === 'fulfilled' && ordersResponse.value.success) {
+          const ordersData = ordersResponse.value.data
+          if (ordersData) {
+            const orders = ordersData.orders.map(order => adminOrderApiService.transformOrderData(order))
+            dispatch({ type: 'SET_ORDERS', payload: orders })
+          }
+        }
+
+        // Handle customers
+        if (customersResponse.status === 'fulfilled' && customersResponse.value.success) {
+          const customersData = customersResponse.value.data
+          if (customersData) {
+            const customers = customersData.customers.map(customer => adminCustomerApiService.transformCustomerData(customer))
+            dispatch({ type: 'SET_CUSTOMERS', payload: customers })
+          }
+        }
+
+      } catch (error) {
+        console.error('❌ Error fetching orders and customers:', error)
+        dispatch({ type: 'SET_ERROR', payload: 'Failed to load orders and customers' })
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false })
+      }
+    }
+
+    fetchOrdersAndCustomers()
   }, [])
 
   return (

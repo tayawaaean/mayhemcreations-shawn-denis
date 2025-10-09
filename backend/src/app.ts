@@ -24,6 +24,7 @@ import customEmbroideryRoute from './routes/customEmbroideryRoute';
 import orderReviewRoute from './routes/orderReviewRoute';
 import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
+import paymentManagementRoute from './routes/paymentManagementRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -144,6 +145,7 @@ app.use('/api/v1/custom-embroidery', customEmbroideryRoute);
 app.use('/api/v1/orders', orderReviewRoute);
 app.use('/api/v1/payments', paymentRoute);
 app.use('/api/v1/payments/paypal', paypalRoute);
+app.use('/api/v1/admin/payments', paymentManagementRoute);
 
 // 404 handler
 app.use(notFound);

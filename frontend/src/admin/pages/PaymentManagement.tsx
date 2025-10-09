@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAdmin } from '../context/AdminContext'
 import { 
   Search, 
@@ -14,14 +14,16 @@ import {
   Download
 } from 'lucide-react'
 import { PaymentLog } from '../types/paymentLogs'
-import { mockPaymentLogs } from '../data/mockPaymentLogs'
+import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import HelpModal from '../components/modals/HelpModal'
 import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
 
 const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
   const { orders } = state
-  const [payments, setPayments] = useState<PaymentLog[]>(mockPaymentLogs)
+  const [payments, setPayments] = useState<PaymentLog[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedProvider, setSelectedProvider] = useState('all')
@@ -30,25 +32,64 @@ const PaymentManagement: React.FC = () => {
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<PaymentLog | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const itemsPerPage = 10
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+
+  // Fetch payments data
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await adminPaymentApiService.getPayments({
+          page: currentPage,
+          limit: itemsPerPage,
+          status: selectedStatus !== 'all' ? selectedStatus : undefined,
+          provider: selectedProvider !== 'all' ? selectedProvider : undefined
+        })
+
+        if (response.success && response.data) {
+          const transformedPayments = response.data.payments.map(payment => 
+            adminPaymentApiService.transformPaymentData(payment)
+          )
+          setPayments(transformedPayments)
+          setTotalPages(response.data.pagination.totalPages)
+        } else {
+          setError(response.error || 'Failed to fetch payments')
+        }
+      } catch (err) {
+        setError('Failed to fetch payments')
+        console.error('Error fetching payments:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPayments()
+  }, [currentPage, selectedStatus, selectedProvider])
 
   const filteredPayments = payments.filter(payment => {
     const matchesSearch = payment.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          payment.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          payment.customerEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          payment.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = selectedStatus === 'all' || payment.status === selectedStatus
-    const matchesProvider = selectedProvider === 'all' || payment.provider === selectedProvider
-    return matchesSearch && matchesStatus && matchesProvider
+    
+    return matchesSearch
   })
 
   // Pagination logic
   const totalItems = filteredPayments.length
-  const totalPages = Math.ceil(totalItems / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const paginatedPayments = filteredPayments.slice(startIndex, endIndex)
+
+  // Refresh payments
+  const refreshPayments = () => {
+    setCurrentPage(1)
+    // The useEffect will trigger and fetch fresh data
+  }
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -236,7 +277,34 @@ const PaymentManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Loading and Error States */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center space-x-2">
+            <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading payments...</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+            <span className="text-red-800">{error}</span>
+            <button
+              onClick={refreshPayments}
+              className="ml-auto text-red-600 hover:text-red-800 underline"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center">
@@ -636,6 +704,8 @@ const PaymentManagement: React.FC = () => {
           <li>Use bulk actions to process multiple payments at once.</li>
         </ol>
       </HelpModal>
+        </>
+      )}
     </div>
   )
 }

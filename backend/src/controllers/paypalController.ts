@@ -71,7 +71,11 @@ export const createPayPalOrderHandler = async (
       cancelUrl,
     };
 
+    console.log('🔍 PayPal Controller - orderData:', orderData);
+
     const validation = validatePayPalOrderData(orderData);
+    console.log('🔍 PayPal Controller - validation result:', validation);
+    
     if (!validation.isValid) {
       res.status(400).json({
         success: false,
@@ -119,7 +123,7 @@ export const capturePayPalOrderHandler = async (
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { orderId, metadata } = req.body;
+    const { orderId, metadata, orderData } = req.body;
 
     if (!userId) {
       res.status(401).json({
@@ -148,6 +152,127 @@ export const capturePayPalOrderHandler = async (
     };
 
     const capture = await capturePayPalOrder(captureData);
+
+    // Update existing order in database after successful capture
+    if (capture.status === 'COMPLETED') {
+      try {
+        const { sequelize } = await import('../config/database');
+        
+        // Find the most recent order review for this user that's in pending-payment status
+        const [orderResult] = await sequelize.query(`
+          SELECT id, user_id, status, total, subtotal, shipping, tax
+          FROM order_reviews 
+          WHERE user_id = ? AND status = 'pending-payment'
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `, {
+          replacements: [userId]
+        });
+
+        if (Array.isArray(orderResult) && orderResult.length > 0) {
+          const order = orderResult[0] as any;
+          
+          // Update order status to approved-processing (payment completed, ready for design processing)
+          await sequelize.query(`
+            UPDATE order_reviews 
+            SET status = 'approved-processing',
+                reviewed_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ?
+          `, {
+            replacements: [order.id]
+          });
+
+          // Create payment record
+          try {
+            const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
+            
+            // Calculate PayPal fees (typically 2.9% + fixed fee)
+            const paypalFeeRate = 0.029;
+            const paypalFixedFee = 0.30;
+            const fees = (order.total * paypalFeeRate) + paypalFixedFee;
+            const netAmount = order.total - fees;
+
+            const paymentResult = await createPaymentRecord({
+              orderId: order.id,
+              orderNumber: generateOrderNumber(order.id),
+              customerId: userId,
+              customerName: metadata?.customerName || 'Unknown Customer',
+              customerEmail: metadata?.customerEmail || 'unknown@example.com',
+              amount: order.total,
+              currency: 'usd',
+              provider: 'paypal',
+              paymentMethod: 'digital_wallet',
+              status: 'completed',
+              transactionId: `paypal_${orderId}`,
+              providerTransactionId: orderId,
+              gatewayResponse: capture,
+              fees: fees,
+              netAmount: netAmount,
+              metadata: {
+                paypalOrderId: orderId,
+                paypalCaptureId: capture.id,
+                ipAddress: metadata?.ipAddress,
+                userAgent: metadata?.userAgent,
+              },
+              notes: 'Payment processed via PayPal',
+            });
+
+            if (paymentResult.success) {
+              logger.info('Payment record created successfully', {
+                paymentId: paymentResult.paymentId,
+                orderId: order.id,
+                paypalOrderId: orderId,
+              });
+            } else {
+              logger.error('Failed to create payment record:', paymentResult.error);
+            }
+          } catch (paymentError) {
+            logger.error('Error creating payment record:', paymentError);
+            // Don't fail the payment if payment record creation fails
+          }
+
+          logger.info('Order status updated to approved-processing after PayPal payment success', {
+            orderId: order.id,
+            userId: userId,
+            paypalOrderId: orderId,
+            amount: order.total,
+          });
+
+          // Emit WebSocket event for real-time updates
+          try {
+            const { getWebSocketService } = await import('../services/websocketService');
+            const webSocketService = getWebSocketService();
+            if (webSocketService) {
+              webSocketService.emitOrderStatusChange(order.id, {
+                userId: userId,
+                status: 'approved-processing',
+                originalStatus: 'pending-payment',
+                reviewedAt: new Date().toISOString(),
+                paypalOrderId: orderId
+              });
+            }
+          } catch (wsError) {
+            logger.error('Error emitting WebSocket event:', wsError);
+          }
+
+          console.log('✅ PayPal payment successful and order updated:', {
+            orderId: order.id,
+            paypalOrderId: orderId,
+            amount: order.total,
+            userId: userId,
+          });
+        } else {
+          logger.warn('No pending-payment order found for user after PayPal payment success', {
+            userId: userId,
+            paypalOrderId: orderId,
+          });
+        }
+      } catch (dbError: any) {
+        logger.error('Error updating order in database after PayPal payment:', dbError);
+        // Don't fail the payment response, just log the error
+      }
+    }
 
     res.status(200).json({
       success: true,

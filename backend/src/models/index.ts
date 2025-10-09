@@ -12,6 +12,7 @@ import { FAQ, FAQAttributes, FAQCreationAttributes } from './faqModel';
 import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationAttributes } from './customEmbroideryModel';
 import Message, { MessageAttributes, MessageCreationAttributes } from './messageModel';
 import { OrderReview, OrderReviewAttributes, OrderReviewCreationAttributes } from './orderReviewModel';
+import { Payment, PaymentAttributes, PaymentCreationAttributes } from './paymentModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -140,6 +141,30 @@ const setupAssociations = (): void => {
     foreignKey: 'userId',
     as: 'orderReviews',
   });
+
+  // Payment belongs to OrderReview
+  Payment.belongsTo(OrderReview, {
+    foreignKey: 'orderId',
+    as: 'order',
+  });
+
+  // OrderReview has many Payments
+  OrderReview.hasMany(Payment, {
+    foreignKey: 'orderId',
+    as: 'payments',
+  });
+
+  // Payment belongs to User (customer)
+  Payment.belongsTo(User, {
+    foreignKey: 'customerId',
+    as: 'customer',
+  });
+
+  // User has many Payments
+  User.hasMany(Payment, {
+    foreignKey: 'customerId',
+    as: 'payments',
+  });
 };
 
 // Initialize associations
@@ -190,6 +215,9 @@ export {
   MessageCreationAttributes,
   OrderReviewAttributes,
   OrderReviewCreationAttributes,
+  Payment,
+  PaymentAttributes,
+  PaymentCreationAttributes,
 };
 
 // Export all models for easy access
@@ -207,6 +235,7 @@ export const models = {
   CustomEmbroidery,
   Message,
   OrderReview,
+  Payment,
 };
 
 // Database synchronization function

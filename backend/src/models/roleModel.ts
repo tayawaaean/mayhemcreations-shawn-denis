@@ -82,15 +82,8 @@ Role.init(
     sequelize,
     modelName: 'Role',
     tableName: 'roles',
-    indexes: [
-      {
-        unique: true,
-        fields: ['name'],
-      },
-      {
-        fields: ['is_active'],
-      },
-    ],
+    // Indexes are managed manually to prevent duplicate key errors
+    indexes: [],
   }
 );
 

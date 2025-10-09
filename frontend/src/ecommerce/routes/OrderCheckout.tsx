@@ -253,7 +253,7 @@ export default function OrderCheckout() {
       } else {
         // Use existing payment service for PayPal
         const paymentData: PaymentData = {
-          amount: Math.round(calculateTotal() * 100), // Convert to cents
+          amount: calculateTotal(), // PayPal expects dollars, not cents
           currency: 'usd',
           customerEmail: formData.email,
           customerName: `${formData.firstName} ${formData.lastName}`,
@@ -276,7 +276,7 @@ export default function OrderCheckout() {
             const itemPrice = calculateItemPrice(item)
             
             return {
-              name: product?.name || item.productName,
+              name: product?.name || item.productName || `Product ${item.productId}`,
               quantity: item.quantity,
               price: itemPrice,
               currency: 'usd'

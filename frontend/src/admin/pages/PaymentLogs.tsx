@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { 
   Search, 
   Filter, 
@@ -19,7 +19,7 @@ import {
   Minus
 } from 'lucide-react'
 import { PaymentLog, PaymentLogStats, PaymentProvider, PaymentStatus, PaymentMethod } from '../types/paymentLogs'
-import { mockPaymentLogs, mockPaymentLogStats } from '../data/mockPaymentLogs'
+import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 
 const PaymentLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -32,25 +32,75 @@ const PaymentLogs: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [payments, setPayments] = useState<PaymentLog[]>([])
+  const [stats, setStats] = useState<PaymentLogStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch payments and stats data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const [paymentsResponse, statsResponse] = await Promise.allSettled([
+          adminPaymentApiService.getPayments({
+            page: currentPage,
+            limit: itemsPerPage,
+            status: selectedStatus !== 'all' ? selectedStatus : undefined,
+            provider: selectedProvider !== 'all' ? selectedProvider : undefined
+          }),
+          adminPaymentApiService.getPaymentStats()
+        ])
+
+        // Handle payments
+        if (paymentsResponse.status === 'fulfilled' && paymentsResponse.value.success) {
+          const paymentsData = paymentsResponse.value.data
+          if (paymentsData) {
+            const transformedPayments = paymentsData.payments.map(payment => 
+              adminPaymentApiService.transformPaymentData(payment)
+            )
+            setPayments(transformedPayments)
+          }
+        }
+
+        // Handle stats
+        if (statsResponse.status === 'fulfilled' && statsResponse.value.success) {
+          const statsData = statsResponse.value.data
+          if (statsData) {
+            const transformedStats = adminPaymentApiService.transformStatsData(statsData)
+            setStats(transformedStats)
+          }
+        }
+
+      } catch (err) {
+        setError('Failed to fetch payment data')
+        console.error('Error fetching payment data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [currentPage, selectedStatus, selectedProvider])
 
   const filteredLogs = useMemo(() => {
-    return mockPaymentLogs.filter(log => {
+    return payments.filter(log => {
       const matchesSearch = 
         log.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.customerEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
       
-      const matchesProvider = selectedProvider === 'all' || log.provider === selectedProvider
-      const matchesStatus = selectedStatus === 'all' || log.status === selectedStatus
       const matchesMethod = selectedMethod === 'all' || log.paymentMethod === selectedMethod
       
       const matchesDateFrom = !dateFrom || new Date(log.createdAt) >= new Date(dateFrom)
       const matchesDateTo = !dateTo || new Date(log.createdAt) <= new Date(dateTo)
       
-      return matchesSearch && matchesProvider && matchesStatus && matchesMethod && matchesDateFrom && matchesDateTo
+      return matchesSearch && matchesMethod && matchesDateFrom && matchesDateTo
     })
-  }, [searchQuery, selectedProvider, selectedStatus, selectedMethod, dateFrom, dateTo])
+  }, [payments, searchQuery, selectedMethod, dateFrom, dateTo])
 
   const paginatedLogs = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -138,7 +188,28 @@ const PaymentLogs: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Loading and Error States */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex items-center space-x-2">
+            <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+            <span className="text-gray-600">Loading payment data...</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+            <span className="text-red-800">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center">
@@ -147,7 +218,7 @@ const PaymentLogs: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${mockPaymentLogStats.netRevenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">${stats?.netAmount?.toLocaleString() || '0'}</p>
             </div>
           </div>
         </div>
@@ -159,7 +230,7 @@ const PaymentLogs: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Transactions</p>
-              <p className="text-2xl font-bold text-gray-900">{mockPaymentLogStats.totalTransactions}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats?.totalPayments || 0}</p>
             </div>
           </div>
         </div>
@@ -171,7 +242,9 @@ const PaymentLogs: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-bold text-gray-900">{mockPaymentLogStats.successRate}%</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {stats?.totalPayments ? Math.round((stats.byStatus.completed?.count || 0) / stats.totalPayments * 100) : 0}%
+              </p>
             </div>
           </div>
         </div>
@@ -183,7 +256,7 @@ const PaymentLogs: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Refunded Amount</p>
-              <p className="text-2xl font-bold text-gray-900">${mockPaymentLogStats.refundedAmount.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">${stats?.byStatus.refunded?.amount?.toLocaleString() || '0'}</p>
             </div>
           </div>
         </div>
@@ -568,6 +641,8 @@ const PaymentLogs: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

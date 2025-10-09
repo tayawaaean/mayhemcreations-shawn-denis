@@ -19,6 +19,7 @@ const sequelize = new Sequelize({
     timestamps: true, // Add createdAt and updatedAt to all models
     underscored: true, // Use snake_case for column names
     freezeTableName: true, // Don't pluralize table names
+    indexes: [], // Disable automatic index creation to prevent duplicate key errors
   },
   dialectOptions: {
     charset: 'utf8mb4',

@@ -54,6 +54,18 @@ export interface PayPalOrderData {
 export interface PayPalCaptureData {
   orderId: string;
   metadata?: Record<string, string>;
+  orderData?: {
+    items: Array<{
+      name: string;
+      quantity: number;
+      unitAmount: number;
+      currency: string;
+    }>;
+    subtotal: number;
+    shipping: number;
+    tax: number;
+    total: number;
+  };
 }
 
 class PaymentApiService {
