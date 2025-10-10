@@ -111,7 +111,7 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
             (req.session as any).user = {
               userId: session.user.id,
               email: session.user.email,
-              role: session.user.role?.name || 'customer',
+              role: session.user.role?.name || 'customer', // Ensure role is set correctly
               permissions: session.user.role?.permissions || [],
               sessionId: session.sessionId,
               accessToken: session.accessToken,
@@ -125,7 +125,9 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
             userId: session.user.id,
             email: session.user.email,
             role: session.user.role?.name,
-            permissions: session.user.role?.permissions?.length || 0
+            roleId: session.user.role?.id,
+            permissions: session.user.role?.permissions?.length || 0,
+            sessionRoleSet: (req.session as any)?.user?.role
           });
 
           // Update session activity
@@ -218,7 +220,9 @@ export const requireRole = (roleNames: string | string[]) => {
         userRole: session?.role,
         requiredRoles: roles,
         hasAnyRole: SessionService.hasAnyRole(req, roles),
-        sessionData: session
+        sessionData: session,
+        sessionRoleType: typeof session?.role,
+        sessionRoleValue: session?.role
       });
 
       if (!SessionService.hasAnyRole(req, roles)) {

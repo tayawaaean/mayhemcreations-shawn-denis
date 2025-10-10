@@ -28,7 +28,8 @@ import {
   BarChart,
   Cog,
   RotateCcw,
-  Clock
+  Clock,
+  Truck
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -80,10 +81,10 @@ const navigationSections = [
     ]
   },
   {
-    name: 'Refunds',
-    icon: RotateCcw,
+    name: 'Shipping',
+    icon: Truck,
     items: [
-      { name: 'Refund Management', href: '/admin/refund-management', icon: RotateCcw, adminOnly: true }
+      { name: 'ShipStation', href: '/admin/shipstation', icon: Truck, adminOnly: false }
     ]
   },
   {

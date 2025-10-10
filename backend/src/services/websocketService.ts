@@ -497,6 +497,14 @@ export class WebSocketService {
 
     logger.info(`📦 Emitted product status change for product ${productId}`);
   }
+
+  /**
+   * Generic method to emit events to admin room
+   */
+  public emitToAdminRoom(eventName: string, data: any): void {
+    this.io.to('admin_room').emit(eventName, data);
+    logger.info(`📡 Emitted ${eventName} to admin room`);
+  }
 }
 
 // Export singleton instance

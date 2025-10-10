@@ -25,6 +25,7 @@ import MyOrders from './ecommerce/routes/MyOrders'
 import VerifyEmail from './pages/VerifyEmail'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentCancel from './pages/PaymentCancel'
+import OrderTracking from './components/OrderTracking'
 import StripeTestSuite from './components/StripeTestSuite'
 
 export default function App() {
@@ -100,6 +101,11 @@ export default function App() {
             <Route path="/order-checkout" element={
               <EcommerceLayout>
                 <OrderCheckout />
+              </EcommerceLayout>
+            } />
+            <Route path="/track-order" element={
+              <EcommerceLayout>
+                <OrderTracking />
               </EcommerceLayout>
             } />
             <Route path="/my-orders" element={

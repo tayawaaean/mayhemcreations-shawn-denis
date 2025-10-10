@@ -25,6 +25,7 @@ import orderReviewRoute from './routes/orderReviewRoute';
 import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
 import paymentManagementRoute from './routes/paymentManagementRoute';
+import shipStationRoute from './routes/shipStationRoute';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -146,6 +147,7 @@ app.use('/api/v1/orders', orderReviewRoute);
 app.use('/api/v1/payments', paymentRoute);
 app.use('/api/v1/payments/paypal', paypalRoute);
 app.use('/api/v1/admin/payments', paymentManagementRoute);
+app.use('/api/v1/shipstation', shipStationRoute);
 
 // 404 handler
 app.use(notFound);

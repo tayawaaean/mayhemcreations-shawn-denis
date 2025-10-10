@@ -27,6 +27,7 @@ import Analytics from './pages/Analytics'
 import ChatSettings from './pages/ChatSettings'
 import PaymentLogs from './pages/PaymentLogs'
 import PaymentManagement from './pages/PaymentManagement'
+import ShipStationManagement from './pages/ShipStationManagement'
 import RefundManagement from './pages/RefundManagement'
 import SystemLogs from './pages/SystemLogs'
 import Profile from './pages/Profile'
@@ -60,7 +61,7 @@ const AdminApp: React.FC = () => {
                         <Route path="material-costs-test" element={<MaterialCostsTest />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="chat-settings" element={<ChatSettings />} />
-                        <Route path="payment-logs" element={<PaymentLogs />} />
+                            <Route path="shipstation" element={<ShipStationManagement />} />
                         <Route path="payment-management" element={<PaymentManagement />} />
                         <Route path="refund-management" element={<RefundManagement />} />
                         <Route path="system-logs" element={<SystemLogs />} />
