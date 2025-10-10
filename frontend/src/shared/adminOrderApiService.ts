@@ -4,6 +4,7 @@
  */
 
 import { Order } from '../admin/types';
+import MultiAccountStorageService from './multiAccountStorage';
 
 export interface OrderApiResponse<T> {
   success: boolean;
@@ -36,7 +37,8 @@ class AdminOrderApiService {
   ): Promise<OrderApiResponse<T>> {
     try {
       // Get token from the same storage as other services
-      const authData = localStorage.getItem('mayhem_auth');
+      const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+      const authData = currentAccount ? JSON.stringify(currentAccount) : null;
       let token = null;
       
       if (authData) {
@@ -97,7 +99,7 @@ class AdminOrderApiService {
     if (params.customerId) searchParams.append('customerId', params.customerId.toString());
 
     const queryString = searchParams.toString();
-    const endpoint = `/orders/review-orders${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/orders/admin/review-orders${queryString ? `?${queryString}` : ''}`;
 
     return this.makeRequest<OrderListResponse>(endpoint);
   }

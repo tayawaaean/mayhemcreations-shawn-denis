@@ -68,9 +68,9 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
   const customerId = user?.id?.toString() || 'anonymous';
 
-  // Join chat room when user is authenticated
+  // Join chat room when chat is opened and user is authenticated
   useEffect(() => {
-    if (isLoggedIn && user && isConnected) {
+    if (isOpen && isLoggedIn && user && isConnected) {
       webSocketService.joinChatRoom(customerId);
       console.log('💬 Joined chat room for customer:', customerId);
       
@@ -93,11 +93,11 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log('💬 Left chat room for customer:', customerId);
       }
     };
-  }, [isLoggedIn, user, isConnected, customerId]);
+  }, [isOpen, isLoggedIn, user, isConnected, customerId]);
 
-  // WebSocket event listeners
+  // WebSocket event listeners - only when chat is open
   useEffect(() => {
-    if (!isConnected) return;
+    if (!isOpen || !isConnected) return;
 
     // Listen for chat messages
     const unsubscribeMessage = subscribe('chat_message_received', (data) => {
@@ -185,10 +185,13 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unsubscribeDisconnection();
       unsubscribeHistory();
     };
-  }, [isConnected, customerId, subscribe]);
+  }, [isOpen, isConnected, customerId, subscribe]);
 
   const sendMessage = (text: string) => {
     if (!text.trim()) return;
+
+    // Ensure WebSocket connection before sending
+    webSocketService.ensureConnection();
 
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newMessage: ChatMessage = {
@@ -274,6 +277,8 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Set typing status immediately (for input changes)
   const setTyping = (isTyping: boolean) => {
+    // Ensure WebSocket connection before sending typing status
+    webSocketService.ensureConnection();
     webSocketService.sendTypingStatus(customerId, isTyping);
     if (typingTimeout.current) {
       clearTimeout(typingTimeout.current);

@@ -75,7 +75,9 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
           found: !!session,
           hasUser: !!(session && session.user),
           sessionId: session?.sessionId,
-          userId: session?.user?.id
+          userId: session?.user?.id,
+          userRole: session?.user?.role?.name,
+          tokenPrefix: token.substring(0, 20) + '...'
         });
 
         if (session && session.user) {
@@ -118,6 +120,13 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
               lastActivity: now,
             };
           }
+
+          logger.info('🔐 HybridAuth: User authenticated successfully', {
+            userId: session.user.id,
+            email: session.user.email,
+            role: session.user.role?.name,
+            permissions: session.user.role?.permissions?.length || 0
+          });
 
           // Update session activity
           await session.update({ 
@@ -203,11 +212,20 @@ export const requireRole = (roleNames: string | string[]) => {
         return;
       }
 
+      const session = SessionService.getSession(req);
+      logger.info('🔐 Role check debug:', {
+        userId: session?.userId,
+        userRole: session?.role,
+        requiredRoles: roles,
+        hasAnyRole: SessionService.hasAnyRole(req, roles),
+        sessionData: session
+      });
+
       if (!SessionService.hasAnyRole(req, roles)) {
         logger.warn(`Access denied for roles: ${roles.join(', ')}`, {
-          userId: SessionService.getSession(req)?.userId,
+          userId: session?.userId,
           requiredRoles: roles,
-          userRole: SessionService.getSession(req)?.role,
+          userRole: session?.role,
         });
         
         res.status(403).json({

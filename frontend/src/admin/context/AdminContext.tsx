@@ -329,7 +329,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         // Handle customers
         if (customersResponse.status === 'fulfilled' && customersResponse.value.success) {
           const customersData = customersResponse.value.data
-          if (customersData) {
+          if (customersData && customersData.customers && Array.isArray(customersData.customers)) {
             const customers = customersData.customers.map(customer => adminCustomerApiService.transformCustomerData(customer))
             dispatch({ type: 'SET_CUSTOMERS', payload: customers })
           }

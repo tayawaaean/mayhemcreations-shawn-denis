@@ -4,6 +4,7 @@ import { useAdmin } from '../../context/AdminContext'
 import { useAdminChat } from '../../context/AdminChatContext'
 import { useRole } from '../../context/RoleContext'
 import { useAdminAuth } from '../../context/AdminAuthContext'
+import { useNotifications } from '../../context/NotificationContext'
 import {
   LayoutDashboard,
   Package,
@@ -119,9 +120,31 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { messages: chatMessages } = useAdminChat()
   const { role } = useRole()
   const { logout } = useAdminAuth()
+  const { getUnreadCountByType } = useNotifications()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  // Total unread from chat context (user-sent messages not yet marked read)
+  
+  // Get notification counts for different sections
   const unreadMessages = chatMessages.filter(m => m.sender === 'user' && !m.isRead).length
+  const unreadPayments = getUnreadCountByType('payment')
+  const unreadOrders = getUnreadCountByType('order')
+  const unreadUpdates = getUnreadCountByType('update')
+
+  // Helper function to get notification count for a specific navigation item
+  const getNotificationCount = (href: string) => {
+    switch (href) {
+      case '/admin/orders':
+        return unreadOrders
+      case '/admin/pending-review':
+        return unreadUpdates
+      case '/admin/payment-management':
+      case '/admin/payment-logs':
+        return unreadPayments
+      case '/admin/messages':
+        return unreadMessages
+      default:
+        return 0
+    }
+  }
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => {
@@ -250,16 +273,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                               `} 
                             />
                             {item.name}
+                            
+                            {/* Notification badges */}
+                            {(() => {
+                              const notificationCount = getNotificationCount(item.href)
+                              return notificationCount > 0 ? (
+                                <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-600 text-white">
+                                  {notificationCount > 99 ? '99+' : notificationCount}
+                                </span>
+                              ) : null
+                            })()}
+                            
                             {/* Admin-only indicator */}
                             {item.adminOnly && (
                               <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-800">
                                 Admin
-                              </span>
-                            )}
-                            {/* Unread badge for Messages */}
-                            {item.name === 'Messages' && unreadMessages > 0 && (
-                              <span className="ml-auto inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-red-600 text-white">
-                                {unreadMessages}
                               </span>
                             )}
                           </Link>

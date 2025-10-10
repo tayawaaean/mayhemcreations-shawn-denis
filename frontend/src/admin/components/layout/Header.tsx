@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { Menu, Search, Bell } from 'lucide-react'
+import { Menu, Search } from 'lucide-react'
 import { UserRole } from '../../context/RoleContext'
+import NotificationBell from '../NotificationBell'
 
 interface HeaderProps {
   onMenuClick: () => void
@@ -42,10 +43,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, role }) => {
 
           {/* Right side */}
           <div className="flex items-center">
-            <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md relative">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { envConfig } from './envConfig';
+import MultiAccountStorageService from './multiAccountStorage';
 
 // Global retry tracking to prevent infinite loops
 let globalRetryCount = 0;
@@ -27,17 +28,10 @@ const createAxiosInstance = (): AxiosInstance => {
   instance.interceptors.request.use(
     async (config) => {
       // Add authorization header if available
-      const token = localStorage.getItem('mayhem_auth');
-      if (token) {
-        try {
-          const authData = JSON.parse(token);
-          if (authData.session?.accessToken) {
-            config.headers.Authorization = `Bearer ${authData.session.accessToken}`;
-            console.log('🔐 Axios: Added auth token to request');
-          }
-        } catch (error) {
-          console.error('❌ Axios: Error parsing auth token:', error);
-        }
+      const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+      if (currentAccount?.session?.accessToken) {
+        config.headers.Authorization = `Bearer ${currentAccount.session.accessToken}`;
+        console.log('🔐 Axios: Added auth token to request');
       }
       
       return config;
@@ -73,7 +67,7 @@ const createAxiosInstance = (): AxiosInstance => {
         // Check if we've exceeded max retries
         if (globalRetryCount >= MAX_RETRIES) {
           console.log('🔐 Axios: Too many refresh attempts, clearing auth state');
-          localStorage.removeItem('mayhem_auth');
+          MultiAccountStorageService.clearAllAccounts();
           globalRetryCount = 0; // Reset for next time
           return Promise.reject(error);
         }
@@ -97,13 +91,20 @@ const createAxiosInstance = (): AxiosInstance => {
             // Reset retry count on successful refresh
             globalRetryCount = 0;
             
-            // Update token in localStorage
-            const token = localStorage.getItem('mayhem_auth');
-            if (token) {
-              const authData = JSON.parse(token);
-              authData.session.accessToken = refreshResponse.data.data.accessToken;
-              authData.session.lastActivity = new Date().toISOString();
-              localStorage.setItem('mayhem_auth', JSON.stringify(authData));
+            // Update token in multi-account storage
+            const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+            if (currentAccount) {
+              MultiAccountStorageService.storeAccountAuthData(
+                currentAccount.user.accountType,
+                {
+                  user: currentAccount.user,
+                  session: {
+                    ...currentAccount.session,
+                    accessToken: refreshResponse.data.data.accessToken,
+                    lastActivity: new Date().toISOString()
+                  }
+                }
+              );
             }
             
             // Update authorization header with new token
@@ -117,12 +118,12 @@ const createAxiosInstance = (): AxiosInstance => {
           
           console.log('❌ Axios: Token refresh failed, clearing auth state');
           // Clear auth state
-          localStorage.removeItem('mayhem_auth');
+          MultiAccountStorageService.clearAllAccounts();
           return Promise.reject(error);
         } catch (refreshError) {
           console.error('❌ Axios: Token refresh error:', refreshError);
           // Clear auth state
-          localStorage.removeItem('mayhem_auth');
+          MultiAccountStorageService.clearAllAccounts();
           return Promise.reject(error);
         }
       }
@@ -145,15 +146,18 @@ const createAxiosInstance = (): AxiosInstance => {
  * Update last activity timestamp
  */
 const updateActivity = (): void => {
-  const token = localStorage.getItem('mayhem_auth');
-  if (token) {
-    try {
-      const authData = JSON.parse(token);
-      authData.session.lastActivity = new Date().toISOString();
-      localStorage.setItem('mayhem_auth', JSON.stringify(authData));
-    } catch (error) {
-      console.error('❌ Axios: Error updating activity:', error);
-    }
+  const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+  if (currentAccount) {
+    MultiAccountStorageService.storeAccountAuthData(
+      currentAccount.user.accountType,
+      {
+        user: currentAccount.user,
+        session: {
+          ...currentAccount.session,
+          lastActivity: new Date().toISOString()
+        }
+      }
+    );
   }
 };
 

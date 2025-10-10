@@ -1,5 +1,6 @@
 import React from 'react'
 import { useAdmin } from '../context/AdminContext'
+import NotificationTest from '../components/NotificationTest'
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -80,6 +81,11 @@ const Dashboard: React.FC = () => {
           <p className="text-sm font-medium text-gray-900">{new Date().toLocaleTimeString()}</p>
         </div>
       </div>
+
+      {/* Test Notifications - Only show in development */}
+      {import.meta.env.DEV && (
+        <NotificationTest />
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">

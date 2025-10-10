@@ -3,7 +3,7 @@
  * Handles all API calls to the backend
  */
 
-import AuthStorageService from '../../shared/authStorage';
+import MultiAccountStorageService from '../../shared/multiAccountStorage';
 import { envConfig } from '../../shared/envConfig';
 import { apiClient } from '../../shared/axiosConfig';
 import { centralizedAuthService } from '../../shared/centralizedAuthService';
@@ -78,7 +78,8 @@ class ApiService {
    * Get authentication headers with JWT token
    */
   private getAuthHeaders(): HeadersInit {
-    const authHeader = AuthStorageService.getAuthHeader();
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    const authHeader = currentAccount?.session?.accessToken ? `Bearer ${currentAccount.session.accessToken}` : null;
     return {
       ...this.defaultHeaders,
       ...(authHeader && { Authorization: authHeader }),
@@ -166,7 +167,20 @@ class ApiService {
       });
 
       if (response.success && response.data?.accessToken) {
-        AuthStorageService.updateAccessToken(response.data.accessToken);
+        const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+        if (currentAccount) {
+          MultiAccountStorageService.storeAccountAuthData(
+            currentAccount.user.accountType,
+            {
+              user: currentAccount.user,
+              session: {
+                ...currentAccount.session,
+                accessToken: response.data.accessToken,
+                lastActivity: new Date().toISOString()
+              }
+            }
+          );
+        }
       }
 
       return response;

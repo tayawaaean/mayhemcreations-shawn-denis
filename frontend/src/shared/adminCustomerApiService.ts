@@ -4,6 +4,7 @@
  */
 
 import { Customer } from '../admin/types';
+import MultiAccountStorageService from './multiAccountStorage';
 
 export interface CustomerApiResponse<T> {
   success: boolean;
@@ -36,7 +37,8 @@ class AdminCustomerApiService {
   ): Promise<CustomerApiResponse<T>> {
     try {
       // Get token from the same storage as other services
-      const authData = localStorage.getItem('mayhem_auth');
+      const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+      const authData = currentAccount ? JSON.stringify(currentAccount) : null;
       let token = null;
       
       if (authData) {

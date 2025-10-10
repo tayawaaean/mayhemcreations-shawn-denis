@@ -4,6 +4,7 @@
  */
 
 import { PaymentLog, PaymentLogStats } from '../admin/types/paymentLogs';
+import { apiClient } from './axiosConfig';
 
 export interface PaymentApiResponse<T> {
   success: boolean;
@@ -65,48 +66,29 @@ class AdminPaymentApiService {
     options: RequestInit = {}
   ): Promise<PaymentApiResponse<T>> {
     try {
-      // Get token from the same storage as other services
-      const authData = localStorage.getItem('mayhem_auth');
-      let token = null;
-      
-      if (authData) {
-        try {
-          const parsed = JSON.parse(authData);
-          token = parsed.session?.accessToken;
-        } catch (error) {
-          console.error('Error parsing auth data:', error);
-        }
-      }
-      
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const response = await apiClient.request({
+        url: endpoint,
+        method: options.method || 'GET',
+        data: options.body ? JSON.parse(options.body as string) : undefined,
+        headers: options.headers,
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-          ...options.headers,
-        },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      return response.data;
+    } catch (error: any) {
+      console.error('Payment API request failed:', error);
+      
+      if (error.response) {
         return {
           success: false,
-          error: data.message || `HTTP ${response.status}`,
+          error: error.response.data?.message || `HTTP ${error.response.status}: ${error.response.statusText}`,
+        };
+      } else {
+        return {
+          success: false,
+          error: error.message || 'Network error',
         };
       }
-
-      return {
-        success: true,
-        data: data.data,
-        message: data.message,
-      };
-    } catch (error) {
-      console.error('Payment API request failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Network error',
-      };
     }
   }
 

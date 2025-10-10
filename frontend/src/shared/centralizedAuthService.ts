@@ -3,7 +3,7 @@
  * Single source of truth for all authentication state and operations
  */
 
-import AuthStorageService from './authStorage';
+import MultiAccountStorageService from './multiAccountStorage';
 import { apiClient } from './axiosConfig';
 import { loggingService } from './loggingService';
 
@@ -51,25 +51,52 @@ class CentralizedAuthService {
    * Initialize authentication state from localStorage
    */
   private initializeFromStorage(): void {
-    const storedUser = AuthStorageService.getUser();
-    const storedSession = AuthStorageService.getSession();
+    // Get the current active account from multi-account storage
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
     
-    if (storedUser && storedSession && AuthStorageService.isAuthenticated()) {
+    // Check if current account is customer but we have a valid employee account with admin role
+    if (currentAccount && currentAccount.user.role === 'customer') {
+      const employeeAccount = MultiAccountStorageService.getAccountAuthData('employee');
+      if (employeeAccount && MultiAccountStorageService.isAccountAuthenticated('employee')) {
+        // Check if employee has admin role
+        if (employeeAccount.user.role === 'admin' || employeeAccount.user.role === 'manager') {
+          console.log('🔄 Auto-switching to employee account (admin role detected)');
+          MultiAccountStorageService.switchAccount('employee');
+          // Re-get the current account after switching
+          const newCurrentAccount = MultiAccountStorageService.getCurrentAccountData();
+          if (newCurrentAccount) {
+            this.initializeFromAccount(newCurrentAccount);
+            return;
+          }
+        }
+      }
+    }
+    
+    if (currentAccount) {
+      this.initializeFromAccount(currentAccount);
+    } else {
+      this.clearAuthState();
+    }
+  }
+
+  private initializeFromAccount(account: any): void {
+    const { user, session } = account;
+    if (user && session && MultiAccountStorageService.isCurrentAccountAuthenticated()) {
       this.authState = {
         user: {
-          id: storedUser.id,
-          email: storedUser.email,
-          firstName: storedUser.firstName || '',
-          lastName: storedUser.lastName || '',
-          role: storedUser.role,
-          isEmailVerified: storedUser.isEmailVerified || false,
-          avatar: storedUser.avatar
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          role: user.role,
+          isEmailVerified: user.isEmailVerified || false,
+          avatar: user.avatar
         },
         isAuthenticated: true,
         isLoading: false,
         lastChecked: Date.now()
       };
-      console.log('🔐 Initialized auth state from localStorage:', this.authState.user);
+      console.log('🔐 Initialized auth state from multi-account storage:', this.authState.user);
       this.notifyListeners(); // Notify listeners of the state change
     } else {
       this.clearAuthState();
@@ -123,31 +150,46 @@ class CentralizedAuthService {
       return this.authState.isAuthenticated;
     }
 
-    // Check localStorage first
-    const storedUser = AuthStorageService.getUser();
-    const storedSession = AuthStorageService.getSession();
-    const isStoredAuthenticated = AuthStorageService.isAuthenticated();
+    // Check multi-account storage first
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    const isStoredAuthenticated = MultiAccountStorageService.isCurrentAccountAuthenticated();
     
-    console.log('🔐 validateSession: localStorage check:', {
-      hasStoredUser: !!storedUser,
-      hasStoredSession: !!storedSession,
+    console.log('🔐 validateSession: multi-account storage check:', {
+      hasCurrentAccount: !!currentAccount,
       isStoredAuthenticated,
       currentAuthState: this.authState
     });
 
     // If no stored data, not authenticated
-    if (!storedUser || !storedSession || !isStoredAuthenticated) {
+    if (!currentAccount || !isStoredAuthenticated) {
       console.log('🔐 validateSession: No valid stored data, not authenticated');
       return false;
     }
 
+    // Check if we need to auto-switch to employee account
+    if (currentAccount.user.role === 'customer') {
+      const employeeAccount = MultiAccountStorageService.getAccountAuthData('employee');
+      if (employeeAccount && MultiAccountStorageService.isAccountAuthenticated('employee')) {
+        if (employeeAccount.user.role === 'admin' || employeeAccount.user.role === 'manager') {
+          console.log('🔄 Auto-switching to employee account during validation');
+          MultiAccountStorageService.switchAccount('employee');
+          // Re-get the current account after switching
+          const newCurrentAccount = MultiAccountStorageService.getCurrentAccountData();
+          if (newCurrentAccount) {
+            this.initializeFromAccount(newCurrentAccount);
+            return this.authState.isAuthenticated;
+          }
+        }
+      }
+    }
+
     // If we have stored data but no current auth state, initialize it
-    if (!this.authState.user && storedUser) {
-      console.log('🔐 validateSession: Initializing auth state from localStorage');
-      this.initializeFromStorage();
+    if (!this.authState.user && currentAccount.user) {
+      console.log('🔐 validateSession: Initializing auth state from multi-account storage');
+      this.initializeFromAccount(currentAccount);
       // After initialization, check if we're now authenticated
       if (this.authState.isAuthenticated) {
-        console.log('🔐 validateSession: Successfully initialized from localStorage');
+        console.log('🔐 validateSession: Successfully initialized from multi-account storage');
         return true;
       }
     }
@@ -155,7 +197,7 @@ class CentralizedAuthService {
     // Simple validation - just check if we have valid data
     // Let axios interceptor handle token refresh automatically
     console.log('🔐 validateSession: Using stored data, letting axios handle refresh');
-    this.updateAuthState(storedUser);
+    this.updateAuthState(currentAccount.user);
     return true;
   }
 
@@ -184,7 +226,21 @@ class CentralizedAuthService {
 
       if (response.data.success && response.data.data?.accessToken) {
         console.log('✅ Access token refreshed successfully');
-        AuthStorageService.updateAccessToken(response.data.data.accessToken);
+        // Update access token in current account
+        const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+        if (currentAccount) {
+          MultiAccountStorageService.storeAccountAuthData(
+            currentAccount.user.accountType,
+            {
+              user: currentAccount.user,
+              session: {
+                ...currentAccount.session,
+                accessToken: response.data.data.accessToken,
+                lastActivity: new Date().toISOString()
+              }
+            }
+          );
+        }
         return true;
       } else {
         console.log('❌ Token refresh failed:', response.data.message);
@@ -238,8 +294,8 @@ class CentralizedAuthService {
       lastChecked: Date.now()
     };
     
-    // Clear localStorage
-    AuthStorageService.clearAuthData();
+    // Clear multi-account storage
+    MultiAccountStorageService.clearAllAccounts();
     
     this.notifyListeners();
   }
@@ -257,16 +313,21 @@ class CentralizedAuthService {
       if (response.data.success && response.data.data) {
         console.log('✅ Login successful');
         
-        // Store auth data
-        AuthStorageService.storeAuthData({
+        // Determine account type based on role
+        const userRole = response.data.data.user.role?.name || response.data.data.user.role;
+        const accountType = userRole === 'customer' ? 'customer' : 'employee';
+        
+        // Store auth data in multi-account storage
+        MultiAccountStorageService.storeAccountAuthData(accountType, {
           user: {
             id: response.data.data.user.id,
             email: response.data.data.user.email,
-            role: response.data.data.user.role?.name || response.data.data.user.role,
+            role: userRole,
             firstName: response.data.data.user.firstName,
             lastName: response.data.data.user.lastName,
             isEmailVerified: response.data.data.user.isEmailVerified,
-            avatar: response.data.data.user.avatar
+            avatar: response.data.data.user.avatar,
+            accountType: accountType
           },
           session: {
             sessionId: response.data.data.sessionId,
@@ -275,6 +336,9 @@ class CentralizedAuthService {
             lastActivity: new Date().toISOString()
           }
         });
+
+        // Set as current account
+        MultiAccountStorageService.setCurrentAccount(accountType);
 
         this.updateAuthState(response.data.data.user);
         

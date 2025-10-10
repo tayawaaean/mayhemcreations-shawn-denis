@@ -40,8 +40,23 @@ class WebSocketService {
   private desiredChatRooms: Set<string> = new Set();
 
   constructor() {
-    // Only initialize in browser environment
-    if (typeof window !== 'undefined') {
+    // Don't auto-connect - wait for explicit connection request
+    // This allows for lazy loading of WebSocket connections
+  }
+
+  /**
+   * Public method to initiate WebSocket connection
+   * Only connects if not already connected or connecting
+   */
+  public ensureConnection(): void {
+    if (typeof window === 'undefined') return;
+    
+    if (!this.socket || !this.isConnected) {
+      // Prevent multiple simultaneous connection attempts
+      if (this.socket && !this.isConnected) {
+        console.log('🔌 WebSocket connection already in progress, skipping...');
+        return;
+      }
       this.connect();
     }
   }
@@ -73,7 +88,7 @@ class WebSocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('🔌 WebSocket connected:', this.socket?.id);
+      console.log('🔌 WebSocket connected:', this.socket?.id || 'unknown');
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
@@ -125,6 +140,7 @@ class WebSocketService {
   // Join user room for customer-specific events
   public joinUserRoom(userId: string): void {
     this.desiredUserId = userId;
+    this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_user_room', userId);
       console.log(`👤 Joined user room for user ${userId}`);
@@ -134,6 +150,7 @@ class WebSocketService {
   // Join admin room for admin-specific events
   public joinAdminRoom(): void {
     this.wantsAdminRoom = true;
+    this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_admin_room');
       console.log('👨‍💼 Joined admin room');
@@ -142,6 +159,7 @@ class WebSocketService {
 
   // Subscribe to events
   public on<K extends keyof WebSocketEvents>(event: K, callback: WebSocketEvents[K]): void {
+    this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket) {
       this.socket.on(event, callback as any);
     }
@@ -222,6 +240,7 @@ class WebSocketService {
 
   public joinChatRoom(customerId: string): void {
     this.desiredChatRooms.add(customerId);
+    this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('join_chat_room', customerId);
     }

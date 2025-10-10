@@ -179,55 +179,42 @@ class ApiAuthService {
   }
 
   /**
-   * Check if user is authenticated (supports both single and multi-account)
+   * Check if user is authenticated (uses multi-account storage)
    */
   isAuthenticated(): boolean {
-    return AuthStorageService.isAuthenticated() || 
-           MultiAccountStorageService.isAccountAuthenticated('customer');
+    return MultiAccountStorageService.isCurrentAccountAuthenticated();
   }
 
   /**
-   * Get current user (supports both single and multi-account)
+   * Get current user (uses multi-account storage)
    */
   getCurrentUser() {
-    const singleUser = AuthStorageService.getUser();
-    if (singleUser) return singleUser;
-    
-    const multiUser = MultiAccountStorageService.getAccountAuthData('customer')?.user;
-    return multiUser || null;
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    return currentAccount?.user || null;
   }
 
   /**
-   * Get user role (supports both single and multi-account)
+   * Get user role (uses multi-account storage)
    */
   getUserRole(): string | null {
-    const singleRole = AuthStorageService.getUserRole();
-    if (singleRole) return singleRole;
-    
-    const multiUser = MultiAccountStorageService.getAccountAuthData('customer')?.user;
-    return multiUser?.role || null;
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    return currentAccount?.user?.role || null;
   }
 
   /**
-   * Check if user has specific role (supports both single and multi-account)
+   * Check if user has specific role (uses multi-account storage)
    */
   hasRole(roleName: string): boolean {
-    const singleHasRole = AuthStorageService.hasRole(roleName);
-    if (singleHasRole) return true;
-    
-    const multiUser = MultiAccountStorageService.getAccountAuthData('customer')?.user;
-    return multiUser?.role === roleName || false;
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    return currentAccount?.user?.role === roleName || false;
   }
 
   /**
-   * Check if user has any of the specified roles (supports both single and multi-account)
+   * Check if user has any of the specified roles (uses multi-account storage)
    */
   hasAnyRole(roleNames: string[]): boolean {
-    const singleHasAnyRole = AuthStorageService.hasAnyRole(roleNames);
-    if (singleHasAnyRole) return true;
-    
-    const multiUser = MultiAccountStorageService.getAccountAuthData('customer')?.user;
-    return multiUser ? roleNames.includes(multiUser.role) : false;
+    const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+    return currentAccount?.user ? roleNames.includes(currentAccount.user.role) : false;
   }
 }
 

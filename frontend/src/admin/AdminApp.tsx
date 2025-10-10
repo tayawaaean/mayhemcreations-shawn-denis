@@ -5,6 +5,7 @@ import { AdminAuthProvider } from './context/AdminAuthContext'
 import { AdminChatProvider } from './context/AdminChatContext'
 import { RoleProvider } from './context/RoleContext'
 import { InventoryProvider } from '../shared/inventoryContext'
+import { NotificationProvider } from './context/NotificationContext'
 import SharedLayout from './components/layout/SharedLayout'
 import Sidebar from './components/layout/Sidebar'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -37,7 +38,8 @@ const AdminApp: React.FC = () => {
         <AdminProvider>
           <InventoryProvider>
             <AdminChatProvider>
-              <Routes>
+              <NotificationProvider>
+                <Routes>
                 <Route path="/*" element={
                   <ProtectedRoute requiredRole="admin">
                     <Routes>
@@ -69,6 +71,7 @@ const AdminApp: React.FC = () => {
                 }>
                 </Route>
               </Routes>
+              </NotificationProvider>
             </AdminChatProvider>
           </InventoryProvider>
         </AdminProvider>
