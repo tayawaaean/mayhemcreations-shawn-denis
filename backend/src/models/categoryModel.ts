@@ -55,7 +55,7 @@ Category.init(
     slug: {
       type: DataTypes.STRING(120),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       validate: {
         notEmpty: true,
         len: [1, 120], // Changed from [2, 120] to [1, 120] to allow single character slugs
@@ -118,10 +118,7 @@ Category.init(
     tableName: 'Categories',
     timestamps: true,
     paranoid: false, // We don't want soft deletes for categories
-    indexes: [
-      {
-        unique: true,
-        fields: ['slug'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['parent_id'],

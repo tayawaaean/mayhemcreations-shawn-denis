@@ -91,7 +91,7 @@ Variant.init(
     sku: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       field: 'sku',
     },
     stock: {
@@ -151,13 +151,11 @@ Variant.init(
     tableName: 'variants',
     timestamps: true,
     underscored: true,
-    indexes: [
-      {
-        fields: ['product_id'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['sku'],
-        unique: true,
+        unique: false, // Temporarily disabled
       },
       {
         fields: ['is_active'],

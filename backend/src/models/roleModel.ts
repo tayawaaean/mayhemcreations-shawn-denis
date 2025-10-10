@@ -41,7 +41,7 @@ Role.init(
     name: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       validate: {
         notEmpty: true,
         len: [2, 50],
@@ -83,7 +83,7 @@ Role.init(
     modelName: 'Role',
     tableName: 'roles',
     // Indexes are managed manually to prevent duplicate key errors
-    indexes: [],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
   }
 );
 

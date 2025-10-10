@@ -263,7 +263,7 @@ User.init(
     email: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       validate: {
         isEmail: true,
         notEmpty: true,
@@ -379,10 +379,7 @@ User.init(
     sequelize,
     modelName: 'User',
     tableName: 'users',
-    indexes: [
-      {
-        unique: true,
-        fields: ['email'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['role_id'],

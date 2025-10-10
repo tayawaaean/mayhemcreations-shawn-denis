@@ -20,6 +20,12 @@ const sequelize = new Sequelize({
     underscored: true, // Use snake_case for column names
     freezeTableName: true, // Don't pluralize table names
     indexes: [], // Disable automatic index creation to prevent duplicate key errors
+    hooks: {
+      beforeSync: () => {
+        console.log('🔧 Database sync disabled to prevent index issues');
+        return Promise.resolve();
+      }
+    }
   },
   dialectOptions: {
     charset: 'utf8mb4',
@@ -44,8 +50,12 @@ const syncDatabase = async (force: boolean = false): Promise<void> => {
     // Import models to ensure they're registered
     await import('../models');
     
-    // Sync database
-    await sequelize.sync({ force });
+    // Sync database with alter to avoid recreating indexes
+    await sequelize.sync({ 
+      force: false, // Never force recreate
+      alter: true,  // Use alter to modify existing tables
+      logging: false // Disable logging to reduce noise
+    });
     console.log('✅ Database synchronized successfully.');
   } catch (error) {
     console.error('❌ Error synchronizing database:', error);

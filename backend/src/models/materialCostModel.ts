@@ -37,7 +37,7 @@ MaterialCost.init(
     name: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       validate: {
         notEmpty: true,
         len: [1, 100]

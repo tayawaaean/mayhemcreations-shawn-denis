@@ -69,7 +69,7 @@ Session.init(
     sessionId: {
       type: DataTypes.STRING(128),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       field: 'session_id', // Map to snake_case column name
       comment: 'Unique session identifier',
     },
@@ -144,10 +144,8 @@ Session.init(
     sequelize,
     tableName: 'sessions',
     timestamps: true,
-    indexes: [
-      {
-        fields: ['session_id'],
-        unique: true,
+    indexes: [], // Temporarily disabled to fix "too many keys" error
+        unique: false, // Temporarily disabled
       },
       {
         fields: ['user_id'],

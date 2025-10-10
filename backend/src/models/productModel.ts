@@ -82,7 +82,7 @@ Product.init(
     slug: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
+      unique: false, // Temporarily disabled
       field: 'slug',
     },
     description: {
@@ -195,7 +195,7 @@ Product.init(
     sku: {
       type: DataTypes.STRING(100),
       allowNull: true,
-      unique: true,
+      unique: false, // Temporarily disabled
       field: 'sku',
     },
     weight: {
@@ -232,10 +232,8 @@ Product.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [
-      {
-        fields: ['slug'],
-        unique: true,
+    indexes: [], // Temporarily disabled to fix "too many keys" error
+        unique: false, // Temporarily disabled
       },
       {
         fields: ['category_id'],
@@ -251,7 +249,7 @@ Product.init(
       },
       {
         fields: ['sku'],
-        unique: true,
+        unique: false, // Temporarily disabled
       },
     ],
   }

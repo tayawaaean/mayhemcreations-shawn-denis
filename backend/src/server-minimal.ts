@@ -1,7 +1,5 @@
 import app from './app';
-import { testDatabaseConnection, syncDatabase, sequelize } from './models';
 import { logger } from './utils/logger';
-import { initializeWebSocket } from './services/websocketService';
 import { createServer } from 'http';
 
 // Environment variables are loaded via --env-file flag
@@ -9,32 +7,20 @@ import { createServer } from 'http';
 const PORT = process.env.PORT || 5001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Start server function
+// Start server function without database sync
 const startServer = async (): Promise<void> => {
   try {
-    // Test database connection
-    await testDatabaseConnection();
-
-    // Sync database (create tables if they don't exist)
-    // In production, you should use migrations instead
-    if (NODE_ENV === 'development') {
-      // Temporarily skip sync to avoid index issues
-      // await sequelize.sync({ alter: true });
-      logger.info('Database sync temporarily disabled to avoid index issues');
-    }
+    logger.info('🚀 Starting server without database sync...');
 
     // Create HTTP server
     const server = createServer(app);
-    
-    // Initialize WebSocket service
-    initializeWebSocket(server);
     
     // Start the server
     server.listen(PORT, () => {
       logger.info(`🚀 Server running on port ${PORT} in ${NODE_ENV} mode`);
       logger.info(`📊 Health check: http://localhost:${PORT}/health`);
       logger.info(`🔐 Auth API: http://localhost:${PORT}/api/v1/auth`);
-      logger.info(`🔌 WebSocket server ready for real-time updates`);
+      logger.info(`🔧 Database sync disabled to prevent index issues`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

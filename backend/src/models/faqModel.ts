@@ -87,9 +87,7 @@ FAQ.init(
     tableName: 'faqs',
     timestamps: true,
     underscored: false, // Use camelCase instead of snake_case
-    indexes: [
-      {
-        fields: ['status'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['category'],

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node --env-file=.env dist/server.js",
     "dev": "node --watch --env-file=.env -r ts-node/register src/server.ts",
+    "dev-minimal": "node --watch --env-file=.env -r ts-node/register src/server-minimal.ts",
+    "dev-basic": "node --watch --env-file=.env -r ts-node/register src/server-basic.ts",
     "build": "tsc",
     "test": "jest --env-file=.env",
     "test:watch": "jest --watch --env-file=.env",

@@ -136,15 +136,13 @@ Cart.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [
-      {
-        fields: ['user_id'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['product_id'],
       },
       {
-        unique: true,
+        unique: false, // Temporarily disabled
         fields: ['user_id', 'product_id', 'customization'],
         name: 'unique_user_product_customization',
       },

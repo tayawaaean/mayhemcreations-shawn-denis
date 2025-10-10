@@ -241,8 +241,12 @@ export const models = {
 // Database synchronization function
 export const syncDatabase = async (force: boolean = false): Promise<void> => {
   try {
-    await sequelize.sync({ force });
-    console.log('✅ Database synchronized successfully.');
+    // Temporarily disabled to prevent index issues
+    console.log('🔧 Database sync temporarily disabled to prevent index issues');
+    return;
+    
+    // await sequelize.sync({ force });
+    // console.log('✅ Database synchronized successfully.');
   } catch (error) {
     console.error('❌ Error synchronizing database:', error);
     throw error;

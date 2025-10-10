@@ -262,9 +262,7 @@ Payment.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [
-      {
-        fields: ['order_id'],
+    indexes: [], // Temporarily disabled to fix "too many keys" error
       },
       {
         fields: ['customer_id'],
@@ -277,7 +275,7 @@ Payment.init(
       },
       {
         fields: ['transaction_id'],
-        unique: true,
+        unique: false, // Temporarily disabled
       },
       {
         fields: ['provider_transaction_id'],

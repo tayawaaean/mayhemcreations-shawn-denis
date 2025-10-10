@@ -181,10 +181,7 @@ OAuthProvider.init({
   modelName: 'OAuthProvider',
   tableName: 'oauth_providers',
   timestamps: true,
-  indexes: [
-    {
-      unique: true,
-      fields: ['provider', 'provider_id'],
+  indexes: [], // Temporarily disabled to fix "too many keys" error
       name: 'unique_provider_id'
     },
     {
