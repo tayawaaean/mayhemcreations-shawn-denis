@@ -184,8 +184,9 @@ export const createCheckoutSessionHandler = async (
     
     try {
       // Try to find existing customer by email
+      const customerEmail = customerInfo?.email || req.user?.email;
       const existingCustomers = await stripe.customers.list({
-        email: req.user?.email,
+        email: customerEmail,
         limit: 1,
       });
       
@@ -193,21 +194,61 @@ export const createCheckoutSessionHandler = async (
         customerId = existingCustomers.data[0].id;
         logger.info('Using existing Stripe customer', {
           customerId,
-          email: req.user?.email,
+          email: customerEmail,
         });
+
+        // Update customer with shipping address if provided
+        if (shippingAddress && customerInfo) {
+          await stripe.customers.update(customerId, {
+            name: customerInfo.name,
+            phone: customerInfo.phone || undefined,
+            shipping: {
+              name: customerInfo.name,
+              phone: customerInfo.phone || undefined,
+              address: {
+                line1: shippingAddress.line1,
+                line2: shippingAddress.line2 || undefined,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                postal_code: shippingAddress.postal_code,
+                country: shippingAddress.country,
+              },
+            },
+          });
+          logger.info('Updated customer with shipping address', { customerId });
+        }
       } else {
-        // Create new customer
-        const customer = await createCustomer(
-          req.user?.email || '',
-          `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
-          {
+        // Create new customer with shipping address
+        const customerData: any = {
+          email: customerEmail,
+          name: customerInfo?.name || `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
+          phone: customerInfo?.phone || undefined,
+          metadata: {
             userId: userId.toString(),
-          }
-        );
+          },
+        };
+
+        // Add shipping address if provided
+        if (shippingAddress && customerInfo) {
+          customerData.shipping = {
+            name: customerInfo.name,
+            phone: customerInfo.phone || undefined,
+            address: {
+              line1: shippingAddress.line1,
+              line2: shippingAddress.line2 || undefined,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postal_code: shippingAddress.postal_code,
+              country: shippingAddress.country,
+            },
+          };
+        }
+
+        const customer = await stripe.customers.create(customerData);
         customerId = customer.id;
-        logger.info('Created new Stripe customer', {
+        logger.info('Created new Stripe customer with shipping', {
           customerId,
-          email: req.user?.email,
+          email: customerEmail,
         });
       }
     } catch (customerError: any) {

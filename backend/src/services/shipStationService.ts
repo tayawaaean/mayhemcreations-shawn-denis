@@ -1,78 +1,246 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+/**
+ * ShipStation Service
+ * Handles shipping rate calculations and label creation via ShipStation API
+ */
+
+import axios from 'axios';
 import { logger } from '../utils/logger';
 
-/**
- * ShipStation API Service
- * Handles all interactions with ShipStation API
- */
-export class ShipStationService {
-  private apiClient: AxiosInstance;
-  private apiKey: string;
-  private apiSecret: string;
-  private baseUrl: string;
+// ShipStation API configuration
+const SHIPSTATION_API_URL = 'https://ssapi.shipstation.com';
+const SHIPSTATION_API_KEY = process.env.SHIPSTATION_API_KEY || '';
+const SHIPSTATION_API_SECRET = process.env.SHIPSTATION_API_SECRET || '';
 
-  constructor() {
-    this.apiKey = process.env.SHIPSTATION_API_KEY || '';
-    this.apiSecret = process.env.SHIPSTATION_API_SECRET || '';
-    this.baseUrl = process.env.SHIPSTATION_BASE_URL || 'https://ssapi.shipstation.com';
-    
-    if (!this.apiKey || !this.apiSecret) {
-      logger.warn('⚠️ ShipStation API credentials not configured');
+// Create base64 encoded auth token
+const authToken = Buffer.from(`${SHIPSTATION_API_KEY}:${SHIPSTATION_API_SECRET}`).toString('base64');
+
+export interface ShipStationAddress {
+  name: string;
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  phone?: string;
+}
+
+export interface ShipStationItem {
+  sku?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  weight?: {
+    value: number;
+    units: 'ounces' | 'pounds' | 'grams';
+  };
+}
+
+export interface ShippingRateRequest {
+  carrierCode?: string; // e.g., 'stamps_com', 'ups', 'fedex', 'usps'
+  fromPostalCode: string;
+  toState: string;
+  toCountry: string;
+  toPostalCode: string;
+  toCity: string;
+  weight: {
+    value: number;
+    units: 'ounces' | 'pounds' | 'grams';
+  };
+  dimensions?: {
+    length: number;
+    width: number;
+    height: number;
+    units: 'inches' | 'centimeters';
+  };
+  confirmation?: 'none' | 'delivery' | 'signature' | 'adult_signature';
+  residential?: boolean;
+}
+
+export interface ShippingRate {
+  serviceName: string;
+  serviceCode: string;
+  shipmentCost: number;
+  otherCost: number;
+  totalCost: number;
+  estimatedDeliveryDays?: number;
+  carrier: string;
+}
+
+export interface ShippingRatesResponse {
+  success: boolean;
+  rates?: ShippingRate[];
+  error?: string;
+}
+
+/**
+ * Get shipping rates from ShipStation
+ */
+export const getShippingRates = async (request: ShippingRateRequest): Promise<ShippingRatesResponse> => {
+  try {
+    if (!SHIPSTATION_API_KEY || !SHIPSTATION_API_SECRET) {
+      throw new Error('ShipStation API credentials not configured');
     }
 
-    this.apiClient = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 30000,
-      auth: {
-        username: this.apiKey,
-        password: this.apiSecret,
-      },
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+    logger.info('Requesting shipping rates from ShipStation', {
+      toPostalCode: request.toPostalCode,
+      toCity: request.toCity,
+      weight: request.weight,
     });
 
-    // Add request/response interceptors for logging
-    this.apiClient.interceptors.request.use(
-      (config) => {
-        logger.info(`🚢 ShipStation API Request: ${config.method?.toUpperCase()} ${config.url}`);
-        return config;
+    const response = await axios.post(
+      `${SHIPSTATION_API_URL}/shipments/getrates`,
+      {
+        carrierCode: request.carrierCode || 'stamps_com', // USPS by default
+        fromPostalCode: request.fromPostalCode,
+        toState: request.toState,
+        toCountry: request.toCountry,
+        toPostalCode: request.toPostalCode,
+        toCity: request.toCity,
+        weight: request.weight,
+        dimensions: request.dimensions || {
+          length: 12,
+          width: 12,
+          height: 6,
+          units: 'inches',
+        },
+        confirmation: request.confirmation || 'none',
+        residential: request.residential !== false, // Default to residential
       },
-      (error) => {
-        logger.error('🚢 ShipStation API Request Error:', error);
-        return Promise.reject(error);
+      {
+        headers: {
+          'Authorization': `Basic ${authToken}`,
+          'Content-Type': 'application/json',
+        },
       }
     );
 
-    this.apiClient.interceptors.response.use(
-      (response) => {
-        logger.info(`🚢 ShipStation API Response: ${response.status} ${response.config.url}`);
-        return response;
-      },
-      (error) => {
-        logger.error('🚢 ShipStation API Response Error:', error.response?.data || error.message);
-        return Promise.reject(error);
-      }
-    );
+    if (!response.data || response.data.length === 0) {
+      logger.warn('No shipping rates returned from ShipStation');
+      return {
+        success: false,
+        error: 'No shipping rates available for this destination',
+      };
+    }
+
+    // Transform ShipStation response to our format
+    const rates: ShippingRate[] = response.data.map((rate: any) => ({
+      serviceName: rate.serviceName,
+      serviceCode: rate.serviceCode,
+      shipmentCost: parseFloat(rate.shipmentCost),
+      otherCost: parseFloat(rate.otherCost),
+      totalCost: parseFloat(rate.shipmentCost) + parseFloat(rate.otherCost),
+      estimatedDeliveryDays: rate.transitDays,
+      carrier: rate.carrierCode || 'USPS',
+    }));
+
+    // Sort by cost (cheapest first)
+    rates.sort((a, b) => a.totalCost - b.totalCost);
+
+    logger.info('Shipping rates retrieved successfully', {
+      ratesCount: rates.length,
+      cheapestRate: rates[0]?.totalCost,
+    });
+
+    return {
+      success: true,
+      rates,
+    };
+  } catch (error: any) {
+    logger.error('Error fetching shipping rates from ShipStation:', {
+      error: error.message,
+      response: error.response?.data,
+    });
+
+    // Return fallback rates if API fails
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message || 'Failed to fetch shipping rates',
+    };
+  }
+};
+
+/**
+ * Calculate total weight of cart items
+ * Default weight per item if not specified
+ */
+export const calculateTotalWeight = (items: any[]): { value: number; units: 'ounces' } => {
+  const DEFAULT_ITEM_WEIGHT_OZ = 8; // 8 oz per item default
+  
+  let totalOunces = 0;
+  
+  items.forEach((item) => {
+    const itemWeight = item.weight?.value || DEFAULT_ITEM_WEIGHT_OZ;
+    const quantity = item.quantity || 1;
+    
+    // Convert to ounces if needed
+    if (item.weight?.units === 'pounds') {
+      totalOunces += itemWeight * 16 * quantity;
+    } else if (item.weight?.units === 'grams') {
+      totalOunces += (itemWeight / 28.35) * quantity;
+    } else {
+      totalOunces += itemWeight * quantity;
+    }
+  });
+
+  return {
+    value: Math.max(totalOunces, 1), // Minimum 1 oz
+    units: 'ounces',
+  };
+};
+
+/**
+ * Get fallback shipping rates (used when API is unavailable)
+ */
+export const getFallbackRates = (destinationState: string): ShippingRate[] => {
+  // Basic flat rate options
+  return [
+    {
+      serviceName: 'Standard Shipping',
+      serviceCode: 'usps_priority_mail',
+      shipmentCost: 9.99,
+      otherCost: 0,
+      totalCost: 9.99,
+      estimatedDeliveryDays: 3,
+      carrier: 'USPS',
+    },
+    {
+      serviceName: 'Express Shipping',
+      serviceCode: 'usps_priority_mail_express',
+      shipmentCost: 24.99,
+      otherCost: 0,
+      totalCost: 24.99,
+      estimatedDeliveryDays: 2,
+      carrier: 'USPS',
+    },
+  ];
+};
+
+/**
+ * ShipStation Service Class
+ * Object-oriented wrapper for ShipStation API operations
+ */
+class ShipStationService {
+  /**
+   * Check if ShipStation is configured
+   */
+  isConfigured(): boolean {
+    return !!(SHIPSTATION_API_KEY && SHIPSTATION_API_SECRET);
   }
 
   /**
-   * Check if ShipStation is properly configured
+   * Test ShipStation connection
    */
-  public isConfigured(): boolean {
-    return !!(this.apiKey && this.apiSecret);
-  }
-
-  /**
-   * Test API connection
-   */
-  public async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<boolean> {
     try {
-      const response = await this.apiClient.get('/carriers');
+      const response = await axios.get(`${SHIPSTATION_API_URL}/accounts/listtags`, {
+        headers: {
+          Authorization: `Basic ${authToken}`,
+        },
+      });
       return response.status === 200;
     } catch (error) {
-      logger.error('🚢 ShipStation connection test failed:', error);
+      logger.error('ShipStation connection test failed:', error);
       return false;
     }
   }
@@ -80,312 +248,207 @@ export class ShipStationService {
   /**
    * Get available carriers
    */
-  public async getCarriers(): Promise<any[]> {
+  async getCarriers(): Promise<any[]> {
     try {
-      const response = await this.apiClient.get('/carriers');
+      const response = await axios.get(`${SHIPSTATION_API_URL}/carriers`, {
+        headers: {
+          Authorization: `Basic ${authToken}`,
+        },
+      });
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching carriers:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching carriers:', error);
+      throw new Error(`Failed to fetch carriers: ${error.message}`);
     }
   }
 
   /**
-   * Get shipping rates for a shipment
+   * Get shipping rates
    */
-  public async getRates(request: {
-    carrierCode: string;
-    serviceCode?: string;
-    packageCode?: string;
-    fromPostalCode: string;
-    toState: string;
-    toCountry: string;
-    toPostalCode: string;
-    weight: {
-      value: number;
-      units: 'pounds' | 'ounces' | 'grams' | 'kilograms';
-    };
-    dimensions?: {
-      length: number;
-      width: number;
-      height: number;
-      units: 'inches' | 'centimeters';
-    };
-  }): Promise<any[]> {
+  async getRates(rateRequest: any): Promise<any> {
     try {
-      const response = await this.apiClient.post('/shipments/getrates', request);
+      const response = await axios.post(
+        `${SHIPSTATION_API_URL}/shipments/getrates`,
+        rateRequest,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error getting shipping rates:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error getting rates:', error);
+      throw new Error(`Failed to get rates: ${error.message}`);
     }
   }
 
   /**
-   * Create a shipping label
+   * Create shipping label
    */
-  public async createLabel(request: {
-    carrierCode: string;
-    serviceCode: string;
-    packageCode: string;
-    confirmation?: string;
-    shipDate: string;
-    weight: {
-      value: number;
-      units: 'pounds' | 'ounces' | 'grams' | 'kilograms';
-    };
-    dimensions?: {
-      length: number;
-      width: number;
-      height: number;
-      units: 'inches' | 'centimeters';
-    };
-    shipFrom: {
-      name: string;
-      company?: string;
-      street1: string;
-      street2?: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-      phone?: string;
-      residential?: boolean;
-    };
-    shipTo: {
-      name: string;
-      company?: string;
-      street1: string;
-      street2?: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-      phone?: string;
-      residential?: boolean;
-    };
-    testLabel?: boolean;
-  }): Promise<any> {
+  async createLabel(labelData: any): Promise<any> {
     try {
-      const response = await this.apiClient.post('/shipments/createlabel', request);
+      const response = await axios.post(
+        `${SHIPSTATION_API_URL}/orders/createlabelfororder`,
+        labelData,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error creating shipping label:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error creating label:', error);
+      throw new Error(`Failed to create label: ${error.message}`);
     }
   }
 
   /**
-   * Get shipment details by ID
+   * Get shipment details
    */
-  public async getShipment(shipmentId: string): Promise<any> {
+  async getShipment(shipmentId: string): Promise<any> {
     try {
-      const response = await this.apiClient.get(`/shipments/${shipmentId}`);
+      const response = await axios.get(
+        `${SHIPSTATION_API_URL}/shipments/${shipmentId}`,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching shipment:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching shipment:', error);
+      throw new Error(`Failed to fetch shipment: ${error.message}`);
     }
   }
 
   /**
    * Get tracking information
    */
-  public async getTracking(trackingNumber: string): Promise<any> {
+  async getTracking(trackingNumber: string): Promise<any> {
     try {
-      const response = await this.apiClient.get(`/shipments/tracking/${trackingNumber}`);
+      const response = await axios.get(
+        `${SHIPSTATION_API_URL}/shipments?trackingNumber=${trackingNumber}`,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching tracking info:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching tracking:', error);
+      throw new Error(`Failed to fetch tracking: ${error.message}`);
     }
   }
 
   /**
-   * Create an order in ShipStation
+   * Create order in ShipStation
    */
-  public async createOrder(orderData: {
-    orderNumber: string;
-    orderKey?: string;
-    orderDate: string;
-    paymentDate?: string;
-    orderStatus: 'awaiting_payment' | 'awaiting_shipment' | 'shipped' | 'on_hold' | 'cancelled';
-    billTo: {
-      name: string;
-      company?: string;
-      street1: string;
-      street2?: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-      phone?: string;
-      residential?: boolean;
-    };
-    shipTo: {
-      name: string;
-      company?: string;
-      street1: string;
-      street2?: string;
-      city: string;
-      state: string;
-      postalCode: string;
-      country: string;
-      phone?: string;
-      residential?: boolean;
-    };
-    items: Array<{
-      lineItemKey?: string;
-      sku?: string;
-      name: string;
-      imageUrl?: string;
-      weight?: {
-        value: number;
-        units: 'pounds' | 'ounces' | 'grams' | 'kilograms';
-      };
-      quantity: number;
-      unitPrice: number;
-      taxAmount?: number;
-      shippingAmount?: number;
-      productId?: number;
-      fulfillmentSku?: string;
-    }>;
-    amountPaid?: number;
-    taxAmount?: number;
-    shippingAmount?: number;
-    customerNotes?: string;
-    internalNotes?: string;
-    gift?: boolean;
-    giftMessage?: string;
-    paymentMethod?: string;
-    requestedShippingService?: string;
-    carrierCode?: string;
-    serviceCode?: string;
-    packageCode?: string;
-    confirmation?: string;
-    shipDate?: string;
-    holdUntilDate?: string;
-    weight?: {
-      value: number;
-      units: 'pounds' | 'ounces' | 'grams' | 'kilograms';
-    };
-    dimensions?: {
-      length: number;
-      width: number;
-      height: number;
-      units: 'inches' | 'centimeters';
-    };
-    insuranceOptions?: {
-      provider?: string;
-      insureShipment?: boolean;
-      insuredValue?: number;
-    };
-    internationalOptions?: {
-      contents?: string;
-      customsItems?: Array<{
-        description: string;
-        quantity: number;
-        value: number;
-        harmonizedTariffCode?: string;
-        countryOfOrigin?: string;
-      }>;
-      nonDelivery?: string;
-    };
-    advancedOptions?: {
-      warehouseId?: number;
-      nonMachinable?: boolean;
-      saturdayDelivery?: boolean;
-      containsAlcohol?: boolean;
-      mergedOrSplit?: boolean;
-      mergedIds?: number[];
-      parentId?: number;
-      storeId?: number;
-      customField1?: string;
-      customField2?: string;
-      customField3?: string;
-      source?: string;
-      billToParty?: string;
-      billToAccount?: string;
-      billToPostalCode?: string;
-      billToCountryCode?: string;
-    };
-    tagIds?: number[];
-  }): Promise<any> {
+  async createOrder(orderData: any): Promise<any> {
     try {
-      const response = await this.apiClient.post('/orders/createorder', orderData);
+      const response = await axios.post(
+        `${SHIPSTATION_API_URL}/orders/createorder`,
+        orderData,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error creating order:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error creating order:', error);
+      throw new Error(`Failed to create order: ${error.message}`);
     }
   }
 
   /**
    * Get orders from ShipStation
    */
-  public async getOrders(params?: {
-    orderStatus?: string;
-    customerId?: string;
-    itemKeyword?: string;
-    createDateStart?: string;
-    createDateEnd?: string;
-    modifyDateStart?: string;
-    modifyDateEnd?: string;
-    orderDateStart?: string;
-    orderDateEnd?: string;
-    page?: number;
-    pageSize?: number;
-    sortBy?: string;
-    sortDir?: 'ASC' | 'DESC';
-  }): Promise<{ orders: any[]; total: number; page: number; pages: number }> {
+  async getOrders(queryParams: any): Promise<any> {
     try {
-      const response = await this.apiClient.get('/orders', { params });
+      const params = new URLSearchParams(queryParams).toString();
+      const response = await axios.get(
+        `${SHIPSTATION_API_URL}/orders?${params}`,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching orders:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching orders:', error);
+      throw new Error(`Failed to fetch orders: ${error.message}`);
     }
   }
 
   /**
    * Update order status
    */
-  public async updateOrderStatus(orderId: string, status: string): Promise<any> {
+  async updateOrderStatus(orderId: string, status: string): Promise<any> {
     try {
-      const response = await this.apiClient.put(`/orders/${orderId}`, { orderStatus: status });
+      const response = await axios.post(
+        `${SHIPSTATION_API_URL}/orders/holduntil`,
+        {
+          orderId,
+          holdUntilDate: status,
+        },
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error updating order status:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error updating order status:', error);
+      throw new Error(`Failed to update order status: ${error.message}`);
     }
   }
 
   /**
    * Get warehouses
    */
-  public async getWarehouses(): Promise<any[]> {
+  async getWarehouses(): Promise<any[]> {
     try {
-      const response = await this.apiClient.get('/warehouses');
+      const response = await axios.get(`${SHIPSTATION_API_URL}/warehouses`, {
+        headers: {
+          Authorization: `Basic ${authToken}`,
+        },
+      });
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching warehouses:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching warehouses:', error);
+      throw new Error(`Failed to fetch warehouses: ${error.message}`);
     }
   }
 
   /**
    * Get stores (sales channels)
    */
-  public async getStores(): Promise<any[]> {
+  async getStores(): Promise<any[]> {
     try {
-      const response = await this.apiClient.get('/stores');
+      const response = await axios.get(`${SHIPSTATION_API_URL}/stores`, {
+        headers: {
+          Authorization: `Basic ${authToken}`,
+        },
+      });
       return response.data;
-    } catch (error) {
-      logger.error('🚢 Error fetching stores:', error);
-      throw error;
+    } catch (error: any) {
+      logger.error('Error fetching stores:', error);
+      throw new Error(`Failed to fetch stores: ${error.message}`);
     }
   }
 }
 
-// Export singleton instance
+// Export singleton instance for use in controllers
 export const shipStationService = new ShipStationService();
+

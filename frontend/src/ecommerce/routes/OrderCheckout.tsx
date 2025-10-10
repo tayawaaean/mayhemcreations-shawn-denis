@@ -25,6 +25,7 @@ import Button from '../../components/Button'
 // Payment integrations now use hosted checkout flows (Stripe/PayPal)
 import { PaymentResult } from '../../shared/paymentService'
 import { paymentsApiService } from '../../shared/paymentsApiService'
+import { calculateShippingRates, ShippingRate } from '../../shared/shippingApiService'
 
 interface OrderItem {
   id: string
@@ -52,6 +53,13 @@ export default function OrderCheckout() {
   const [isComplete, setIsComplete] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  
+  // Shipping rates state
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([])
+  const [selectedShippingRate, setSelectedShippingRate] = useState<ShippingRate | null>(null)
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false)
+  const [shippingError, setShippingError] = useState<string | null>(null)
 
   // Get user info from auth context if available
   const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
@@ -238,8 +246,90 @@ export default function OrderCheckout() {
   }
 
   const calculateTax = () => calculateSubtotal() * 0.08 // 8% tax
-  const calculateShipping = () => calculateSubtotal() > 50 ? 0 : 9.99 // Free shipping over $50
+  const calculateShipping = () => {
+    // Use selected shipping rate if available, otherwise use default
+    if (selectedShippingRate) {
+      return selectedShippingRate.totalCost
+    }
+    // Fallback: Free shipping over $50, otherwise $9.99
+    return calculateSubtotal() > 50 ? 0 : 9.99
+  }
   const calculateTotal = () => calculateSubtotal() + calculateTax() + calculateShipping()
+  
+  // Fetch shipping rates when address is complete
+  const fetchShippingRates = async () => {
+    if (!formData.address || !formData.city || !formData.state || !formData.zipCode) {
+      return
+    }
+    
+    if (!order || !order.items) {
+      return
+    }
+    
+    setIsLoadingShipping(true)
+    setShippingError(null)
+    
+    try {
+      const response = await calculateShippingRates(
+        {
+          street1: formData.address,
+          street2: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.zipCode,
+          country: 'US',
+        },
+        order.items.map(item => ({
+          id: item.id,
+          name: item.productName,
+          quantity: item.quantity,
+          price: calculateItemPrice(item),
+        }))
+      )
+      
+      if (response.success && response.data) {
+        setShippingRates(response.data.rates)
+        setSelectedShippingRate(response.data.recommendedRate)
+        
+        if (response.data.warning) {
+          setShippingError(response.data.warning)
+        }
+        
+        console.log('✅ Shipping rates fetched:', response.data.rates)
+      } else {
+        setShippingError('Unable to fetch shipping rates. Using estimated rates.')
+        // Set default fallback rate
+        const fallbackRate = {
+          serviceName: 'Standard Shipping',
+          serviceCode: 'standard',
+          shipmentCost: 9.99,
+          otherCost: 0,
+          totalCost: 9.99,
+          estimatedDeliveryDays: 5,
+          carrier: 'USPS',
+        }
+        setShippingRates([fallbackRate])
+        setSelectedShippingRate(fallbackRate)
+      }
+    } catch (error) {
+      console.error('Error fetching shipping rates:', error)
+      setShippingError('Unable to fetch shipping rates. Using estimated rates.')
+      // Set default fallback rate
+      const fallbackRate = {
+        serviceName: 'Standard Shipping',
+        serviceCode: 'standard',
+        shipmentCost: 9.99,
+        otherCost: 0,
+        totalCost: 9.99,
+        estimatedDeliveryDays: 5,
+        carrier: 'USPS',
+      }
+      setShippingRates([fallbackRate])
+      setSelectedShippingRate(fallbackRate)
+    } finally {
+      setIsLoadingShipping(false)
+    }
+  }
 
   const canProceed = () => {
     switch (currentStep) {
@@ -256,7 +346,12 @@ export default function OrderCheckout() {
     }
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      // Fetch shipping rates when moving from shipping to payment step
+      await fetchShippingRates()
+    }
+    
     if (currentStep < 3) {
       setCurrentStep(prev => prev + 1)
     }
@@ -731,6 +826,77 @@ export default function OrderCheckout() {
                 </h2>
                 
                 <div className="space-y-6">
+                  {/* Shipping Options */}
+                  <div className="space-y-4 pb-6 border-b border-gray-200">
+                    <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                      <Truck className="w-5 h-5 mr-2 text-accent" />
+                      Shipping Options
+                    </h3>
+                    
+                    {isLoadingShipping ? (
+                      <div className="text-center py-8">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
+                        <p className="text-sm text-gray-600 mt-2">Calculating shipping rates...</p>
+                      </div>
+                    ) : shippingError ? (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm text-yellow-800">{shippingError}</p>
+                        </div>
+                      </div>
+                    ) : shippingRates.length > 0 ? (
+                      <div className="space-y-3">
+                        {shippingRates.map((rate, index) => (
+                          <div
+                            key={index}
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                              selectedShippingRate?.serviceCode === rate.serviceCode
+                                ? 'border-accent bg-accent/5'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            onClick={() => setSelectedShippingRate(rate)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center">
+                                  <h4 className="font-medium text-gray-900">{rate.serviceName}</h4>
+                                  {index === 0 && (
+                                    <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">
+                                      Recommended
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {rate.carrier} • {rate.estimatedDeliveryDays ? `${rate.estimatedDeliveryDays}-day delivery` : 'Standard delivery'}
+                                </p>
+                              </div>
+                              <div className="flex items-center ml-4">
+                                <span className="text-lg font-semibold text-gray-900 mr-4">
+                                  ${rate.totalCost.toFixed(2)}
+                                </span>
+                                <div className={`w-5 h-5 rounded-full border-2 ${
+                                  selectedShippingRate?.serviceCode === rate.serviceCode
+                                    ? 'border-accent bg-accent'
+                                    : 'border-gray-300'
+                                }`}>
+                                  {selectedShippingRate?.serviceCode === rate.serviceCode && (
+                                    <div className="w-full h-full rounded-full bg-white scale-50"></div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <Truck className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No shipping rates available</p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Payment Options */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium text-gray-900">Choose Payment Method</h3>
@@ -866,86 +1032,201 @@ export default function OrderCheckout() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
                   <CheckCircle className="w-5 h-5 mr-2 text-accent" />
-                  Order Review
+                  Review Your Order
                 </h2>
                 
                 <div className="space-y-6">
-                  {/* Order Summary */}
+                  {/* Shipping Information Review */}
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Shipping Information</h3>
+                      <button
+                        onClick={() => setCurrentStep(1)}
+                        className="text-sm text-accent hover:text-accent/80 font-medium flex items-center"
+                      >
+                        Edit
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div className="flex items-start">
+                        <User className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {formData.firstName} {formData.lastName}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start">
+                        <Mail className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
+                        <p className="text-sm text-gray-700">{formData.email}</p>
+                      </div>
+                      <div className="flex items-start">
+                        <Phone className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
+                        <p className="text-sm text-gray-700">{formData.phone || 'Not provided'}</p>
+                      </div>
+                      <div className="flex items-start">
+                        <MapPin className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
+                        <div>
+                          <p className="text-sm text-gray-700">{formData.address}</p>
+                          {formData.apartment && (
+                            <p className="text-sm text-gray-700">{formData.apartment}</p>
+                          )}
+                          <p className="text-sm text-gray-700">
+                            {formData.city}, {formData.state} {formData.zipCode}
+                          </p>
+                          <p className="text-sm text-gray-700">{formData.country}</p>
+                        </div>
+                      </div>
+                      {formData.notes && (
+                        <div className="flex items-start pt-2 border-t border-gray-200">
+                          <AlertCircle className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
+                          <div>
+                            <p className="text-xs font-medium text-gray-600">Delivery Instructions:</p>
+                            <p className="text-sm text-gray-700">{formData.notes}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment Method Review */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Payment Method</h3>
+                      <button
+                        onClick={() => setCurrentStep(2)}
+                        className="text-sm text-accent hover:text-accent/80 font-medium flex items-center"
+                      >
+                        Edit
+                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <CreditCard className="w-5 h-5 text-gray-500 mr-2" />
+                        <p className="text-sm font-medium text-gray-900">
+                          {paymentMethod === 'stripe' && 'Credit Card (via Stripe)'}
+                          {paymentMethod === 'paypal' && 'PayPal'}
+                          {paymentMethod === 'google' && 'Google Pay'}
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        {paymentMethod === 'stripe' && 'You will be redirected to Stripe\'s secure checkout to complete payment.'}
+                        {paymentMethod === 'paypal' && 'You will be redirected to PayPal to complete payment.'}
+                        {paymentMethod === 'google' && 'You will be redirected to Google Pay to complete payment.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Order Items */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Order Items</h3>
                     <div className="space-y-4">
-                      {console.log('🔍 Order items for summary:', order?.items)}
                       {order?.items?.length > 0 ? (
                         order.items.map((item, index) => {
-                          // Handle both numeric and string product IDs
-                          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-                          const product = products.find(p => {
-                            // Check both string and numeric ID matches
-                            return p.id === item.productId || p.id === numericId;
-                          });
-                          console.log('🔍 Item details:', { item, product })
-                          if (!product) {
-                            console.log('❌ Product not found for item:', item.productId)
-                            return null
-                          }
+                          console.log('📦 Order item:', item);
                           
-                          // Calculate item price including customization costs
-                          const itemPrice = calculateItemPrice(item)
+                          // Use item's embedded product data first, then try to find in products array
+                          const displayImage = item.productImage || item.customization?.mockup || (item.product?.images?.[0]) || 'https://via.placeholder.com/100';
+                          const displayName = item.productName || (item.product?.title) || `Product #${item.productId}`;
+                          const itemPrice = item.price || calculateItemPrice(item);
+                          
+                          console.log('📦 Display data:', { displayImage, displayName, itemPrice });
                           
                           return (
                             <div key={index} className="border border-gray-200 rounded-lg p-4">
                               <div className="flex items-start space-x-4">
                                 <img
-                                  src={product.image}
-                                  alt={product.title}
-                                  className="w-16 h-16 object-cover rounded-lg"
+                                  src={displayImage}
+                                  alt={displayName}
+                                  className="w-20 h-20 object-cover rounded-lg border border-gray-200"
                                 />
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-gray-900">{product.title}</h4>
+                                  <h4 className="font-medium text-gray-900">{displayName}</h4>
                                   <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                                   
                                   {item.customization && (
-                                    <div className="mt-2 space-y-1">
-                                      <p className="text-sm font-medium text-gray-700">Customization:</p>
-                                      {item.customization.design && (
-                                        <p className="text-xs text-gray-600">
-                                          Design: {item.customization.design.name}
-                                        </p>
-                                      )}
-                                      <p className="text-xs text-gray-600">
-                                        Placement: {item.customization.placement}
-                                      </p>
-                                      <p className="text-xs text-gray-600">
-                                        Size: {item.customization.size}
-                                      </p>
-                                      <p className="text-xs text-gray-600">
-                                        Color: {item.customization.color}
-                                      </p>
+                                    <div className="mt-2 p-2 bg-purple-50 rounded border border-purple-100">
+                                      <p className="text-xs font-medium text-purple-900 mb-1">✨ Customized</p>
+                                      <div className="space-y-0.5 text-xs text-gray-600">
+                                        {item.customization.designs?.length > 0 && (
+                                          <p>• {item.customization.designs.length} design(s)</p>
+                                        )}
+                                        {item.customization.selectedStyles && (
+                                          <>
+                                            {item.customization.selectedStyles.color && (
+                                              <p>• Color: {item.customization.selectedStyles.color}</p>
+                                            )}
+                                            {item.customization.selectedStyles.size && (
+                                              <p>• Size: {item.customization.selectedStyles.size}</p>
+                                            )}
+                                          </>
+                                        )}
+                                        {item.customization.placement && (
+                                          <p>• Placement: {item.customization.placement}</p>
+                                        )}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <p className="font-medium text-gray-900">
+                                  <p className="font-semibold text-gray-900 text-lg">
                                     ${(itemPrice * item.quantity).toFixed(2)}
                                   </p>
-                                  {item.customization && (
-                                    <p className="text-xs text-gray-500">
-                                      ${itemPrice.toFixed(2)} each
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    ${itemPrice.toFixed(2)} × {item.quantity}
                                     </p>
-                                  )}
                                 </div>
                               </div>
                             </div>
                           )
                         })
                       ) : (
-                        <div className="text-center py-8">
-                          <p className="text-gray-500">No items found in order</p>
+                        <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                          <p className="text-gray-500 font-medium">No items found in order</p>
                           <p className="text-sm text-gray-400 mt-2">
-                            Order ID: {order?.id || 'Unknown'}
+                            Please go back and add items to your cart
                           </p>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Order Summary Totals */}
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Subtotal</span>
+                        <span className="font-medium text-gray-900">${calculateSubtotal().toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <div className="flex flex-col">
+                          <span className="text-gray-600">Shipping</span>
+                          {selectedShippingRate && (
+                            <span className="text-xs text-gray-500 mt-0.5">
+                              {selectedShippingRate.serviceName}
+                              {selectedShippingRate.estimatedDeliveryDays && ` (${selectedShippingRate.estimatedDeliveryDays} days)`}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-medium text-gray-900">
+                          {calculateShipping() === 0 ? 'FREE' : `$${calculateShipping().toFixed(2)}`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Tax (8%)</span>
+                        <span className="font-medium text-gray-900">${calculateTax().toFixed(2)}</span>
+                      </div>
+                      <div className="border-t border-gray-300 pt-3 flex justify-between">
+                        <span className="text-base font-semibold text-gray-900">Total</span>
+                        <span className="text-xl font-bold text-accent">${calculateTotal().toFixed(2)}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -955,16 +1236,27 @@ export default function OrderCheckout() {
                       <input
                         type="checkbox"
                         id="terms"
-                        className="mt-1 mr-3"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-1 mr-3 w-4 h-4 text-accent border-gray-300 rounded focus:ring-accent"
                         required
                       />
-                      <label htmlFor="terms" className="text-sm text-gray-600">
+                      <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">
                         I agree to the{' '}
-                        <a href="#" className="text-accent hover:underline">Terms of Service</a>
+                        <a href="#" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                          Terms of Service
+                        </a>
                         {' '}and{' '}
-                        <a href="#" className="text-accent hover:underline">Privacy Policy</a>
+                        <a href="#" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                          Privacy Policy
+                        </a>
                       </label>
                     </div>
+                    {!termsAccepted && (
+                      <p className="text-xs text-red-600 mt-2">
+                        You must accept the terms and conditions to place your order
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -991,8 +1283,9 @@ export default function OrderCheckout() {
               ) : (
                 <Button
                   onClick={handlePlaceOrder}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !termsAccepted}
                   className="bg-accent hover:bg-accent/90"
+                  title={!termsAccepted ? 'Please accept the terms and conditions' : ''}
                 >
                   {isProcessing ? (
                     <>
@@ -1013,18 +1306,43 @@ export default function OrderCheckout() {
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sticky top-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Total</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h3>
               
               <div className="space-y-4">
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
+                  <span className="font-medium text-gray-900">${calculateSubtotal().toFixed(2)}</span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <div className="flex flex-col">
+                    <span className="text-gray-600">Shipping</span>
+                    {selectedShippingRate && currentStep >= 2 && (
+                      <span className="text-xs text-gray-500 mt-0.5">
+                        {selectedShippingRate.serviceName}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-medium text-gray-900">
+                    {currentStep >= 2 ? (
+                      calculateShipping() === 0 ? 'FREE' : `$${calculateShipping().toFixed(2)}`
+                    ) : (
+                      <span className="text-xs text-gray-500">Calculated at checkout</span>
+                    )}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Tax (8%)</span>
+                  <span className="font-medium text-gray-900">${calculateTax().toFixed(2)}</span>
                 </div>
                 
                 <div className="border-t pt-4">
                   <div className="flex justify-between text-lg font-semibold">
-                    <span>Total</span>
-                    <span>${calculateSubtotal().toFixed(2)}</span>
+                    <span className="text-gray-900">Total</span>
+                    <span className="text-accent">
+                      {currentStep >= 2 ? `$${calculateTotal().toFixed(2)}` : `$${(calculateSubtotal() + calculateTax()).toFixed(2)}+`}
+                    </span>
                   </div>
                 </div>
               </div>

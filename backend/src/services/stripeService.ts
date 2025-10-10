@@ -103,7 +103,6 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       payment_method_types: stripeConfig.paymentMethodTypes,
       line_items: data.lineItems,
       mode: 'payment',
-      customer: data.customerId,
       success_url: data.successUrl,
       cancel_url: data.cancelUrl,
       metadata: data.metadata || {},
@@ -113,25 +112,32 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       },
     };
 
-    // If shipping address is provided, pre-fill it
-    if (data.shippingAddress && data.customerInfo) {
+    // Set customer OR customer_email (not both)
+    // If customer exists, Stripe will pre-fill shipping from customer.shipping
+    if (data.customerId) {
+      sessionData.customer = data.customerId;
+    } else if (data.customerInfo?.email) {
+      sessionData.customer_email = data.customerInfo.email;
+    }
+
+    // Add shipping options if address is provided
+    if (data.shippingAddress) {
       sessionData.shipping_options = [
         {
           shipping_rate_data: {
             type: 'fixed_amount',
             fixed_amount: {
-              amount: 0, // Will be calculated by your system
+              amount: 0, // Calculated by your system
               currency: 'usd',
             },
             display_name: 'Standard Shipping',
           },
         },
       ];
+    }
 
-      // Pre-fill customer details
-      sessionData.customer_email = data.customerInfo.email;
-      
-      // Store shipping address in metadata since Stripe collects it during checkout
+    // Store additional info in metadata for reference
+    if (data.shippingAddress && data.customerInfo) {
       sessionData.metadata = {
         ...sessionData.metadata,
         shipping_name: data.customerInfo.name,

@@ -26,6 +26,7 @@ import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
 import paymentManagementRoute from './routes/paymentManagementRoute';
 import shipStationRoute from './routes/shipStationRoute';
+import shippingRoute from './routes/shippingRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
 
 // Import middlewares
@@ -148,6 +149,7 @@ app.use('/api/v1/orders', orderReviewRoute);
 app.use('/api/v1/payments', paymentRoute);
 app.use('/api/v1/payments/paypal', paypalRoute);
 app.use('/api/v1/admin/payments', paymentManagementRoute);
+app.use('/api/v1/shipping', shippingRoute);
 app.use('/api/v1/shipstation', shipStationRoute);
 
 // Database maintenance endpoint
