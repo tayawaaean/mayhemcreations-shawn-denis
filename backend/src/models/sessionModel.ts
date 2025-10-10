@@ -81,8 +81,8 @@ Session.init(
         model: 'users',
         key: 'id',
       },
-      onUpdate: 'CASCADE',
-      onDelete: 'CASCADE',
+      onUpdate: 'NO ACTION', // Changed from CASCADE to prevent session deletion on user updates
+      onDelete: 'CASCADE',   // Keep CASCADE for delete - sessions should be removed if user is deleted
       comment: 'Reference to user',
     },
     accessToken: {
@@ -145,18 +145,6 @@ Session.init(
     tableName: 'sessions',
     timestamps: true,
     indexes: [], // Temporarily disabled to fix "too many keys" error
-        unique: false, // Temporarily disabled
-      },
-      {
-        fields: ['user_id'],
-      },
-      {
-        fields: ['is_active'],
-      },
-      {
-        fields: ['user_id', 'is_active'],
-      },
-    ],
   }
 );
 

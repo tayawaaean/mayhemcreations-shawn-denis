@@ -340,7 +340,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           })
           
           // Update local state with database response
-          setItems((prev) => {
+          const newItems = ((prev: CartItem[]) => {
             console.log('🛒 Updating local state with database response:', {
               prevItemsCount: prev.length,
               hasCustomization: !!customization,
@@ -386,7 +386,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 product: product // Include the full product data
               }]
             }
-          })
+          })(items)
+          
+          // Update state with new items
+          setItems(newItems)
+          
+          // Force synchronous localStorage update to ensure it's available immediately
+          try {
+            const compressedItems = compressCartData(newItems)
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+            console.log('🛒 Synchronously saved to localStorage')
+          } catch (error) {
+            console.warn('🛒 Could not save to localStorage:', error)
+          }
+          
           setIsCleared(false) // Reset cleared flag when adding items
           console.log('🛒 Successfully added item to cart, returning true')
           return true

@@ -40,7 +40,9 @@ export const createPayPalOrderHandler = async (
       amount, 
       currency, 
       description, 
-      items, 
+      items,
+      customerInfo,
+      shippingAddress,
       metadata, 
       returnUrl, 
       cancelUrl 
@@ -60,9 +62,10 @@ export const createPayPalOrderHandler = async (
       amount,
       currency: currency || 'USD',
       description: description || 'Mayhem Creations Order',
-      customerEmail: req.user?.email,
-      customerName: `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
+      customerEmail: customerInfo?.email || req.user?.email,
+      customerName: customerInfo?.name || `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
       items,
+      shippingAddress,
       metadata: {
         userId: userId.toString(),
         ...metadata,

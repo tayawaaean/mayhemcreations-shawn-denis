@@ -816,6 +816,8 @@ export default function Customize() {
       
       if (success) {
         console.log('✅ Successfully added to cart, showing confirmation')
+        // Wait a bit for state to fully update and sync
+        await new Promise(resolve => setTimeout(resolve, 100))
         setShowCartConfirmation(true)
         // Reset customization data after successful add
         resetCustomization()

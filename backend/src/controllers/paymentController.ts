@@ -147,7 +147,7 @@ export const createCheckoutSessionHandler = async (
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { lineItems, successUrl, cancelUrl, metadata } = req.body;
+    const { lineItems, successUrl, cancelUrl, customerInfo, shippingAddress, metadata } = req.body;
 
     if (!userId) {
       res.status(401).json({
@@ -223,6 +223,8 @@ export const createCheckoutSessionHandler = async (
       customerId,
       successUrl: successUrl || `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
+      customerInfo,
+      shippingAddress,
       metadata: {
         userId: userId.toString(),
         ...metadata,

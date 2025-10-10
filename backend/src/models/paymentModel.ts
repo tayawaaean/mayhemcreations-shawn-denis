@@ -262,31 +262,7 @@ Payment.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-      },
-      {
-        fields: ['customer_id'],
-      },
-      {
-        fields: ['provider'],
-      },
-      {
-        fields: ['status'],
-      },
-      {
-        fields: ['transaction_id'],
-        unique: false, // Temporarily disabled
-      },
-      {
-        fields: ['provider_transaction_id'],
-      },
-      {
-        fields: ['created_at'],
-      },
-      {
-        fields: ['customer_id', 'status'],
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

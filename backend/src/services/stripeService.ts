@@ -30,6 +30,19 @@ export interface CreateCheckoutSessionData {
   customerId?: string;
   successUrl: string;
   cancelUrl: string;
+  customerInfo?: {
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  shippingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
   metadata?: Record<string, string>;
 }
 
@@ -86,7 +99,7 @@ export const createPaymentIntent = async (data: CreatePaymentIntentData): Promis
  */
 export const createCheckoutSession = async (data: CreateCheckoutSessionData): Promise<CheckoutSessionResult> => {
   try {
-    const session = await stripe.checkout.sessions.create({
+    const sessionData: any = {
       payment_method_types: stripeConfig.paymentMethodTypes,
       line_items: data.lineItems,
       mode: 'payment',
@@ -96,13 +109,48 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       metadata: data.metadata || {},
       billing_address_collection: 'required',
       shipping_address_collection: {
-        allowed_countries: ['US', 'CA'], // Add more countries as needed
+        allowed_countries: ['US'], // US only
       },
-    });
+    };
+
+    // If shipping address is provided, pre-fill it
+    if (data.shippingAddress && data.customerInfo) {
+      sessionData.shipping_options = [
+        {
+          shipping_rate_data: {
+            type: 'fixed_amount',
+            fixed_amount: {
+              amount: 0, // Will be calculated by your system
+              currency: 'usd',
+            },
+            display_name: 'Standard Shipping',
+          },
+        },
+      ];
+
+      // Pre-fill customer details
+      sessionData.customer_email = data.customerInfo.email;
+      
+      // Store shipping address in metadata since Stripe collects it during checkout
+      sessionData.metadata = {
+        ...sessionData.metadata,
+        shipping_name: data.customerInfo.name,
+        shipping_line1: data.shippingAddress.line1,
+        shipping_line2: data.shippingAddress.line2 || '',
+        shipping_city: data.shippingAddress.city,
+        shipping_state: data.shippingAddress.state,
+        shipping_postal_code: data.shippingAddress.postal_code,
+        shipping_country: data.shippingAddress.country,
+        customer_phone: data.customerInfo.phone || '',
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionData);
 
     logger.info('Checkout Session created', {
       sessionId: session.id,
       lineItemsCount: data.lineItems.length,
+      hasShippingAddress: !!data.shippingAddress,
     });
 
     return {

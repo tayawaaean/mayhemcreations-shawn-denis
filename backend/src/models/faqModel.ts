@@ -87,18 +87,7 @@ FAQ.init(
     tableName: 'faqs',
     timestamps: true,
     underscored: false, // Use camelCase instead of snake_case
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-      },
-      {
-        fields: ['category'],
-      },
-      {
-        fields: ['sortOrder'],
-      },
-      {
-        fields: ['status', 'category', 'sortOrder'],
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

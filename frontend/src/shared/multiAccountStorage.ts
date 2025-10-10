@@ -137,6 +137,20 @@ class MultiAccountStorageService {
   }
 
   /**
+   * Set the current account type (used during login)
+   */
+  static setCurrentAccount(accountType: 'customer' | 'employee'): void {
+    try {
+      const multiData = this.getMultiAccountData();
+      multiData.currentAccount = accountType;
+      this.setMultiAccountData(multiData);
+      console.log(`✅ Set current account to ${accountType}`);
+    } catch (error) {
+      console.error('Error setting current account:', error);
+    }
+  }
+
+  /**
    * Switch to a different account type
    */
   static switchAccount(accountType: 'customer' | 'employee'): boolean {

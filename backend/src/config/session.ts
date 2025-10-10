@@ -14,7 +14,7 @@ sessionStore = new MemoryStore({
 const sessionConfig = session({
   store: sessionStore,
   secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-in-production',
-  resave: false, // Don't save session if unmodified
+  resave: true, // Changed to true to ensure sessions are saved even during DB operations
   saveUninitialized: false, // Don't create session until something stored
   rolling: true, // Reset expiration on every request
   cookie: {

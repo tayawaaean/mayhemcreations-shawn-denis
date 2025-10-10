@@ -379,19 +379,16 @@ User.init(
     sequelize,
     modelName: 'User',
     tableName: 'users',
-    indexes: [], // Temporarily disabled to fix "too many keys" error
+    indexes: [
+      {
+        fields: ['email'],
+        unique: true,
       },
       {
         fields: ['role_id'],
       },
       {
         fields: ['is_active'],
-      },
-      {
-        fields: ['email_verification_token'],
-      },
-      {
-        fields: ['password_reset_token'],
       },
     ],
     hooks: {

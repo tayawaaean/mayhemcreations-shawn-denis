@@ -118,18 +118,7 @@ Category.init(
     tableName: 'Categories',
     timestamps: true,
     paranoid: false, // We don't want soft deletes for categories
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-      },
-      {
-        fields: ['parent_id'],
-      },
-      {
-        fields: ['status'],
-      },
-      {
-        fields: ['sort_order'],
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

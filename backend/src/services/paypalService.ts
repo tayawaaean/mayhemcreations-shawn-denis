@@ -1,10 +1,30 @@
 /**
- * PayPal Service - Simplified Implementation
- * Handles PayPal payment operations with basic functionality
- * Note: This is a simplified implementation that can be enhanced later
+ * PayPal Service - Real PayPal API Integration
+ * Handles PayPal payment operations with PayPal Checkout Server SDK
  */
 
+import paypal from '@paypal/checkout-server-sdk';
 import { logger } from '../utils/logger';
+
+// PayPal Environment Configuration
+function paypalEnvironment() {
+  const clientId = process.env.PAYPAL_CLIENT_ID || '';
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal credentials not configured');
+  }
+
+  if (process.env.PAYPAL_ENVIRONMENT === 'production') {
+    return new paypal.core.LiveEnvironment(clientId, clientSecret);
+  }
+  return new paypal.core.SandboxEnvironment(clientId, clientSecret);
+}
+
+// PayPal Client
+function paypalClient() {
+  return new paypal.core.PayPalHttpClient(paypalEnvironment());
+}
 
 export interface CreatePayPalOrderData {
   amount: number; // Amount in dollars
@@ -18,6 +38,14 @@ export interface CreatePayPalOrderData {
     unitAmount: number; // Amount in dollars
     currency: string;
   }>;
+  shippingAddress?: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    postal_code: string;
+    country: string;
+  };
   metadata?: Record<string, string>;
   returnUrl?: string;
   cancelUrl?: string;
@@ -68,9 +96,7 @@ export interface PayPalCaptureResult {
 }
 
 /**
- * Create a PayPal Order
- * Note: This is a placeholder implementation for development
- * In production, integrate with actual PayPal SDK
+ * Create a PayPal Order using real PayPal API
  */
 export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<PayPalOrderResult> => {
   try {
@@ -79,27 +105,66 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
       ? data.items.reduce((sum, item) => sum + (item.unitAmount * item.quantity), 0)
       : data.amount;
 
-    // Generate a mock order ID for development
-    const orderId = `paypal_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Create PayPal Order Request
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
     
-    logger.info('PayPal Order created (mock)', {
-      orderId,
+    const requestBody: any = {
+      intent: 'CAPTURE',
+      purchase_units: [{
+        amount: {
+          currency_code: data.currency?.toUpperCase() || 'USD',
+          value: formatPayPalAmount(totalAmount),
+        },
+        description: data.description || 'Mayhem Creations Order',
+        custom_id: data.metadata?.userId || undefined,
+      }],
+      application_context: {
+        brand_name: 'Mayhem Creations',
+        landing_page: 'BILLING',
+        user_action: 'PAY_NOW',
+        return_url: data.returnUrl || process.env.FRONTEND_URL + '/payment/success',
+        cancel_url: data.cancelUrl || process.env.FRONTEND_URL + '/payment/cancel'
+      }
+    };
+
+    // Add shipping address if provided
+    if (data.shippingAddress) {
+      requestBody.purchase_units[0].shipping = {
+        name: {
+          full_name: data.customerName || 'Customer'
+        },
+        address: {
+          address_line_1: data.shippingAddress.line1,
+          address_line_2: data.shippingAddress.line2 || undefined,
+          admin_area_2: data.shippingAddress.city,
+          admin_area_1: data.shippingAddress.state,
+          postal_code: data.shippingAddress.postal_code,
+          country_code: data.shippingAddress.country
+        }
+      };
+    }
+
+    request.requestBody(requestBody);
+
+    // Execute PayPal API Request
+    const response = await paypalClient().execute(request);
+    const order = response.result;
+    
+    logger.info('PayPal Order created successfully', {
+      orderId: order.id,
       amount: totalAmount,
       currency: data.currency || 'USD',
     });
 
-    // Return mock order data
+    // Extract approval URL
+    const approvalUrl = order.links?.find((link: any) => link.rel === 'approve')?.href;
+
     return {
-      id: orderId,
-      status: 'CREATED',
-      links: [
-        {
-          href: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
-          rel: 'approve',
-          method: 'GET',
-        },
-      ],
-      approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
+      id: order.id,
+      status: order.status,
+      links: order.links || [],
+      approvalUrl: approvalUrl
     };
   } catch (error: any) {
     logger.error('Error creating PayPal Order:', error);
@@ -108,51 +173,34 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
 };
 
 /**
- * Capture a PayPal Order
- * Note: This is a placeholder implementation for development
- * In production, integrate with actual PayPal SDK
+ * Capture a PayPal Order using real PayPal API
  */
 export const capturePayPalOrder = async (data: CapturePayPalOrderData): Promise<PayPalCaptureResult> => {
   try {
-    // Generate a mock capture ID for development
-    const captureId = `paypal_capture_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Create PayPal Capture Request
+    const request = new paypal.orders.OrdersCaptureRequest(data.orderId);
+    // Request body is optional for capture, use type assertion
+    (request as any).requestBody({});
+
+    // Execute PayPal API Request
+    const response = await paypalClient().execute(request);
+    const capture = response.result;
     
-    logger.info('PayPal Order captured (mock)', {
+    logger.info('PayPal Order captured successfully', {
       orderId: data.orderId,
-      captureId,
+      captureId: capture.id,
+      status: capture.status,
     });
 
-    // Return mock capture data
     return {
-      id: captureId,
-      status: 'COMPLETED',
-      amount: {
+      id: capture.id,
+      status: capture.status,
+      amount: capture.purchase_units?.[0]?.payments?.captures?.[0]?.amount || {
         currency_code: 'USD',
-        value: '25.99', // Mock amount
+        value: '0.00'
       },
-      payer: {
-        email_address: 'customer@example.com',
-        name: {
-          given_name: 'John',
-          surname: 'Doe',
-        },
-      },
-      purchase_units: [
-        {
-          payments: {
-            captures: [
-              {
-                id: captureId,
-                status: 'COMPLETED',
-                amount: {
-                  currency_code: 'USD',
-                  value: '25.99',
-                },
-              },
-            ],
-          },
-        },
-      ],
+      payer: capture.payer,
+      purchase_units: capture.purchase_units
     };
   } catch (error: any) {
     logger.error('Error capturing PayPal Order:', error);
@@ -161,31 +209,29 @@ export const capturePayPalOrder = async (data: CapturePayPalOrderData): Promise<
 };
 
 /**
- * Retrieve a PayPal Order
- * Note: This is a placeholder implementation for development
- * In production, integrate with actual PayPal SDK
+ * Retrieve a PayPal Order using real PayPal API
  */
 export const retrievePayPalOrder = async (orderId: string) => {
   try {
-    logger.info('PayPal Order retrieved (mock)', { orderId });
+    // Create PayPal Get Order Request
+    const request = new paypal.orders.OrdersGetRequest(orderId);
+
+    // Execute PayPal API Request
+    const response = await paypalClient().execute(request);
+    const order = response.result;
     
-    // Return mock order data
+    logger.info('PayPal Order retrieved successfully', { 
+      orderId: order.id,
+      status: order.status 
+    });
+    
     return {
-      id: orderId,
-      status: 'APPROVED',
-      amount: {
-        currency_code: 'USD',
-        value: '25.99',
-      },
-      payer: {
-        email_address: 'customer@example.com',
-        name: {
-          given_name: 'John',
-          surname: 'Doe',
-        },
-      },
-      createTime: new Date().toISOString(),
-      updateTime: new Date().toISOString(),
+      id: order.id,
+      status: order.status,
+      amount: order.purchase_units?.[0]?.amount,
+      payer: order.payer,
+      createTime: order.create_time,
+      updateTime: order.update_time,
     };
   } catch (error: any) {
     logger.error('Error retrieving PayPal Order:', error);

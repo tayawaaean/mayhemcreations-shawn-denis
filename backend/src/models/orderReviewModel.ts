@@ -224,18 +224,7 @@ OrderReview.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-      },
-      {
-        fields: ['status'],
-      },
-      {
-        fields: ['submitted_at'],
-      },
-      {
-        fields: ['user_id', 'status'],
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

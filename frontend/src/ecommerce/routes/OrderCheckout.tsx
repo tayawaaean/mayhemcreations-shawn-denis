@@ -22,9 +22,8 @@ import {
 import { products } from '../../data/products'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import Button from '../../components/Button'
-// StripePaymentForm removed for hosted Checkout flow
-import PayPalButton from '../../components/PayPalButton'
-import { paymentService, PaymentData, PaymentResult } from '../../shared/paymentService'
+// Payment integrations now use hosted checkout flows (Stripe/PayPal)
+import { PaymentResult } from '../../shared/paymentService'
 import { paymentsApiService } from '../../shared/paymentsApiService'
 
 interface OrderItem {
@@ -54,13 +53,16 @@ export default function OrderCheckout() {
   const [paymentError, setPaymentError] = useState<string | null>(null)
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
 
+  // Get user info from auth context if available
+  const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
+
   // Form states
   const [formData, setFormData] = useState({
-    // Personal Info
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
+    // Personal Info - Pre-filled with user data but editable
+    firstName: userInfo.firstName || '',
+    lastName: userInfo.lastName || '',
+    email: userInfo.email || '',
+    phone: userInfo.phone || '',
     
     // Address
     address: '',
@@ -97,6 +99,18 @@ export default function OrderCheckout() {
         const parsedOrder = JSON.parse(orderData)
         console.log('✅ Parsed order data:', parsedOrder)
         setOrder(parsedOrder)
+        
+        // Also load saved form data if returning from PayPal
+        const savedFormData = sessionStorage.getItem('checkoutFormData')
+        if (savedFormData) {
+          try {
+            const parsedFormData = JSON.parse(savedFormData)
+            setFormData(parsedFormData)
+            console.log('✅ Restored form data from sessionStorage')
+          } catch (error) {
+            console.error('❌ Error parsing form data:', error)
+          }
+        }
       } catch (error) {
         console.error('❌ Error parsing order data:', error)
         navigate('/my-orders')
@@ -108,15 +122,19 @@ export default function OrderCheckout() {
     }
   }, [navigate])
 
-  // Handle Stripe Checkout success/cancel redirects
+  // Handle Stripe/PayPal Checkout success/cancel redirects
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const success = urlParams.get('success')
     const canceled = urlParams.get('canceled')
+    const paypalSuccess = urlParams.get('paypal_success')
+    const paypalCanceled = urlParams.get('paypal_canceled')
     const orderId = urlParams.get('orderId')
+    const paypalToken = urlParams.get('token')
 
+    // Handle Stripe success
     if (success === 'true' && orderId) {
-      // Payment successful
+      setPaymentMethod('stripe')
       setPaymentResult({
         success: true,
         paymentId: `stripe_${Date.now()}`,
@@ -124,17 +142,25 @@ export default function OrderCheckout() {
       })
       setIsComplete(true)
       sessionStorage.removeItem('checkoutOrder')
-      
-      // Clean up URL
+      sessionStorage.removeItem('checkoutFormData')
       window.history.replaceState({}, document.title, window.location.pathname)
-    } else if (canceled === 'true') {
-      // Payment canceled
+    } 
+    // Handle Stripe cancel
+    else if (canceled === 'true') {
       setPaymentError('Payment was canceled. You can try again or choose a different payment method.')
-      
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-  }, [formData.email])
+    // Handle PayPal success
+    else if (paypalSuccess === 'true' && paypalToken) {
+      setPaymentMethod('paypal')
+      handlePayPalReturn(paypalToken, formData.email)
+    }
+    // Handle PayPal cancel
+    else if (paypalCanceled === 'true') {
+      setPaymentError('PayPal payment was canceled. You can try again or choose a different payment method.')
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -248,58 +274,13 @@ export default function OrderCheckout() {
     
     try {
       if (paymentMethod === 'stripe') {
-        // Use Stripe Checkout for Stripe payments
+        // Use Stripe Checkout (hosted, with redirect)
         await handleStripeCheckout()
+      } else if (paymentMethod === 'paypal') {
+        // Use PayPal Checkout (hosted, with redirect)
+        await handlePayPalCheckout()
       } else {
-        // Use existing payment service for PayPal
-        const paymentData: PaymentData = {
-          amount: calculateTotal(), // PayPal expects dollars, not cents
-          currency: 'usd',
-          customerEmail: formData.email,
-          customerName: `${formData.firstName} ${formData.lastName}`,
-          description: `Order ${order.id} - ${order.items.length} item(s)`,
-          billingAddress: {
-            line1: formData.address,
-            line2: formData.apartment,
-            city: formData.city,
-            state: formData.state,
-            postal_code: formData.zipCode,
-            country: formData.country
-          },
-          items: order.items.map((item) => {
-            // Handle both numeric and string product IDs
-            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-            const product = products.find(p => {
-              // Check both string and numeric ID matches
-              return p.id === item.productId || p.id === numericId;
-            });
-            const itemPrice = calculateItemPrice(item)
-            
-            return {
-              name: product?.name || item.productName || `Product ${item.productId}`,
-              quantity: item.quantity,
-              price: itemPrice,
-              currency: 'usd'
-            }
-          }),
-          metadata: {
-            orderId: order.id,
-            customerPhone: formData.phone,
-            notes: formData.notes
-          }
-        }
-
-        // Process payment
-        const result = await paymentService.processPayment(paymentMethod, paymentData)
-        setPaymentResult(result)
-
-        if (result.success) {
-          setIsComplete(true)
-          // Clear sessionStorage after successful payment
-          sessionStorage.removeItem('checkoutOrder')
-        } else {
-          setPaymentError(result.error || 'Payment failed')
-        }
+        setPaymentError('Payment method not supported')
       }
     } catch (error) {
       console.error('Payment processing error:', error)
@@ -341,6 +322,19 @@ export default function OrderCheckout() {
         lineItems,
         successUrl,
         cancelUrl,
+        customerInfo: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          phone: formData.phone,
+        },
+        shippingAddress: {
+          line1: formData.address,
+          line2: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.zipCode,
+          country: 'US',
+        },
         metadata: {
           orderId: String(order.id),
           customerEmail: formData.email,
@@ -348,6 +342,8 @@ export default function OrderCheckout() {
       })
 
       if (response.success && response.data?.url) {
+        // Save form data to sessionStorage before redirect
+        sessionStorage.setItem('checkoutFormData', JSON.stringify(formData))
         // Redirect to hosted Stripe Checkout
         window.location.href = response.data.url
         return
@@ -360,18 +356,98 @@ export default function OrderCheckout() {
     }
   }
 
-  const handlePaymentSuccess = (result: PaymentResult) => {
-    setPaymentResult(result)
-    if (result.success) {
-      handlePlaceOrder()
-    } else {
-      setPaymentError(result.error || 'Payment failed')
+  const handlePayPalCheckout = async () => {
+    try {
+      // Build PayPal order items
+      const items = order.items.map((item) => {
+        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+        const product = products.find(p => {
+          return p.id === item.productId || p.id === numericId;
+        });
+        const itemPrice = calculateItemPrice(item)
+        return {
+          name: product?.title || item.productName,
+          quantity: item.quantity,
+          unitAmount: itemPrice,
+          currency: 'usd'
+        }
+      })
+
+      const response = await paymentsApiService.createPayPalOrder({
+        amount: calculateTotal(),
+        currency: 'usd',
+        description: `Order ${order.id} - ${order.items.length} item(s)`,
+        items,
+        customerInfo: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          phone: formData.phone,
+        },
+        shippingAddress: {
+          line1: formData.address,
+          line2: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.zipCode,
+          country: 'US',
+        },
+        metadata: {
+          orderId: String(order.id),
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+        },
+        returnUrl: `${window.location.origin}/order-checkout?paypal_success=true&orderId=${order.id}`,
+        cancelUrl: `${window.location.origin}/order-checkout?paypal_canceled=true`,
+      })
+
+      if (response.success && response.data?.approvalUrl) {
+        // Save form data to sessionStorage before redirect
+        sessionStorage.setItem('checkoutFormData', JSON.stringify(formData))
+        // Redirect to PayPal for approval
+        window.location.href = response.data.approvalUrl
+        return
+      }
+
+      setPaymentError(response.message || 'Failed to create PayPal order')
+    } catch (error) {
+      console.error('PayPal payment error:', error)
+      setPaymentError('Failed to process payment. Please try again.')
     }
   }
 
-  const handlePaymentError = (error: any) => {
-    console.error('Payment error:', error)
-    setPaymentError(error instanceof Error ? error.message : 'Payment failed')
+  const handlePayPalReturn = async (paypalToken: string, customerEmail: string) => {
+    try {
+      setIsProcessing(true)
+      console.log('Capturing PayPal payment for token:', paypalToken)
+
+      // Capture the PayPal order
+      const response = await paymentsApiService.capturePayPalOrder({
+        orderId: paypalToken,
+        metadata: {
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+        }
+      })
+
+      if (response.success) {
+        setPaymentResult({
+          success: true,
+          paymentId: response.data?.id || paypalToken,
+          payerEmail: customerEmail
+        })
+        setIsComplete(true)
+        sessionStorage.removeItem('checkoutOrder')
+        sessionStorage.removeItem('checkoutFormData')
+        window.history.replaceState({}, document.title, window.location.pathname)
+      } else {
+        setPaymentError(response.message || 'Failed to capture PayPal payment')
+      }
+    } catch (error) {
+      console.error('PayPal capture error:', error)
+      setPaymentError('Failed to complete PayPal payment. Please contact support.')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   // Show loading state while order is being loaded
@@ -620,17 +696,10 @@ export default function OrderCheckout() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Country
                         </label>
-                        <select
-                          name="country"
-                          value={formData.country}
-                          onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                        >
-                          <option value="United States">United States</option>
-                          <option value="Canada">Canada</option>
-                          <option value="United Kingdom">United Kingdom</option>
-                          <option value="Australia">Australia</option>
-                        </select>
+                        <div className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                          🇺🇸 United States
+                        </div>
+                        <input type="hidden" name="country" value="United States" />
                       </div>
                     </div>
                   </div>
@@ -646,7 +715,7 @@ export default function OrderCheckout() {
                       onChange={handleInputChange}
                       rows={3}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
-                      placeholder="Any special delivery instructions..."
+                      placeholder="Any special delivery instructions for the carrier..."
                     />
                   </div>
                 </div>
@@ -742,42 +811,24 @@ export default function OrderCheckout() {
                   {paymentMethod === 'paypal' && (
                     <div className="border-t pt-6">
                       <h3 className="text-lg font-medium text-gray-900 mb-4">PayPal Payment</h3>
-                      <PayPalButton
-                        paymentData={{
-                          amount: calculateTotal(),
-                          currency: 'usd',
-                          description: `Order ${order.id} - ${order.items.length} item(s)`,
-                          customerEmail: formData.email,
-                          customerName: `${formData.firstName} ${formData.lastName}`,
-                          items: order.items.map((item) => {
-                            // Handle both numeric and string product IDs
-                            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-                            const product = products.find(p => {
-                              // Check both string and numeric ID matches
-                              return p.id === item.productId || p.id === numericId;
-                            });
-                            const itemPrice = calculateItemPrice(item)
-                            
-                            return {
-                              name: product?.name || item.productName,
-                              quantity: item.quantity,
-                              price: itemPrice,
-                              currency: 'usd'
-                            }
-                          })
-                        }}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                        onCancel={(data) => console.log('PayPal payment cancelled:', data)}
-                        disabled={isProcessing}
-                        style={{
-                          layout: 'vertical',
-                          color: 'blue',
-                          shape: 'rect',
-                          label: 'paypal',
-                          height: 50
-                        }}
-                      />
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <svg className="h-6 w-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 3.993-.032.17a.804.804 0 0 1-.794.679H7.72a.483.483 0 0 1-.477-.558L7.418 21h1.518l.95-6.02h1.385c4.678 0 7.75-2.203 8.796-6.502z"/>
+                              <path d="M2.778 21.813a.483.483 0 0 1-.478-.558l2.001-12.689A.965.965 0 0 1 5.25 7.75h6.326c1.663 0 2.982.29 3.926 1.036.9.71 1.372 1.728 1.372 2.955 0 .308-.03.623-.088.944-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 3.993-.032.17a.804.804 0 0 1-.794.679H2.778z"/>
+                            </svg>
+                          </div>
+                          <div className="ml-3 flex-1">
+                            <p className="text-sm text-blue-800">
+                              Click "Place Order" below to continue to PayPal's secure checkout.
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">
+                              You'll be redirected to PayPal to complete your payment.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 

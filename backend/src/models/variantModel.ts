@@ -151,16 +151,7 @@ Variant.init(
     tableName: 'variants',
     timestamps: true,
     underscored: true,
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-      },
-      {
-        fields: ['sku'],
-        unique: false, // Temporarily disabled
-      },
-      {
-        fields: ['is_active'],
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

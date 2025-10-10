@@ -232,26 +232,7 @@ Product.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [], // Temporarily disabled to fix "too many keys" error
-        unique: false, // Temporarily disabled
-      },
-      {
-        fields: ['category_id'],
-      },
-      {
-        fields: ['subcategory_id'],
-      },
-      {
-        fields: ['status'],
-      },
-      {
-        fields: ['featured'],
-      },
-      {
-        fields: ['sku'],
-        unique: false, // Temporarily disabled
-      },
-    ],
+    indexes: [] // Temporarily disabled to fix "too many keys" error
   }
 );
 

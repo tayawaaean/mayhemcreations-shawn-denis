@@ -347,7 +347,7 @@ const handleCheckoutSessionCompleted = async (session: any) => {
     
     // Find the most recent order review for this user that's in pending-payment status
     const [orderResult] = await sequelize.query(`
-      SELECT id, user_id, status, total 
+      SELECT id, user_id, status, total, subtotal, shipping, tax
       FROM order_reviews 
       WHERE user_id = ? AND status = 'pending-payment'
       ORDER BY created_at DESC 
@@ -369,6 +369,57 @@ const handleCheckoutSessionCompleted = async (session: any) => {
       `, {
         replacements: [order.id]
       });
+
+      // Create payment record
+      try {
+        const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
+        
+        // Calculate Stripe fees (typically 2.9% + 30¢)
+        const stripeFeeRate = 0.029;
+        const stripeFixedFee = 0.30;
+        const amountInDollars = session.amount_total / 100; // Convert cents to dollars
+        const fees = (amountInDollars * stripeFeeRate) + stripeFixedFee;
+        const netAmount = amountInDollars - fees;
+
+        const paymentResult = await createPaymentRecord({
+          orderId: order.id,
+          orderNumber: generateOrderNumber(order.id),
+          customerId: userId,
+          customerName: session.customer_details?.name || session.metadata?.customerName || 'Unknown Customer',
+          customerEmail: session.customer_details?.email || session.metadata?.customerEmail || 'unknown@example.com',
+          amount: amountInDollars,
+          currency: session.currency || 'usd',
+          provider: 'stripe',
+          paymentMethod: 'card',
+          status: 'completed',
+          transactionId: `stripe_session_${session.id}`,
+          providerTransactionId: session.payment_intent || session.id,
+          gatewayResponse: session,
+          fees: fees,
+          netAmount: netAmount,
+          metadata: {
+            stripeCustomerId: session.customer,
+            stripeSessionId: session.id,
+            stripePaymentIntentId: session.payment_intent,
+            ipAddress: session.metadata?.ipAddress,
+            userAgent: session.metadata?.userAgent,
+          },
+          notes: 'Payment processed via Stripe Checkout Session',
+        });
+
+        if (paymentResult.success) {
+          logger.info('Payment record created successfully', {
+            paymentId: paymentResult.paymentId,
+            orderId: order.id,
+            stripeSessionId: session.id,
+          });
+        } else {
+          logger.error('Failed to create payment record:', paymentResult.error);
+        }
+      } catch (paymentError) {
+        logger.error('Error creating payment record:', paymentError);
+        // Don't fail the webhook if payment record creation fails
+      }
 
       logger.info('Order status updated to approved-processing after checkout completion', {
         orderId: order.id,

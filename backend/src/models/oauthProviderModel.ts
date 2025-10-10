@@ -181,18 +181,7 @@ OAuthProvider.init({
   modelName: 'OAuthProvider',
   tableName: 'oauth_providers',
   timestamps: true,
-  indexes: [], // Temporarily disabled to fix "too many keys" error
-      name: 'unique_provider_id'
-    },
-    {
-      fields: ['user_id'],
-      name: 'idx_oauth_providers_user_id'
-    },
-    {
-      fields: ['email'],
-      name: 'idx_oauth_providers_email'
-    }
-  ]
+  indexes: [] // Temporarily disabled to fix "too many keys" error
 });
 
 export default OAuthProvider;
