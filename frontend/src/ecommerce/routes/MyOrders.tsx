@@ -5,6 +5,7 @@ import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditC
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
+import { productReviewApiService } from '../../shared/productReviewApiService'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
@@ -629,7 +630,19 @@ export default function MyOrders() {
   const [reviewOrderId, setReviewOrderId] = useState<number | null>(null)
   const [rating, setRating] = useState<number>(5)
   const [reviewText, setReviewText] = useState<string>('')
+  const [reviewImages, setReviewImages] = useState<string[]>([])
   const [submittingReview, setSubmittingReview] = useState(false)
+  const [reviewResultModal, setReviewResultModal] = useState<{
+    show: boolean
+    success: boolean
+    title: string
+    message: string
+  }>({
+    show: false,
+    success: false,
+    title: '',
+    message: ''
+  })
   const [backendProducts, setBackendProducts] = useState<any[]>([])
   
   // WebSocket hook for real-time updates
@@ -1145,6 +1158,59 @@ export default function MyOrders() {
       ...prev,
       [itemId]: file
     }))
+  }
+
+  // Handle review image upload
+  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+
+    // Limit to 5 images
+    if (reviewImages.length + files.length > 5) {
+      setReviewResultModal({
+        show: true,
+        success: false,
+        title: 'Too Many Images',
+        message: 'You can upload a maximum of 5 images per review.'
+      })
+      return
+    }
+
+    // Convert files to base64 and add to reviewImages
+    Array.from(files).forEach((file) => {
+      // Check file size (max 5MB per image)
+      if (file.size > 5 * 1024 * 1024) {
+        setReviewResultModal({
+          show: true,
+          success: false,
+          title: 'File Too Large',
+          message: `Image "${file.name}" is too large. Maximum size is 5MB per image.`
+        })
+        return
+      }
+
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        setReviewResultModal({
+          show: true,
+          success: false,
+          title: 'Invalid File Type',
+          message: `File "${file.name}" is not an image. Please upload PNG or JPG files only.`
+        })
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setReviewImages((prev) => [...prev, reader.result as string])
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Remove review image
+  const removeReviewImage = (index: number) => {
+    setReviewImages((prev) => prev.filter((_, i) => i !== index))
   }
 
   // Submit re-uploaded files
@@ -2615,10 +2681,64 @@ export default function MyOrders() {
                   />
                 </div>
 
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Add Photos (Optional)
+                  </label>
+                  <div className="space-y-3">
+                    {/* Upload Button */}
+                    {reviewImages.length < 5 && (
+                      <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                        <div className="text-center">
+                          <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            Click to upload images ({reviewImages.length}/5)
+                          </span>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB each</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleReviewImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+
+                    {/* Image Previews */}
+                    {reviewImages.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {reviewImages.map((image, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={image}
+                              alt={`Review ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                            />
+                            <button
+                              onClick={() => removeReviewImage(index)}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Submit Button */}
                 <div className="flex justify-end space-x-3 mt-6">
                   <Button
-                    onClick={() => setShowReviewModal(false)}
+                    onClick={() => {
+                      setShowReviewModal(false);
+                      setRating(5);
+                      setReviewText('');
+                      setReviewImages([]);
+                    }}
                     className="bg-gray-200 hover:bg-gray-300 text-gray-800"
                   >
                     Cancel
@@ -2628,16 +2748,74 @@ export default function MyOrders() {
                       if (!reviewOrderId) return;
                       setSubmittingReview(true);
                       try {
-                        // TODO: Call API to submit review
-                        console.log('Submitting review:', { orderId: reviewOrderId, rating, reviewText });
-                        // For now, just close the modal
-                        setShowReviewModal(false);
-                        setRating(5);
-                        setReviewText('');
-                        alert('Thank you for your review!');
-                      } catch (error) {
+                        // Get the order to find the product ID
+                        const order = orders.find(o => o.id === reviewOrderId);
+                        if (!order || order.items.length === 0) {
+                          setReviewResultModal({
+                            show: true,
+                            success: false,
+                            title: 'Error',
+                            message: 'Could not find order details. Please try again.'
+                          });
+                          return;
+                        }
+
+                        // For now, submit a review for the first product in the order
+                        // Filter out custom embroidery items (they don't have a numeric product ID)
+                        const reviewableProducts = order.items.filter(item => {
+                          const pid = parseInt(item.productId);
+                          return !isNaN(pid) && item.productId !== 'custom-embroidery';
+                        });
+
+                        if (reviewableProducts.length === 0) {
+                          setReviewResultModal({
+                            show: true,
+                            success: false,
+                            title: 'Unable to Review',
+                            message: 'This order contains only custom items that cannot be reviewed individually. Please contact us for feedback!'
+                          });
+                          return;
+                        }
+
+                        const firstProduct = reviewableProducts[0];
+                        const productId = parseInt(firstProduct.productId);
+
+                        const response = await productReviewApiService.createReview({
+                          productId,
+                          orderId: reviewOrderId,
+                          rating,
+                          title: `Review for ${firstProduct.productName}`,
+                          comment: reviewText,
+                          images: reviewImages.length > 0 ? reviewImages : undefined,
+                        });
+
+                        if (response.success) {
+                          setShowReviewModal(false);
+                          setRating(5);
+                          setReviewText('');
+                          setReviewImages([]);
+                          setReviewResultModal({
+                            show: true,
+                            success: true,
+                            title: 'Review Submitted!',
+                            message: 'Thank you for your review! It will be published after admin approval.'
+                          });
+                        } else {
+                          setReviewResultModal({
+                            show: true,
+                            success: false,
+                            title: 'Submission Failed',
+                            message: response.message || 'Failed to submit review. Please try again.'
+                          });
+                        }
+                      } catch (error: any) {
                         console.error('Error submitting review:', error);
-                        alert('Failed to submit review. Please try again.');
+                        setReviewResultModal({
+                          show: true,
+                          success: false,
+                          title: 'Error',
+                          message: error.message || 'Failed to submit review. Please try again.'
+                        });
                       } finally {
                         setSubmittingReview(false);
                       }
@@ -2648,6 +2826,52 @@ export default function MyOrders() {
                     {submittingReview ? 'Submitting...' : 'Submit Review'}
                   </Button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Result Modal */}
+      {reviewResultModal.show && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="fixed inset-0 bg-black opacity-50" onClick={() => setReviewResultModal({ ...reviewResultModal, show: false })}></div>
+            
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="text-center">
+                {/* Icon */}
+                {reviewResultModal.success ? (
+                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  </div>
+                ) : (
+                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                    <XCircle className="h-8 w-8 text-red-600" />
+                  </div>
+                )}
+
+                {/* Title */}
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {reviewResultModal.title}
+                </h3>
+
+                {/* Message */}
+                <p className="text-gray-600 mb-6">
+                  {reviewResultModal.message}
+                </p>
+
+                {/* Close Button */}
+                <Button
+                  onClick={() => setReviewResultModal({ ...reviewResultModal, show: false })}
+                  className={`w-full ${
+                    reviewResultModal.success 
+                      ? 'bg-green-600 hover:bg-green-700' 
+                      : 'bg-gray-600 hover:bg-gray-700'
+                  } text-white`}
+                >
+                  Close
+                </Button>
               </div>
             </div>
           </div>

@@ -66,19 +66,66 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   ]);
   
   const typingTimeout = useRef<NodeJS.Timeout | null>(null);
-  const customerId = user?.id?.toString() || 'anonymous';
+  
+  // Generate or retrieve guest ID for unauthenticated users
+  const getGuestId = () => {
+    let guestId = localStorage.getItem('mayhem_guest_id');
+    if (!guestId) {
+      guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('mayhem_guest_id', guestId);
+      console.log('🆕 Created new guest ID:', guestId);
+    }
+    return guestId;
+  };
+  
+  // Use real user ID if logged in, otherwise use persistent guest ID
+  const customerId = isLoggedIn && user?.id ? user.id.toString() : getGuestId();
 
-  // Join chat room when chat is opened and user is authenticated
+  // Handle authentication state changes (login/logout)
+  const prevAuthState = useRef(isLoggedIn);
   useEffect(() => {
-    if (isOpen && isLoggedIn && user && isConnected) {
-      webSocketService.joinChatRoom(customerId);
-      console.log('💬 Joined chat room for customer:', customerId);
+    // Only react to actual auth state changes (not initial mount)
+    if (prevAuthState.current !== isLoggedIn) {
+      console.log(`🔄 Auth state changed: ${isLoggedIn ? 'Logged In' : 'Guest'} - Customer ID: ${customerId}`);
       
-      // Add welcome message
+      // Clear previous chat messages when switching between guest/authenticated
+      setMessages([]);
+      
+      // If chat is open, immediately join the new room
+      if (isOpen && isConnected) {
+        webSocketService.joinChatRoom(customerId);
+        console.log(`💬 Switched to chat room: ${customerId} ${isLoggedIn ? '(authenticated)' : '(guest)'}`);
+        
+        // Add welcome message for the new state
+        const welcomeMessage: ChatMessage = {
+          id: 'welcome',
+          text: isLoggedIn 
+            ? 'Hello! How can we help you today?' 
+            : 'Hello! Feel free to ask us any questions. Sign in anytime to save your conversation history.',
+          sender: 'admin',
+          timestamp: new Date(),
+          customerId
+        };
+        setMessages([welcomeMessage]);
+      }
+      
+      prevAuthState.current = isLoggedIn;
+    }
+  }, [isLoggedIn, customerId, isOpen, isConnected]); // Trigger on auth or connection changes
+
+  // Join chat room when chat is opened (authenticated or guest)
+  useEffect(() => {
+    if (isOpen && isConnected && customerId) {
+      webSocketService.joinChatRoom(customerId);
+      console.log(`💬 Joined chat room: ${customerId} ${isLoggedIn ? '(authenticated)' : '(guest)'}`);
+      
+      // Add welcome message only if no messages exist
       if (messages.length === 0) {
         const welcomeMessage: ChatMessage = {
           id: 'welcome',
-          text: 'Hello! How can we help you today?',
+          text: isLoggedIn 
+            ? 'Hello! How can we help you today?' 
+            : 'Hello! Feel free to ask us any questions. Sign in anytime to save your conversation history.',
           sender: 'admin',
           timestamp: new Date(),
           customerId
@@ -88,20 +135,29 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     return () => {
-      if (isLoggedIn && user) {
+      if (customerId) {
         webSocketService.leaveChatRoom(customerId);
         console.log('💬 Left chat room for customer:', customerId);
       }
     };
-  }, [isOpen, isLoggedIn, user, isConnected, customerId]);
+  }, [isOpen, isConnected, customerId]);
 
-  // WebSocket event listeners - only when chat is open
+  // WebSocket event listeners - listen even when closed
+  // Re-subscribe when customerId changes to filter messages correctly
   useEffect(() => {
-    if (!isOpen || !isConnected) return;
+    if (!isConnected) return;
+
+    console.log(`🔌 WebSocket listeners active for customer: ${customerId}`);
 
     // Listen for chat messages
     const unsubscribeMessage = subscribe('chat_message_received', (data) => {
       console.log('💬 Received chat message:', data);
+      
+      // Only accept messages for the current customer ID
+      if (String(data.customerId) !== String(customerId)) {
+        console.log(`🚫 Ignoring message for different customer: ${data.customerId} (current: ${customerId})`);
+        return;
+      }
       
       const newMessage: ChatMessage = {
         id: data.messageId,
@@ -126,6 +182,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // Update unread counter for admin messages when widget closed
       if (data.sender === 'admin' && !isOpen) {
+        console.log(`📬 Customer: New unread message from admin (total: ${unreadCount + 1})`);
         setUnreadCount(c => c + 1);
         
         // Show browser notification for admin messages
@@ -185,7 +242,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unsubscribeDisconnection();
       unsubscribeHistory();
     };
-  }, [isOpen, isConnected, customerId, subscribe]);
+  }, [isConnected, customerId, subscribe]);
 
   const sendMessage = (text: string) => {
     if (!text.trim()) return;

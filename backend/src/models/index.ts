@@ -13,6 +13,7 @@ import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationA
 import Message, { MessageAttributes, MessageCreationAttributes } from './messageModel';
 import { OrderReview, OrderReviewAttributes, OrderReviewCreationAttributes } from './orderReviewModel';
 import { Payment, PaymentAttributes, PaymentCreationAttributes } from './paymentModel';
+import ProductReview, { ProductReviewAttributes, ProductReviewCreationAttributes } from './productReviewModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -118,16 +119,20 @@ const setupAssociations = (): void => {
     as: 'user',
   });
 
-  // Message belongs to User (customer)
+  // Message belongs to User (customer) - Optional for guest support
+  // Note: customerId can be numeric (user ID) or string (guest ID like "guest_123")
+  // No foreign key constraint to allow guest messages
   Message.belongsTo(User, {
     foreignKey: 'customerId',
     as: 'customer',
+    constraints: false, // No foreign key constraint for guest support
   });
 
   // User has many Messages
   User.hasMany(Message, {
     foreignKey: 'customerId',
     as: 'messages',
+    constraints: false, // No foreign key constraint for guest support
   });
 
   // OrderReview belongs to User
@@ -152,6 +157,37 @@ const setupAssociations = (): void => {
   OrderReview.hasMany(Payment, {
     foreignKey: 'orderId',
     as: 'payments',
+  });
+
+  // ProductReview associations
+  ProductReview.belongsTo(Product, {
+    foreignKey: 'productId',
+    as: 'product',
+  });
+
+  Product.hasMany(ProductReview, {
+    foreignKey: 'productId',
+    as: 'reviews',
+  });
+
+  ProductReview.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  User.hasMany(ProductReview, {
+    foreignKey: 'userId',
+    as: 'productReviews',
+  });
+
+  ProductReview.belongsTo(OrderReview, {
+    foreignKey: 'orderId',
+    as: 'order',
+  });
+
+  OrderReview.hasMany(ProductReview, {
+    foreignKey: 'orderId',
+    as: 'productReviews',
   });
 
   // Payment belongs to User (customer)
@@ -218,6 +254,9 @@ export {
   Payment,
   PaymentAttributes,
   PaymentCreationAttributes,
+  ProductReview,
+  ProductReviewAttributes,
+  ProductReviewCreationAttributes,
 };
 
 // Export all models for easy access
@@ -236,6 +275,7 @@ export const models = {
   Message,
   OrderReview,
   Payment,
+  ProductReview,
 };
 
 // Database synchronization function

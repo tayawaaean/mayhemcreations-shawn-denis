@@ -127,6 +127,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const unreadPayments = getUnreadCountByType('payment')
   const unreadOrders = getUnreadCountByType('order')
   const unreadUpdates = getUnreadCountByType('update')
+  
+  // Debug logging for unread messages
+  React.useEffect(() => {
+    if (unreadMessages > 0) {
+      console.log(`📬 Sidebar: ${unreadMessages} unread messages detected`);
+    }
+  }, [unreadMessages])
 
   // Helper function to get notification count for a specific navigation item
   const getNotificationCount = (href: string) => {

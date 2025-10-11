@@ -203,27 +203,55 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       const newMessage: AdminChatMessage = {
-        id: data.messageId,
+        id: String(data.messageId), // Ensure ID is always string
         text: (data as any).text ?? undefined,
         sender: data.sender,
         timestamp: new Date(data.timestamp),
         customerId: data.customerId,
         customerName: (data as any).name || undefined,
         customerEmail: (data as any).email || undefined,
-        isRead: data.sender === 'admin',
+        isRead: data.sender === 'admin' || data.customerId === selectedCustomer, // Mark as read if currently viewing that customer
         type: (data as any).type,
         attachment: normalizeAttachment((data as any).attachment)
       };
 
       setMessages(prev => {
-        // Prevent duplicates from echo with enhanced logic
-        const exists = prev.some(msg => 
-          msg.id === newMessage.id || 
-          (msg.text === newMessage.text && 
-           msg.sender === newMessage.sender && 
-           msg.customerId === newMessage.customerId &&
-           Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000)
-        );
+        // Enhanced duplicate prevention
+        const exists = prev.some(msg => {
+          // Check by ID (most reliable)
+          if (String(msg.id) === String(newMessage.id)) {
+            console.log(`🚫 Duplicate blocked by ID: ${newMessage.id}`);
+            return true;
+          }
+          
+          // Check by content for near-duplicates
+          const sameCustomer = msg.customerId === newMessage.customerId;
+          const sameSender = msg.sender === newMessage.sender;
+          const sameType = msg.type === newMessage.type;
+          const sameText = msg.text === newMessage.text;
+          const nearTime = Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 2000;
+          
+          if (sameCustomer && sameSender && sameType && sameText && nearTime) {
+            console.log(`🚫 Duplicate blocked by content match: ${newMessage.id}`);
+            return true;
+          }
+          
+          // For attachments, also compare type
+          if (sameCustomer && sameSender && sameType && newMessage.type !== 'text' && nearTime) {
+            console.log(`🚫 Duplicate attachment blocked: ${newMessage.id}`);
+            return true;
+          }
+          
+          return false;
+        });
+        
+        if (!exists) {
+          console.log(`✅ Adding new message: ${newMessage.id} (${newMessage.type || 'text'}) isRead: ${newMessage.isRead}`);
+          if (newMessage.sender === 'user' && !newMessage.isRead) {
+            console.log(`📬 New unread message from customer ${newMessage.customerId}`);
+          }
+        }
+        
         return exists ? prev : [...prev, newMessage];
       });
 
@@ -320,7 +348,8 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       unsubscribeDisconnection();
       unsubscribeThreads();
     };
-  }, [isConnected, subscribe]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected]);
 
   // Load history when selecting a customer
   useEffect(() => {
@@ -332,6 +361,7 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const onHistory = (data: any) => {
       if (String(data.customerId) !== String(selectedCustomer)) return;
+      console.log(`📜 Loading chat history for customer ${selectedCustomer} (${data.messages?.length || 0} messages)`);
       const history: AdminChatMessage[] = data.messages.map((m: any) => ({
         id: String(m.id),
         text: m.text ?? undefined,
@@ -342,10 +372,54 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         attachment: normalizeAttachment((m as any).attachment)
       }));
       setMessages(prev => {
-        // Merge without duplicates
-        const map = new Map(prev.map(m => [m.id, m]));
-        for (const m of history) map.set(m.id, m);
-        return Array.from(map.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        // Enhanced duplicate detection
+        const map = new Map<string, AdminChatMessage>();
+        
+        // Add existing messages first (keep the real-time version)
+        prev.forEach(m => {
+          const key = String(m.id);
+          map.set(key, m);
+        });
+        
+        // Add history messages only if they don't exist
+        history.forEach(m => {
+          const key = String(m.id);
+          if (!map.has(key)) {
+            // Also check for near-duplicate by timestamp and content
+            const isDuplicate = Array.from(map.values()).some(existing => {
+              const sameCustomer = existing.customerId === m.customerId;
+              const sameSender = existing.sender === m.sender;
+              const sameType = existing.type === m.type;
+              const nearTime = Math.abs(new Date(existing.timestamp).getTime() - new Date(m.timestamp).getTime()) < 2000;
+              
+              // For text messages, compare text content
+              if (m.type === 'text' || !m.type) {
+                return sameCustomer && sameSender && existing.text === m.text && nearTime;
+              }
+              
+              // For images/files, just check type, sender, customer, and time
+              // (attachments are unlikely to be sent at exact same time)
+              if (m.type === 'image' || m.type === 'file') {
+                return sameCustomer && sameSender && sameType && nearTime;
+              }
+              
+              return false;
+            });
+            
+            if (isDuplicate) {
+              console.log(`🚫 History: Skipping duplicate ${m.type || 'text'} message: ${key}`);
+            } else {
+              console.log(`➕ History: Adding ${m.type || 'text'} message: ${key}`);
+              map.set(key, m);
+            }
+          } else {
+            console.log(`🔑 History: Message ${key} already exists by ID`);
+          }
+        });
+        
+        const result = Array.from(map.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        console.log(`✅ Merged history: ${prev.length} existing + ${history.length} from history = ${result.length} total (${prev.length + history.length - result.length} duplicates removed)`);
+        return result;
       });
       // Mark all user messages for this customer as read when opening
       setMessages(prev => prev.map(msg => (
@@ -372,8 +446,18 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isRead: true
     };
 
+    console.log(`📤 Admin sending message: ${messageId}`);
+
     // Add message to local state immediately
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => {
+      // Check if already exists (shouldn't, but just in case)
+      const exists = prev.some(m => String(m.id) === String(messageId));
+      if (exists) {
+        console.log(`⚠️ Message ${messageId} already exists in state`);
+        return prev;
+      }
+      return [...prev, newMessage];
+    });
 
     // Send via WebSocket
     webSocketService.sendChatMessage(messageId, text.trim(), customerId);
@@ -415,7 +499,19 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         data: base64,
       }
     };
-    setMessages(prev => [...prev, newMessage]);
+    
+    console.log(`📤 Admin sending attachment: ${messageId} (${newMessage.type})`);
+    
+    setMessages(prev => {
+      // Check if already exists
+      const exists = prev.some(m => String(m.id) === String(messageId));
+      if (exists) {
+        console.log(`⚠️ Attachment ${messageId} already exists in state`);
+        return prev;
+      }
+      return [...prev, newMessage];
+    });
+    
     webSocketService.sendChatAttachment(messageId, customerId, { type: newMessage.type === 'image' ? 'image' : 'file', attachment: newMessage.attachment });
   };
 

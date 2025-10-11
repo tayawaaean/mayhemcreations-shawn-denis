@@ -1,10 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip } from 'lucide-react'
+import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip, UserPlus } from 'lucide-react'
 import { useRealTimeChat } from '../../shared/realTimeChatContext'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import Button from '../../components/Button'
 
 export default function ChatWidget() {
   const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions, unreadCount } = useRealTimeChat()
+  const { isLoggedIn } = useAuth()
+  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
@@ -122,6 +126,30 @@ export default function ChatWidget() {
 
         {!isMinimized && (
           <>
+            {/* Guest User Banner */}
+            {!isLoggedIn && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-blue-200 p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center space-x-2">
+                    <UserPlus className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-800 font-medium">Guest Mode</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      navigate('/login');
+                    }}
+                    className="text-blue-600 hover:text-blue-800 font-medium underline text-xs"
+                  >
+                    Sign In
+                  </button>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  Sign in to save your conversation history
+                </p>
+              </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((message) => (

@@ -89,16 +89,29 @@ export class WebSocketService {
         socket.join(`chat_${customerId}`);
         logger.info(`💬 Socket ${socket.id} joined chat room for customer ${customerId}`);
         
-        // Lookup user profile for enrichment
+        // Check if this is a guest user
+        const isGuest = String(customerId).startsWith('guest_');
+
+        // Lookup user profile for enrichment (only for registered users)
         let profile: any = null;
-        try {
-          const [rows] = await sequelize.query(
-            'SELECT id, first_name as firstName, last_name as lastName, email FROM users WHERE id = ? LIMIT 1',
-            { replacements: [customerId] }
-          );
-          profile = (rows as any)[0] || null;
-        } catch (e) {
-          logger.warn(`Could not fetch user profile for ${customerId}: ${(e as any).message}`);
+        if (!isGuest) {
+          try {
+            const [rows] = await sequelize.query(
+              'SELECT id, first_name as firstName, last_name as lastName, email FROM users WHERE id = ? LIMIT 1',
+              { replacements: [customerId] }
+            );
+            profile = (rows as any)[0] || null;
+          } catch (e) {
+            logger.warn(`Could not fetch user profile for ${customerId}: ${(e as any).message}`);
+          }
+        } else {
+          // For guest users, create a mock profile
+          profile = {
+            id: customerId,
+            firstName: 'Guest',
+            lastName: 'User',
+            email: null
+          };
         }
 
         // Notify admins that customer is online with identity if available
@@ -109,10 +122,10 @@ export class WebSocketService {
           timestamp: new Date().toISOString()
         });
 
-        // Send recent chat history directly to this socket
+        // Send recent chat history directly to this socket (supports both user IDs and guest IDs)
         try {
           const rows = await Message.findAll({
-            where: { customerId: Number(customerId) } as any,
+            where: { customerId: String(customerId) } as any, // Use string comparison for guest support
             order: [['createdAt', 'ASC']],
             limit: 100,
           });
@@ -128,6 +141,7 @@ export class WebSocketService {
             customerId,
             messages,
           });
+          logger.info(`📜 Loaded ${messages.length} messages for ${isGuest ? 'guest' : 'user'} ${customerId}`);
         } catch (e) {
           logger.warn(`Failed to load chat history for ${customerId}: ${(e as any).message}`);
         }
@@ -148,9 +162,10 @@ export class WebSocketService {
       // Admin can request chat history for a customer without joining their room
       socket.on('request_chat_history', async (data: { customerId: string; limit?: number }) => {
         const limit = data.limit && data.limit > 0 && data.limit <= 500 ? data.limit : 100;
+        const isGuest = String(data.customerId).startsWith('guest_');
         try {
           const rows = await Message.findAll({
-            where: { customerId: Number(data.customerId) } as any,
+            where: { customerId: String(data.customerId) } as any, // Use string for guest support
             order: [['createdAt', 'ASC']],
             limit,
           });
@@ -217,9 +232,12 @@ export class WebSocketService {
         const isAdmin = socket.rooms.has('admin_room');
         const sender: 'user' | 'admin' = isAdmin ? 'admin' : 'user';
 
-        // Enrich with profile for admin consumers
+        // Check if this is a guest user
+        const isGuest = String(data.customerId).startsWith('guest_');
+
+        // Enrich with profile for admin consumers (only for registered users)
         let profile: any = null;
-        if (sender === 'user') {
+        if (sender === 'user' && !isGuest) {
           try {
             const [rows] = await sequelize.query(
               'SELECT id, first_name as firstName, last_name as lastName, email FROM users WHERE id = ? LIMIT 1',
@@ -231,17 +249,27 @@ export class WebSocketService {
           }
         }
 
-        // Persist message
+        // For guest users, create a mock profile
+        if (sender === 'user' && isGuest) {
+          profile = {
+            id: data.customerId,
+            firstName: 'Guest',
+            lastName: 'User',
+            email: null
+          };
+        }
+
+        // Persist message (supports both numeric user IDs and guest string IDs)
         try {
           const created = await Message.create({
-            customerId: Number(data.customerId),
+            customerId: String(data.customerId), // Keep as string for guest support
             sender,
-            // Some older schemas require non-null text; default to empty string for attachments
             text: data.text ?? '',
             type: data.type ?? 'text',
             attachment: data.attachment ?? null,
+            isGuest, // Flag to identify guest messages
           } as any);
-          logger.info(`💾 Saved message ${created.id} for customer ${data.customerId} (type=${data.type ?? 'text'})`);
+          logger.info(`💾 Saved message ${created.id} for ${isGuest ? 'guest' : 'user'} ${data.customerId} (type=${data.type ?? 'text'})`);
         } catch (e) {
           logger.warn(`Failed to persist chat message for ${data.customerId}: ${(e as any).message}`);
         }
