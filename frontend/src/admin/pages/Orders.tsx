@@ -92,6 +92,8 @@ const Orders: React.FC = () => {
     switch (status) {
       case 'pending':
         return <Clock className="h-4 w-4" />
+      case 'preparing':
+        return <Package className="h-4 w-4" />
       case 'processing':
         return <Package className="h-4 w-4" />
       case 'shipped':
@@ -109,6 +111,8 @@ const Orders: React.FC = () => {
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800'
+      case 'preparing':
+        return 'bg-teal-100 text-teal-800'
       case 'processing':
         return 'bg-blue-100 text-blue-800'
       case 'shipped':
@@ -182,6 +186,7 @@ const Orders: React.FC = () => {
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending' },
+    { value: 'preparing', label: 'Preparing' },
     { value: 'processing', label: 'Processing' },
     { value: 'shipped', label: 'Shipped' },
     { value: 'delivered', label: 'Delivered' },

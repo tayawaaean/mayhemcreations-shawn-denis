@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, Copy, Settings, Calculator, ArrowRight } from 'lucide-react'
+import { Check, Copy, Settings, Calculator, ArrowRight, ArrowLeft, Info, AlertCircle } from 'lucide-react'
 import { useCustomization, EmbroideryDesignData, EmbroideryStyle } from '../context/CustomizationContext'
 import Button from '../../components/Button'
 
@@ -36,6 +36,40 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
     return embroideryStyles.filter(style => style.category === category)
   }
 
+  const getSimplifiedCategoryInfo = (category: keyof EmbroideryStyle) => {
+    const info = {
+      coverage: { 
+        question: "How much of your design should we embroider?",
+        help: "This affects how detailed the final embroidery will be"
+      },
+      material: {
+        question: "What type of thread material?",
+        help: "Different materials have different looks and durability"
+      },
+      border: {
+        question: "How should the edges look?",
+        help: "This affects the finishing around your design"
+      },
+      threads: {
+        question: "Any special thread colors or effects?",
+        help: "Optional - add special threads for extra style"
+      },
+      backing: {
+        question: "Do you need extra support backing?",
+        help: "Optional - adds durability for frequently washed items"
+      },
+      upgrades: {
+        question: "Want any special effects?",
+        help: "Optional - make your design stand out even more"
+      },
+      cutting: {
+        question: "How should we finish the edges?",
+        help: "Optional - choose how the design is cut and finished"
+      }
+    }
+    return info[category] || { question: title, help: description }
+  }
+
   const renderStyleSelector = (
     category: keyof EmbroideryStyle,
     title: string,
@@ -49,11 +83,20 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
 
     if (options.length === 0) return null
 
+    const categoryInfo = getSimplifiedCategoryInfo(category)
+    const isRequired = ['coverage', 'material', 'border'].includes(category)
+
     return (
       <div className="space-y-3">
-        <div>
-          <h4 className="font-medium text-gray-900">{title}</h4>
-          <p className="text-sm text-gray-600">{description}</p>
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-semibold text-gray-900">{categoryInfo.question}</h4>
+              {isRequired && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Required</span>}
+              {!isRequired && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Optional</span>}
+            </div>
+            <p className="text-sm text-gray-600">{categoryInfo.help}</p>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -106,10 +149,13 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
     <div className="space-y-6">
       {/* Design Selection */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <Settings className="w-5 h-5 mr-2 text-accent" />
-          Choose Embroidery Options for Each Design
-        </h3>
+        <div className="mb-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-2 flex items-center">
+            <Settings className="w-6 h-6 mr-2 text-accent" />
+            Step 4: How Do You Want It Embroidered?
+          </h3>
+          <p className="text-gray-600">Choose the style and options for each design - don't worry, we'll explain what everything means!</p>
+        </div>
         
         {customizationData.designs.length > 0 ? (
           <div className="space-y-4">
@@ -206,26 +252,109 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
             )}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-500">
-            <Settings className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No designs uploaded yet.</p>
-            <p className="text-sm">Go back to step 2 to upload your designs.</p>
+          <div className="text-center py-12 text-gray-500">
+            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Settings className="w-10 h-10 text-gray-400" />
+            </div>
+            <p className="text-lg font-medium text-gray-700 mb-2">No designs to customize yet</p>
+            <p className="text-sm text-gray-500">You'll need to upload at least one design in Step 2 before choosing embroidery options.</p>
           </div>
         )}
       </div>
 
+      {/* Help Section */}
+      {customizationData.designs.length > 0 && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-5">
+          <h4 className="font-semibold text-purple-900 mb-3 flex items-center">
+            <Info className="w-5 h-5 mr-2" />
+            Quick Tips for Choosing Options
+          </h4>
+          <div className="space-y-2 text-sm text-purple-800">
+            <p>• <strong>Not sure what to pick?</strong> The standard options work great for most designs</p>
+            <p>• <strong>Save time:</strong> Choose options for one design, then use "Copy Options" for others</p>
+            <p>• <strong>Watch the price:</strong> The design cost updates as you select options</p>
+            <p>• <strong>Optional items:</strong> You can skip optional upgrades if you want to keep costs down</p>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Message */}
+      {customizationData.designs.length > 0 && (
+        <>
+          {customizationData.designs.some(design => 
+            !design.selectedStyles.coverage || 
+            !design.selectedStyles.material || 
+            !design.selectedStyles.border
+          ) ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <Info className="w-5 h-5 text-amber-600 mr-3 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-900 mb-2">Please complete required options for all designs:</p>
+                  <ul className="text-sm text-amber-800 space-y-1">
+                    {customizationData.designs.map((design, index) => {
+                      const missing: string[] = []
+                      if (!design.selectedStyles.coverage) missing.push('Coverage')
+                      if (!design.selectedStyles.material) missing.push('Material')
+                      if (!design.selectedStyles.border) missing.push('Border Style')
+                      
+                      if (missing.length > 0) {
+                        return (
+                          <li key={design.id}>
+                            <strong>Design {index + 1} ({design.name}):</strong> Missing {missing.join(', ')}
+                          </li>
+                        )
+                      }
+                      return null
+                    })}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="flex items-center">
+                <Check className="w-5 h-5 text-green-600 mr-2 flex-shrink-0" />
+                <p className="text-sm text-green-800 font-medium">Perfect! All required options are selected for {customizationData.designs.length} design{customizationData.designs.length > 1 ? 's' : ''}.</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Navigation */}
       <div className="flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
         <Button variant="outline" onClick={onBack} className="w-full sm:w-auto">
+          <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Positioning
         </Button>
         <Button 
           onClick={onComplete} 
-          disabled={customizationData.designs.length === 0}
+          disabled={
+            customizationData.designs.length === 0 || 
+            customizationData.designs.some(design => 
+              !design.selectedStyles.coverage || 
+              !design.selectedStyles.material || 
+              !design.selectedStyles.border
+            )
+          }
           className="w-full sm:w-auto"
         >
-          Continue to Review
-          <ArrowRight className="w-4 h-4 ml-2" />
+          {customizationData.designs.length === 0 
+            ? 'Add designs first' 
+            : customizationData.designs.some(design => 
+                !design.selectedStyles.coverage || 
+                !design.selectedStyles.material || 
+                !design.selectedStyles.border
+              )
+            ? 'Complete required options to continue'
+            : 'Next: Review Everything'}
+          {customizationData.designs.length > 0 && 
+           !customizationData.designs.some(design => 
+             !design.selectedStyles.coverage || 
+             !design.selectedStyles.material || 
+             !design.selectedStyles.border
+           ) && <ArrowRight className="w-4 h-4 ml-2" />}
         </Button>
       </div>
     </div>

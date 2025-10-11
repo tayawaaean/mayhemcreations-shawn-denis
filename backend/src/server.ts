@@ -18,9 +18,9 @@ const startServer = async (): Promise<void> => {
     // Sync database (create tables if they don't exist)
     // In production, you should use migrations instead
     if (NODE_ENV === 'development') {
-      // Temporarily skip sync to avoid index issues
-      // await sequelize.sync({ alter: true });
-      logger.info('Database sync temporarily disabled to avoid index issues');
+      // Sync with alter: true to update tables without dropping data
+      await sequelize.sync({ alter: true });
+      logger.info('✅ Database synced successfully');
     }
 
     // Create HTTP server

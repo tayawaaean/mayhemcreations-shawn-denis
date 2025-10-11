@@ -90,23 +90,38 @@ const MultiEmbroideryManager: React.FC<MultiEmbroideryManagerProps> = ({ onDesig
               <Upload className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-900">Upload Your Designs</h3>
+              <h3 className="text-xl font-bold text-gray-900">Step 2: Upload Your Design</h3>
               <p className="text-gray-600 text-sm">
-                Add up to {customizationData.maxDesigns} design files for embroidery
+                Add your logo, artwork, or image - we'll embroider it for you!
               </p>
             </div>
           </div>
           
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">Supported Formats:</h4>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">PNG</span>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">JPG</span>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">JPEG</span>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">GIF</span>
-              <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">SVG</span>
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+              <FileText className="w-5 h-5 mr-2" />
+              What kind of files can I upload?
+            </h4>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-blue-800 font-medium mb-2">We accept these image types:</p>
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full">PNG (best for logos)</span>
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full">JPG / JPEG</span>
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full">GIF</span>
+                  <span className="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1.5 rounded-full">SVG (best quality)</span>
+                </div>
+              </div>
+              <div className="bg-blue-100 rounded-md p-3">
+                <p className="text-xs text-blue-900 font-medium mb-1">Quick Tips:</p>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li>• Each file should be under 10MB</li>
+                  <li>• Clear, high-quality images work best</li>
+                  <li>• PNG files with transparent backgrounds look great</li>
+                  <li>• You can upload up to {customizationData.maxDesigns} different designs</li>
+                </ul>
+              </div>
             </div>
-            <p className="text-xs text-blue-700 mt-2">Maximum file size: 10MB per file</p>
           </div>
         </div>
 
@@ -142,33 +157,37 @@ const MultiEmbroideryManager: React.FC<MultiEmbroideryManagerProps> = ({ onDesig
           {customizationData.designs.length >= customizationData.maxDesigns ? (
             <div className="text-gray-500">
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-200 rounded-full flex items-center justify-center">
-                <Upload className="w-8 h-8 text-gray-400" />
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
-              <p className="text-xl font-semibold mb-2">Maximum designs reached</p>
-              <p className="text-sm">You can upload up to {customizationData.maxDesigns} designs</p>
-              <p className="text-xs text-gray-400 mt-3">
-                Remove a design to upload a new one
+              <p className="text-xl font-semibold text-gray-900 mb-2">All {customizationData.maxDesigns} design slots filled!</p>
+              <p className="text-sm text-gray-600">That's the maximum number of designs for one product</p>
+              <p className="text-xs text-gray-500 mt-3">
+                Want to change one? Remove a design below to upload a different one
               </p>
             </div>
           ) : (
             <div>
-              <div className="w-20 h-20 mx-auto mb-6 bg-accent/10 rounded-full flex items-center justify-center">
+              <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-accent/20 to-accent/10 rounded-full flex items-center justify-center animate-pulse">
                 <Upload className="w-10 h-10 text-accent" />
               </div>
-              <p className="text-2xl font-semibold text-gray-900 mb-3">
-                <span className="text-accent">Click to upload</span> or drag and drop
+              <p className="text-2xl font-bold text-gray-900 mb-2">
+                <span className="text-accent">Click here</span> or drag your design
               </p>
               <p className="text-gray-600 mb-4">
-                Choose your design files from your computer
+                It's as simple as choosing a photo from your computer
               </p>
-              <div className="inline-flex items-center px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent/90 transition-colors">
-                <Upload className="w-4 h-4 mr-2" />
-                Choose Files
+              <div className="inline-flex items-center px-6 py-3 bg-accent text-white rounded-lg font-semibold hover:bg-accent/90 transition-all shadow-md hover:shadow-lg transform hover:scale-105">
+                <Upload className="w-5 h-5 mr-2" />
+                Browse My Computer
               </div>
-              <div className="mt-4 text-sm text-gray-500">
-                <p>{customizationData.designs.length} of {customizationData.maxDesigns} designs uploaded</p>
-                {customizationData.designs.length > 0 && (
-                  <p className="text-xs mt-1">Each design will be customized individually</p>
+              <div className="mt-6 text-sm">
+                {customizationData.designs.length === 0 ? (
+                  <p className="text-gray-500">No designs uploaded yet - let's get started!</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-green-600 font-medium">{customizationData.designs.length} design{customizationData.designs.length > 1 ? 's' : ''} uploaded!</p>
+                    <p className="text-gray-500 text-xs">You can add {customizationData.maxDesigns - customizationData.designs.length} more design{customizationData.maxDesigns - customizationData.designs.length === 1 ? '' : 's'}</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -181,14 +200,14 @@ const MultiEmbroideryManager: React.FC<MultiEmbroideryManagerProps> = ({ onDesig
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <CheckCircle className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3 animate-bounce">
+                <CheckCircle className="w-6 h-6 text-green-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Your Designs ({customizationData.designs.length})
+                <h3 className="text-lg font-bold text-gray-900">
+                  Great! {customizationData.designs.length} Design{customizationData.designs.length > 1 ? 's' : ''} Ready
                 </h3>
-                <p className="text-sm text-gray-600">Ready for customization and embroidery</p>
+                <p className="text-sm text-green-600 font-medium">Your {customizationData.designs.length > 1 ? 'designs are' : 'design is'} uploaded and ready to customize</p>
               </div>
             </div>
           </div>

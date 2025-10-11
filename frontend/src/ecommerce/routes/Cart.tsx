@@ -273,20 +273,35 @@ export default function Cart() {
             quantity: item.quantity,
             customization: item.customization,
             reviewStatus: 'pending' as const,
-            product: products.find(p => {
+            product: item.product || products.find(p => {
               // Handle both numeric and string product IDs
               const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
               return p.id === item.productId || p.id === numericId;
             }),
             // Snapshot key product info for backend persistence and later display
             productName: (() => {
+              // First try to use the product data from the cart item
+              if (item.product?.title) {
+                return item.product.title;
+              }
+              // Fallback to looking up in static products array
               const p = products.find(p => {
                 const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
                 return p.id === item.productId || p.id === numericId;
               });
-              return p?.title || null;
+              return p?.title || `Product #${item.productId}`;
             })(),
             productSnapshot: (() => {
+              // First try to use the product data from the cart item
+              if (item.product) {
+                return { 
+                  id: item.product.id, 
+                  title: item.product.title, 
+                  price: item.product.price, 
+                  image: item.product.image 
+                };
+              }
+              // Fallback to looking up in static products array
               const p = products.find(p => {
                 const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
                 return p.id === item.productId || p.id === numericId;

@@ -248,6 +248,48 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
         // Don't fail the webhook if payment record creation fails
       }
 
+      // Create actual order record for admin orders management
+      try {
+        const { createOrderFromReview } = await import('../controllers/orderController');
+        
+        // Extract shipping details from metadata
+        const shippingDetails = {
+          firstName: paymentIntent.metadata?.firstName || '',
+          lastName: paymentIntent.metadata?.lastName || '',
+          email: paymentIntent.metadata?.customerEmail || paymentIntent.metadata?.email || '',
+          phone: paymentIntent.metadata?.phone || '',
+          street: paymentIntent.metadata?.street || '',
+          city: paymentIntent.metadata?.city || '',
+          state: paymentIntent.metadata?.state || '',
+          zipCode: paymentIntent.metadata?.zipCode || '',
+          country: paymentIntent.metadata?.country || 'US',
+        };
+
+        const orderResult = await createOrderFromReview(
+          order.id,
+          {
+            paymentIntentId: paymentIntent.id,
+            transactionId: `stripe_${paymentIntent.id}`,
+            cardLast4: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.last4,
+            cardBrand: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.brand,
+            paymentMethod: 'card',
+            paymentProvider: 'stripe',
+          },
+          shippingDetails
+        );
+
+        if (orderResult.success) {
+          logger.info('Order created successfully from payment', {
+            orderId: orderResult.orderId,
+            orderNumber: orderResult.orderNumber,
+            orderReviewId: order.id,
+          });
+        }
+      } catch (orderError) {
+        logger.error('Error creating order from payment:', orderError);
+        // Don't fail the webhook if order creation fails
+      }
+
       logger.info('Order status updated to approved-processing after payment success', {
         orderId: order.id,
         userId: userId,
@@ -419,6 +461,48 @@ const handleCheckoutSessionCompleted = async (session: any) => {
       } catch (paymentError) {
         logger.error('Error creating payment record:', paymentError);
         // Don't fail the webhook if payment record creation fails
+      }
+
+      // Create actual order record for admin orders management
+      try {
+        const { createOrderFromReview } = await import('../controllers/orderController');
+        
+        // Extract shipping details from metadata
+        const shippingDetails = {
+          firstName: session.metadata?.firstName || session.customer_details?.name?.split(' ')[0] || '',
+          lastName: session.metadata?.lastName || session.customer_details?.name?.split(' ').slice(1).join(' ') || '',
+          email: session.customer_details?.email || session.metadata?.customerEmail || session.metadata?.email || '',
+          phone: session.metadata?.phone || session.customer_details?.phone || '',
+          street: session.metadata?.street || session.customer_details?.address?.line1 || '',
+          city: session.metadata?.city || session.customer_details?.address?.city || '',
+          state: session.metadata?.state || session.customer_details?.address?.state || '',
+          zipCode: session.metadata?.zipCode || session.customer_details?.address?.postal_code || '',
+          country: session.metadata?.country || session.customer_details?.address?.country || 'US',
+        };
+
+        const orderResult = await createOrderFromReview(
+          order.id,
+          {
+            paymentIntentId: session.payment_intent || session.id,
+            transactionId: `stripe_session_${session.id}`,
+            cardLast4: session.metadata?.cardLast4,
+            cardBrand: session.metadata?.cardBrand,
+            paymentMethod: 'card',
+            paymentProvider: 'stripe',
+          },
+          shippingDetails
+        );
+
+        if (orderResult.success) {
+          logger.info('Order created successfully from payment', {
+            orderId: orderResult.orderId,
+            orderNumber: orderResult.orderNumber,
+            orderReviewId: order.id,
+          });
+        }
+      } catch (orderError) {
+        logger.error('Error creating order from payment:', orderError);
+        // Don't fail the webhook if order creation fails
       }
 
       logger.info('Order status updated to approved-processing after checkout completion', {

@@ -33,11 +33,15 @@ export type ProductVariant = {
 
 export type Order = {
   id: string
+  orderNumber?: string
   customerId: string
   customer: Customer
   items: OrderItem[]
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  status: 'pending' | 'preparing' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
   total: number
+  subtotal?: number
+  shipping?: number
+  tax?: number
   shippingAddress: Address
   billingAddress: Address
   paymentMethod: string
@@ -53,6 +57,8 @@ export type Order = {
     refundedAt?: Date
     refundAmount?: number
   }
+  trackingNumber?: string
+  shippingCarrier?: string
   notes: string[]
   createdAt: Date
   updatedAt: Date

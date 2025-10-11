@@ -13,6 +13,7 @@ import { CustomEmbroidery, CustomEmbroideryAttributes, CustomEmbroideryCreationA
 import Message, { MessageAttributes, MessageCreationAttributes } from './messageModel';
 import { OrderReview, OrderReviewAttributes, OrderReviewCreationAttributes } from './orderReviewModel';
 import { Payment, PaymentAttributes, PaymentCreationAttributes } from './paymentModel';
+import Order, { OrderAttributes } from './orderModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -165,6 +166,30 @@ const setupAssociations = (): void => {
     foreignKey: 'customerId',
     as: 'payments',
   });
+
+  // Order belongs to User
+  Order.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // User has many Orders
+  User.hasMany(Order, {
+    foreignKey: 'userId',
+    as: 'orders',
+  });
+
+  // Order belongs to OrderReview (optional reference)
+  Order.belongsTo(OrderReview, {
+    foreignKey: 'orderReviewId',
+    as: 'orderReview',
+  });
+
+  // OrderReview can have one Order
+  OrderReview.hasOne(Order, {
+    foreignKey: 'orderReviewId',
+    as: 'order',
+  });
 };
 
 // Initialize associations
@@ -218,6 +243,8 @@ export {
   Payment,
   PaymentAttributes,
   PaymentCreationAttributes,
+  Order,
+  OrderAttributes,
 };
 
 // Export all models for easy access
@@ -236,17 +263,16 @@ export const models = {
   Message,
   OrderReview,
   Payment,
+  Order,
 };
 
 // Database synchronization function
 export const syncDatabase = async (force: boolean = false): Promise<void> => {
   try {
-    // Temporarily disabled to prevent index issues
-    console.log('🔧 Database sync temporarily disabled to prevent index issues');
-    return;
-    
-    // await sequelize.sync({ force });
-    // console.log('✅ Database synchronized successfully.');
+    // Sync database with alter: true to update existing tables without dropping data
+    // Use force: true only when explicitly needed (drops all tables)
+    await sequelize.sync({ force, alter: !force });
+    console.log(`✅ Database synchronized successfully (${force ? 'force' : 'alter'} mode).`);
   } catch (error) {
     console.error('❌ Error synchronizing database:', error);
     throw error;

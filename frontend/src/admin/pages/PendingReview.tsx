@@ -446,9 +446,9 @@ const PendingReview: React.FC = () => {
     
     if (!hasPictureReplies) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          <X className="h-3 w-3 mr-1" />
-          No Reply
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+          <Clock className="h-3 w-3 mr-1" />
+          No Sample Yet
         </span>
       );
     }
@@ -478,14 +478,14 @@ const PendingReview: React.FC = () => {
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Confirmed ({confirmedCount})
+            ✅ Approved ({confirmedCount})
           </span>
         );
       } else if (anyRejected && confirmedCount === 0) {
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-            <XCircle className="h-3 w-3 mr-1" />
-            Rejected ({rejectedCount})
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Needs Changes ({rejectedCount})
           </span>
         );
       } else if (anyRejected && confirmedCount > 0) {
@@ -501,7 +501,7 @@ const PendingReview: React.FC = () => {
                 <XCircle className="h-3 w-3 mr-1" />
                 {rejectedCount}
               </span>
-              <span className="text-xs text-gray-500 ml-1">Mixed</span>
+              <span className="text-xs text-gray-500 ml-1">Mixed Feedback</span>
             </div>
             
             {/* Tooltip with item details */}
@@ -640,28 +640,28 @@ const PendingReview: React.FC = () => {
     // Picture replies uploaded but no customer confirmation yet
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-        <ImageIcon className="h-3 w-3 mr-1" />
-        Pending
+        <Clock className="h-3 w-3 mr-1" />
+        Waiting for Customer
       </span>
     );
   }
 
   const statusOptions = [
-    { value: 'all', label: 'All Status' },
-    { value: 'pending', label: 'Pending Review' },
-    { value: 'needs-changes', label: 'Design Review Pending' },
-    { value: 'pending-payment', label: 'Pending Payment' },
-    { value: 'approved-processing', label: 'Approved - Processing Design' },
-    { value: 'rejected', label: 'Rejected - Needs Re-upload' }
+    { value: 'all', label: '📋 All Orders' },
+    { value: 'pending', label: '⏳ Needs Review' },
+    { value: 'needs-changes', label: '🎨 Awaiting Customer Feedback' },
+    { value: 'pending-payment', label: '💳 Ready for Payment' },
+    { value: 'approved-processing', label: '✅ Approved & Processing' },
+    { value: 'rejected', label: '🔄 Needs Re-submission' }
   ]
 
   const pictureReplyStatusOptions = [
-    { value: 'all', label: 'All Design Reviews' },
-    { value: 'no-reply', label: 'No Reply' },
-    { value: 'pending', label: 'Pending Confirmation' },
-    { value: 'confirmed', label: 'Confirmed' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'partial', label: 'Partial' }
+    { value: 'all', label: '📸 All Sample Status' },
+    { value: 'no-reply', label: '⭕ No Sample Sent' },
+    { value: 'pending', label: '⏰ Waiting for Customer' },
+    { value: 'confirmed', label: '✅ Customer Approved' },
+    { value: 'rejected', label: '❌ Customer Needs Changes' },
+    { value: 'partial', label: '⚡ Mixed Response' }
   ]
 
   const formatDate = (dateString: string) => {

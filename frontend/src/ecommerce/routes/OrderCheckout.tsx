@@ -26,6 +26,7 @@ import Button from '../../components/Button'
 import { PaymentResult } from '../../shared/paymentService'
 import { paymentsApiService } from '../../shared/paymentsApiService'
 import { calculateShippingRates, ShippingRate } from '../../shared/shippingApiService'
+import { useAuth } from '../context/AuthContext'
 
 interface OrderItem {
   id: string
@@ -61,16 +62,16 @@ export default function OrderCheckout() {
   const [isLoadingShipping, setIsLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState<string | null>(null)
 
-  // Get user info from auth context if available
-  const userInfo = JSON.parse(localStorage.getItem('user') || '{}')
+  // Get user info from auth context
+  const { user: authUser } = useAuth()
 
   // Form states
   const [formData, setFormData] = useState({
     // Personal Info - Pre-filled with user data but editable
-    firstName: userInfo.firstName || '',
-    lastName: userInfo.lastName || '',
-    email: userInfo.email || '',
-    phone: userInfo.phone || '',
+    firstName: authUser?.firstName || '',
+    lastName: authUser?.lastName || '',
+    email: authUser?.email || '',
+    phone: authUser?.phone || '',
     
     // Address
     address: '',

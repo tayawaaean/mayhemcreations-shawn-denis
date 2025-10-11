@@ -31,7 +31,7 @@ export default function Customize() {
     getDesignById,
     resetCustomization
   } = useCustomization()
-  const { add: addToCart } = useCart()
+  const { add: addToCart, syncWithDatabase } = useCart()
   const [currentStep, setCurrentStep] = useState(1)
   const [dragActive, setDragActive] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -629,11 +629,11 @@ export default function Customize() {
 
 
   const steps = [
-    { number: 1, title: 'Choose Color & Size', description: 'Pick your favorite color and size', icon: '🎨' },
-    { number: 2, title: 'Upload Your Designs', description: 'Add your design files (PNG, JPG, etc.)', icon: '📁' },
-    { number: 3, title: 'Add Design Notes', description: 'Tell us where to place each design', icon: '📝' },
-    { number: 4, title: 'Choose Embroidery Style', description: 'Select how you want each design embroidered', icon: '🧵' },
-    { number: 5, title: 'Review & Order', description: 'Check everything and place your order', icon: '✅' }
+    { number: 1, title: 'Pick Your Product', description: 'Choose the color and size you like' },
+    { number: 2, title: 'Upload Design', description: 'Add your logo or artwork' },
+    { number: 3, title: 'Position It', description: 'Show us where to put your design' },
+    { number: 4, title: 'Customize Options', description: 'Pick how you want it embroidered' },
+    { number: 5, title: 'Review & Add to Cart', description: 'Double-check everything looks perfect' }
   ]
 
   const getStepProgress = () => {
@@ -669,6 +669,12 @@ export default function Customize() {
   }
 
   const handleAddToCart = async () => {
+    // Guard against double submission
+    if (isAddingToCart) {
+      console.log('⚠️ Already adding to cart, ignoring duplicate request')
+      return
+    }
+    
     if (!product) {
       console.error('❌ No product found for adding to cart')
       return
@@ -816,8 +822,8 @@ export default function Customize() {
       
       if (success) {
         console.log('✅ Successfully added to cart, showing confirmation')
-        // Wait a bit for state to fully update and sync
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Wait for state to fully update and sync across all components
+        await new Promise(resolve => setTimeout(resolve, 300))
         setShowCartConfirmation(true)
         // Reset customization data after successful add
         resetCustomization()
@@ -832,8 +838,12 @@ export default function Customize() {
     }
   }
 
-  const handleViewCart = () => {
+  const handleViewCart = async () => {
     setShowCartConfirmation(false)
+    // Force cart to sync to ensure the latest items are displayed
+    await syncWithDatabase()
+    // Small delay to ensure state propagation
+    await new Promise(resolve => setTimeout(resolve, 100))
     navigate('/cart')
   }
 
@@ -850,7 +860,7 @@ export default function Customize() {
       // Show final view for clean capture (this hides all numbers, handles, and info)
       setShowFinalView(true)
       // Wait for UI to update
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 300))
       
       const mockupBase64 = await captureElementAsBase64(productRef.current, {
         backgroundColor: '#ffffff'
@@ -863,7 +873,7 @@ export default function Customize() {
     setShowFinalDesignModal(true)
       setFinalDesignImage(mockupBase64)
       
-      console.log('✅ Clean design preview captured:', {
+      console.log('✅ High-quality design preview captured:', {
         hasImage: !!mockupBase64,
         imageSize: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
       })
@@ -925,9 +935,7 @@ export default function Customize() {
                       ? 'bg-accent text-white'
                       : 'bg-gray-200 text-gray-600'
                   }`}>
-                    {currentStep > step.number ? <Check className="w-4 h-4" /> : (
-                      <span className="text-sm">{step.icon}</span>
-                    )}
+                    {currentStep > step.number ? <Check className="w-4 h-4" /> : step.number}
                   </div>
                   <p className={`text-xs font-medium ${
                     currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
@@ -960,9 +968,7 @@ export default function Customize() {
                       ? 'bg-accent text-white'
                       : 'bg-gray-200 text-gray-600'
                   }`}>
-                    {currentStep > step.number ? <Check className="w-5 h-5" /> : (
-                      <span className="text-lg">{step.icon}</span>
-                    )}
+                    {currentStep > step.number ? <Check className="w-5 h-5" /> : step.number}
                   </div>
                   <div className="ml-3">
                     <p className={`text-sm font-medium ${
@@ -995,19 +1001,21 @@ export default function Customize() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Left Side - Product Preview */}
-          <div className="space-y-4 sm:space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="space-y-4 sm:space-y-6 flex flex-col items-center justify-start">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
                 {showFinalView ? 'Final Product Preview' : 'Product Preview'}
               </h3>
               
               {/* Product Image with Design Overlay */}
-              <div className="relative" ref={productRef}>
-                <img
-                  src={product.image}
-                  alt={product.title}
-                  className="w-full h-64 sm:h-80 lg:h-96 object-cover rounded-lg"
-                />
+              <div className="flex justify-center items-center">
+                <div className="relative max-w-2xl w-full" ref={productRef}>
+                  <img
+                    src={product.image}
+                    alt={product.title}
+                    className="w-full h-auto object-contain rounded-lg"
+                    style={{ maxHeight: '600px', imageRendering: '-webkit-optimize-contrast' as any }}
+                  />
                  {/* Render Multiple Designs */}
                  {customizationData.designs.map((design, index) => (
                    <div
@@ -1047,10 +1055,12 @@ export default function Customize() {
                          }}
                        />
                        
-                       {/* Design Number Badge */}
-                       <div className="absolute -top-2 -left-2 bg-accent text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
-                         {index + 1}
-                       </div>
+                      {/* Design Number Badge - Only show when not in final view */}
+                      {!showFinalView && (
+                        <div className="absolute -top-2 -left-2 bg-accent text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
+                          {index + 1}
+                        </div>
+                      )}
                        
                        {/* Design Controls - Only show when not in final view */}
                        {!showFinalView && (
@@ -1174,10 +1184,12 @@ export default function Customize() {
                            }}
                          />
                        
-                       {/* Legacy Design Number Badge */}
-                       <div className="absolute -top-2 -left-2 bg-blue-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
-                         L
-                       </div>
+                      {/* Legacy Design Number Badge - Only show when not in final view */}
+                      {!showFinalView && (
+                        <div className="absolute -top-2 -left-2 bg-blue-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-lg">
+                          L
+                        </div>
+                      )}
                        
                        {/* Legacy Design Controls - Only show when not in final view */}
                        {!showFinalView && (
@@ -1219,12 +1231,14 @@ export default function Customize() {
                        )}
                      </div>
                    </div>
-                 )}
+                   )}
                 </div>
               </div>
+            </div>
 
-              {customizationData.design && (
-                <div className="mt-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+            {customizationData.design && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 w-full">
+                <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
                   {customizationData.placement === 'manual' ? (
                     <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-6 text-sm text-gray-600">
                       <div className="flex items-center space-x-1">
@@ -1257,12 +1271,12 @@ export default function Customize() {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-              {/* Design Controls */}
-              {customizationData.design && currentStep === 3 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            {/* Design Controls */}
+            {customizationData.design && currentStep === 3 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 w-full">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Embroidery Sizing</h3>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1330,7 +1344,7 @@ export default function Customize() {
                   </div>
                  </div>
             )}
-          </div>
+            </div>
 
           {/* Right Side - Customization Options */}
           <div className="space-y-4 sm:space-y-6">
@@ -1905,6 +1919,7 @@ export default function Customize() {
         <div className="fixed bottom-4 right-4 lg:bottom-6 lg:right-6 z-40">
           <ChatWidget />
         </div>
+        </div>
       </div>
 
       {/* Guidelines Modal */}
@@ -2049,13 +2064,13 @@ export default function Customize() {
 
       {/* Final Design Modal */}
       {showFinalDesignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center">
                   <Eye className="w-6 h-6 mr-2 text-accent" />
-                  Your Final Design
+                  Your Final Design Preview
                 </h2>
                 <button
                   onClick={() => setShowFinalDesignModal(false)}
@@ -2066,24 +2081,26 @@ export default function Customize() {
               </div>
               
               <div className="space-y-6">
-                {/* Product with Design */}
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+                {/* Product with Design - Centered and Full Width */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6 text-center">
                     {product?.title} - Final Product Preview
                   </h3>
-                  <div className="flex justify-center">
-                    <div className="relative max-w-md w-full">
+                  <div className="flex justify-center items-center">
+                    <div className="relative w-full max-w-3xl">
                       {finalDesignImage ? (
                         <img
                           src={finalDesignImage}
                           alt="Final design preview"
-                          className="w-full h-auto object-contain rounded-lg shadow-lg"
+                          className="w-full h-auto object-contain rounded-lg shadow-2xl"
+                          style={{ imageRendering: 'crisp-edges' as any, maxHeight: '600px' }}
                         />
                       ) : (
                         <img
                           src={product?.image}
                           alt={product?.title}
-                          className="w-full h-80 object-cover rounded-lg shadow-lg"
+                          className="w-full h-auto object-contain rounded-lg shadow-2xl"
+                          style={{ imageRendering: 'crisp-edges' as any, maxHeight: '600px' }}
                         />
                       )}
                     </div>
@@ -2092,27 +2109,29 @@ export default function Customize() {
 
                 {/* Uploaded Design Images */}
                 {(customizationData.designs.length > 0 || customizationData.design) && (
-                  <div className="bg-white border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                  <div className="bg-white border-2 border-gray-200 rounded-xl p-6">
+                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center text-lg">
                       <Upload className="w-5 h-5 mr-2 text-accent" />
-                      Uploaded Design Files
+                      Your Original Design Files
                     </h4>
                     
                     {/* Multi-Design Images */}
                 {customizationData.designs.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {customizationData.designs.map((design, index) => (
                           <div key={design.id} className="text-center">
-                            <div className="bg-gray-100 rounded-lg p-3 mb-2">
+                            <div className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200 flex items-center justify-center" style={{ minHeight: '200px' }}>
                           <img
                             src={design.preview}
                                 alt={`Design ${index + 1}`}
-                                className="w-full h-24 object-contain rounded"
+                                className="max-w-full max-h-48 object-contain rounded"
+                                style={{ imageRendering: 'crisp-edges' as any }}
                           />
                           </div>
-                            <div className="text-xs text-gray-600">
-                              <div className="font-medium">Design {index + 1}</div>
-                              <div className="text-gray-500 truncate">{design.name}</div>
+                            <div className="text-sm text-gray-700">
+                              <div className="font-semibold mb-1">Design {index + 1}</div>
+                              <div className="text-gray-500 truncate text-xs">{design.name}</div>
+                              <div className="text-gray-400 text-xs mt-1">{design.dimensions.width}" × {design.dimensions.height}"</div>
                         </div>
                           </div>
                         ))}
@@ -2121,17 +2140,20 @@ export default function Customize() {
                     
                     {/* Legacy Single Design Image */}
                     {customizationData.designs.length === 0 && customizationData.design && (
-                      <div className="text-center">
-                        <div className="bg-gray-100 rounded-lg p-4 mb-3 max-w-xs mx-auto">
-                          <img
-                            src={customizationData.design.preview}
-                            alt="Design"
-                            className="w-full h-32 object-contain rounded"
-                          />
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <div className="font-medium">{customizationData.design.name}</div>
-                          <div className="text-gray-500">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</div>
+                      <div className="flex justify-center">
+                        <div className="text-center max-w-md">
+                          <div className="bg-gray-50 rounded-xl p-6 mb-4 border border-gray-200 flex items-center justify-center" style={{ minHeight: '300px' }}>
+                            <img
+                              src={customizationData.design.preview}
+                              alt="Design"
+                              className="max-w-full max-h-64 object-contain rounded"
+                              style={{ imageRendering: 'crisp-edges' as any }}
+                            />
+                          </div>
+                          <div className="text-sm text-gray-700">
+                            <div className="font-semibold mb-1">{customizationData.design.name}</div>
+                            <div className="text-gray-500 text-xs">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</div>
+                          </div>
                         </div>
                       </div>
                     )}

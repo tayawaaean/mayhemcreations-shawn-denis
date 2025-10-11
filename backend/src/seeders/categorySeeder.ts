@@ -116,37 +116,6 @@ const categorySeedData: CategorySeedData[] = [
       },
     ],
   },
-  {
-    name: 'Patches',
-    slug: 'patches',
-    description: 'Custom embroidered patches',
-    image: 'https://images.unsplash.com/photo-1583391733956-6c78276477e1?w=300&h=200&fit=crop',
-    status: 'active',
-    sortOrder: 3,
-    children: [
-      {
-        name: 'Iron-On Patches',
-        slug: 'iron-on-patches',
-        description: 'Custom iron-on patches',
-        status: 'active',
-        sortOrder: 1,
-      },
-      {
-        name: 'Sew-On Patches',
-        slug: 'sew-on-patches',
-        description: 'Custom sew-on patches',
-        status: 'active',
-        sortOrder: 2,
-      },
-      {
-        name: 'Patch Packs',
-        slug: 'patch-packs',
-        description: 'Custom patch collections',
-        status: 'active',
-        sortOrder: 3,
-      },
-    ],
-  },
 ];
 
 /**

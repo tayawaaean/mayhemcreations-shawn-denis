@@ -223,32 +223,47 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h3>
               <div className="space-y-4">
-                {order.items.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
-                    <div className="flex items-center">
-                      <img
-                        src={item.product.primaryImage}
-                        alt={item.product.title}
-                        className="h-12 w-12 rounded-lg object-cover"
-                      />
-                      <div className="ml-4">
-                        <p className="text-sm font-medium text-gray-900">{item.product.title}</p>
-                        <p className="text-sm text-gray-500">SKU: {item.product.sku}</p>
-                        <p className="text-sm text-gray-500">
-                          {item.variant.size && `Size: ${item.variant.size}`}
-                          {item.variant.color && `, Color: ${item.variant.color}`}
+                {order.items.map((item: any, index: number) => {
+                  // Access product info from the nested structure
+                  const product = item.product || item.productSnapshot || {};
+                  const customization = item.customization || {};
+                  const selectedVariant = customization.selectedVariant || {};
+                  const productImage = product.image || product.primaryImage || '';
+                  const productTitle = item.productName || product.title || 'Product';
+                  
+                  return (
+                    <div key={index} className="flex items-center justify-between py-3 border-b border-gray-100 last:border-b-0">
+                      <div className="flex items-center">
+                        {productImage && (
+                          <img
+                            src={productImage}
+                            alt={productTitle}
+                            className="h-12 w-12 rounded-lg object-cover"
+                          />
+                        )}
+                        <div className="ml-4">
+                          <p className="text-sm font-medium text-gray-900">{productTitle}</p>
+                          {selectedVariant.color && (
+                            <p className="text-sm text-gray-500">
+                              Color: {selectedVariant.color}
+                              {selectedVariant.size && `, Size: ${selectedVariant.size}`}
+                            </p>
+                          )}
+                          {customization.notes && (
+                            <p className="text-xs text-gray-400 mt-1">{customization.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">Qty: {item.quantity}</p>
+                        <p className="text-sm text-gray-600">${Number(item.price || 0).toFixed(2)} each</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          ${(Number(item.price || 0) * item.quantity).toFixed(2)}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">Qty: {item.quantity}</p>
-                      <p className="text-sm text-gray-600">${item.price.toFixed(2)} each</p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

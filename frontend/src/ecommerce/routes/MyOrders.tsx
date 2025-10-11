@@ -435,27 +435,27 @@ const getStatusIcon = (status: Order['status']) => {
 const getStatusText = (status: Order['status']) => {
   switch (status) {
     case 'pending-review':
-      return 'Pending Admin Review'
+      return 'Being Reviewed'
     case 'rejected-needs-upload':
-      return 'Rejected - Re-upload Required'
+      return 'Needs Your Attention'
     case 'picture-reply-pending':
-      return 'Picture Reply Pending'
+      return 'Design Sample Ready'
     case 'picture-reply-rejected':
-      return 'Picture Rejected - Admin Will Re-upload'
+      return 'We\'re Making Adjustments'
     case 'picture-reply-approved':
-      return 'Picture Approved'
+      return 'Design Approved'
     case 'pending-payment':
-      return 'Pending Payment'
+      return 'Ready for Payment'
     case 'approved-processing':
-      return 'Approved - Processing Design'
+      return 'Being Prepared'
     case 'ready-for-production':
-      return 'Ready for Production'
+      return 'Ready to Make'
     case 'in-production':
-      return 'In Production'
+      return 'Being Made'
     case 'ready-for-checkout':
-      return 'Ready for Checkout'
+      return 'Ready to Order'
     default:
-      return 'Unknown'
+      return 'In Progress'
   }
 }
 
@@ -1227,17 +1227,17 @@ export default function MyOrders() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
           >
-            <option value="all">All Status</option>
-            <option value="pending-review">Pending Admin Review</option>
-            <option value="rejected-needs-upload">Rejected - Re-upload Required</option>
-            <option value="picture-reply-pending">Picture Reply Pending</option>
-            <option value="picture-reply-rejected">Picture Rejected</option>
-            <option value="picture-reply-approved">Picture Approved</option>
-            <option value="pending-payment">Pending Payment</option>
-            <option value="approved-processing">Approved - Processing Design</option>
-            <option value="ready-for-production">Ready for Production</option>
-            <option value="in-production">In Production</option>
-            <option value="ready-for-checkout">Ready for Checkout</option>
+            <option value="all">All Orders</option>
+            <option value="pending-review">Being Reviewed</option>
+            <option value="rejected-needs-upload">Needs Your Attention</option>
+            <option value="picture-reply-pending">Design Sample Ready</option>
+            <option value="picture-reply-rejected">We're Making Adjustments</option>
+            <option value="picture-reply-approved">Design Approved</option>
+            <option value="pending-payment">Ready for Payment</option>
+            <option value="approved-processing">Being Prepared</option>
+            <option value="ready-for-production">Ready to Make</option>
+            <option value="in-production">Being Made</option>
+            <option value="ready-for-checkout">Ready to Order</option>
           </select>
 
           <select
@@ -1910,23 +1910,17 @@ export default function MyOrders() {
                 </div>
 
                 {/* Picture Replies Section - Grouped by Product */}
-                {(() => {
-                  console.log('🔍 Debug adminPictureReplies:', {
-                    hasAdminPictureReplies: !!selectedOrder.adminPictureReplies,
-                    isArray: Array.isArray(selectedOrder.adminPictureReplies),
-                    length: selectedOrder.adminPictureReplies?.length,
-                    adminPictureReplies: selectedOrder.adminPictureReplies,
-                    selectedOrderId: selectedOrder.id,
-                    status: selectedOrder.status
-                  });
-                  
-                  return selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0;
-                })() && (
+                {selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                      <MessageSquare className="w-5 h-5 text-blue-600" />
-                      <span>Design Review Conversations</span>
-                    </h3>
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-6 border border-blue-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center space-x-2">
+                        <MessageSquare className="w-5 h-5 text-blue-600" />
+                        <span>Your Design Samples Are Ready!</span>
+                      </h3>
+                      <p className="text-sm text-gray-700">
+                        We've created sample versions of your design. Please review them and let us know if you love them or want any changes.
+                      </p>
+                    </div>
                     
                     {/* Group replies by item */}
                     <div className="space-y-6">
@@ -2008,21 +2002,30 @@ export default function MyOrders() {
                                       {/* Admin Message */}
                                       <div className="flex justify-start">
                                         <div className="max-w-xs lg:max-w-md">
-                                          <div className="bg-blue-500 text-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                                          <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl rounded-bl-md px-4 py-3 shadow-lg">
                                             <div className="flex items-start space-x-3">
-                                              <img
-                                                src={reply.image}
-                                                alt="Admin Picture Reply"
-                                                className="w-16 h-16 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-                                                onClick={() => window.open(reply.image, '_blank')}
-                                              />
+                                              <div className="flex-shrink-0">
+                                                <img
+                                                  src={reply.image}
+                                                  alt="Your design sample"
+                                                  className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-all hover:scale-105 border-2 border-white shadow-md"
+                                                  onClick={() => window.open(reply.image, '_blank')}
+                                                  title="Click to view full size"
+                                                />
+                                                <p className="text-xs text-center text-blue-100 mt-1">Click to enlarge</p>
+                                              </div>
                                               <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-blue-100 mb-1">Admin</p>
+                                                <div className="flex items-center space-x-2 mb-1">
+                                                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                                  <p className="text-sm font-semibold text-white">Our Design Team</p>
+                                                </div>
                                                 {reply.notes && (
-                                                  <p className="text-sm text-white mb-2">{reply.notes}</p>
+                                                  <div className="bg-blue-600 bg-opacity-50 rounded-lg p-2 mb-2">
+                                                    <p className="text-sm text-white leading-relaxed">{reply.notes}</p>
+                                                  </div>
                                                 )}
-                                                <p className="text-xs text-blue-200 opacity-75">
-                                                  {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleString() : 'Unknown time'}
+                                                <p className="text-xs text-blue-100 opacity-90">
+                                                  Sent on {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
                                                 </p>
                                               </div>
                                             </div>
@@ -2034,64 +2037,98 @@ export default function MyOrders() {
                                       <div className="flex justify-end">
                                         <div className="max-w-xs lg:max-w-md">
                                           {selectedOrder && (selectedOrder.status === 'pending-payment' || selectedOrder.status === 'approved-processing') ? (
-                                            <div className="bg-green-100 text-green-800 rounded-2xl rounded-br-md px-4 py-3 shadow-sm border border-green-200">
-                                              <div className="flex items-center space-x-2 mb-1">
-                                                <User className="h-4 w-4" />
-                                                <p className="text-sm font-medium">You</p>
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-200 text-green-800">
-                                                  ✓ Approved
-                                                </span>
+                                            <div className="bg-gradient-to-br from-green-50 to-green-100 text-green-900 rounded-2xl rounded-br-md px-4 py-3 shadow-md border-2 border-green-300">
+                                              <div className="flex items-center space-x-2 mb-2">
+                                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                                  <Check className="h-5 w-5 text-white" />
+                                                </div>
+                                                <div>
+                                                  <p className="text-sm font-semibold">You Approved This!</p>
+                                                  <p className="text-xs text-green-700">Great choice!</p>
+                                                </div>
                                               </div>
-                                              <p className="text-sm">
-                                                {selectedOrder.status === 'pending-payment' 
-                                                  ? 'Design approved - Payment required to proceed'
-                                                  : 'Design approved and being processed - No further action needed'
-                                                }
-                                              </p>
+                                              <div className="bg-white bg-opacity-50 rounded-lg p-2">
+                                                <p className="text-sm">
+                                                  {selectedOrder.status === 'pending-payment' 
+                                                    ? '🎉 Design approved! Please complete payment to start production.'
+                                                    : '✨ Design approved and in progress. We\'ll notify you when it\'s ready!'
+                                                  }
+                                                </p>
+                                              </div>
                                             </div>
                                           ) : (
-                                            <div className="bg-gray-100 text-gray-600 rounded-2xl rounded-br-md px-4 py-3 shadow-sm border border-gray-200">
-                                              <div className="flex items-center space-x-2 mb-2">
-                                                <User className="h-4 w-4" />
-                                                <p className="text-sm font-medium">Your Response</p>
+                                            <div className="bg-white rounded-2xl rounded-br-md px-4 py-4 shadow-md border-2 border-gray-200">
+                                              <div className="flex items-center space-x-2 mb-3">
+                                                <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
+                                                  <User className="h-4 w-4 text-white" />
+                                                </div>
+                                                <p className="text-sm font-semibold text-gray-900">What Do You Think?</p>
                                               </div>
                                               
                                               <div className="space-y-3">
-                                                <p className="text-sm font-medium text-gray-700">Do you approve this picture?</p>
-                                                <div className="flex space-x-4">
-                                                  <label className="flex items-center space-x-2">
+                                                <p className="text-sm text-gray-700">Does this design look good to you?</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                  <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                                    pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                      ? 'border-green-500 bg-green-50' 
+                                                      : 'border-gray-300 hover:border-green-300 hover:bg-green-50'
+                                                  }`}>
                                                     <input
                                                       type="radio"
                                                       name={`confirmation-${reply.itemId}`}
                                                       checked={pictureConfirmations[reply.itemId]?.confirmed === true}
                                                       onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
-                                                      className="text-green-600 focus:ring-green-500"
+                                                      className="sr-only"
                                                     />
-                                                    <span className="text-sm text-green-700">✓ Approve</span>
+                                                    <CheckCircle className={`h-8 w-8 mb-1 ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                        ? 'text-green-600' 
+                                                        : 'text-gray-400'
+                                                    }`} />
+                                                    <span className={`text-sm font-medium ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                        ? 'text-green-700' 
+                                                        : 'text-gray-700'
+                                                    }`}>Love It!</span>
+                                                    <span className="text-xs text-gray-500 mt-1">Looks perfect</span>
                                                   </label>
-                                                  <label className="flex items-center space-x-2">
+                                                  <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                                    pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                      ? 'border-orange-500 bg-orange-50' 
+                                                      : 'border-gray-300 hover:border-orange-300 hover:bg-orange-50'
+                                                  }`}>
                                                     <input
                                                       type="radio"
                                                       name={`confirmation-${reply.itemId}`}
                                                       checked={pictureConfirmations[reply.itemId]?.confirmed === false}
                                                       onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
-                                                      className="text-red-600 focus:ring-red-500"
+                                                      className="sr-only"
                                                     />
-                                                    <span className="text-sm text-red-700">✗ Reject</span>
+                                                    <AlertCircle className={`h-8 w-8 mb-1 ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                        ? 'text-orange-600' 
+                                                        : 'text-gray-400'
+                                                    }`} />
+                                                    <span className={`text-sm font-medium ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                        ? 'text-orange-700' 
+                                                        : 'text-gray-700'
+                                                    }`}>Need Changes</span>
+                                                    <span className="text-xs text-gray-500 mt-1">Let's adjust</span>
                                                   </label>
                                                 </div>
                                                 
                                                 {/* Notes */}
                                                 <div>
                                                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    Your Notes (Optional)
+                                                    Any Comments? (Optional)
                                                   </label>
                                                   <textarea
                                                     value={pictureConfirmations[reply.itemId]?.notes || ''}
                                                     onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
                                                     rows={2}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none"
-                                                    placeholder="Add any comments about this picture..."
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm resize-none"
+                                                    placeholder="Tell us what you'd like to change..."
                                                   />
                                                 </div>
                                               </div>
@@ -2130,16 +2167,16 @@ export default function MyOrders() {
                         return itemReplies.length === 0;
                       }) && (
                         <div className="text-center py-8">
-                          <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                          <h3 className="mt-2 text-lg font-medium text-gray-900">No Design Samples Found</h3>
-                          <p className="mt-1 text-sm text-gray-500">
-                            Admin hasn't uploaded design samples for any items in this order yet.
+                          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                            <Clock className="h-8 w-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900">Hang Tight!</h3>
+                          <p className="mt-2 text-sm text-gray-600 max-w-sm mx-auto">
+                            Our design team is working on your samples. We'll notify you as soon as they're ready to review!
                           </p>
-                          <div className="mt-4 text-xs text-gray-400">
-                            <p>Debug Info:</p>
-                            <p>Total adminPictureReplies: {selectedOrder.adminPictureReplies?.length || 0}</p>
-                            <p>Available reply item IDs: {selectedOrder.adminPictureReplies?.map(r => r.itemId).join(', ') || 'None'}</p>
-                            <p>Order item IDs: {selectedOrder.items.map(item => item.id).join(', ')}</p>
+                          <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
+                            Usually ready within 24-48 hours
                           </div>
                         </div>
                       )}
@@ -2147,29 +2184,6 @@ export default function MyOrders() {
                   </div>
                 )}
 
-                {/* Debug section - show when no conversations */}
-                {(!selectedOrder.adminPictureReplies || !Array.isArray(selectedOrder.adminPictureReplies) || selectedOrder.adminPictureReplies.length === 0) && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center space-x-2">
-                      <MessageSquare className="w-5 h-5 text-gray-400" />
-                      <span>Design Review Conversations</span>
-                    </h3>
-                    <div className="text-center py-8">
-                      <MessageSquare className="mx-auto h-12 w-12 text-gray-400" />
-                      <h3 className="mt-2 text-lg font-medium text-gray-900">No Design Samples Yet</h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Admin hasn't uploaded design samples for this order yet.
-                      </p>
-                      <div className="mt-4 text-xs text-gray-400">
-                        <p>Debug Info:</p>
-                        <p>Has adminPictureReplies: {selectedOrder.adminPictureReplies ? 'Yes' : 'No'}</p>
-                        <p>Is Array: {Array.isArray(selectedOrder.adminPictureReplies) ? 'Yes' : 'No'}</p>
-                        <p>Length: {selectedOrder.adminPictureReplies?.length || 0}</p>
-                        <p>Order Status: {selectedOrder.status}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
               </div>
 

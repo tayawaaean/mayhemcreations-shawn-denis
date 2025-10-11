@@ -89,6 +89,7 @@ class AdminOrderApiService {
     page?: number;
     limit?: number;
     status?: string;
+    paymentStatus?: string;
     customerId?: number;
   } = {}): Promise<OrderApiResponse<OrderListResponse>> {
     const searchParams = new URLSearchParams();
@@ -96,10 +97,12 @@ class AdminOrderApiService {
     if (params.page) searchParams.append('page', params.page.toString());
     if (params.limit) searchParams.append('limit', params.limit.toString());
     if (params.status) searchParams.append('status', params.status);
+    if (params.paymentStatus) searchParams.append('paymentStatus', params.paymentStatus);
     if (params.customerId) searchParams.append('customerId', params.customerId.toString());
 
     const queryString = searchParams.toString();
-    const endpoint = `/orders/admin/review-orders${queryString ? `?${queryString}` : ''}`;
+    // Changed to use the new admin orders endpoint
+    const endpoint = `/admin/orders${queryString ? `?${queryString}` : ''}`;
 
     return this.makeRequest<OrderListResponse>(endpoint);
   }
@@ -108,7 +111,8 @@ class AdminOrderApiService {
    * Get order details by ID
    */
   async getOrderById(orderId: string): Promise<OrderApiResponse<Order>> {
-    return this.makeRequest<Order>(`/orders/review-orders/${orderId}`);
+    // Changed to use the new admin orders endpoint
+    return this.makeRequest<Order>(`/admin/orders/${orderId}`);
   }
 
   /**
@@ -117,69 +121,94 @@ class AdminOrderApiService {
   async updateOrderStatus(
     orderId: string,
     status: string,
-    adminNotes?: string
+    adminNotes?: string,
+    trackingNumber?: string,
+    shippingCarrier?: string
   ): Promise<OrderApiResponse<Order>> {
-    return this.makeRequest<Order>(`/orders/review-orders/${orderId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status, adminNotes }),
+    // Changed to use the new admin orders endpoint
+    return this.makeRequest<Order>(`/admin/orders/${orderId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ 
+        status, 
+        adminNotes,
+        trackingNumber,
+        shippingCarrier
+      }),
     });
   }
 
   /**
    * Transform API order data to Order format
+   * Updated to handle the new orders table structure
    */
   transformOrderData(apiOrder: any): Order {
+    // Parse JSON fields if they are strings
+    const items = typeof apiOrder.items === 'string' ? JSON.parse(apiOrder.items) : apiOrder.items;
+    const shippingAddress = typeof apiOrder.shippingAddress === 'string' ? JSON.parse(apiOrder.shippingAddress) : apiOrder.shippingAddress;
+    const billingAddress = apiOrder.billingAddress && typeof apiOrder.billingAddress === 'string' 
+      ? JSON.parse(apiOrder.billingAddress) 
+      : apiOrder.billingAddress;
+
     return {
       id: apiOrder.id.toString(),
-      customerId: apiOrder.user_id.toString(),
+      orderNumber: apiOrder.orderNumber || `ORD-${apiOrder.id}`,
+      customerId: apiOrder.userId.toString(),
       customer: {
-        id: apiOrder.user_id.toString(),
-        name: `${apiOrder.user?.first_name || ''} ${apiOrder.user?.last_name || ''}`.trim(),
-        email: apiOrder.user?.email || '',
-        phone: apiOrder.user?.phone || '',
+        id: apiOrder.userId.toString(),
+        name: `${apiOrder.user_first_name || shippingAddress?.firstName || ''} ${apiOrder.user_last_name || shippingAddress?.lastName || ''}`.trim(),
+        email: apiOrder.user_email || shippingAddress?.email || '',
+        phone: apiOrder.user_phone || shippingAddress?.phone || '',
         address: {
-          street: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: 'US'
+          street: shippingAddress?.street || '',
+          city: shippingAddress?.city || '',
+          state: shippingAddress?.state || '',
+          zipCode: shippingAddress?.zipCode || '',
+          country: shippingAddress?.country || 'US'
         },
+        orders: [],
+        totalSpent: parseFloat(apiOrder.total.toString()),
         avatar: '',
         status: 'active',
-        createdAt: apiOrder.user?.created_at || new Date().toISOString(),
-        lastLogin: apiOrder.user?.last_login || new Date().toISOString()
+        createdAt: new Date(apiOrder.createdAt || new Date()),
+        lastOrderDate: new Date(apiOrder.createdAt || new Date())
       },
-      items: apiOrder.order_data || [],
-      status: apiOrder.status,
+      items: items || [],
+      status: apiOrder.status || 'preparing',
       total: parseFloat(apiOrder.total.toString()),
-      subtotal: parseFloat(apiOrder.subtotal.toString()),
-      shipping: parseFloat(apiOrder.shipping.toString()),
-      tax: parseFloat(apiOrder.tax.toString()),
+      subtotal: parseFloat(apiOrder.subtotal.toString()) || 0,
+      shipping: parseFloat(apiOrder.shipping.toString()) || 0,
+      tax: parseFloat(apiOrder.tax.toString()) || 0,
       shippingAddress: {
+        street: shippingAddress?.street || '',
+        city: shippingAddress?.city || '',
+        state: shippingAddress?.state || '',
+        zipCode: shippingAddress?.zipCode || '',
+        country: shippingAddress?.country || 'US'
+      },
+      billingAddress: billingAddress || shippingAddress || {
         street: '',
         city: '',
         state: '',
         zipCode: '',
         country: 'US'
       },
-      billingAddress: {
-        street: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        country: 'US'
-      },
-      paymentMethod: 'Credit Card', // Default, will be updated from payment data
-      paymentStatus: apiOrder.status === 'approved-processing' ? 'completed' : 'pending',
-      paymentProvider: 'stripe', // Default, will be updated from payment data
+      paymentMethod: apiOrder.paymentMethod || 'Credit Card',
+      paymentStatus: apiOrder.paymentStatus || 'completed',
+      paymentProvider: apiOrder.paymentProvider || 'stripe',
       paymentDetails: {
-        transactionId: '',
-        providerTransactionId: '',
-        processedAt: apiOrder.reviewed_at ? new Date(apiOrder.reviewed_at) : undefined
+        transactionId: apiOrder.transactionId || '',
+        providerTransactionId: apiOrder.paymentIntentId || '',
+        cardLast4: apiOrder.cardLast4 || '',
+        cardBrand: apiOrder.cardBrand || '',
+        processedAt: apiOrder.createdAt ? new Date(apiOrder.createdAt) : undefined
       },
-      notes: apiOrder.admin_notes ? [apiOrder.admin_notes] : [],
-      createdAt: new Date(apiOrder.created_at),
-      updatedAt: new Date(apiOrder.updated_at)
+      trackingNumber: apiOrder.trackingNumber || undefined,
+      shippingCarrier: apiOrder.shippingCarrier || undefined,
+      notes: apiOrder.adminNotes || apiOrder.customerNotes || apiOrder.internalNotes 
+        ? [apiOrder.adminNotes, apiOrder.customerNotes, apiOrder.internalNotes].filter(Boolean) 
+        : [],
+      createdAt: new Date(apiOrder.createdAt || new Date()),
+      updatedAt: new Date(apiOrder.updatedAt || new Date())
     };
   }
 }
