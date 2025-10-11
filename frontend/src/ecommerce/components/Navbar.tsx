@@ -372,6 +372,23 @@ export default function Navbar() {
     }
   }, [dropdownTimeout])
 
+  // Listen for custom event from ChatWidget to open auth modal
+  useEffect(() => {
+    const handleOpenAuthModal = (event: CustomEvent) => {
+      const mode = event.detail?.mode || 'login'
+      setAuthMode(mode)
+      setShowAuthModal(true)
+      setMobileMenuOpen(false)
+      console.log('🔓 Opening auth modal from external trigger:', mode)
+    }
+
+    window.addEventListener('openAuthModal', handleOpenAuthModal as EventListener)
+
+    return () => {
+      window.removeEventListener('openAuthModal', handleOpenAuthModal as EventListener)
+    }
+  }, [])
+
   return (
     <header className="w-full bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="container">

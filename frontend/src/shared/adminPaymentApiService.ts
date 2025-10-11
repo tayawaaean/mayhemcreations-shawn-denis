@@ -111,7 +111,7 @@ class AdminPaymentApiService {
     if (params.customerId) searchParams.append('customerId', params.customerId.toString());
 
     const queryString = searchParams.toString();
-    const endpoint = `/admin/payments${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/admin/payment-logs${queryString ? `?${queryString}` : ''}`;
 
     return this.makeRequest<PaymentListResponse>(endpoint);
   }
@@ -120,14 +120,14 @@ class AdminPaymentApiService {
    * Get payment statistics
    */
   async getPaymentStats(): Promise<PaymentApiResponse<PaymentStatsResponse>> {
-    return this.makeRequest<PaymentStatsResponse>('/admin/payments/stats');
+    return this.makeRequest<PaymentStatsResponse>('/admin/payment-logs/stats');
   }
 
   /**
    * Get payment details by ID
    */
   async getPaymentById(paymentId: string): Promise<PaymentApiResponse<PaymentLog>> {
-    return this.makeRequest<PaymentLog>(`/admin/payments/${paymentId}`);
+    return this.makeRequest<PaymentLog>(`/admin/payment-logs/${paymentId}`);
   }
 
   /**
@@ -137,7 +137,7 @@ class AdminPaymentApiService {
     paymentId: string,
     notes: string
   ): Promise<PaymentApiResponse<{ notes: string }>> {
-    return this.makeRequest<{ notes: string }>(`/admin/payments/${paymentId}/notes`, {
+    return this.makeRequest<{ notes: string }>(`/admin/payment-logs/${paymentId}/notes`, {
       method: 'PUT',
       body: JSON.stringify({ notes }),
     });

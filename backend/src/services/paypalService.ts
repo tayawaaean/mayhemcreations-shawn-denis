@@ -32,6 +32,7 @@ export interface CreatePayPalOrderData {
   description?: string;
   customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
   items?: Array<{
     name: string;
     quantity: number;
@@ -128,21 +129,69 @@ export interface PayPalCaptureResult {
  */
 export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<PayPalOrderResult> => {
   try {
-    // Calculate total amount
-    const totalAmount = data.items 
+    // Calculate subtotal from items
+    const subtotal = data.items 
       ? data.items.reduce((sum, item) => sum + (item.unitAmount * item.quantity), 0)
       : data.amount;
+
+    // Extract shipping and tax from metadata (passed from frontend)
+    const shippingCost = data.metadata?.shipping ? parseFloat(data.metadata.shipping) : 0;
+    const taxAmount = data.metadata?.tax ? parseFloat(data.metadata.tax) : 0;
+    
+    // Calculate total amount (subtotal + shipping + tax)
+    const totalAmount = subtotal + shippingCost + taxAmount;
+
+    logger.info('💰 PayPal Order Pricing:', {
+      subtotal: formatPayPalAmount(subtotal),
+      shipping: formatPayPalAmount(shippingCost),
+      tax: formatPayPalAmount(taxAmount),
+      total: formatPayPalAmount(totalAmount)
+    });
 
     // Create PayPal Order Request
     const request = new paypal.orders.OrdersCreateRequest();
     request.prefer("return=representation");
     
+    // Split customer name into first and last name
+    const nameParts = (data.customerName || 'Customer').trim().split(' ');
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
     const requestBody: any = {
       intent: 'CAPTURE',
+      payer: {
+        // Override PayPal account info with form data
+        name: {
+          given_name: firstName,
+          surname: lastName || 'Customer'
+        },
+        email_address: data.customerEmail,
+        phone: data.customerPhone ? {
+          phone_type: 'MOBILE',
+          phone_number: {
+            national_number: data.customerPhone.replace(/\D/g, '')
+          }
+        } : undefined
+      },
       purchase_units: [{
         amount: {
           currency_code: data.currency?.toUpperCase() || 'USD',
           value: formatPayPalAmount(totalAmount),
+          // Add breakdown so PayPal shows subtotal, shipping, and tax separately
+          breakdown: {
+            item_total: {
+              currency_code: data.currency?.toUpperCase() || 'USD',
+              value: formatPayPalAmount(subtotal)
+            },
+            shipping: {
+              currency_code: data.currency?.toUpperCase() || 'USD',
+              value: formatPayPalAmount(shippingCost)
+            },
+            tax_total: {
+              currency_code: data.currency?.toUpperCase() || 'USD',
+              value: formatPayPalAmount(taxAmount)
+            }
+          }
         },
         description: data.description || 'Mayhem Creations Order',
         custom_id: data.metadata?.userId || undefined,
@@ -151,14 +200,15 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
         brand_name: 'Mayhem Creations',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
+        shipping_preference: 'SET_PROVIDED_ADDRESS', // Use the address we provide, don't allow changes
         return_url: data.returnUrl || process.env.FRONTEND_URL + '/payment/success',
         cancel_url: data.cancelUrl || process.env.FRONTEND_URL + '/payment/cancel'
       }
     };
 
-    // Add shipping address if provided
+    // Add shipping address if provided (required when shipping_preference is SET_PROVIDED_ADDRESS)
     if (data.shippingAddress) {
-      requestBody.purchase_units[0].shipping = {
+      const shippingData: any = {
         name: {
           full_name: data.customerName || 'Customer'
         },
@@ -171,9 +221,32 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
           country_code: data.shippingAddress.country
         }
       };
+      
+      // Add phone number if provided
+      if (data.customerPhone) {
+        shippingData.phone_number = {
+          national_number: data.customerPhone.replace(/\D/g, '') // Remove non-numeric characters
+        };
+      }
+      
+      requestBody.purchase_units[0].shipping = shippingData;
     }
 
     request.requestBody(requestBody);
+
+    // Log the complete request for debugging
+    logger.info('📦 Creating PayPal Order with request:', {
+      shippingPreference: requestBody.application_context.shipping_preference,
+      payerName: `${requestBody.payer.name.given_name} ${requestBody.payer.name.surname}`,
+      payerEmail: requestBody.payer.email_address,
+      hasShipping: !!requestBody.purchase_units[0].shipping,
+      shippingAddress: requestBody.purchase_units[0].shipping?.address,
+      shippingName: requestBody.purchase_units[0].shipping?.name?.full_name,
+      amount: {
+        total: requestBody.purchase_units[0].amount.value,
+        breakdown: requestBody.purchase_units[0].amount.breakdown
+      }
+    });
 
     // Execute PayPal API Request
     const response = await paypalClient().execute(request);
@@ -183,6 +256,7 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
       orderId: order.id,
       amount: totalAmount,
       currency: data.currency || 'USD',
+      status: order.status,
     });
 
     // Extract approval URL

@@ -139,28 +139,52 @@ export default function OrderCheckout() {
     const paypalSuccess = urlParams.get('paypal_success')
     const paypalCanceled = urlParams.get('paypal_canceled')
     const orderId = urlParams.get('orderId')
-    const paypalToken = urlParams.get('token')
+    const paypalToken = urlParams.get('token') // PayPal's token parameter
+    const payerId = urlParams.get('PayerID') // PayPal's payer ID parameter
+
+    console.log('🔍 Payment return detected:', { 
+      success, 
+      canceled, 
+      paypalSuccess, 
+      paypalCanceled, 
+      orderId, 
+      paypalToken, 
+      payerId,
+      hasOrder: !!order,
+      orderLoaded: !!order?.id
+    })
 
     // Handle Stripe success
     if (success === 'true' && orderId) {
-      setPaymentMethod('stripe')
-      setPaymentResult({
-        success: true,
-        paymentId: `stripe_${Date.now()}`,
-        payerEmail: formData.email
-      })
-      setIsComplete(true)
+      console.log('✅ Stripe payment success detected')
+      // Clean up checkout data
       sessionStorage.removeItem('checkoutOrder')
       sessionStorage.removeItem('checkoutFormData')
-      window.history.replaceState({}, document.title, window.location.pathname)
+      
+      // Redirect to My Orders with success message
+      navigate('/my-orders', {
+        state: {
+          paymentSuccess: true,
+          paymentMethod: 'stripe',
+          orderId: orderId
+        }
+      })
     } 
     // Handle Stripe cancel
     else if (canceled === 'true') {
       setPaymentError('Payment was canceled. You can try again or choose a different payment method.')
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-    // Handle PayPal success
-    else if (paypalSuccess === 'true' && paypalToken) {
+    // Handle PayPal success - PayPal redirects with token and PayerID parameters
+    // IMPORTANT: Wait for order to be loaded before processing PayPal return
+    else if (paypalToken && payerId) {
+      if (!order || !order.id) {
+        console.log('⏳ Waiting for order data to load...', { hasOrder: !!order, orderId: order?.id })
+        // Order not loaded yet, this effect will run again when order is set
+        return
+      }
+      
+      console.log('✅ PayPal payment success detected', { paypalToken, payerId, orderId: order.id })
       setPaymentMethod('paypal')
       handlePayPalReturn(paypalToken, formData.email)
     }
@@ -169,7 +193,7 @@ export default function OrderCheckout() {
       setPaymentError('PayPal payment was canceled. You can try again or choose a different payment method.')
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-  }, [])
+  }, [order, navigate])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -505,6 +529,21 @@ export default function OrderCheckout() {
           orderId: String(order.id),
           customerEmail: formData.email,
           customerName: `${formData.firstName} ${formData.lastName}`,
+          // Store form data for consistent address usage
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          street: formData.address,
+          apartment: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: 'US',
+          // Add pricing breakdown for order tracking
+          subtotal: String(calculateSubtotal().toFixed(2)),
+          shipping: String(calculateShipping().toFixed(2)),
+          tax: String(calculateTax().toFixed(2)),
+          total: String(calculateTotal().toFixed(2)),
         },
         returnUrl: `${window.location.origin}/order-checkout?paypal_success=true&orderId=${order.id}`,
         cancelUrl: `${window.location.origin}/order-checkout?paypal_canceled=true`,
@@ -528,32 +567,69 @@ export default function OrderCheckout() {
   const handlePayPalReturn = async (paypalToken: string, customerEmail: string) => {
     try {
       setIsProcessing(true)
-      console.log('Capturing PayPal payment for token:', paypalToken)
+      console.log('🔄 Capturing PayPal payment...', { 
+        paypalToken, 
+        orderId: order?.id,
+        hasFormData: !!formData.email,
+        formData: {
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        }
+      })
+
+      if (!order || !order.id) {
+        console.error('❌ No order found in state - this should not happen as useEffect waits for order')
+        setPaymentError('Order information could not be loaded. Please check your cart and try again.')
+        setIsProcessing(false)
+        return
+      }
 
       // Capture the PayPal order
       const response = await paymentsApiService.capturePayPalOrder({
         orderId: paypalToken,
         metadata: {
-          customerEmail: formData.email,
+          customerEmail: formData.email || customerEmail,
           customerName: `${formData.firstName} ${formData.lastName}`,
+          // Include form data and pricing for order completion
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          street: formData.address,
+          apartment: formData.apartment,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: 'US',
+          subtotal: String(calculateSubtotal().toFixed(2)),
+          shipping: String(calculateShipping().toFixed(2)),
+          tax: String(calculateTax().toFixed(2)),
+          total: String(calculateTotal().toFixed(2)),
         }
       })
 
+      console.log('📦 PayPal capture response:', response)
+
       if (response.success) {
-        setPaymentResult({
-          success: true,
-          paymentId: response.data?.id || paypalToken,
-          payerEmail: customerEmail
-        })
-        setIsComplete(true)
+        console.log('✅ PayPal payment captured successfully')
+        // Clean up checkout data
         sessionStorage.removeItem('checkoutOrder')
         sessionStorage.removeItem('checkoutFormData')
-        window.history.replaceState({}, document.title, window.location.pathname)
+        
+        // Redirect to My Orders with success message
+        navigate('/my-orders', { 
+          state: { 
+            paymentSuccess: true,
+            paymentMethod: 'paypal',
+            orderId: order.id 
+          }
+        })
       } else {
+        console.error('❌ PayPal capture failed:', response.message)
         setPaymentError(response.message || 'Failed to capture PayPal payment')
       }
     } catch (error) {
-      console.error('PayPal capture error:', error)
+      console.error('❌ PayPal capture error:', error)
       setPaymentError('Failed to complete PayPal payment. Please contact support.')
     } finally {
       setIsProcessing(false)
@@ -663,6 +739,30 @@ export default function OrderCheckout() {
                   <MapPin className="w-5 h-5 mr-2 text-accent" />
                   Shipping Information
                 </h2>
+
+                {/* Important Notice for Shipping Address */}
+                <div className="mb-6 bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-900">
+                        Important: This address will be used for shipping
+                      </h3>
+                      <p className="mt-1 text-sm text-blue-700">
+                        Please ensure the information below is accurate. This shipping address will be used to deliver your order, regardless of your payment method.
+                      </p>
+                      {paymentMethod === 'paypal' && (
+                        <p className="mt-2 text-xs text-blue-600 font-medium">
+                          Note: Even if you have a different address saved in PayPal, we will ship to the address you enter here.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="space-y-6">
                   {/* Personal Information */}
@@ -992,7 +1092,7 @@ export default function OrderCheckout() {
                   {paymentMethod === 'paypal' && (
                     <div className="border-t pt-6">
                       <h3 className="text-lg font-medium text-gray-900 mb-4">PayPal Payment</h3>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                         <div className="flex items-start">
                           <div className="flex-shrink-0">
                             <svg className="h-6 w-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
@@ -1001,11 +1101,30 @@ export default function OrderCheckout() {
                             </svg>
                           </div>
                           <div className="ml-3 flex-1">
-                            <p className="text-sm text-blue-800">
-                              Click "Place Order" below to continue to PayPal's secure checkout.
+                            <p className="text-sm font-medium text-blue-900 mb-1">
+                              Secure PayPal Checkout
                             </p>
-                            <p className="text-xs text-blue-600 mt-1">
-                              You'll be redirected to PayPal to complete your payment.
+                            <p className="text-sm text-blue-700">
+                              Click "Place Order" below to continue to PayPal's secure checkout page.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Shipping Address Notice for PayPal */}
+                      <div className="bg-amber-50 border-l-4 border-amber-400 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-amber-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h4 className="text-sm font-medium text-amber-900">
+                              Your order will ship to the address you entered in Step 1
+                            </h4>
+                            <p className="mt-1 text-xs text-amber-700">
+                              We use the shipping address you provided in this form, not the address saved in your PayPal account. Please make sure it's correct before proceeding.
                             </p>
                           </div>
                         </div>

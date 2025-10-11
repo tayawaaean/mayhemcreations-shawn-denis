@@ -161,6 +161,27 @@ export default function Cart() {
     return itemPrice
   }
   
+  // Helper function to get available stock for an item
+  const getAvailableStock = (item: typeof enriched[0]): number => {
+    // Custom embroidery has unlimited stock
+    if (item.productId === 'custom-embroidery') {
+      return 999;
+    }
+
+    // If item has a selected variant, use variant stock
+    if (item.customization?.selectedVariant?.stock !== undefined) {
+      return item.customization.selectedVariant.stock;
+    }
+
+    // Otherwise, use product stock (if available)
+    if (item.product?.stock !== undefined) {
+      return item.product.stock;
+    }
+
+    // Default to 99 if no stock info available
+    return 99;
+  };
+
   const subtotal = enriched.reduce((s, e) => s + (calculateItemPrice(e) * e.quantity), 0)
   // Shipping will be calculated based on location during checkout
   const shipping = 0 // Will be calculated in checkout based on location
@@ -495,7 +516,7 @@ export default function Cart() {
                             item.reviewStatus === 'rejected' ? 'bg-red-100 text-red-800' :
                             'bg-blue-100 text-blue-800'
                           }`}>
-                            {item.reviewStatus === 'pending' && 'Pending Review'}
+                            {item.reviewStatus === 'pending' && 'For Review'}
                             {item.reviewStatus === 'approved' && '✅ Approved'}
                             {item.reviewStatus === 'rejected' && '❌ Needs Changes'}
                             {item.reviewStatus === 'needs-changes' && '📝 Needs Changes'}
@@ -547,33 +568,44 @@ export default function Cart() {
                     
                     {/* Quantity Controls */}
                     <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto">
-                      {item.reviewStatus === 'pending' ? (
-                        // Items pending review have fixed quantity
-                        <div className="flex items-center border border-gray-300 rounded-md bg-gray-50">
-                          <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center text-gray-600">
-                            {item.quantity}
-                          </span>
-                        </div>
-                      ) : (
-                        // Approved items can have quantity changed
-                        <div className="flex items-center border border-gray-300 rounded-md">
-                          <button
-                            onClick={() => update(item.productId, Math.max(1, item.quantity - 1))}
-                            className="p-2 hover:bg-gray-50 transition-colors"
-                          >
-                            <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                          <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => update(item.productId, item.quantity + 1)}
-                            className="p-2 hover:bg-gray-50 transition-colors"
-                          >
-                            <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                        </div>
-                      )}
+                      {/* Allow quantity adjustment for all items in cart */}
+                      {(() => {
+                        const availableStock = getAvailableStock(item);
+                        const isAtMaxStock = item.quantity >= availableStock;
+                        const isLowStock = availableStock <= 5;
+                        
+                        return (
+                          <div className="flex flex-col items-start space-y-1">
+                            <div className="flex items-center border border-gray-300 rounded-md bg-white hover:border-accent transition-colors">
+                              <button
+                                onClick={() => update(item.productId, Math.max(1, item.quantity - 1))}
+                                className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={item.quantity <= 1}
+                                title={item.quantity <= 1 ? "Minimum quantity is 1" : "Decrease quantity"}
+                              >
+                                <Minus className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </button>
+                              <span className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium min-w-[2.5rem] sm:min-w-[3rem] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => update(item.productId, Math.min(availableStock, item.quantity + 1))}
+                                className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={isAtMaxStock}
+                                title={isAtMaxStock ? `Maximum available: ${availableStock}` : "Increase quantity"}
+                              >
+                                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                              </button>
+                            </div>
+                            {/* Stock indicator */}
+                            {isLowStock && availableStock < 999 && (
+                              <span className="text-xs text-orange-600 font-medium">
+                                {isAtMaxStock ? 'Max reached' : `Only ${availableStock} left`}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                       
                       {item.customization && (
                         <button
@@ -588,6 +620,7 @@ export default function Cart() {
                       <button
                         onClick={() => remove(item.productId)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Remove from cart"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

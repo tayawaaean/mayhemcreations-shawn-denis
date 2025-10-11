@@ -168,6 +168,56 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       }
     })
 
+    // Listen for new orders submitted for review
+    const unsubscribeNewOrder = subscribe('new_order_notification', (data: any) => {
+      console.log('🔔 New order notification received:', data)
+      addNotification({
+        type: 'order',
+        title: 'New Order for Review',
+        message: `New order with ${data.itemCount} item(s) submitted. Total: $${Number(data.total).toFixed(2)}`,
+        priority: 'high',
+        data: {
+          orderReviewId: data.orderReviewId,
+          userId: data.userId,
+          itemCount: data.itemCount,
+          total: data.total
+        }
+      })
+    })
+
+    // Listen for paid orders
+    const unsubscribePaidOrder = subscribe('order_paid_notification', (data: any) => {
+      console.log('🔔 Order paid notification received:', data)
+      addNotification({
+        type: 'payment',
+        title: 'Order Payment Received',
+        message: `Order #${data.orderNumber || data.orderReviewId} has been paid. Total: $${Number(data.total).toFixed(2)}`,
+        priority: 'high',
+        data: {
+          orderReviewId: data.orderReviewId,
+          orderNumber: data.orderNumber,
+          userId: data.userId,
+          total: data.total
+        }
+      })
+    })
+
+    // Listen for delivered orders
+    const unsubscribeDeliveredOrder = subscribe('order_delivered_notification', (data: any) => {
+      console.log('🔔 Order delivered notification received:', data)
+      addNotification({
+        type: 'update',
+        title: 'Order Delivered',
+        message: `Order #${data.orderNumber || data.orderReviewId} has been marked as delivered`,
+        priority: 'medium',
+        data: {
+          orderReviewId: data.orderReviewId,
+          orderNumber: data.orderNumber,
+          userId: data.userId
+        }
+      })
+    })
+
     // Listen for system notifications
     const unsubscribeSystem = subscribe('system_notification', (data: any) => {
       addNotification({
@@ -184,6 +234,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       unsubscribeOrder()
       unsubscribeOrderUpdate()
       unsubscribeMessage()
+      unsubscribeNewOrder()
+      unsubscribePaidOrder()
+      unsubscribeDeliveredOrder()
       unsubscribeSystem()
     }
   }, [user, subscribe])

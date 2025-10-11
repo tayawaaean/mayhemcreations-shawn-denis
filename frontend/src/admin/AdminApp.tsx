@@ -59,6 +59,7 @@ const AdminApp: React.FC = () => {
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="shipstation" element={<ShipStationManagement />} />
                         <Route path="payment-management" element={<PaymentManagement />} />
+                        <Route path="payment-logs" element={<PaymentLogs />} />
                         <Route path="refund-management" element={<RefundManagement />} />
                         <Route path="system-logs" element={<SystemLogs />} />
                         <Route path="profile" element={<Profile />} />

@@ -26,6 +26,7 @@ import productReviewRoute from './routes/productReviewRoute';
 import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
 import paymentManagementRoute from './routes/paymentManagementRoute';
+import paymentLogRoute from './routes/paymentLogRoute';
 import shipStationRoute from './routes/shipStationRoute';
 import shippingRoute from './routes/shippingRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
@@ -151,6 +152,7 @@ app.use('/api/v1/reviews', productReviewRoute);
 app.use('/api/v1/payments', paymentRoute);
 app.use('/api/v1/payments/paypal', paypalRoute);
 app.use('/api/v1/admin/payments', paymentManagementRoute);
+app.use('/api/v1/admin/payment-logs', paymentLogRoute);
 app.use('/api/v1/shipping', shippingRoute);
 app.use('/api/v1/shipstation', shipStationRoute);
 

@@ -95,6 +95,18 @@ class ProductReviewApiService {
   }
 
   /**
+   * Get all reviews by the current user
+   */
+  async getMyReviews(): Promise<ApiResponse<ProductReview[]>> {
+    try {
+      const response = await apiAuthService.get<ProductReview[]>('/reviews/my-reviews', true);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to fetch your reviews');
+    }
+  }
+
+  /**
    * Get all reviews (Admin only)
    */
   async getAllReviews(status?: 'all' | 'pending' | 'approved' | 'rejected'): Promise<ApiResponse<ProductReview[]>> {

@@ -1180,60 +1180,103 @@ const PendingReview: React.FC = () => {
         </button>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats cards - Now Clickable for Quick Filtering */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="h-6 w-6 text-yellow-600" />
+        <button
+          onClick={() => {
+            setSelectedStatus('pending');
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+          }}
+          className="bg-white p-6 rounded-lg shadow-sm border-2 border-yellow-200 hover:border-yellow-400 hover:shadow-md transition-all text-left group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
+                <Clock className="h-6 w-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">For Review</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {reviews.filter(r => r.status === 'pending' || r.status === 'picture-reply-pending').length}
+                </p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Pending Review</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'pending' || r.status === 'picture-reply-pending').length}
-              </p>
-            </div>
+            <AlertCircle className="h-5 w-5 text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <DollarSign className="h-6 w-6 text-orange-600" />
+          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+        </button>
+        
+        <button
+          onClick={() => {
+            setSelectedStatus('pending-payment');
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+          }}
+          className="bg-white p-6 rounded-lg shadow-sm border-2 border-orange-200 hover:border-orange-400 hover:shadow-md transition-all text-left group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
+                <DollarSign className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Awaiting Payment</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {reviews.filter(r => r.status === 'pending-payment' || r.status === 'ready-for-checkout').length}
+                </p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Awaiting Payment</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'pending-payment' || r.status === 'ready-for-checkout').length}
-              </p>
-            </div>
+            <Eye className="h-5 w-5 text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Package className="h-6 w-6 text-purple-600" />
+          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+        </button>
+        
+        <button
+          onClick={() => {
+            setSelectedStatus('in-production');
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+          }}
+          className="bg-white p-6 rounded-lg shadow-sm border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all text-left group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                <Package className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">In Production</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {reviews.filter(r => r.status === 'approved-processing' || r.status === 'in-production').length}
+                </p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">In Production</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'approved-processing' || r.status === 'in-production').length}
-              </p>
-            </div>
+            <Eye className="h-5 w-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+        </button>
+        
+        <button
+          onClick={() => {
+            setSelectedStatus('shipped');
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+          }}
+          className="bg-white p-6 rounded-lg shadow-sm border-2 border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Shipped & Delivered</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {reviews.filter(r => r.status === 'shipped' || r.status === 'delivered').length}
+                </p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Shipped & Delivered</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'shipped' || r.status === 'delivered').length}
-              </p>
-            </div>
+            <Eye className="h-5 w-5 text-green-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-        </div>
+          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+        </button>
       </div>
 
       {/* Filters and search */}
@@ -1315,7 +1358,7 @@ const PendingReview: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submitted
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -1393,14 +1436,38 @@ const PendingReview: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(review.submitted_at)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      {/* Primary Action Button - Highlighted */}
                       <button
                         onClick={() => handleViewReview(review)}
-                      className="text-blue-600 hover:text-blue-900 p-2 rounded hover:bg-blue-50 transition-colors"
-                      title="View details and manage order"
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        title="View details and manage order"
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4 mr-2" />
+                        View & Manage
                       </button>
+                      
+                      {/* Quick Status Indicator Badge */}
+                      {review.status === 'pending' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Needs Review
+                        </span>
+                      )}
+                      {review.status === 'picture-reply-pending' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Awaiting Response
+                        </span>
+                      )}
+                      {review.status === 'pending-payment' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                          <DollarSign className="h-3 w-3 mr-1" />
+                          Ready to Pay
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1572,14 +1639,28 @@ const PendingReview: React.FC = () => {
                           
                           return (
                             <div className="pt-4 border-t border-gray-200">
-                              <p className="text-sm font-medium text-gray-600 mb-2">Shipping Address</p>
-                              <div className="text-base text-gray-900 space-y-1">
-                                <p className="font-medium">{address.firstName} {address.lastName}</p>
-                                {address.phone && <p>{address.phone}</p>}
-                                <p>{address.street}</p>
-                                <p>{address.city}, {address.state} {address.zipCode}</p>
-                                <p>{address.country}</p>
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-sm font-medium text-gray-600">Shipping Address</p>
+                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  Verified by Customer
+                                </span>
                               </div>
+                              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                <div className="text-base text-gray-900 space-y-1">
+                                  <p className="font-medium">{address.firstName} {address.lastName}</p>
+                                  {address.phone && <p className="text-sm text-gray-600">📞 {address.phone}</p>}
+                                  <p>{address.street}</p>
+                                  {address.apartment && <p className="text-sm text-gray-500">{address.apartment}</p>}
+                                  <p>{address.city}, {address.state} {address.zipCode}</p>
+                                  <p className="font-medium">{address.country}</p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2 italic">
+                                This is the shipping address provided by the customer during checkout. Use this address for order fulfillment.
+                              </p>
                             </div>
                           );
                         } catch (e) {
@@ -3168,7 +3249,7 @@ const PendingReview: React.FC = () => {
                         selectedReview.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
                       }`}>1</div>
                       <span className={selectedReview.status === 'pending' ? 'text-amber-800 font-medium' : 'text-gray-600'}>
-                        Pending Review
+                        For Review
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -3239,7 +3320,7 @@ const PendingReview: React.FC = () => {
                     onChange={(e) => setSelectedReview({...selectedReview, status: e.target.value as any})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="pending">1. Pending Review</option>
+                    <option value="pending">1. For Review</option>
                     <option value="needs-changes">2. Design Review Pending</option>
                     <option value="picture-reply-approved">3. Customer Approves Design</option>
                     <option value="pending-payment">4. Pending Payment</option>

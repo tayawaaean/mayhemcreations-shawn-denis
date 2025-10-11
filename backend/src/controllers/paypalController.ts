@@ -64,6 +64,7 @@ export const createPayPalOrderHandler = async (
       description: description || 'Mayhem Creations Order',
       customerEmail: customerInfo?.email || req.user?.email,
       customerName: customerInfo?.name || `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
+      customerPhone: customerInfo?.phone || metadata?.phone,
       items,
       shippingAddress,
       metadata: {
@@ -175,20 +176,42 @@ export const capturePayPalOrderHandler = async (
         if (Array.isArray(orderResult) && orderResult.length > 0) {
           const order = orderResult[0] as any;
           
-          // Extract shipping address from PayPal response
+          // Prioritize form data (metadata) over PayPal shipping address
+          // This ensures consistent address usage like Stripe
+          const useFormData = metadata?.street && metadata?.city; // Check if form data exists
+          
           const shippingDetails = capture.purchase_units?.[0]?.shipping;
           const payerInfo = capture.payer;
           
-          // Format shipping address for database
-          const shippingAddress = shippingDetails ? {
-            name: shippingDetails.name?.full_name || `${payerInfo?.name?.given_name || ''} ${payerInfo?.name?.surname || ''}`.trim(),
-            address_line_1: shippingDetails.address?.address_line_1 || '',
-            address_line_2: shippingDetails.address?.address_line_2 || '',
+          // Format shipping address for database - use same format as Stripe for consistency
+          // This ensures the admin panel can correctly display addresses from both payment providers
+          // Note: Email is stored separately in order_reviews.user_email, not in the address object
+          const shippingAddress = useFormData ? {
+            firstName: metadata.firstName || '',
+            lastName: metadata.lastName || '',
+            phone: metadata.phone || '',
+            street: metadata.street || '',
+            apartment: metadata.apartment || '',
+            city: metadata.city || '',
+            state: metadata.state || '',
+            zipCode: metadata.zipCode || '',
+            country: metadata.country || 'US',
+          } : (shippingDetails ? {
+            firstName: payerInfo?.name?.given_name || '',
+            lastName: payerInfo?.name?.surname || '',
+            phone: '',
+            street: shippingDetails.address?.address_line_1 || '',
+            apartment: shippingDetails.address?.address_line_2 || '',
             city: shippingDetails.address?.admin_area_2 || '',
             state: shippingDetails.address?.admin_area_1 || '',
-            postal_code: shippingDetails.address?.postal_code || '',
+            zipCode: shippingDetails.address?.postal_code || '',
             country: shippingDetails.address?.country_code || '',
-          } : null;
+          } : null);
+          
+          logger.info('📍 Using address from:', { 
+            source: useFormData ? 'Form Data (Priority)' : 'PayPal Response (Fallback)',
+            shippingAddress 
+          });
           
           // Generate order number if not exists
           const { generateOrderNumber } = await import('../services/paymentRecordService');
@@ -198,14 +221,21 @@ export const capturePayPalOrderHandler = async (
           const payerEmail = payerInfo?.email_address || metadata?.customerEmail || '';
           const cardBrand = 'paypal'; // PayPal doesn't provide card brand
           
-          logger.info('💳 Saving PayPal shipping details:', {
+          // Extract pricing information from metadata (passed from frontend)
+          const subtotal = metadata?.subtotal ? parseFloat(metadata.subtotal) : order.subtotal || null;
+          const shipping = metadata?.shipping ? parseFloat(metadata.shipping) : order.shipping || null;
+          const tax = metadata?.tax ? parseFloat(metadata.tax) : order.tax || null;
+          const total = metadata?.total ? parseFloat(metadata.total) : order.total || null;
+          
+          logger.info('💳 Saving PayPal payment details:', {
             orderId: order.id,
             shippingAddress,
             payerEmail,
             orderNumber,
+            pricing: { subtotal, shipping, tax, total }
           });
           
-          // Update order status and payment/shipping details
+          // Update order status and payment/shipping details with pricing
           await sequelize.query(`
             UPDATE order_reviews 
             SET status = 'approved-processing',
@@ -218,6 +248,10 @@ export const capturePayPalOrderHandler = async (
                 payment_intent_id = ?,
                 transaction_id = ?,
                 card_brand = ?,
+                subtotal = ?,
+                shipping = ?,
+                tax = ?,
+                total = ?,
                 reviewed_at = NOW(),
                 updated_at = NOW()
             WHERE id = ?
@@ -229,6 +263,10 @@ export const capturePayPalOrderHandler = async (
               capture.id, // PayPal capture ID as payment intent
               `paypal_${orderId}`,
               cardBrand,
+              subtotal,
+              shipping,
+              tax,
+              total,
               order.id
             ]
           });
@@ -506,13 +544,17 @@ const handlePaymentCaptureCompleted = async (event: any) => {
           const fullShipping = fullOrder.purchase_units?.[0]?.shipping;
           
           if (fullShipping) {
+            // Use same format as Stripe for consistency with admin panel display
+            // Email is stored separately in order_reviews.user_email
             fullShippingAddress = {
-              name: fullShipping.name?.full_name || `${payerInfo?.name?.given_name || ''} ${payerInfo?.name?.surname || ''}`.trim(),
-              address_line_1: fullShipping.address?.address_line_1 || '',
-              address_line_2: fullShipping.address?.address_line_2 || '',
+              firstName: payerInfo?.name?.given_name || '',
+              lastName: payerInfo?.name?.surname || '',
+              phone: '',
+              street: fullShipping.address?.address_line_1 || '',
+              apartment: fullShipping.address?.address_line_2 || '',
               city: fullShipping.address?.admin_area_2 || '',
               state: fullShipping.address?.admin_area_1 || '',
-              postal_code: fullShipping.address?.postal_code || '',
+              zipCode: fullShipping.address?.postal_code || '',
               country: fullShipping.address?.country_code || '',
             };
           }
@@ -586,24 +628,133 @@ const handlePaymentCaptureCompleted = async (event: any) => {
 };
 
 const handlePaymentCaptureDenied = async (event: any) => {
+  const captureResource = event.resource;
+  
   logger.info('Payment capture denied', {
-    captureId: event.resource?.id,
-    reason: event.resource?.reason_code,
+    captureId: captureResource?.id,
+    reason: captureResource?.reason_code,
   });
   
-  // TODO: Update order status in database
-  // TODO: Send notification email
+  try {
+    const { sequelize } = await import('../config/database');
+    
+    // Try to find the most recent pending order
+    const [orderResult] = await sequelize.query(`
+      SELECT id, user_id
+      FROM order_reviews 
+      WHERE status = 'pending-payment'
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `);
+    
+    let orderId = 0;
+    let userId = 0;
+    if (Array.isArray(orderResult) && orderResult.length > 0) {
+      const order = orderResult[0] as any;
+      orderId = order.id;
+      userId = order.user_id;
+    }
+    
+    // Log failed PayPal payment
+    const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
+    
+    const amount = captureResource?.amount?.value ? parseFloat(captureResource.amount.value) : 0;
+    
+    await createPaymentRecord({
+      orderId: orderId,
+      orderNumber: orderId > 0 ? generateOrderNumber(orderId) : 'N/A',
+      customerId: userId,
+      customerName: captureResource?.payer?.name?.given_name || 'Unknown Customer',
+      customerEmail: captureResource?.payer?.email_address || 'unknown@example.com',
+      amount: amount,
+      currency: captureResource?.amount?.currency_code || 'USD',
+      provider: 'paypal',
+      paymentMethod: 'digital_wallet',
+      status: 'failed',
+      transactionId: `paypal_${captureResource?.id}`,
+      providerTransactionId: captureResource?.id || '',
+      gatewayResponse: captureResource,
+      fees: 0,
+      netAmount: 0,
+      metadata: {
+        reasonCode: captureResource?.reason_code,
+        eventType: event.event_type,
+      },
+      notes: `PayPal payment denied: ${captureResource?.reason_code || 'Unknown reason'}`,
+    });
+    
+    logger.info('Failed PayPal payment logged successfully', {
+      captureId: captureResource?.id,
+      reasonCode: captureResource?.reason_code,
+    });
+  } catch (error) {
+    logger.error('Error logging denied PayPal payment:', error);
+  }
 };
 
 const handlePaymentCaptureRefunded = async (event: any) => {
+  const refundResource = event.resource;
+  
   logger.info('Payment capture refunded', {
-    captureId: event.resource?.id,
-    refundAmount: event.resource?.amount,
+    refundId: refundResource?.id,
+    refundAmount: refundResource?.amount,
   });
   
-  // TODO: Update order status in database
-  // TODO: Send refund confirmation email
-  // TODO: Restore inventory
+  try {
+    const { sequelize } = await import('../config/database');
+    
+    // Try to find existing payment by PayPal transaction ID
+    const captureId = refundResource?.links?.find((link: any) => 
+      link.rel === 'up'
+    )?.href?.split('/').pop();
+    
+    const [paymentResult] = await sequelize.query(`
+      SELECT * FROM payments 
+      WHERE provider_transaction_id LIKE ? 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `, {
+      replacements: [`%${captureId}%`]
+    });
+    
+    if (Array.isArray(paymentResult) && paymentResult.length > 0) {
+      const payment = paymentResult[0] as any;
+      
+      // Update existing payment to refunded status
+      const refundAmount = refundResource?.amount?.value ? parseFloat(refundResource.amount.value) : 0;
+      
+      await sequelize.query(`
+        UPDATE payments 
+        SET status = 'refunded',
+            refund_amount = ?,
+            refunded_at = NOW(),
+            notes = CONCAT(COALESCE(notes, ''), '\\nRefunded: ', ?),
+            gateway_response = ?,
+            updated_at = NOW()
+        WHERE id = ?
+      `, {
+        replacements: [
+          refundAmount,
+          refundResource?.note_to_payer || 'No reason provided',
+          JSON.stringify(refundResource),
+          payment.id
+        ]
+      });
+      
+      logger.info('PayPal refund logged successfully', {
+        paymentId: payment.id,
+        refundId: refundResource?.id,
+        refundAmount,
+      });
+    } else {
+      logger.warn('No existing payment found for refund', {
+        refundId: refundResource?.id,
+        captureId,
+      });
+    }
+  } catch (error) {
+    logger.error('Error logging PayPal refund:', error);
+  }
 };
 
 const handleOrderApproved = async (event: any) => {

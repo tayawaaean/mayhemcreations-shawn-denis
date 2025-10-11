@@ -402,11 +402,11 @@ const PaymentLogs: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        ${payment.amount.toFixed(2)} {payment.currency}
+                        ${Number(payment.amount).toFixed(2)} {payment.currency}
                       </div>
                       {payment.fees > 0 && (
                         <div className="text-sm text-gray-500">
-                          Fee: ${payment.fees.toFixed(2)}
+                          Fee: ${Number(payment.fees).toFixed(2)}
                         </div>
                       )}
                     </div>
@@ -523,15 +523,15 @@ const PaymentLogs: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600">Amount:</span>
-                      <span className="text-sm text-gray-900">${selectedPayment.amount.toFixed(2)} {selectedPayment.currency}</span>
+                      <span className="text-sm text-gray-900">${Number(selectedPayment.amount).toFixed(2)} {selectedPayment.currency}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600">Fees:</span>
-                      <span className="text-sm text-gray-900">${selectedPayment.fees.toFixed(2)}</span>
+                      <span className="text-sm text-gray-900">${Number(selectedPayment.fees).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-gray-600">Net Amount:</span>
-                      <span className="text-sm text-gray-900">${selectedPayment.netAmount.toFixed(2)}</span>
+                      <span className="text-sm text-gray-900">${Number(selectedPayment.netAmount).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -610,7 +610,7 @@ const PaymentLogs: React.FC = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                Refund: ${refund.amount.toFixed(2)}
+                                Refund: ${Number(refund.amount).toFixed(2)}
                               </div>
                               <div className="text-sm text-gray-600">{refund.reason}</div>
                               <div className="text-sm text-gray-500">

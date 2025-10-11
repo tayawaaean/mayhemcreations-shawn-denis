@@ -534,22 +534,26 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
-    // If status is 'delivered', deduct stock for physical products
-    if (status === 'delivered') {
+    // Deduct stock when order enters production (best practice for custom orders)
+    // This happens after design approval but before shipping
+    if (status === 'in-production') {
       try {
         const { deductStockForOrder } = await import('../services/stockService');
         const stockDeducted = await deductStockForOrder(parseInt(id));
         if (stockDeducted) {
-          logger.info(`✅ Stock deducted successfully for delivered order ${id}`);
+          logger.info(`✅ Stock deducted successfully for order ${id} entering production`);
         } else {
-          logger.warn(`⚠️ Failed to deduct stock for delivered order ${id}`);
+          logger.warn(`⚠️ Failed to deduct stock for order ${id}`);
         }
       } catch (stockError) {
-        logger.error(`❌ Error deducting stock for delivered order ${id}:`, stockError);
+        logger.error(`❌ Error deducting stock for order ${id}:`, stockError);
         // Don't fail the status update if stock deduction fails
         // Admin can manually adjust inventory if needed
       }
     }
+    
+    // Note: Custom embroidery items don't have stock limits (made-to-order)
+    // Only physical products like caps, bags, etc. will have stock deducted
 
     // If approved, update cart items to approved status
     if (status === 'approved') {

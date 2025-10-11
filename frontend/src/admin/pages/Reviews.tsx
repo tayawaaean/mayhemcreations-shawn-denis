@@ -304,7 +304,7 @@ const Reviews: React.FC = () => {
                                   key={imgIndex}
                                   src={image}
                                   alt={`Review ${imgIndex + 1}`}
-                                  className="w-full h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                  className="w-full h-28 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
                                 />
                               ))}
                             </div>

@@ -496,10 +496,10 @@ const PaymentManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${payment.amount.toFixed(2)}
+                    ${Number(payment.amount).toFixed(2)}
                     {payment.refundAmount && (
                       <div className="text-xs text-red-600">
-                        Refunded: ${payment.refundAmount.toFixed(2)}
+                        Refunded: ${Number(payment.refundAmount).toFixed(2)}
                       </div>
                     )}
                   </td>
@@ -584,7 +584,7 @@ const PaymentManagement: React.FC = () => {
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500">Amount</p>
-                        <p className="text-sm font-medium text-gray-900">${payment.amount.toFixed(2)}</p>
+                        <p className="text-sm font-medium text-gray-900">${Number(payment.amount).toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Provider</p>

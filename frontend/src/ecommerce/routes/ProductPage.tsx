@@ -380,7 +380,7 @@ export default function ProductPage() {
                                     key={imgIndex}
                                     src={image}
                                     alt={`Review ${imgIndex + 1}`}
-                                    className="w-full h-24 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="w-full h-32 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
                                   />
                                 ))}
                               </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User, Calendar } from 'lucide-react'
+import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User, Calendar, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
@@ -609,6 +609,7 @@ const findItemForReply = (reply: PictureReply, order: Order): { productName: str
 
 export default function MyOrders() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, isLoggedIn } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -617,6 +618,13 @@ export default function MyOrders() {
   const [sortBy, setSortBy] = useState<'newest' | 'oldest'>('newest')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [showOrderDetails, setShowOrderDetails] = useState(false)
+  const [paymentSuccessNotification, setPaymentSuccessNotification] = useState<{
+    show: boolean
+    paymentMethod?: string
+    orderId?: number
+  }>({
+    show: false
+  })
   const [pictureConfirmations, setPictureConfirmations] = useState<{[itemId: string]: {confirmed: boolean | null, notes: string, designId?: string, designName?: string, embroideryStyle?: string}}>({})
   const [submittingConfirmations, setSubmittingConfirmations] = useState(false)
   const [showReuploadModal, setShowReuploadModal] = useState(false)
@@ -644,6 +652,7 @@ export default function MyOrders() {
     message: ''
   })
   const [backendProducts, setBackendProducts] = useState<any[]>([])
+  const [orderReviews, setOrderReviews] = useState<Record<number, any>>({}) // Store reviews by order ID
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useWebSocket()
@@ -661,11 +670,48 @@ export default function MyOrders() {
     }
   }
 
+  // Load user reviews
+  const loadUserReviews = async () => {
+    try {
+      const response = await productReviewApiService.getMyReviews()
+      if (response.success && response.data) {
+        // Organize reviews by order ID for quick lookup
+        const reviewsByOrder: Record<number, any> = {}
+        response.data.forEach((review: any) => {
+          reviewsByOrder[review.orderId] = review
+        })
+        setOrderReviews(reviewsByOrder)
+        console.log('📝 Loaded user reviews:', response.data.length)
+      }
+    } catch (error) {
+      console.error('Error loading user reviews:', error)
+    }
+  }
+
+  // Check for payment success from checkout redirect
+  useEffect(() => {
+    const state = location.state as any
+    if (state?.paymentSuccess) {
+      setPaymentSuccessNotification({
+        show: true,
+        paymentMethod: state.paymentMethod,
+        orderId: state.orderId
+      })
+      // Auto-hide after 8 seconds
+      setTimeout(() => {
+        setPaymentSuccessNotification({ show: false })
+      }, 8000)
+      // Clear the state to prevent showing again on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location, navigate])
+
   // Load orders on component mount
   useEffect(() => {
     if (isLoggedIn) {
       loadOrders()
       loadBackendProducts()
+      loadUserReviews()
     }
   }, [isLoggedIn])
 
@@ -1299,6 +1345,54 @@ export default function MyOrders() {
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
+      {/* Payment Success Notification */}
+      {paymentSuccessNotification.show && (
+        <div className="mb-6 bg-green-50 border-l-4 border-green-500 rounded-lg p-6 shadow-lg animate-fade-in">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-8 w-8 text-green-500" />
+            </div>
+            <div className="ml-4 flex-1">
+              <h3 className="text-xl font-bold text-green-900 mb-2">
+                Payment Successful! 🎉
+              </h3>
+              <p className="text-green-800 mb-2">
+                Your payment has been processed successfully. Your order is now being prepared.
+              </p>
+              <div className="text-sm text-green-700 space-y-1">
+                <p>
+                  <strong>Payment Method:</strong> {' '}
+                  {paymentSuccessNotification.paymentMethod === 'paypal' ? 'PayPal' : 
+                   paymentSuccessNotification.paymentMethod === 'stripe' ? 'Credit Card' : 
+                   'Payment Completed'}
+                </p>
+                {paymentSuccessNotification.orderId && (
+                  <p>
+                    <strong>Order ID:</strong> #{paymentSuccessNotification.orderId}
+                  </p>
+                )}
+                <p className="mt-2">
+                  ✓ You'll receive updates on your order status below
+                </p>
+                <p>✓ Estimated delivery: 3-5 business days after production</p>
+              </div>
+              <button
+                onClick={() => setPaymentSuccessNotification({ show: false })}
+                className="mt-3 inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                Got it, thanks!
+              </button>
+            </div>
+            <button
+              onClick={() => setPaymentSuccessNotification({ show: false })}
+              className="ml-4 text-green-500 hover:text-green-700 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8">
         <div className="flex items-center space-x-4">
           <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
@@ -1747,18 +1841,99 @@ export default function MyOrders() {
                         </div>
                       )}
                       
-                      {/* Leave a Review Button */}
+                      {/* Review Section */}
                       <div className="mt-4">
-                        <Button
-                          onClick={() => {
-                            setReviewOrderId(order.id);
-                            setShowReviewModal(true);
-                          }}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center space-x-2"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span>Leave a Review</span>
-                        </Button>
+                        {orderReviews[order.id] ? (
+                          // Show submitted review
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <CheckCircle className="w-5 h-5 text-green-600" />
+                                <h4 className="font-semibold text-gray-900">Your Review</h4>
+                              </div>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                orderReviews[order.id].status === 'approved' ? 'bg-green-100 text-green-800' :
+                                orderReviews[order.id].status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {orderReviews[order.id].status === 'approved' ? 'Approved' :
+                                 orderReviews[order.id].status === 'rejected' ? 'Rejected' :
+                                 'Pending Review'}
+                              </span>
+                            </div>
+                            
+                            {/* Star Rating */}
+                            <div className="flex items-center space-x-1 mb-2">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-4 h-4 ${
+                                    i < orderReviews[order.id].rating
+                                      ? 'fill-yellow-400 text-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                              <span className="text-sm text-gray-600 ml-2">
+                                {orderReviews[order.id].rating} out of 5
+                              </span>
+                            </div>
+                            
+                            {/* Review Title */}
+                            <h5 className="font-medium text-gray-900 mb-1">
+                              {orderReviews[order.id].title}
+                            </h5>
+                            
+                            {/* Review Comment */}
+                            <p className="text-sm text-gray-700 mb-2">
+                              {orderReviews[order.id].comment}
+                            </p>
+                            
+                            {/* Review Images */}
+                            {orderReviews[order.id].images && orderReviews[order.id].images.length > 0 && (
+                              <div className="flex space-x-2 mt-2">
+                                {orderReviews[order.id].images.map((img: string, idx: number) => (
+                                  <img
+                                    key={idx}
+                                    src={img}
+                                    alt={`Review ${idx + 1}`}
+                                    className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80"
+                                    onClick={() => {
+                                      setEnlargedImage(img);
+                                      setEnlargedImageTitle(`Review Image ${idx + 1}`);
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            
+                            {/* Admin Response */}
+                            {orderReviews[order.id].adminResponse && (
+                              <div className="mt-3 bg-blue-50 rounded p-3 border-l-4 border-blue-500">
+                                <p className="text-xs font-semibold text-blue-900 mb-1">Admin Response:</p>
+                                <p className="text-sm text-blue-800">
+                                  {orderReviews[order.id].adminResponse}
+                                </p>
+                              </div>
+                            )}
+                            
+                            <p className="text-xs text-gray-500 mt-2">
+                              Submitted on {new Date(orderReviews[order.id].createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        ) : (
+                          // Show "Leave a Review" button
+                          <Button
+                            onClick={() => {
+                              setReviewOrderId(order.id);
+                              setShowReviewModal(true);
+                            }}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center space-x-2"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>Leave a Review</span>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2366,82 +2541,91 @@ export default function MyOrders() {
                                               </div>
                                             </div>
                                           ) : (
-                                            <div className="bg-white rounded-2xl rounded-br-md px-4 py-4 shadow-md border-2 border-gray-200">
-                                              <div className="flex items-center space-x-2 mb-3">
-                                                <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
-                                                  <User className="h-4 w-4 text-white" />
-                                                </div>
-                                                <p className="text-sm font-semibold text-gray-900">What Do You Think?</p>
-                                              </div>
-                                              
-                                              <div className="space-y-3">
-                                                <p className="text-sm text-gray-700">Does this design look good to you?</p>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                  <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                                    pictureConfirmations[reply.itemId]?.confirmed === true 
-                                                      ? 'border-green-500 bg-green-50' 
-                                                      : 'border-gray-300 hover:border-green-300 hover:bg-green-50'
-                                                  }`}>
-                                                    <input
-                                                      type="radio"
-                                                      name={`confirmation-${reply.itemId}`}
-                                                      checked={pictureConfirmations[reply.itemId]?.confirmed === true}
-                                                      onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
-                                                      className="sr-only"
-                                                    />
-                                                    <CheckCircle className={`h-8 w-8 mb-1 ${
-                                                      pictureConfirmations[reply.itemId]?.confirmed === true 
-                                                        ? 'text-green-600' 
-                                                        : 'text-gray-400'
-                                                    }`} />
-                                                    <span className={`text-sm font-medium ${
-                                                      pictureConfirmations[reply.itemId]?.confirmed === true 
-                                                        ? 'text-green-700' 
-                                                        : 'text-gray-700'
-                                                    }`}>Love It!</span>
-                                                    <span className="text-xs text-gray-500 mt-1">Looks perfect</span>
-                                                  </label>
-                                                  <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                                    pictureConfirmations[reply.itemId]?.confirmed === false 
-                                                      ? 'border-orange-500 bg-orange-50' 
-                                                      : 'border-gray-300 hover:border-orange-300 hover:bg-orange-50'
-                                                  }`}>
-                                                    <input
-                                                      type="radio"
-                                                      name={`confirmation-${reply.itemId}`}
-                                                      checked={pictureConfirmations[reply.itemId]?.confirmed === false}
-                                                      onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
-                                                      className="sr-only"
-                                                    />
-                                                    <AlertCircle className={`h-8 w-8 mb-1 ${
-                                                      pictureConfirmations[reply.itemId]?.confirmed === false 
-                                                        ? 'text-orange-600' 
-                                                        : 'text-gray-400'
-                                                    }`} />
-                                                    <span className={`text-sm font-medium ${
-                                                      pictureConfirmations[reply.itemId]?.confirmed === false 
-                                                        ? 'text-orange-700' 
-                                                        : 'text-gray-700'
-                                                    }`}>Need Changes</span>
-                                                    <span className="text-xs text-gray-500 mt-1">Let's adjust</span>
-                                                  </label>
+                                            // Only show approval buttons if order hasn't moved to payment or beyond
+                                            selectedOrder.status !== 'pending-payment' &&
+                                            selectedOrder.status !== 'approved-processing' &&
+                                            selectedOrder.status !== 'ready-for-production' &&
+                                            selectedOrder.status !== 'in-production' &&
+                                            selectedOrder.status !== 'ready-for-checkout' &&
+                                            selectedOrder.status !== 'shipped' &&
+                                            selectedOrder.status !== 'delivered' ? (
+                                              <div className="bg-white rounded-2xl rounded-br-md px-4 py-4 shadow-md border-2 border-gray-200">
+                                                <div className="flex items-center space-x-2 mb-3">
+                                                  <div className="w-8 h-8 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
+                                                    <User className="h-4 w-4 text-white" />
+                                                  </div>
+                                                  <p className="text-sm font-semibold text-gray-900">What Do You Think?</p>
                                                 </div>
                                                 
-                                                {/* Notes */}
-                                                <div>
-                                                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                    Any Comments? (Optional)
-                                                  </label>
-                                                  <textarea
-                                                    value={pictureConfirmations[reply.itemId]?.notes || ''}
-                                                    onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
-                                                    rows={2}
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm resize-none"
-                                                    placeholder="Tell us what you'd like to change..."
-                                                  />
+                                                <div className="space-y-3">
+                                                  <p className="text-sm text-gray-700">Does this design look good to you?</p>
+                                                  <div className="grid grid-cols-2 gap-3">
+                                                    <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                        ? 'border-green-500 bg-green-50' 
+                                                        : 'border-gray-300 hover:border-green-300 hover:bg-green-50'
+                                                    }`}>
+                                                      <input
+                                                        type="radio"
+                                                        name={`confirmation-${reply.itemId}`}
+                                                        checked={pictureConfirmations[reply.itemId]?.confirmed === true}
+                                                        onChange={() => handlePictureConfirmationChange(reply.itemId, true)}
+                                                        className="sr-only"
+                                                      />
+                                                      <CheckCircle className={`h-8 w-8 mb-1 ${
+                                                        pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                          ? 'text-green-600' 
+                                                          : 'text-gray-400'
+                                                      }`} />
+                                                      <span className={`text-sm font-medium ${
+                                                        pictureConfirmations[reply.itemId]?.confirmed === true 
+                                                          ? 'text-green-700' 
+                                                          : 'text-gray-700'
+                                                      }`}>Love It!</span>
+                                                      <span className="text-xs text-gray-500 mt-1">Looks perfect</span>
+                                                    </label>
+                                                    <label className={`flex flex-col items-center justify-center p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                                      pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                        ? 'border-orange-500 bg-orange-50' 
+                                                        : 'border-gray-300 hover:border-orange-300 hover:bg-orange-50'
+                                                    }`}>
+                                                      <input
+                                                        type="radio"
+                                                        name={`confirmation-${reply.itemId}`}
+                                                        checked={pictureConfirmations[reply.itemId]?.confirmed === false}
+                                                        onChange={() => handlePictureConfirmationChange(reply.itemId, false)}
+                                                        className="sr-only"
+                                                      />
+                                                      <AlertCircle className={`h-8 w-8 mb-1 ${
+                                                        pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                          ? 'text-orange-600' 
+                                                          : 'text-gray-400'
+                                                      }`} />
+                                                      <span className={`text-sm font-medium ${
+                                                        pictureConfirmations[reply.itemId]?.confirmed === false 
+                                                          ? 'text-orange-700' 
+                                                          : 'text-gray-700'
+                                                      }`}>Need Changes</span>
+                                                      <span className="text-xs text-gray-500 mt-1">Let's adjust</span>
+                                                    </label>
+                                                  </div>
+                                                  
+                                                  {/* Notes */}
+                                                  <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                      Any Comments? (Optional)
+                                                    </label>
+                                                    <textarea
+                                                      value={pictureConfirmations[reply.itemId]?.notes || ''}
+                                                      onChange={(e) => handlePictureConfirmationNotesChange(reply.itemId, e.target.value)}
+                                                      rows={2}
+                                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm resize-none"
+                                                      placeholder="Tell us what you'd like to change..."
+                                                    />
+                                                  </div>
                                                 </div>
                                               </div>
-                                            </div>
+                                            ) : null
                                           )}
                                         </div>
                                       </div>
@@ -2502,8 +2686,18 @@ export default function MyOrders() {
                     Close
                   </Button>
                   
-                  {/* Submit Picture Confirmations Button */}
-                  {selectedOrder.adminPictureReplies && Array.isArray(selectedOrder.adminPictureReplies) && selectedOrder.adminPictureReplies.length > 0 && Object.values(pictureConfirmations).some(c => c.confirmed !== null) && selectedOrder.status !== 'pending-payment' && selectedOrder.status !== 'approved-processing' && (
+                  {/* Submit Picture Confirmations Button - Only show for orders still in design approval phase */}
+                  {selectedOrder.adminPictureReplies && 
+                   Array.isArray(selectedOrder.adminPictureReplies) && 
+                   selectedOrder.adminPictureReplies.length > 0 && 
+                   Object.values(pictureConfirmations).some(c => c.confirmed !== null) && 
+                   selectedOrder.status !== 'pending-payment' && 
+                   selectedOrder.status !== 'approved-processing' && 
+                   selectedOrder.status !== 'ready-for-production' &&
+                   selectedOrder.status !== 'in-production' &&
+                   selectedOrder.status !== 'ready-for-checkout' &&
+                   selectedOrder.status !== 'shipped' &&
+                   selectedOrder.status !== 'delivered' && (
                     <Button 
                       onClick={handleSubmitPictureConfirmations}
                       disabled={submittingConfirmations}
@@ -2794,6 +2988,8 @@ export default function MyOrders() {
                           setRating(5);
                           setReviewText('');
                           setReviewImages([]);
+                          // Reload reviews to update the UI
+                          loadUserReviews();
                           setReviewResultModal({
                             show: true,
                             success: true,
@@ -2810,11 +3006,14 @@ export default function MyOrders() {
                         }
                       } catch (error: any) {
                         console.error('Error submitting review:', error);
+                        console.error('Error response data:', error.response?.data);
+                        console.error('Error status:', error.response?.status);
+                        const errorMessage = error.response?.data?.message || error.message || 'Failed to submit review. Please try again.';
                         setReviewResultModal({
                           show: true,
                           success: false,
                           title: 'Error',
-                          message: error.message || 'Failed to submit review. Please try again.'
+                          message: errorMessage
                         });
                       } finally {
                         setSubmittingReview(false);

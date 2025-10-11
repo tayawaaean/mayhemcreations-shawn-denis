@@ -2,13 +2,11 @@ import React, { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip, UserPlus } from 'lucide-react'
 import { useRealTimeChat } from '../../shared/realTimeChatContext'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
 import Button from '../../components/Button'
 
 export default function ChatWidget() {
   const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions, unreadCount } = useRealTimeChat()
   const { isLoggedIn } = useAuth()
-  const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
@@ -137,7 +135,8 @@ export default function ChatWidget() {
                   <button
                     onClick={() => {
                       setIsOpen(false);
-                      navigate('/login');
+                      // Trigger custom event to open navbar auth modal
+                      window.dispatchEvent(new CustomEvent('openAuthModal', { detail: { mode: 'login' } }));
                     }}
                     className="text-blue-600 hover:text-blue-800 font-medium underline text-xs"
                   >

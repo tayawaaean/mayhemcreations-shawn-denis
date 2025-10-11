@@ -32,17 +32,22 @@ export const createReview = async (
     const { productId, orderId, rating, title, comment, images } = req.body;
 
     // Log the incoming request for debugging
-    logger.info('Creating review with data:', { 
+    logger.info('📝 Creating review with data:', { 
       userId, 
-      productId, 
-      orderId, 
+      productId: productId,
+      productIdType: typeof productId,
+      orderId: orderId,
+      orderIdType: typeof orderId,
       rating, 
       title: title?.substring(0, 50), 
-      hasImages: !!images 
+      comment: comment?.substring(0, 50),
+      hasImages: !!images,
+      imageCount: images?.length 
     });
 
     // Validate required fields
     if (!userId) {
+      logger.error('❌ User not authenticated');
       return res.status(401).json({
         success: false,
         message: 'User not authenticated',
@@ -51,7 +56,18 @@ export const createReview = async (
     }
 
     if (!productId || !orderId || !rating || !title || !comment) {
-      logger.error('Missing required fields:', { productId, orderId, rating, title, comment });
+      logger.error('❌ Missing required fields:', { 
+        hasProductId: !!productId, 
+        hasOrderId: !!orderId, 
+        hasRating: !!rating, 
+        hasTitle: !!title, 
+        hasComment: !!comment,
+        productId,
+        orderId,
+        rating,
+        title,
+        comment
+      });
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: productId, orderId, rating, title, comment',
@@ -78,6 +94,7 @@ export const createReview = async (
     }
 
     // Check if order exists and belongs to user
+    logger.info('🔍 Checking order:', { orderId, userId });
     const [orderResult] = await sequelize.query(`
       SELECT id, user_id, status, order_data
       FROM order_reviews
@@ -86,7 +103,13 @@ export const createReview = async (
       replacements: [orderId, userId]
     });
 
+    logger.info('📦 Order query result:', { 
+      found: Array.isArray(orderResult) && orderResult.length > 0,
+      resultCount: Array.isArray(orderResult) ? orderResult.length : 0 
+    });
+
     if (!Array.isArray(orderResult) || orderResult.length === 0) {
+      logger.error('❌ Order not found or does not belong to user:', { orderId, userId });
       return res.status(404).json({
         success: false,
         message: 'Order not found or does not belong to you',
@@ -95,12 +118,14 @@ export const createReview = async (
     }
 
     const order = orderResult[0] as any;
+    logger.info('📦 Order status:', { orderId, status: order.status });
 
     // Check if order is delivered (can only review delivered orders)
     if (order.status !== 'delivered') {
+      logger.error('❌ Order not delivered yet:', { orderId, status: order.status });
       return res.status(400).json({
         success: false,
-        message: 'You can only review products from delivered orders',
+        message: `You can only review products from delivered orders. Current status: ${order.status}`,
         timestamp: new Date().toISOString(),
       });
     }
@@ -119,14 +144,32 @@ export const createReview = async (
     }
 
     // Check if product exists in order (handle both string and number productId)
+    logger.info('🔍 Checking if product is in order:', { 
+      productId, 
+      orderDataLength: orderData.length,
+      orderProducts: orderData.map(i => ({ 
+        productId: i.productId, 
+        type: typeof i.productId,
+        productName: i.productName 
+      }))
+    });
+    
     const productInOrder = orderData.some((item: any) => {
       const itemProductId = typeof item.productId === 'string' ? parseInt(item.productId) : item.productId;
-      return itemProductId === productId || item.productId === String(productId);
+      const matches = itemProductId === productId || item.productId === String(productId);
+      if (matches) {
+        logger.info('✅ Product found in order:', { itemProductId, productId });
+      }
+      return matches;
     });
     
     if (!productInOrder) {
       // Log for debugging
-      logger.warn(`Product ${productId} not found in order ${orderId}. Order items:`, orderData.map(i => i.productId));
+      logger.error('❌ Product not found in order:', { 
+        productId, 
+        orderId, 
+        orderProducts: orderData.map(i => i.productId) 
+      });
       return res.status(400).json({
         success: false,
         message: 'Product was not found in this order',
@@ -135,6 +178,7 @@ export const createReview = async (
     }
 
     // Check if user has already reviewed this product for this order
+    logger.info('🔍 Checking for existing review:', { productId, userId, orderId });
     const [existingReview] = await sequelize.query(`
       SELECT id FROM product_reviews
       WHERE product_id = ? AND user_id = ? AND order_id = ?
@@ -143,12 +187,15 @@ export const createReview = async (
     });
 
     if (Array.isArray(existingReview) && existingReview.length > 0) {
+      logger.error('❌ Duplicate review attempt:', { productId, userId, orderId });
       return res.status(400).json({
         success: false,
         message: 'You have already reviewed this product for this order',
         timestamp: new Date().toISOString(),
       });
     }
+    
+    logger.info('✅ All validations passed, creating review');
 
     // Prepare review data for insertion
     const reviewData = {
@@ -438,6 +485,79 @@ export const deleteReview = async (
     return res.status(500).json({
       success: false,
       message: 'Failed to delete review',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Get all reviews by the current user
+ * @route GET /api/v1/reviews/my-reviews
+ * @access Private (Customer only)
+ */
+export const getMyReviews = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<Response | void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Get all reviews by this user
+    const [reviews] = await sequelize.query(`
+      SELECT 
+        pr.*,
+        p.title as product_title,
+        p.sku as product_sku
+      FROM product_reviews pr
+      LEFT JOIN products p ON pr.product_id = p.id
+      WHERE pr.user_id = ?
+      ORDER BY pr.created_at DESC
+    `, {
+      replacements: [userId]
+    });
+
+    // Transform reviews to proper format
+    const transformedReviews = (reviews as any[]).map(review => ({
+      id: review.id,
+      productId: review.product_id,
+      orderId: review.order_id,
+      rating: review.rating,
+      title: review.title,
+      comment: review.comment,
+      status: review.status,
+      isVerified: review.is_verified,
+      helpfulVotes: review.helpful_votes,
+      images: review.images ? JSON.parse(review.images) : null,
+      adminResponse: review.admin_response,
+      adminRespondedAt: review.admin_responded_at,
+      createdAt: review.created_at,
+      updatedAt: review.updated_at,
+      productTitle: review.product_title,
+      productSku: review.product_sku,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: transformedReviews,
+      message: 'Reviews retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error('Error fetching user reviews:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch reviews',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString(),
     });

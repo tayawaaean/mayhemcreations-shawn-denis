@@ -274,10 +274,10 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
       // Update order_reviews with payment and shipping information
       try {
         // Extract shipping details from metadata
+        // Note: Email is stored separately in order_reviews.user_email, not in the address object
         const shippingDetails = {
           firstName: paymentIntent.metadata?.firstName || '',
           lastName: paymentIntent.metadata?.lastName || '',
-          email: paymentIntent.metadata?.customerEmail || paymentIntent.metadata?.email || '',
           phone: paymentIntent.metadata?.phone || '',
           street: paymentIntent.metadata?.street || '',
           city: paymentIntent.metadata?.city || '',
@@ -399,10 +399,69 @@ const handlePaymentIntentFailed = async (paymentIntent: any) => {
       lastPaymentError: paymentIntent.last_payment_error,
     });
 
-    // TODO: Add your business logic here
-    // - Update order status to failed
-    // - Send failure notification
-    // - Log the failure reason
+    // Extract userId from metadata
+    const userId = paymentIntent.metadata?.userId;
+    
+    const { sequelize } = await import('../config/database');
+    
+    // Try to find the most recent order for context
+    let orderId = 0;
+    let orderNumber = 'N/A';
+    if (userId) {
+      const [orderResult] = await sequelize.query(`
+        SELECT id FROM order_reviews 
+        WHERE user_id = ? AND status = 'pending-payment'
+        ORDER BY created_at DESC 
+        LIMIT 1
+      `, {
+        replacements: [userId]
+      });
+      
+      if (Array.isArray(orderResult) && orderResult.length > 0) {
+        const order = orderResult[0] as any;
+        orderId = order.id;
+        orderNumber = `ORD-${Date.now()}-${order.id}`;
+      }
+    }
+
+    // Log failed payment transaction
+    try {
+      const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
+      
+      const amount = paymentIntent.amount / 100; // Convert from cents
+      
+      await createPaymentRecord({
+        orderId: orderId,
+        orderNumber: orderId > 0 ? generateOrderNumber(orderId) : orderNumber,
+        customerId: userId ? parseInt(userId) : 0,
+        customerName: paymentIntent.metadata?.customerName || 'Unknown Customer',
+        customerEmail: paymentIntent.metadata?.customerEmail || paymentIntent.receipt_email || 'unknown@example.com',
+        amount: amount,
+        currency: paymentIntent.currency || 'usd',
+        provider: 'stripe',
+        paymentMethod: 'card',
+        status: 'failed',
+        transactionId: `stripe_${paymentIntent.id}`,
+        providerTransactionId: paymentIntent.id,
+        gatewayResponse: paymentIntent,
+        fees: 0,
+        netAmount: 0,
+        metadata: {
+          errorCode: paymentIntent.last_payment_error?.code,
+          errorMessage: paymentIntent.last_payment_error?.message,
+          errorType: paymentIntent.last_payment_error?.type,
+          declineCode: paymentIntent.last_payment_error?.decline_code,
+        },
+        notes: `Payment failed: ${paymentIntent.last_payment_error?.message || 'Unknown error'}`,
+      });
+
+      logger.info('Failed payment logged successfully', {
+        paymentIntentId: paymentIntent.id,
+        errorMessage: paymentIntent.last_payment_error?.message,
+      });
+    } catch (paymentError) {
+      logger.error('Error logging failed payment:', paymentError);
+    }
     
     console.log('❌ Payment failed:', {
       id: paymentIntent.id,
@@ -544,10 +603,10 @@ const handleCheckoutSessionCompleted = async (session: any) => {
       // Update order_reviews with payment and shipping information
       try {
         // Extract shipping details from metadata
+        // Note: Email is stored separately in order_reviews.user_email, not in the address object
         const shippingDetails = {
           firstName: session.metadata?.firstName || session.customer_details?.name?.split(' ')[0] || '',
           lastName: session.metadata?.lastName || session.customer_details?.name?.split(' ').slice(1).join(' ') || '',
-          email: session.customer_details?.email || session.metadata?.customerEmail || session.metadata?.email || '',
           phone: session.metadata?.phone || session.customer_details?.phone || '',
           street: session.metadata?.street || session.customer_details?.address?.line1 || '',
           city: session.metadata?.city || session.customer_details?.address?.city || '',

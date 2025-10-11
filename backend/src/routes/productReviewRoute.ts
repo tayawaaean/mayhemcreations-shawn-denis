@@ -11,6 +11,7 @@ import {
   getAllReviews,
   updateReviewStatus,
   deleteReview,
+  getMyReviews,
   markReviewHelpful
 } from '../controllers/productReviewController';
 
@@ -22,6 +23,13 @@ const router = express.Router();
  * @access  Private (Customer only)
  */
 router.post('/', hybridAuthenticate, createReview);
+
+/**
+ * @route   GET /api/v1/reviews/my-reviews
+ * @desc    Get all reviews by the current user
+ * @access  Private (Customer only)
+ */
+router.get('/my-reviews', hybridAuthenticate, getMyReviews);
 
 /**
  * @route   GET /api/v1/reviews/product/:productId
