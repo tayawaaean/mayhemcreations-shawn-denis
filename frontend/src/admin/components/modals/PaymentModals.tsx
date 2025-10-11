@@ -138,7 +138,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
 
   React.useEffect(() => {
     if (payment) {
-      setRefundAmount(payment.amount.toString())
+      setRefundAmount(Number(payment.amount).toString())
     }
   }, [payment])
 
@@ -154,7 +154,7 @@ export const RefundModal: React.FC<RefundModalProps> = ({
     setIsProcessing(false)
   }
 
-  const maxRefundAmount = payment.amount - (payment.refundAmount || 0)
+  const maxRefundAmount = Number(payment.amount) - (payment.refundAmount ? Number(payment.refundAmount) : 0)
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -201,12 +201,12 @@ export const RefundModal: React.FC<RefundModalProps> = ({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Original Amount:</span>
-                      <span className="font-medium">${payment.amount.toFixed(2)}</span>
+                      <span className="font-medium">${Number(payment.amount).toFixed(2)}</span>
                     </div>
                     {payment.refundAmount && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Already Refunded:</span>
-                        <span className="font-medium text-red-600">${payment.refundAmount.toFixed(2)}</span>
+                        <span className="font-medium text-red-600">${Number(payment.refundAmount).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
