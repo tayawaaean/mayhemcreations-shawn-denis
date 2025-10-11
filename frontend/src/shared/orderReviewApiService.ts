@@ -28,7 +28,7 @@ export interface OrderReview {
   shipping: number;
   tax: number;
   total: number;
-  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing';
+  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered';
   submitted_at: string;
   reviewed_at?: string;
   admin_notes?: string;
@@ -36,6 +36,24 @@ export interface OrderReview {
   customer_confirmations?: CustomerConfirmation[];
   picture_reply_uploaded_at?: string;
   customer_confirmed_at?: string;
+  // Payment and shipping fields
+  order_number?: string;
+  shipping_address?: any; // JSON address object
+  billing_address?: any; // JSON address object
+  payment_method?: string;
+  payment_status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded';
+  payment_provider?: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual';
+  payment_intent_id?: string;
+  transaction_id?: string;
+  card_last4?: string;
+  card_brand?: string;
+  tracking_number?: string;
+  shipping_carrier?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  estimated_delivery_date?: string;
+  customer_notes?: string;
+  internal_notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -63,8 +81,10 @@ export interface CustomerConfirmation {
 }
 
 export interface UpdateReviewStatusRequest {
-  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing';
+  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered';
   adminNotes?: string;
+  trackingNumber?: string;
+  shippingCarrier?: string;
 }
 
 class OrderReviewApiService {

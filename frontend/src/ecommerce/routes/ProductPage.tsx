@@ -139,7 +139,7 @@ export default function ProductPage() {
                           ? 'text-yellow-600' 
                           : 'text-green-600'
                     }`}>
-                      {totalStock === 0 ? 'Out of Stock' : `${totalStock} in stock`}
+                      {totalStock === 0 ? 'Out of Stock' : totalStock <= 5 ? 'Low Stock' : 'In Stock'}
                     </span>
                   </div>
                 )}

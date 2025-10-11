@@ -185,7 +185,7 @@ export default function Cart() {
 
       // Create order data for admin review
       const orderData = {
-        items: pendingItems.map(item => {
+        items: pendingItems.map((item, index) => {
           // Calculate pricing breakdown for this item
           const baseProductPrice = Number(item.product?.price) || 0;
           let embroideryPrice = 0;
@@ -269,6 +269,7 @@ export default function Cart() {
           const totalItemPrice = baseProductPrice + embroideryPrice + embroideryOptionsPrice;
           
           const enrichedItem = {
+            id: `${item.productId}-${Date.now()}-${index}`, // Generate unique ID for each item
             productId: item.productId,
             quantity: item.quantity,
             customization: item.customization,

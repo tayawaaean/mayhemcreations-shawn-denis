@@ -28,7 +28,6 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
   const [embroideryOptions, setEmbroideryOptions] = useState<EmbroideryOption[]>([])
   const [loading, setLoading] = useState(false)
   const [materialCosts, setMaterialCosts] = useState<CostBreakdown | null>(null)
-  const [currentStep, setCurrentStep] = useState(0)
   const [showReview, setShowReview] = useState(false)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [selectedStyles, setSelectedStyles] = useState<{
@@ -169,64 +168,48 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
     }))
   }
 
-  const currentCategory = stepCategories[currentStep]
-  const categoryStyles = embroideryOptions.filter(style => style.category === currentCategory.key)
-
-  const handleStyleSelect = (style: EmbroideryOption) => {
-    if (currentCategory.key === 'threads' || currentCategory.key === 'upgrades') {
+  // Handle selecting/deselecting an option for a specific category
+  const handleStyleSelect = (style: EmbroideryOption, categoryKey: string) => {
+    if (categoryKey === 'threads' || categoryKey === 'upgrades') {
       // Toggle for multi-select categories
       setSelectedStyles(prev => ({
         ...prev,
-        [currentCategory.key]: prev[currentCategory.key as keyof typeof prev].includes(style)
-          ? (prev[currentCategory.key as keyof typeof prev] as EmbroideryOption[]).filter(s => s.id !== style.id)
-          : [...(prev[currentCategory.key as keyof typeof prev] as EmbroideryOption[]), style]
+        [categoryKey]: prev[categoryKey as keyof typeof prev].includes(style)
+          ? (prev[categoryKey as keyof typeof prev] as EmbroideryOption[]).filter(s => s.id !== style.id)
+          : [...(prev[categoryKey as keyof typeof prev] as EmbroideryOption[]), style]
       }))
     } else {
       // Toggle for single-select categories (allow unselecting)
-      const currentSelected = selectedStyles[currentCategory.key as keyof typeof selectedStyles] as EmbroideryOption
+      const currentSelected = selectedStyles[categoryKey as keyof typeof selectedStyles] as EmbroideryOption
       setSelectedStyles(prev => ({
         ...prev,
-        [currentCategory.key]: currentSelected?.id === style.id ? null : style
+        [categoryKey]: currentSelected?.id === style.id ? null : style
       }))
     }
   }
 
-  const isStyleSelected = (style: EmbroideryOption) => {
-    if (currentCategory.key === 'threads' || currentCategory.key === 'upgrades') {
-      return (selectedStyles[currentCategory.key as keyof typeof selectedStyles] as EmbroideryOption[]).some(s => s.id === style.id)
+  // Check if a specific style is selected
+  const isStyleSelected = (style: EmbroideryOption, categoryKey: string) => {
+    if (categoryKey === 'threads' || categoryKey === 'upgrades') {
+      return (selectedStyles[categoryKey as keyof typeof selectedStyles] as EmbroideryOption[]).some(s => s.id === style.id)
     } else {
-      return (selectedStyles[currentCategory.key as keyof typeof selectedStyles] as EmbroideryOption)?.id === style.id
+      return (selectedStyles[categoryKey as keyof typeof selectedStyles] as EmbroideryOption)?.id === style.id
     }
   }
 
-  const canProceed = () => {
-    if (currentCategory.required) {
-      if (currentCategory.key === 'threads' || currentCategory.key === 'upgrades' || currentCategory.key === 'cutting') {
-        return true // Optional categories
+  // Check if all required categories are selected for final review
+  const canProceedToReview = () => {
+    // Check all required categories
+    const requiredCategories = stepCategories.filter(cat => cat.required)
+    
+    for (const category of requiredCategories) {
+      const selected = selectedStyles[category.key as keyof typeof selectedStyles]
+      if (!selected || (Array.isArray(selected) && selected.length === 0)) {
+        return false
       }
-      // For required single-select categories, check if something is selected
-      const selected = selectedStyles[currentCategory.key as keyof typeof selectedStyles]
-      return selected !== null && selected !== undefined
     }
+    
     return true
-  }
-
-  const nextStep = () => {
-    if (currentStep < stepCategories.length - 1) {
-      setCurrentStep(currentStep + 1)
-    } else {
-      setShowReview(true)
-    }
-  }
-
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
-
-  const getStepProgress = () => {
-    return ((currentStep + 1) / stepCategories.length) * 100
   }
 
   const formatPrice = (price: number | string) => MaterialPricingService.formatPrice(price)
@@ -565,110 +548,107 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
             </div>
           </div>
 
-          {/* Step-by-Step Embroidery Options */}
+          {/* All Embroidery Options - Displayed At Once */}
           {uploadedFile && size.width > 0 && size.height > 0 && (
             <div className="space-y-6">
-              {/* Progress Bar */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Step {currentStep + 1} of {stepCategories.length}: {currentCategory.title}
-                  </h3>
-                  <span className="text-sm text-gray-500">{currentCategory.description}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-accent h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${getStepProgress()}%` }}
-                  />
-                </div>
-              </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-6 text-center">
+                  Embroidery Options
+                </h3>
+                
+                {stepCategories.map((category) => {
+                  const categoryStyles = embroideryOptions.filter(
+                    (opt) => opt.category === category.key && opt.isActive
+                  )
+                  
+                  if (categoryStyles.length === 0) return null
 
-              {/* Style Selection */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="mb-4 text-sm text-gray-600 text-center">
-                  {currentCategory.key === 'threads' || currentCategory.key === 'upgrades' 
-                    ? 'Click to select/deselect multiple options' 
-                    : 'Click to select, click again to deselect'
-                  }
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {categoryStyles.map((style) => (
-                    <div
-                      key={style.id}
-                      className={`border-2 rounded-lg p-4 cursor-pointer transition-all relative group ${
-                        isStyleSelected(style)
-                          ? 'border-accent bg-accent/5 hover:bg-accent/10'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleStyleSelect(style)}
-                    >
-                      {style.isPopular && (
-                        <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center">
-                          <Star className="w-3 h-3 mr-1" />
-                          Most Popular
+                  return (
+                    <div key={category.key} className="mb-8 pb-8 border-b border-gray-200 last:border-b-0">
+                      {/* Category Header */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-semibold text-gray-900">
+                            {category.title}
+                          </h4>
+                          <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                            category.required 
+                              ? 'bg-red-100 text-red-800 border border-red-200' 
+                              : 'bg-blue-100 text-blue-800 border border-blue-200'
+                          }`}>
+                            {category.required ? 'REQUIRED' : 'OPTIONAL'}
+                          </span>
                         </div>
-                      )}
-
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                        <div className="w-8 h-8 bg-gray-300 rounded"></div>
-                      </div>
-
-                      <h4 className="font-semibold text-gray-900 text-center mb-2 text-sm">
-                        {style.name}
-                      </h4>
-
-                      <p className="text-xs text-gray-600 text-center mb-3">
-                        {style.description}
-                      </p>
-
-                      <div className="text-center">
-                        <p className="text-sm font-bold text-accent">
-                          {Number(style.price) === 0 ? 'Free' : `+${formatPrice(style.price)}`}
+                        <p className="text-sm text-gray-600 mt-1">
+                          {category.key === 'threads' || category.key === 'upgrades' 
+                            ? 'Select as many as needed' 
+                            : category.required ? 'Choose one option' : 'Choose one option (optional)'}
                         </p>
-                        {style.estimatedTime !== '0 days' && (
-                          <p className="text-xs text-gray-500">{style.estimatedTime}</p>
-                        )}
                       </div>
 
-                      {isStyleSelected(style) && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center group-hover:bg-red-500 transition-colors" title="Click to deselect">
-                          <CheckCircle className="w-4 h-4 text-white" />
-                        </div>
-                      )}
+                      {/* Options Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {categoryStyles.map((style) => (
+                          <div
+                            key={style.id}
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all relative group ${
+                              isStyleSelected(style, category.key)
+                                ? 'border-accent bg-accent/5 hover:bg-accent/10'
+                                : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            onClick={() => handleStyleSelect(style, category.key)}
+                          >
+                            {style.isPopular && (
+                              <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full flex items-center z-10">
+                                <Star className="w-3 h-3 mr-1" />
+                                Most Popular
+                              </div>
+                            )}
+
+                            <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                              <Palette className="w-8 h-8 text-gray-400" />
+                            </div>
+
+                            <h5 className="font-semibold text-gray-900 text-center mb-2 text-sm">
+                              {style.name}
+                            </h5>
+
+                            <p className="text-xs text-gray-600 text-center mb-3 min-h-[2.5rem]">
+                              {style.description}
+                            </p>
+
+                            <div className="text-center">
+                              <p className="text-sm font-bold text-accent">
+                                {Number(style.price) === 0 ? 'Free' : `+${formatPrice(style.price)}`}
+                              </p>
+                              {style.estimatedTime !== '0 days' && (
+                                <p className="text-xs text-gray-500">{style.estimatedTime}</p>
+                              )}
+                            </div>
+
+                            {isStyleSelected(style, category.key) && (
+                              <div className="absolute top-2 right-2 w-6 h-6 bg-accent rounded-full flex items-center justify-center transition-colors" title="Selected">
+                                <CheckCircle className="w-4 h-4 text-white" />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )
+                })}
 
-                {/* Navigation */}
-                <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                {/* Review Button */}
+                <div className="mt-8 flex justify-center">
                   <Button
-                    variant="outline"
-                    onClick={prevStep}
-                    disabled={currentStep === 0}
-                    className="w-full sm:w-auto"
+                    onClick={() => setShowReview(true)}
+                    disabled={!canProceedToReview()}
+                    className="px-8 py-3"
+                    size="lg"
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Previous
+                    <ShoppingCart className="w-5 h-5 mr-2" />
+                    Review & Add to Cart
                   </Button>
-
-                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowReview(true)}
-                      className="w-full sm:w-auto"
-                    >
-                      Review All
-                    </Button>
-                    <Button
-                      onClick={nextStep}
-                      disabled={!canProceed()}
-                      className="w-full sm:w-auto"
-                    >
-                      {currentStep === stepCategories.length - 1 ? 'Review' : 'Next'}
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>

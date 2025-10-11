@@ -60,7 +60,6 @@ const navigationSections = [
     icon: ShoppingCart,
     items: [
       { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, adminOnly: false },
-      { name: 'Pending Review', href: '/admin/pending-review', icon: Clock, adminOnly: false },
       { name: 'Customers', href: '/admin/customers', icon: Users, adminOnly: false },
       { name: 'Reviews', href: '/admin/reviews', icon: Star, adminOnly: false }
     ]
@@ -108,8 +107,7 @@ const navigationSections = [
     icon: Cog,
     items: [
       { name: 'My Profile', href: '/admin/profile', icon: Users, adminOnly: false },
-      { name: 'Material Costs', href: '/admin/material-costs', icon: DollarSign, adminOnly: true },
-      { name: 'Chat Settings', href: '/admin/chat-settings', icon: Settings, adminOnly: true }
+      { name: 'Material Costs', href: '/admin/material-costs', icon: DollarSign, adminOnly: true }
     ]
   }
 ]
@@ -134,9 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const getNotificationCount = (href: string) => {
     switch (href) {
       case '/admin/orders':
-        return unreadOrders
-      case '/admin/pending-review':
-        return unreadUpdates
+        return unreadOrders + unreadUpdates
       case '/admin/payment-management':
       case '/admin/payment-logs':
         return unreadPayments

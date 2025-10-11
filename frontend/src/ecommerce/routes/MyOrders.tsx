@@ -44,7 +44,7 @@ interface OrderItem {
 interface Order {
   id: number
   orderNumber: string
-  status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout'
+  status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered'
   orderDate: string
   total: number
   items: OrderItem[]
@@ -54,7 +54,41 @@ interface Order {
   customerConfirmations?: CustomerConfirmation[]
   pictureReplyUploadedAt?: string
   customerConfirmedAt?: string
+  trackingNumber?: string
+  shippingCarrier?: string
+  shippedAt?: string
+  deliveredAt?: string
   originalOrderData?: any[] // Store original order data for matching
+}
+
+// Map old statuses to new statuses
+const mapStatus = (oldStatus: string): Order['status'] => {
+  switch (oldStatus) {
+    case 'pending':
+      return 'pending-review'
+    case 'approved':
+      return 'approved-processing' // After payment, goes to approved-processing
+    case 'rejected':
+      return 'rejected-needs-upload'
+    case 'needs-changes':
+      return 'picture-reply-pending'
+    case 'picture-reply-approved':
+      return 'pending-payment' // After customer approves picture reply, goes to pending payment
+    case 'pending-payment':
+      return 'pending-payment'
+    case 'approved-processing':
+      return 'approved-processing'
+    case 'in-production':
+      return 'in-production'
+    case 'ready-for-checkout':
+      return 'ready-for-checkout'
+    case 'shipped':
+      return 'shipped'
+    case 'delivered':
+      return 'delivered'
+    default:
+      return oldStatus as Order['status']
+  }
 }
 
 // Helper function to convert OrderReview to Order
@@ -87,32 +121,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
         productImage: item.product?.image
       }))
     });
-  }
-
-  // Map old statuses to new statuses
-  const mapStatus = (oldStatus: string): Order['status'] => {
-    switch (oldStatus) {
-      case 'pending':
-        return 'pending-review'
-      case 'approved':
-        return 'approved-processing' // After payment, goes to approved-processing
-      case 'rejected':
-        return 'rejected-needs-upload'
-      case 'needs-changes':
-        return 'picture-reply-pending'
-      case 'picture-reply-approved':
-        return 'pending-payment' // After customer approves picture reply, goes to pending payment
-      case 'pending-payment':
-        return 'pending-payment'
-      case 'approved-processing':
-        return 'approved-processing'
-      case 'in-production':
-        return 'in-production'
-      case 'ready-for-checkout':
-        return 'ready-for-checkout'
-      default:
-        return oldStatus as Order['status']
-    }
   }
 
   const convertedItems = orderData.map((item: any) => {
@@ -391,12 +399,20 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
       undefined,
     pictureReplyUploadedAt: orderReview.picture_reply_uploaded_at,
     customerConfirmedAt: orderReview.customer_confirmed_at,
+    trackingNumber: orderReview.tracking_number,
+    shippingCarrier: orderReview.shipping_carrier,
+    shippedAt: orderReview.shipped_at,
+    deliveredAt: orderReview.delivered_at,
     originalOrderData: orderData // Store original order data for matching
   };
 
   console.log('🔍 Final converted order:', {
     orderId: convertedOrder.id,
     status: convertedOrder.status,
+    trackingNumber: convertedOrder.trackingNumber,
+    shippingCarrier: convertedOrder.shippingCarrier,
+    shippedAt: convertedOrder.shippedAt,
+    deliveredAt: convertedOrder.deliveredAt,
     hasAdminPictureReplies: !!convertedOrder.adminPictureReplies,
     adminPictureRepliesLength: convertedOrder.adminPictureReplies?.length || 0,
     adminPictureReplies: convertedOrder.adminPictureReplies
@@ -427,6 +443,10 @@ const getStatusIcon = (status: Order['status']) => {
       return <Truck className="w-5 h-5 text-blue-500" />
     case 'ready-for-checkout':
       return <CreditCard className="w-5 h-5 text-purple-500" />
+    case 'shipped':
+      return <Package className="w-5 h-5 text-purple-500" />
+    case 'delivered':
+      return <CheckCircle className="w-5 h-5 text-green-500" />
     default:
       return <Clock className="w-5 h-5 text-gray-500" />
   }
@@ -454,6 +474,10 @@ const getStatusText = (status: Order['status']) => {
       return 'Being Made'
     case 'ready-for-checkout':
       return 'Ready to Order'
+    case 'shipped':
+      return 'On the Way'
+    case 'delivered':
+      return 'Delivered'
     default:
       return 'In Progress'
   }
@@ -481,6 +505,10 @@ const getStatusColor = (status: Order['status']) => {
       return 'bg-blue-100 text-blue-800'
     case 'ready-for-checkout':
       return 'bg-purple-100 text-purple-800'
+    case 'shipped':
+      return 'bg-purple-100 text-purple-800'
+    case 'delivered':
+      return 'bg-green-100 text-green-800'
     default:
       return 'bg-gray-100 text-gray-800'
   }
@@ -593,6 +621,15 @@ export default function MyOrders() {
   const [showReuploadModal, setShowReuploadModal] = useState(false)
   const [reuploadFiles, setReuploadFiles] = useState<{[itemId: string]: File | null}>({})
   const [submittingReupload, setSubmittingReupload] = useState(false)
+  // Image enlargement modal state
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
+  const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>('')
+  // Product review modal state
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [reviewOrderId, setReviewOrderId] = useState<number | null>(null)
+  const [rating, setRating] = useState<number>(5)
+  const [reviewText, setReviewText] = useState<string>('')
+  const [submittingReview, setSubmittingReview] = useState(false)
   const [backendProducts, setBackendProducts] = useState<any[]>([])
   
   // WebSocket hook for real-time updates
@@ -644,7 +681,11 @@ export default function MyOrders() {
         order.id === data.orderId 
           ? { 
               ...order, 
-              status: data.statusData.status
+              status: mapStatus(data.statusData.status),
+              trackingNumber: data.statusData.trackingNumber || order.trackingNumber,
+              shippingCarrier: data.statusData.shippingCarrier || order.shippingCarrier,
+              shippedAt: data.statusData.shippedAt || order.shippedAt,
+              deliveredAt: data.statusData.deliveredAt || order.deliveredAt
             }
           : order
       ));
@@ -1237,6 +1278,8 @@ export default function MyOrders() {
             <option value="approved-processing">Being Prepared</option>
             <option value="ready-for-production">Ready to Make</option>
             <option value="in-production">Being Made</option>
+            <option value="shipped">On the Way</option>
+            <option value="delivered">Delivered</option>
             <option value="ready-for-checkout">Ready to Order</option>
           </select>
 
@@ -1507,14 +1550,32 @@ export default function MyOrders() {
                 </div>
               </div>
 
-              {/* Admin Notes */}
+              {/* Admin Notes - Red styling for rejected orders */}
               {order.adminNotes && (
-                <div className="px-6 py-3 bg-blue-50 border-t border-blue-100">
+                <div className={`px-6 py-3 border-t ${
+                  order.status === 'rejected-needs-upload' 
+                    ? 'bg-red-50 border-red-100' 
+                    : 'bg-blue-50 border-blue-100'
+                }`}>
                   <div className="flex items-start space-x-3">
-                    <MessageSquare className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <MessageSquare className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                      order.status === 'rejected-needs-upload' 
+                        ? 'text-red-600' 
+                        : 'text-blue-600'
+                    }`} />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-blue-800 mb-1">Admin Message</p>
-                      <p className="text-sm text-blue-700">{order.adminNotes}</p>
+                      <p className={`text-sm font-semibold mb-1 ${
+                        order.status === 'rejected-needs-upload' 
+                          ? 'text-red-800' 
+                          : 'text-blue-800'
+                      }`}>
+                        {order.status === 'rejected-needs-upload' ? '⚠️ Rejection Reason' : 'Admin Message'}
+                      </p>
+                      <p className={`text-sm ${
+                        order.status === 'rejected-needs-upload' 
+                          ? 'text-red-700' 
+                          : 'text-blue-700'
+                      }`}>{order.adminNotes}</p>
                     </div>
                   </div>
                 </div>
@@ -1547,6 +1608,92 @@ export default function MyOrders() {
                       <p className="text-sm text-blue-700 mt-1">
                         Your order is being processed. We'll notify you when it's ready for shipping.
                       </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {order.status === 'shipped' && (
+                <div className="px-6 py-4 bg-purple-50 border-t border-purple-100">
+                  <div className="flex items-start space-x-3">
+                    <Package className="w-6 h-6 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-purple-800 mb-2">Shipped</p>
+                      <p className="text-sm text-purple-700 mb-3">
+                        Your order is on its way! Track your package using the information below.
+                      </p>
+                      {order.trackingNumber ? (
+                        <div className="bg-white rounded-lg p-3 border border-purple-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600">Courier:</span>
+                            <span className="text-sm font-semibold text-gray-900">{order.shippingCarrier || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600">Tracking Number:</span>
+                            <span className="text-sm font-mono font-semibold text-purple-700">{order.trackingNumber}</span>
+                          </div>
+                          {order.shippedAt && (
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-gray-600">Shipped On:</span>
+                              <span className="text-xs text-gray-700">{new Date(order.shippedAt).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-lg p-3 border border-purple-200">
+                          <p className="text-sm text-gray-600 italic">Tracking information will be available soon.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {order.status === 'delivered' && (
+                <div className="px-6 py-4 bg-green-50 border-t border-green-100">
+                  <div className="flex items-start space-x-3">
+                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-green-800 mb-2">Delivered</p>
+                      <p className="text-sm text-green-700 mb-3">
+                        Your order has been delivered successfully! Thank you for your purchase.
+                      </p>
+                      {order.trackingNumber ? (
+                        <div className="bg-white rounded-lg p-3 border border-green-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600">Courier:</span>
+                            <span className="text-sm font-semibold text-gray-900">{order.shippingCarrier || 'N/A'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-600">Tracking Number:</span>
+                            <span className="text-sm font-mono font-semibold text-green-700">{order.trackingNumber}</span>
+                          </div>
+                          {order.deliveredAt && (
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                              <span className="text-xs font-medium text-gray-600">Delivered On:</span>
+                              <span className="text-xs text-gray-700">{new Date(order.deliveredAt).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-white rounded-lg p-3 border border-green-200">
+                          <p className="text-sm text-gray-600 italic">Tracking information not available.</p>
+                        </div>
+                      )}
+                      
+                      {/* Leave a Review Button */}
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => {
+                            setReviewOrderId(order.id);
+                            setShowReviewModal(true);
+                          }}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center space-x-2"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>Leave a Review</span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1608,9 +1755,23 @@ export default function MyOrders() {
                     )}
                     {selectedOrder.adminNotes && (
                       <div className="col-span-2">
-                        <p className="text-sm font-medium text-gray-500">Admin Notes</p>
-                        <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded">
-                          <p className="text-sm text-blue-800">{selectedOrder.adminNotes}</p>
+                        <p className={`text-sm font-medium ${
+                          selectedOrder.status === 'rejected-needs-upload' 
+                            ? 'text-red-600' 
+                            : 'text-gray-500'
+                        }`}>
+                          {selectedOrder.status === 'rejected-needs-upload' ? '⚠️ Rejection Reason' : 'Admin Notes'}
+                        </p>
+                        <div className={`mt-1 p-3 border rounded ${
+                          selectedOrder.status === 'rejected-needs-upload' 
+                            ? 'bg-red-50 border-red-200' 
+                            : 'bg-blue-50 border-blue-200'
+                        }`}>
+                          <p className={`text-sm ${
+                            selectedOrder.status === 'rejected-needs-upload' 
+                              ? 'text-red-800 font-medium' 
+                              : 'text-blue-800'
+                          }`}>{selectedOrder.adminNotes}</p>
                     </div>
                       </div>
                     )}
@@ -1646,6 +1807,84 @@ export default function MyOrders() {
                   </div>
                 )}
 
+                {/* Tracking Information - Shipped Status */}
+                {selectedOrder && selectedOrder.status === 'shipped' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <Package className="h-6 w-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-purple-800 mb-2">Order Shipped!</h3>
+                        <p className="text-sm text-purple-700 mb-3">
+                          Your order is on its way! Track your package using the information below.
+                        </p>
+                        {selectedOrder.trackingNumber ? (
+                          <div className="bg-white rounded-lg p-4 space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
+                                <p className="text-base font-semibold text-gray-900">{selectedOrder.shippingCarrier || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
+                                <p className="text-base font-mono font-semibold text-purple-700">{selectedOrder.trackingNumber}</p>
+                              </div>
+                            </div>
+                            {selectedOrder.shippedAt && (
+                              <div className="pt-3 border-t border-gray-200">
+                                <p className="text-xs font-medium text-gray-600 mb-1">Shipped Date</p>
+                                <p className="text-sm text-gray-900">{new Date(selectedOrder.shippedAt).toLocaleString()}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-lg p-4">
+                            <p className="text-sm text-gray-600 italic">Tracking information will be available soon.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tracking Information - Delivered Status */}
+                {selectedOrder && selectedOrder.status === 'delivered' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <CheckCircle className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-green-800 mb-2">Order Delivered!</h3>
+                        <p className="text-sm text-green-700 mb-3">
+                          Your order has been delivered successfully. Thank you for your purchase!
+                        </p>
+                        {selectedOrder.trackingNumber ? (
+                          <div className="bg-white rounded-lg p-4 space-y-3">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
+                                <p className="text-base font-semibold text-gray-900">{selectedOrder.shippingCarrier || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
+                                <p className="text-base font-mono font-semibold text-green-700">{selectedOrder.trackingNumber}</p>
+                              </div>
+                            </div>
+                            {selectedOrder.deliveredAt && (
+                              <div className="pt-3 border-t border-gray-200">
+                                <p className="text-xs font-medium text-gray-600 mb-1">Delivered Date</p>
+                                <p className="text-sm text-gray-900">{new Date(selectedOrder.deliveredAt).toLocaleString()}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-lg p-4">
+                            <p className="text-sm text-gray-600 italic">Tracking information not available.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Order Items */}
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-3">Order Items</h3>
@@ -1660,7 +1899,11 @@ export default function MyOrders() {
                               <img
                                 src={item.customization?.mockup || item.productImage}
                                 alt={`Final ${item.productName}`}
-                                className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                                className="w-24 h-24 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => {
+                                  setEnlargedImage(item.customization?.mockup || item.productImage);
+                                  setEnlargedImageTitle(`${item.productName} - Final Product`);
+                                }}
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
                                   target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
@@ -1723,7 +1966,11 @@ export default function MyOrders() {
                                             <img
                                               src={imageSrc}
                                               alt={`Design ${index + 1}`}
-                                              className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                              className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                              onClick={() => {
+                                                setEnlargedImage(imageSrc);
+                                                setEnlargedImageTitle(`${design.name || `Design ${index + 1}`}`);
+                                              }}
                                               onError={(e) => {
                                                 console.error('❌ Image failed to load:', {
                                                   designName: design.name,
@@ -1749,7 +1996,11 @@ export default function MyOrders() {
                                       <img
                                         src={item.customization.design.preview}
                                         alt="Design"
-                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => {
+                                          setEnlargedImage(item.customization?.design?.preview || '');
+                                          setEnlargedImageTitle(item.customization?.design?.name || 'Design');
+                                        }}
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
                                           target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
@@ -1764,7 +2015,11 @@ export default function MyOrders() {
                                       <img
                                         src={item.customization.embroideryData.designImage}
                                         alt="Design"
-                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                        className="w-16 h-16 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => {
+                                          setEnlargedImage(item.customization?.embroideryData?.designImage || '');
+                                          setEnlargedImageTitle(item.customization?.embroideryData?.designName || 'Design');
+                                        }}
                                         onError={(e) => {
                                           const target = e.target as HTMLImageElement;
                                           target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
@@ -1925,36 +2180,24 @@ export default function MyOrders() {
                     {/* Group replies by item */}
                     <div className="space-y-6">
                       {selectedOrder.items.map((item, itemIndex) => {
-                        // Find replies for this specific item
+                        // Find replies for this specific item - USE EXACT MATCHING ONLY
                         const itemReplies = selectedOrder.adminPictureReplies?.filter(reply => {
-                          // Enhanced matching logic to handle various ID formats
+                          // Convert to strings for comparison
                           const replyItemIdStr = String(reply.itemId || '');
                           const itemIdStr = String(item.id || '');
                           const productIdStr = String(item.productId || '');
                           
+                          // STRICT EXACT MATCH ONLY - no fuzzy matching
                           const matches = 
-                            // Exact matches
-                            reply.itemId === item.id || 
-                            reply.itemId === item.productId ||
-                            replyItemIdStr === itemIdStr ||
-                            replyItemIdStr === productIdStr ||
-                            // Handle custom-embroidery-0 vs custom-embroidery mismatch
-                            (replyItemIdStr === 'custom-embroidery-0' && itemIdStr === 'custom-embroidery') ||
-                            (replyItemIdStr === 'custom-embroidery' && itemIdStr === 'custom-embroidery-0') ||
-                            // Handle other potential mismatches with startsWith/contains
-                            (replyItemIdStr && itemIdStr && replyItemIdStr.startsWith(itemIdStr)) ||
-                            (replyItemIdStr && itemIdStr && itemIdStr.startsWith(replyItemIdStr)) ||
-                            (replyItemIdStr && productIdStr && replyItemIdStr.startsWith(productIdStr)) ||
-                            (replyItemIdStr && productIdStr && productIdStr.startsWith(replyItemIdStr));
+                            replyItemIdStr === itemIdStr || 
+                            replyItemIdStr === productIdStr;
                           
-                          console.log('🔍 Item reply matching:', {
+                          console.log('🔍 Item reply matching (exact):', {
                             itemId: item.id,
                             productId: item.productId,
                             replyItemId: reply.itemId,
                             matches,
-                            itemName: item.productName,
-                            customEmbroideryMatch: (reply.itemId === 'custom-embroidery-0' && item.id === 'custom-embroidery'),
-                            startsWithMatch: (reply.itemId && item.id && reply.itemId.startsWith(item.id))
+                            itemName: item.productName
                           });
                           
                           return matches;
@@ -2289,6 +2532,123 @@ export default function MyOrders() {
               >
                 {submittingReupload ? 'Uploading...' : 'Submit Re-upload'}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Enlargement Modal */}
+      {enlargedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4" onClick={() => setEnlargedImage(null)}>
+          <div className="relative max-w-7xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setEnlargedImage(null)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {enlargedImageTitle && (
+              <div className="absolute -top-12 left-0 text-white text-lg font-medium bg-black bg-opacity-50 px-4 py-2 rounded">
+                {enlargedImageTitle}
+              </div>
+            )}
+            <img
+              src={enlargedImage}
+              alt="Enlarged view"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={() => setEnlargedImage(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Product Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="fixed inset-0 bg-black opacity-50" onClick={() => setShowReviewModal(false)}></div>
+            
+            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Write a Review</h3>
+                <button
+                  onClick={() => setShowReviewModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Rating */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rating
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className={`text-3xl transition-colors ${
+                          star <= rating ? 'text-yellow-400' : 'text-gray-300'
+                        } hover:text-yellow-400`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                    <span className="text-sm text-gray-600 ml-2">({rating}/5)</span>
+                  </div>
+                </div>
+
+                {/* Review Text */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Review
+                  </label>
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Share your experience with this product..."
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button
+                    onClick={() => setShowReviewModal(false)}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!reviewOrderId) return;
+                      setSubmittingReview(true);
+                      try {
+                        // TODO: Call API to submit review
+                        console.log('Submitting review:', { orderId: reviewOrderId, rating, reviewText });
+                        // For now, just close the modal
+                        setShowReviewModal(false);
+                        setRating(5);
+                        setReviewText('');
+                        alert('Thank you for your review!');
+                      } catch (error) {
+                        console.error('Error submitting review:', error);
+                        alert('Failed to submit review. Please try again.');
+                      } finally {
+                        setSubmittingReview(false);
+                      }
+                    }}
+                    disabled={submittingReview || !reviewText.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                  >
+                    {submittingReview ? 'Submitting...' : 'Submit Review'}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

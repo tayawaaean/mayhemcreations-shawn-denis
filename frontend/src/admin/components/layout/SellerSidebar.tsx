@@ -58,7 +58,6 @@ const navigationSections = [
     icon: ShoppingCart,
     items: [
       { name: 'Orders', href: '/seller/orders', icon: ShoppingCart },
-      { name: 'Pending Review', href: '/seller/pending-review', icon: Clock },
       { name: 'Customers', href: '/seller/customers', icon: Users },
       { name: 'Reviews', href: '/seller/reviews', icon: Star }
     ]

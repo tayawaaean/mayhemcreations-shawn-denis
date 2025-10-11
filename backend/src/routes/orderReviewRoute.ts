@@ -12,6 +12,7 @@ import {
   updateReviewStatus,
   uploadPictureReply,
   confirmPictureReplies,
+  getOrderStats,
 } from '../controllers/orderReviewController';
 
 const router = Router();
@@ -58,5 +59,12 @@ router.post('/admin/review-orders/:id/picture-reply', hybridAuthenticate, requir
  * @access Private (Customer only)
  */
 router.post('/review-orders/:id/confirm-pictures', hybridAuthenticate, requireRole(['customer']), confirmPictureReplies);
+
+/**
+ * @route GET /api/v1/orders/admin/stats
+ * @desc Get order statistics for dashboard
+ * @access Private (Admin only)
+ */
+router.get('/admin/stats', hybridAuthenticate, requireRole(['admin']), getOrderStats);
 
 export default router;

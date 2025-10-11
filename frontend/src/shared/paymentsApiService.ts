@@ -42,6 +42,8 @@ export const paymentsApiService = {
     cancelUrl?: string
     customerInfo?: CustomerInfo
     shippingAddress?: ShippingAddress
+    shippingCost?: number
+    taxAmount?: number
     metadata?: Record<string, string>
   }) {
     return apiAuthService.post<{ id: string; url: string }>(

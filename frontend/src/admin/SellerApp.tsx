@@ -8,7 +8,6 @@ import SellerSidebar from './components/layout/SellerSidebar'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
-import Orders from './pages/Orders'
 import PendingReview from './pages/PendingReview'
 import Customers from './pages/Customers'
 import Reviews from './pages/Reviews'
@@ -20,7 +19,6 @@ import FAQs from './pages/FAQs'
 import Analytics from './pages/Analytics'
 import PaymentManagement from './pages/PaymentManagement'
 import SellerRefundManagement from './pages/SellerRefundManagement'
-// ChatSettings is admin-only, so not included in seller routes
 
 const SellerApp: React.FC = () => {
   return (
@@ -34,8 +32,7 @@ const SellerApp: React.FC = () => {
                   <Route path="/*" element={<SharedLayout SidebarComponent={SellerSidebar} />}>
                     <Route index element={<Dashboard />} />
                     <Route path="products" element={<Products />} />
-                    <Route path="orders" element={<Orders />} />
-                    <Route path="pending-review" element={<PendingReview />} />
+                    <Route path="orders" element={<PendingReview />} />
                     <Route path="customers" element={<Customers />} />
                     <Route path="reviews" element={<Reviews />} />
                     <Route path="messages" element={<Messages />} />

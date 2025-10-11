@@ -61,12 +61,40 @@ export interface VariantInventoryData {
   };
 }
 
+export interface OrderStats {
+  totalOrders: number;
+  totalSales: number;
+  ordersByStatus: Array<{
+    status: string;
+    count: number;
+  }>;
+  recentOrders: Array<{
+    id: number;
+    order_number: string;
+    total: string;
+    status: string;
+    updated_at: string;
+    user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  }>;
+  revenueChart: Array<{
+    date: string;
+    revenue: string;
+  }>;
+}
+
 export interface AnalyticsData {
   totalProducts: number;
   totalCustomers: number;
+  totalOrders?: number;
+  totalSales?: number;
   lowStockVariants: Variant[];
   lowStockCount: number;
   outOfStockCount: number;
+  recentOrders?: OrderStats['recentOrders'];
+  revenueChart?: OrderStats['revenueChart'];
 }
 
 class AdminAnalyticsApiService {
@@ -108,6 +136,16 @@ class AdminAnalyticsApiService {
   }
 
   /**
+   * Get order statistics
+   */
+  async getOrderStats(): Promise<ApiResponse<OrderStats>> {
+    console.log('🔄 Calling /orders/admin/stats...')
+    const response = await apiAuthService.get<OrderStats>('/orders/admin/stats', true);
+    console.log('📊 Order Stats Raw Response:', response)
+    return response;
+  }
+
+  /**
    * Get comprehensive analytics data for dashboard
    */
   async getDashboardAnalytics(): Promise<ApiResponse<AnalyticsData>> {
@@ -115,15 +153,17 @@ class AdminAnalyticsApiService {
       console.log('🔄 Fetching dashboard analytics...')
       
       // Fetch all required data in parallel
-      const [productStatsResponse, userStatsResponse, inventoryResponse] = await Promise.all([
+      const [productStatsResponse, userStatsResponse, inventoryResponse, orderStatsResponse] = await Promise.all([
         this.getProductStats(),
         this.getUserStats(),
-        this.getInventoryStatus(10) // Low stock threshold of 10
+        this.getInventoryStatus(10), // Low stock threshold of 10
+        this.getOrderStats() // Get order statistics
       ]);
 
       console.log('📊 Product Stats Response:', productStatsResponse)
       console.log('👥 User Stats Response:', userStatsResponse)
       console.log('📦 Variant Inventory Response:', inventoryResponse)
+      console.log('📊 Order Stats Response:', orderStatsResponse)
 
       // Check each response individually for better error reporting
       if (!productStatsResponse.success) {
@@ -134,6 +174,11 @@ class AdminAnalyticsApiService {
       if (!inventoryResponse.success) {
         console.error('❌ Variant Inventory API failed:', inventoryResponse.message)
         throw new Error(`Variant Inventory API failed: ${inventoryResponse.message}`);
+      }
+      
+      if (!orderStatsResponse.success) {
+        console.error('❌ Order Stats API failed:', orderStatsResponse.message)
+        throw new Error(`Order Stats API failed: ${orderStatsResponse.message}`);
       }
 
       // Handle user stats failure gracefully (might be auth issue)
@@ -170,13 +215,21 @@ class AdminAnalyticsApiService {
       const analyticsData: AnalyticsData = {
         totalProducts: productStatsResponse.data?.total || 0,
         totalCustomers: totalCustomers,
+        totalOrders: orderStatsResponse.data?.totalOrders || 0,
+        totalSales: orderStatsResponse.data?.totalSales || 0,
         lowStockVariants: lowStockVariants,
         lowStockCount: inventoryResponse.data?.statistics?.lowStock || 0,
-        outOfStockCount: inventoryResponse.data?.statistics?.outOfStock || 0
+        outOfStockCount: inventoryResponse.data?.statistics?.outOfStock || 0,
+        recentOrders: orderStatsResponse.data?.recentOrders || [],
+        revenueChart: orderStatsResponse.data?.revenueChart || []
       };
 
       console.log('✅ Final Analytics Data:', analyticsData)
       console.log('⚠️ Low Stock Variants (first 5):', lowStockVariants)
+      console.log('📊 Total Orders:', analyticsData.totalOrders)
+      console.log('💰 Total Sales:', analyticsData.totalSales)
+      console.log('📈 Recent Orders:', analyticsData.recentOrders)
+      console.log('📊 Revenue Chart:', analyticsData.revenueChart)
 
       return {
         success: true,

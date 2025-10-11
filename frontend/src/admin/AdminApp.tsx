@@ -11,7 +11,6 @@ import Sidebar from './components/layout/Sidebar'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
-import Orders from './pages/Orders'
 import PendingReview from './pages/PendingReview'
 import Customers from './pages/Customers'
 import Reviews from './pages/Reviews'
@@ -24,7 +23,6 @@ import FAQs from './pages/FAQs'
 import MaterialCosts from './pages/MaterialCosts'
 import MaterialCostsTest from './pages/MaterialCostsTest'
 import Analytics from './pages/Analytics'
-import ChatSettings from './pages/ChatSettings'
 import PaymentLogs from './pages/PaymentLogs'
 import PaymentManagement from './pages/PaymentManagement'
 import ShipStationManagement from './pages/ShipStationManagement'
@@ -47,8 +45,7 @@ const AdminApp: React.FC = () => {
                       <Route path="/*" element={<SharedLayout SidebarComponent={Sidebar} />}>
                         <Route index element={<Dashboard />} />
                         <Route path="products" element={<Products />} />
-                        <Route path="orders" element={<Orders />} />
-                        <Route path="pending-review" element={<PendingReview />} />
+                        <Route path="orders" element={<PendingReview />} />
                         <Route path="customers" element={<Customers />} />
                         <Route path="reviews" element={<Reviews />} />
                         <Route path="users" element={<UsersPage />} />
@@ -60,8 +57,7 @@ const AdminApp: React.FC = () => {
                         <Route path="material-costs" element={<MaterialCosts />} />
                         <Route path="material-costs-test" element={<MaterialCostsTest />} />
                         <Route path="analytics" element={<Analytics />} />
-                        <Route path="chat-settings" element={<ChatSettings />} />
-                            <Route path="shipstation" element={<ShipStationManagement />} />
+                        <Route path="shipstation" element={<ShipStationManagement />} />
                         <Route path="payment-management" element={<PaymentManagement />} />
                         <Route path="refund-management" element={<RefundManagement />} />
                         <Route path="system-logs" element={<SystemLogs />} />

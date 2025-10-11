@@ -78,8 +78,7 @@ const initialState: AdminState = {
     revenueChart: [],
     topProducts: [],
     recentOrders: [],
-    lowStockProducts: [],
-    lowStockCount: 0
+    lowStockProducts: []
   },
   selectedProduct: null,
   selectedOrder: null,
@@ -237,16 +236,29 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           
           // Convert the API data to match the Analytics type
           const analyticsData: Analytics = {
-            totalSales: 0, // Will be calculated from orders
-            totalOrders: response.data.totalOrders || 0,
+            totalSales: response.data.totalSales || 0, // Sales from delivered orders
+            totalOrders: response.data.totalOrders || 0, // Total orders from order_reviews
             totalProducts: response.data.totalProducts,
             totalCustomers: response.data.totalCustomers,
             salesGrowth: 0, // Will be calculated
             ordersGrowth: 0, // Will be calculated
             customersGrowth: 0, // Will be calculated
-            revenueChart: [], // Will be calculated
-            topProducts: [], // Will be calculated
-            recentOrders: [], // Will be calculated
+            revenueChart: (response.data.revenueChart || []).map((item: any) => ({
+              date: item.date,
+              revenue: parseFloat(item.revenue) || 0
+            })),
+            topProducts: [], // Removed as requested
+            recentOrders: (response.data.recentOrders || []).map((order: any) => ({
+              id: order.order_number || order.id.toString(),
+              orderNumber: order.order_number || `ORD-${order.id}`,
+              customer: {
+                name: `${order.first_name || ''} ${order.last_name || ''}`.trim() || order.email,
+                email: order.email
+              },
+              total: parseFloat(order.total) || 0,
+              status: order.status || 'processing',
+              date: order.updated_at
+            })),
             lowStockProducts: response.data.lowStockVariants.map(variant => ({
               id: variant.id.toString(),
               title: variant.product?.title || variant.name || 'Unknown Product',

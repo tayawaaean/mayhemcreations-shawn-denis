@@ -199,6 +199,29 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
         replacements: [order.id]
       });
 
+      // Note: Stock will be deducted when order status changes to 'delivered'
+      // This allows for order modifications during production
+
+      // Emit notification to admin room about paid order
+      try {
+        const { getWebSocketService } = await import('../services/websocketService');
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitToAdminRoom('order_paid_notification', {
+            type: 'order_paid',
+            orderReviewId: order.id,
+            userId,
+            amount: order.total,
+            status: 'approved-processing',
+            message: `Payment received for order #${order.id} ($${order.total})`,
+            timestamp: new Date().toISOString()
+          });
+          logger.info(`📢 Emitted paid order notification for order ${order.id}`);
+        }
+      } catch (notificationError) {
+        logger.error('Error emitting paid order notification:', notificationError);
+      }
+
       // Create payment record
       try {
         const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
@@ -443,6 +466,29 @@ const handleCheckoutSessionCompleted = async (session: any) => {
       `, {
         replacements: [order.id]
       });
+
+      // Note: Stock will be deducted when order status changes to 'delivered'
+      // This allows for order modifications during production
+
+      // Emit notification to admin room about paid order
+      try {
+        const { getWebSocketService } = await import('../services/websocketService');
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitToAdminRoom('order_paid_notification', {
+            type: 'order_paid',
+            orderReviewId: order.id,
+            userId,
+            amount: order.total,
+            status: 'approved-processing',
+            message: `Payment received for order #${order.id} ($${order.total})`,
+            timestamp: new Date().toISOString()
+          });
+          logger.info(`📢 Emitted paid order notification for order ${order.id}`);
+        }
+      } catch (notificationError) {
+        logger.error('Error emitting paid order notification:', notificationError);
+      }
 
       // Create payment record
       try {

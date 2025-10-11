@@ -260,6 +260,27 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       total
     });
 
+    // Emit notification to admin room about new pending review order
+    try {
+      const webSocketService = getWebSocketService();
+      if (webSocketService) {
+        webSocketService.emitToAdminRoom('new_order_notification', {
+          type: 'new_order',
+          orderReviewId,
+          userId,
+          itemCount: items.length,
+          total,
+          status: 'pending',
+          message: `New order submitted for review (${items.length} items, $${total})`,
+          timestamp: new Date().toISOString()
+        });
+        logger.info(`📢 Emitted new order notification for order ${orderReviewId}`);
+      }
+    } catch (notificationError) {
+      logger.error('Error emitting new order notification:', notificationError);
+      // Don't fail the request if notification fails
+    }
+
   } catch (error: any) {
     logger.error('Error submitting order for review:', error);
     res.status(500).json({
@@ -305,6 +326,10 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
         customer_confirmations,
         picture_reply_uploaded_at,
         customer_confirmed_at,
+        tracking_number,
+        shipping_carrier,
+        shipped_at,
+        delivered_at,
         created_at,
         updated_at
       FROM order_reviews 
@@ -509,6 +534,23 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // If status is 'delivered', deduct stock for physical products
+    if (status === 'delivered') {
+      try {
+        const { deductStockForOrder } = await import('../services/stockService');
+        const stockDeducted = await deductStockForOrder(parseInt(id));
+        if (stockDeducted) {
+          logger.info(`✅ Stock deducted successfully for delivered order ${id}`);
+        } else {
+          logger.warn(`⚠️ Failed to deduct stock for delivered order ${id}`);
+        }
+      } catch (stockError) {
+        logger.error(`❌ Error deducting stock for delivered order ${id}:`, stockError);
+        // Don't fail the status update if stock deduction fails
+        // Admin can manually adjust inventory if needed
+      }
+    }
+
     // If approved, update cart items to approved status
     if (status === 'approved') {
       await sequelize.query(`
@@ -559,6 +601,23 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
         shippedAt: status === 'shipped' ? new Date().toISOString() : undefined,
         deliveredAt: status === 'delivered' ? new Date().toISOString() : undefined
       });
+
+      // Emit notification to admin room for delivered orders
+      if (status === 'delivered') {
+        try {
+          webSocketService.emitToAdminRoom('order_delivered_notification', {
+            type: 'order_delivered',
+            orderReviewId: parseInt(id),
+            userId,
+            status: finalStatus,
+            message: `Order #${id} has been delivered`,
+            timestamp: new Date().toISOString()
+          });
+          logger.info(`📢 Emitted delivered order notification for order ${id}`);
+        } catch (notificationError) {
+          logger.error('Error emitting delivered order notification:', notificationError);
+        }
+      }
     }
 
     logger.info(`Order review ${id} status updated to ${status}`, {
@@ -825,6 +884,92 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({
       success: false,
       message: 'Failed to confirm picture replies',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Get order statistics for dashboard
+ * @route GET /api/v1/orders/admin/stats
+ * @access Private (Admin only)
+ */
+export const getOrderStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
+  try {
+    // Get total orders count
+    const [totalOrdersResult] = await sequelize.query(`
+      SELECT COUNT(*) as total_orders
+      FROM order_reviews
+    `);
+    const totalOrders = (totalOrdersResult[0] as any).total_orders || 0;
+
+    // Get total sales from delivered orders
+    const [totalSalesResult] = await sequelize.query(`
+      SELECT COALESCE(SUM(total), 0) as total_sales
+      FROM order_reviews
+      WHERE status = 'delivered'
+    `);
+    const totalSales = parseFloat((totalSalesResult[0] as any).total_sales) || 0;
+
+    // Get order count by status for additional insights
+    const [ordersByStatusResult] = await sequelize.query(`
+      SELECT 
+        status,
+        COUNT(*) as count
+      FROM order_reviews
+      GROUP BY status
+    `);
+
+    // Get recent paid orders (last 10)
+    const [recentOrdersResult] = await sequelize.query(`
+      SELECT 
+        or_table.id,
+        or_table.order_number,
+        or_table.total,
+        or_table.status,
+        or_table.updated_at,
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        u.email
+      FROM order_reviews or_table
+      JOIN users u ON or_table.user_id = u.id
+      WHERE or_table.payment_status = 'completed'
+      ORDER BY or_table.updated_at DESC
+      LIMIT 10
+    `);
+
+    // Get revenue chart data (last 7 days)
+    const [revenueChartResult] = await sequelize.query(`
+      SELECT 
+        DATE(updated_at) as date,
+        COALESCE(SUM(total), 0) as revenue
+      FROM order_reviews
+      WHERE status = 'delivered'
+        AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY DATE(updated_at)
+      ORDER BY date ASC
+    `);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalOrders,
+        totalSales,
+        ordersByStatus: ordersByStatusResult,
+        recentOrders: recentOrdersResult,
+        revenueChart: revenueChartResult
+      },
+      message: 'Order statistics retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error('Error fetching order statistics:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order statistics',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString(),
     });

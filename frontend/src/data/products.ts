@@ -177,6 +177,8 @@ export const products: Product[] = [
     badges: [],
     category: 'accessories',
     subcategory: 'cap',
+    availableColors: ['Black', 'Navy', 'White', 'Gray', 'Red', 'Royal Blue'],
+    availableSizes: ['One Size'],
     reviews: mockProductReviews['mayhem-003'],
     averageRating: 3.0,
     totalReviews: 1
@@ -190,7 +192,9 @@ export const products: Product[] = [
     alt: 'Snapback cap',
     badges: [],
     category: 'accessories',
-    subcategory: 'cap'
+    subcategory: 'cap',
+    availableColors: ['Black', 'Navy', 'White', 'Gray', 'Red', 'Charcoal'],
+    availableSizes: ['One Size']
   },
   {
     id: 'mayhem-013',
@@ -201,7 +205,9 @@ export const products: Product[] = [
     alt: 'Trucker cap',
     badges: [],
     category: 'accessories',
-    subcategory: 'cap'
+    subcategory: 'cap',
+    availableColors: ['Black/White', 'Navy/White', 'Red/White', 'Gray/Black', 'Black/Red'],
+    availableSizes: ['One Size']
   },
 
   // Accessories - Bags
@@ -214,7 +220,9 @@ export const products: Product[] = [
     alt: 'Canvas tote bag flat lay',
     badges: [],
     category: 'accessories',
-    subcategory: 'bag'
+    subcategory: 'bag',
+    availableColors: ['Natural', 'Black', 'Navy', 'Red', 'Forest Green'],
+    availableSizes: ['One Size']
   },
   {
     id: 'mayhem-014',
@@ -225,7 +233,9 @@ export const products: Product[] = [
     alt: 'Drawstring backpack',
     badges: [],
     category: 'accessories',
-    subcategory: 'bag'
+    subcategory: 'bag',
+    availableColors: ['Black', 'Navy', 'Red', 'Royal Blue', 'White'],
+    availableSizes: ['One Size']
   },
   {
     id: 'mayhem-015',
@@ -236,7 +246,9 @@ export const products: Product[] = [
     alt: 'Crossbody bag',
     badges: ['new'],
     category: 'accessories',
-    subcategory: 'bag'
+    subcategory: 'bag',
+    availableColors: ['Black', 'Brown', 'Navy', 'Tan', 'Charcoal'],
+    availableSizes: ['One Size']
   },
 
   // Embroidery

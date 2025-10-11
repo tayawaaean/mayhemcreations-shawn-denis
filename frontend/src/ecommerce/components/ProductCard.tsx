@@ -54,7 +54,7 @@ export default function ProductCard({ product }: { product: Product }) {
                   ? 'bg-yellow-500 text-white' 
                   : 'bg-green-500 text-white'
             }`}>
-              {isOutOfStock ? 'Out of Stock' : `${currentStock} in stock`}
+              {isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock'}
               {hasUpdates && <span className="ml-1 text-blue-200">●</span>}
             </span>
           )}

@@ -431,9 +431,23 @@ export default function OrderCheckout() {
           postal_code: formData.zipCode,
           country: 'US',
         },
+        shippingCost: calculateShipping(), // Pass actual shipping cost
+        taxAmount: calculateTax(), // Pass actual tax amount
         metadata: {
           orderId: String(order.id),
           customerEmail: formData.email,
+          subtotal: String(calculateSubtotal().toFixed(2)),
+          shipping: String(calculateShipping().toFixed(2)),
+          tax: String(calculateTax().toFixed(2)),
+          total: String(calculateTotal().toFixed(2)),
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone || '',
+          street: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+          country: 'US',
         },
       })
 

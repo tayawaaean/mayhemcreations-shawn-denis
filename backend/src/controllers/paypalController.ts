@@ -233,6 +233,9 @@ export const capturePayPalOrderHandler = async (
             ]
           });
 
+          // Note: Stock will be deducted when order status changes to 'delivered'
+          // This allows for order modifications during production
+
           // Create payment record
           try {
             const { createPaymentRecord, generateOrderNumber } = await import('../services/paymentRecordService');
@@ -548,6 +551,9 @@ const handlePaymentCaptureCompleted = async (event: any) => {
           order.id
         ]
       });
+      
+      // Note: Stock will be deducted when order status changes to 'delivered'
+      // This allows for order modifications during production
       
       logger.info('✅ Order updated via PayPal webhook with shipping details', {
         orderId: order.id,

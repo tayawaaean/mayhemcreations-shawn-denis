@@ -38,10 +38,15 @@ const PendingReview: React.FC = () => {
   const [selectedReviews, setSelectedReviews] = useState<number[]>([])
   const [selectedReview, setSelectedReview] = useState<OrderReview | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  // Image enlargement modal state
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
+  const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>('')
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<{src: string, alt: string, type: string} | null>(null)
   const [adminNotes, setAdminNotes] = useState('')
+  const [trackingNumber, setTrackingNumber] = useState('')
+  const [shippingCarrier, setShippingCarrier] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [pictureReplies, setPictureReplies] = useState<{[itemId: string]: {image: string, notes: string, designId?: string, designName?: string, embroideryStyle?: string}}>({})
@@ -246,22 +251,47 @@ const PendingReview: React.FC = () => {
   }
 
 
-  const handleStatusUpdate = async (reviewId: number, status: string, notes: string) => {
+  const handleStatusUpdate = async (reviewId: number, status: string, notes: string, tracking?: string, carrier?: string) => {
     try {
+      // Validate rejection reason if status is rejected
+      if (status === 'rejected' && !notes.trim()) {
+        alert('Please provide a reason for rejection in the admin notes');
+        return;
+      }
+
+      // Validate shipping info if status is shipped
+      if (status === 'shipped' && (!tracking || !carrier)) {
+        alert('Please provide both tracking number and shipping carrier for shipped orders');
+        return;
+      }
+
       const response = await orderReviewApiService.updateReviewStatus(reviewId, {
         status: status as any,
-        adminNotes: notes
+        adminNotes: notes,
+        trackingNumber: tracking,
+        shippingCarrier: carrier
       })
       
       if (response.success) {
         // Update local state
         setReviews(prev => prev.map(review => 
           review.id === reviewId 
-            ? { ...review, status: status as any, admin_notes: notes, reviewed_at: new Date().toISOString() }
+            ? { 
+                ...review, 
+                status: status as any, 
+                admin_notes: notes, 
+                tracking_number: tracking || review.tracking_number,
+                shipping_carrier: carrier || review.shipping_carrier,
+                shipped_at: status === 'shipped' ? new Date().toISOString() : review.shipped_at,
+                delivered_at: status === 'delivered' ? new Date().toISOString() : review.delivered_at,
+                reviewed_at: new Date().toISOString() 
+              }
             : review
         ))
         setIsStatusModalOpen(false)
         setAdminNotes('')
+        setTrackingNumber('')
+        setShippingCarrier('')
       } else {
         alert('Failed to update review status')
       }
@@ -355,6 +385,7 @@ const PendingReview: React.FC = () => {
         alert('Picture replies uploaded successfully!')
         setPictureReplies({})
         loadReviews() // Refresh the reviews
+        setIsDetailModalOpen(false) // Close the modal after successful upload
       } else {
         alert('Failed to upload picture replies. Please try again.')
       }
@@ -372,11 +403,24 @@ const PendingReview: React.FC = () => {
       case 'pending':
         return <Clock className="h-4 w-4" />
       case 'approved':
+      case 'approved-processing':
         return <CheckCircle className="h-4 w-4" />
       case 'rejected':
         return <X className="h-4 w-4" />
       case 'needs-changes':
+      case 'picture-reply-pending':
+      case 'picture-reply-rejected':
         return <AlertCircle className="h-4 w-4" />
+      case 'ready-for-production':
+      case 'in-production':
+        return <Package className="h-4 w-4" />
+      case 'shipped':
+        return <Package className="h-4 w-4" />
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4" />
+      case 'ready-for-checkout':
+      case 'pending-payment':
+        return <DollarSign className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
     }
@@ -385,15 +429,29 @@ const PendingReview: React.FC = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-amber-50 text-amber-800 border border-amber-200'
       case 'approved':
-        return 'bg-green-100 text-green-800'
+      case 'approved-processing':
+      case 'picture-reply-approved':
+        return 'bg-emerald-50 text-emerald-800 border border-emerald-200'
       case 'rejected':
-        return 'bg-red-100 text-red-800'
+        return 'bg-rose-50 text-rose-800 border border-rose-200'
       case 'needs-changes':
-        return 'bg-blue-100 text-blue-800'
+      case 'picture-reply-pending':
+      case 'picture-reply-rejected':
+        return 'bg-blue-50 text-blue-800 border border-blue-200'
+      case 'ready-for-production':
+      case 'in-production':
+        return 'bg-purple-50 text-purple-800 border border-purple-200'
+      case 'shipped':
+        return 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+      case 'delivered':
+        return 'bg-green-50 text-green-800 border border-green-200'
+      case 'ready-for-checkout':
+      case 'pending-payment':
+        return 'bg-orange-50 text-orange-800 border border-orange-200'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 border border-gray-200'
     }
   }
 
@@ -476,28 +534,28 @@ const PendingReview: React.FC = () => {
 
       if (allConfirmed) {
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
             <CheckCircle className="h-3 w-3 mr-1" />
-            ✅ Approved ({confirmedCount})
+            ✓ Approved ({confirmedCount})
           </span>
         );
       } else if (anyRejected && confirmedCount === 0) {
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">
             <AlertCircle className="h-3 w-3 mr-1" />
-            Needs Changes ({rejectedCount})
+            ✗ Needs Changes ({rejectedCount})
           </span>
         );
       } else if (anyRejected && confirmedCount > 0) {
         return (
           <div className="group relative">
             <div className="flex items-center space-x-1 cursor-pointer">
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
                 <CheckCircle className="h-3 w-3 mr-1" />
                 {confirmedCount}
               </span>
               <span className="text-gray-400">/</span>
-              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200">
                 <XCircle className="h-3 w-3 mr-1" />
                 {rejectedCount}
               </span>
@@ -568,7 +626,7 @@ const PendingReview: React.FC = () => {
         return (
           <div className="group relative">
             <div className="flex items-center space-x-1 cursor-pointer">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">
                 <Clock className="h-3 w-3 mr-1" />
                 Partial
               </span>
@@ -683,8 +741,8 @@ const PendingReview: React.FC = () => {
 
   // Function to handle image click for preview
   const handleImageClick = (src: string, alt: string, type: string) => {
-    setSelectedImage({ src, alt, type })
-    setIsImageModalOpen(true)
+    setEnlargedImage(src)
+    setEnlargedImageTitle(alt)
   }
 
   // Function to download image
@@ -1100,7 +1158,7 @@ const PendingReview: React.FC = () => {
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center space-x-4">
-            <h1 className="text-3xl font-bold text-gray-900">Pending Review</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
             {/* WebSocket connection status */}
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -1130,9 +1188,35 @@ const PendingReview: React.FC = () => {
               <Clock className="h-6 w-6 text-yellow-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Pending</p>
+              <p className="text-sm font-medium text-gray-600">Pending Review</p>
               <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'pending').length}
+                {reviews.filter(r => r.status === 'pending' || r.status === 'picture-reply-pending').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <DollarSign className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Awaiting Payment</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {reviews.filter(r => r.status === 'pending-payment' || r.status === 'ready-for-checkout').length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Package className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">In Production</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {reviews.filter(r => r.status === 'approved-processing' || r.status === 'in-production').length}
               </p>
             </div>
           </div>
@@ -1143,35 +1227,9 @@ const PendingReview: React.FC = () => {
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Approved</p>
+              <p className="text-sm font-medium text-gray-600">Shipped & Delivered</p>
               <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'pending-payment').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <X className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Rejected</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'rejected').length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <AlertCircle className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Needs Changes</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reviews.filter(r => r.status === 'needs-changes').length}
+                {reviews.filter(r => r.status === 'shipped' || r.status === 'delivered').length}
               </p>
             </div>
           </div>
@@ -1439,6 +1497,121 @@ const PendingReview: React.FC = () => {
                   <p><strong>Email:</strong> {selectedReview.user_email}</p>
                 </div>
 
+                {/* Payment and Shipping Info (only shown after payment) */}
+                {(selectedReview as any).order_number && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-300">
+                    <h4 className="font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-gray-600" />
+                      Payment & Shipping Details
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      {/* Order Number */}
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Order Number</p>
+                        <p className="text-base text-gray-900 font-mono">{(selectedReview as any).order_number}</p>
+                      </div>
+
+                      {/* Payment Status */}
+                      <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">Payment Status</p>
+                        <p className="text-base text-gray-900 capitalize">
+                          {(selectedReview as any).payment_status === 'completed' && '✓ '}
+                          {(selectedReview as any).payment_status || 'N/A'}
+                        </p>
+                      </div>
+
+                      {/* Payment Method */}
+                      {(selectedReview as any).payment_method && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-600 mb-1">Payment Method</p>
+                          <p className="text-base text-gray-900 capitalize">
+                            {(selectedReview as any).payment_provider || 'N/A'} - {(selectedReview as any).payment_method}
+                            {(selectedReview as any).card_last4 && ` •••• ${(selectedReview as any).card_last4}`}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Transaction ID */}
+                      {(selectedReview as any).transaction_id && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-600 mb-1">Transaction ID</p>
+                          <p className="text-sm text-gray-700 font-mono break-all">{(selectedReview as any).transaction_id}</p>
+                        </div>
+                      )}
+
+                      {/* Price Breakdown */}
+                      <div className="pt-4 border-t border-gray-200">
+                        <p className="text-sm font-medium text-gray-600 mb-3">Order Summary</p>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-base">
+                            <span className="text-gray-700">Subtotal</span>
+                            <span className="text-gray-900">${Number(selectedReview.subtotal || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-base">
+                            <span className="text-gray-700">Shipping</span>
+                            <span className="text-gray-900">${Number(selectedReview.shipping || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-base">
+                            <span className="text-gray-700">Tax</span>
+                            <span className="text-gray-900">${Number(selectedReview.tax || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200">
+                            <span className="text-gray-900">Total Paid</span>
+                            <span className="text-gray-900">${Number(selectedReview.total || 0).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Shipping Address */}
+                      {(selectedReview as any).shipping_address && (() => {
+                        try {
+                          const address = typeof (selectedReview as any).shipping_address === 'string' 
+                            ? JSON.parse((selectedReview as any).shipping_address)
+                            : (selectedReview as any).shipping_address;
+                          
+                          return (
+                            <div className="pt-4 border-t border-gray-200">
+                              <p className="text-sm font-medium text-gray-600 mb-2">Shipping Address</p>
+                              <div className="text-base text-gray-900 space-y-1">
+                                <p className="font-medium">{address.firstName} {address.lastName}</p>
+                                {address.phone && <p>{address.phone}</p>}
+                                <p>{address.street}</p>
+                                <p>{address.city}, {address.state} {address.zipCode}</p>
+                                <p>{address.country}</p>
+                              </div>
+                            </div>
+                          );
+                        } catch (e) {
+                          return null;
+                        }
+                      })()}
+
+                      {/* Tracking Info */}
+                      {(selectedReview as any).tracking_number && (
+                        <div className="pt-4 border-t border-gray-200">
+                          <p className="text-sm font-medium text-gray-600 mb-2">Tracking Information</p>
+                          <div className="space-y-2">
+                            <p className="text-base text-gray-900">
+                              <span className="font-medium">Tracking Number:</span> {(selectedReview as any).tracking_number}
+                            </p>
+                            {(selectedReview as any).shipping_carrier && (
+                              <p className="text-base text-gray-900">
+                                <span className="font-medium">Carrier:</span> {(selectedReview as any).shipping_carrier}
+                              </p>
+                            )}
+                            {(selectedReview as any).shipped_at && (
+                              <p className="text-base text-gray-700">
+                                <span className="font-medium">Shipped:</span> {new Date((selectedReview as any).shipped_at).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Picture Reply Summary */}
                 {(() => {
                   // Parse admin picture replies if it's a string
@@ -1453,11 +1626,11 @@ const PendingReview: React.FC = () => {
                   
                   return adminPictureReplies && Array.isArray(adminPictureReplies) && adminPictureReplies.length > 0;
                 })() && (
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h4 className="font-medium text-blue-900 mb-3">Design Review Summary</h4>
+                  <div className="bg-white p-4 rounded-lg border border-gray-300">
+                    <h4 className="font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">Design Review Summary</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-gray-900">
                           {(() => {
                             let adminPictureReplies = selectedReview.admin_picture_replies;
                             if (typeof adminPictureReplies === 'string') {
@@ -1470,10 +1643,10 @@ const PendingReview: React.FC = () => {
                             return Array.isArray(adminPictureReplies) ? adminPictureReplies.length : 0;
                           })()}
                         </div>
-                        <div className="text-sm text-blue-700">Total Replies</div>
+                        <div className="text-sm text-gray-600 mt-1">Total Replies</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-gray-900">
                           {(() => {
                             // Parse customer confirmations if it's a string
                             let customerConfirmations = selectedReview.customer_confirmations;
@@ -1489,10 +1662,10 @@ const PendingReview: React.FC = () => {
                             return confirmedCount;
                           })()}
                         </div>
-                        <div className="text-sm text-green-700">Confirmed</div>
+                        <div className="text-sm text-gray-600 mt-1">✓ Confirmed</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-2xl font-bold text-gray-900">
                           {(() => {
                             // Parse customer confirmations if it's a string
                             let customerConfirmations = selectedReview.customer_confirmations;
@@ -1508,7 +1681,7 @@ const PendingReview: React.FC = () => {
                             return rejectedCount;
                           })()}
                         </div>
-                        <div className="text-sm text-red-700">Rejected</div>
+                        <div className="text-sm text-gray-600 mt-1">✗ Rejected</div>
                       </div>
                     </div>
                     
@@ -1636,8 +1809,10 @@ const PendingReview: React.FC = () => {
                         console.log('🔍 OrderReview Modal - First item mockup:', orderData[0]?.customization?.mockup);
                         return (
                           <div className="space-y-2">
-                            {orderData.map((item: any, index: number) => (
-                              <div key={index} className="flex justify-between items-start p-3 bg-white rounded border">
+                            {orderData.map((item: any, index: number) => {
+                              const itemKey = item.id || `${item.productId}-${index}`;
+                              return (
+                                <div key={itemKey} className="flex justify-between items-start p-3 bg-white rounded border">
                                 <div className="flex-1">
                                   <div className="flex items-start space-x-3">
                                     {/* Product/Design Image */}
@@ -1794,9 +1969,11 @@ const PendingReview: React.FC = () => {
                                                   <MousePointer className="h-4 w-4 text-blue-600" />
                                                   <span className="text-xs font-medium text-blue-800">Original Uploaded Design Files</span>
                                                 </div>
-                                                <div className="flex flex-wrap gap-2">
+                                                <div className="space-y-2">
                                                   {item.customization.designs.map((design: any, index: number) => (
-                                                    <div key={design.id || index} className="relative group">
+                                                    <div key={design.id || index} className="flex items-center space-x-2 bg-white rounded-lg p-2 border border-blue-200">
+                                                      {/* Design Thumbnail */}
+                                                      <div className="relative group flex-shrink-0">
                                                       {renderImageWithFallback(
                                                         design.preview || design.base64 || design.file,
                                                         `Design: ${design.name || 'Design ' + (index + 1)}`,
@@ -1808,8 +1985,8 @@ const PendingReview: React.FC = () => {
                                                         ),
                                                         'small'
                                                       )}
-                                                      <div className="absolute -bottom-1 -right-1 bg-white text-xs px-1 rounded text-gray-600 border shadow-sm">
-                                                        {design.dimensions?.width}" × {design.dimensions?.height}"
+                                                      <div className="absolute -top-1 -left-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold shadow">
+                                                        {index + 1}
                                                       </div>
                                                       {/* Download button on hover */}
                                                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded flex items-center justify-center">
@@ -1825,6 +2002,61 @@ const PendingReview: React.FC = () => {
                                                           <Download className="h-3 w-3" />
                                                         </button>
                                                       </div>
+                                                      </div>
+                                                      
+                                                      {/* Design Details */}
+                                                      <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-medium text-gray-900 truncate">{design.name || `Design ${index + 1}`}</p>
+                                                        <div className="flex items-center space-x-3 mt-1">
+                                                          {/* Size - Most Important */}
+                                                          <div className="flex items-center space-x-1">
+                                                            <Maximize2 className="h-3 w-3 text-blue-600" />
+                                                            <span className="text-xs font-semibold text-blue-700">
+                                                              {Number(design.dimensions?.width || 0).toFixed(2)}" × {Number(design.dimensions?.height || 0).toFixed(2)}"
+                                                            </span>
+                                                          </div>
+                                                          {/* Placement if available */}
+                                                          {design.placement && (
+                                                            <div className="flex items-center space-x-1">
+                                                              <MousePointer className="h-3 w-3 text-gray-500" />
+                                                              <span className="text-xs text-gray-600 capitalize">{design.placement.replace('-', ' ')}</span>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                        {/* Embroidery Style Options if available */}
+                                                        {design.selectedStyles && (
+                                                          <div className="flex flex-wrap gap-1 mt-1">
+                                                            {design.selectedStyles.coverage && (
+                                                              <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                                                                {design.selectedStyles.coverage.name}
+                                                              </span>
+                                                            )}
+                                                            {design.selectedStyles.material && (
+                                                              <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                                                                {design.selectedStyles.material.name}
+                                                              </span>
+                                                            )}
+                                                            {design.selectedStyles.border && (
+                                                              <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                                                                {design.selectedStyles.border.name}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                      
+                                                      {/* Download Button */}
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          const filename = `design-${index + 1}-${design.name || 'design'}.png`;
+                                                          downloadImage(design.preview || design.base64 || design.file, filename);
+                                                        }}
+                                                        className="flex-shrink-0 text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors"
+                                                        title="Download this design"
+                                                      >
+                                                        <Download className="h-4 w-4" />
+                                                      </button>
                                                     </div>
                                                   ))}
                                                 </div>
@@ -1873,14 +2105,59 @@ const PendingReview: React.FC = () => {
                                               </div>
                                             </div>
                                           ) : item.productId === 'custom-embroidery' && item.customization.embroideryData ? (
-                                            <div className="text-xs text-gray-500 mt-1">
-                                              <p>Size: {item.customization.embroideryData.dimensions?.width}" × {item.customization.embroideryData.dimensions?.height}"</p>
-                                              <p>Material: {item.customization.embroideryData.materialCosts?.selectedMaterial?.name}</p>
+                                            <div className="mt-2 bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="flex items-center space-x-1">
+                                                  <Maximize2 className="h-3 w-3 text-gray-500" />
+                                                  <span className="text-gray-600 font-medium">Size:</span>
+                                                  <span className="text-gray-900 font-semibold">
+                                                    {Number(item.customization.embroideryData.dimensions?.width || 0).toFixed(2)}" × {Number(item.customization.embroideryData.dimensions?.height || 0).toFixed(2)}"
+                                                  </span>
+                                                </div>
+                                                <div className="flex items-center space-x-1">
+                                                  <Layers className="h-3 w-3 text-gray-500" />
+                                                  <span className="text-gray-600 font-medium">Material:</span>
+                                                  <span className="text-gray-900">{item.customization.embroideryData.materialCosts?.selectedMaterial?.name || 'Standard'}</span>
+                                                </div>
+                                              </div>
                                             </div>
-                                          ) : item.customization.design && (
-                                            <div className="text-xs text-gray-500 mt-1">
-                                              <p>Design: {item.customization.design.name}</p>
-                                              <p>Placement: {item.customization.placement} • Size: {item.customization.size} • Color: {item.customization.color}</p>
+                                          ) : item.customization.design ? (
+                                            <div className="mt-2 bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                              <div className="space-y-1 text-xs">
+                                                {item.customization.placement && (
+                                                  <div className="flex items-center space-x-1">
+                                                    <MousePointer className="h-3 w-3 text-gray-500" />
+                                                    <span className="text-gray-600 font-medium">Placement:</span>
+                                                    <span className="text-gray-900 capitalize">{item.customization.placement.replace('-', ' ')}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ) : null}
+                                          
+                                          {/* Show product variant details (size/color) - always display if available */}
+                                          {(item.customization.size || item.customization.color) && (
+                                            <div className="mt-2 bg-blue-50 rounded-lg p-2 border border-blue-200">
+                                              <div className="flex items-center space-x-1 mb-1">
+                                                <Package className="h-3 w-3 text-blue-600" />
+                                                <span className="text-xs font-medium text-blue-800">Product Variant</span>
+                                              </div>
+                                              <div className="space-y-1 text-xs">
+                                                {item.customization.size && (
+                                                  <div className="flex items-center space-x-1">
+                                                    <Maximize2 className="h-3 w-3 text-gray-500" />
+                                                    <span className="text-gray-600 font-medium">Size:</span>
+                                                    <span className="text-gray-900 font-semibold uppercase">{item.customization.size}</span>
+                                                  </div>
+                                                )}
+                                                {item.customization.color && (
+                                                  <div className="flex items-center space-x-1">
+                                                    <div className="h-3 w-3 rounded border border-gray-300" style={{ backgroundColor: item.customization.color }}></div>
+                                                    <span className="text-gray-600 font-medium">Color:</span>
+                                                    <span className="text-gray-900 capitalize">{item.customization.color}</span>
+                                                  </div>
+                                                )}
+                                              </div>
                                             </div>
                                           )}
                                         </div>
@@ -1950,7 +2227,8 @@ const PendingReview: React.FC = () => {
                                 
                                 {/* Price - removed to avoid duplicate breakdown */}
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         );
                       } else {
@@ -2329,8 +2607,10 @@ const PendingReview: React.FC = () => {
                     return (
                       <div className="space-y-4">
                         {orderData.map((item: any, index: number) => {
-                          // Generate a unique key for this item
+                          // Use the unique item ID - fallback to productId-index if not available (for old orders)
                           const itemKey = item.id || `${item.productId}-${index}`;
+                          
+                          console.log('🔑 Item key generated:', itemKey, 'for item:', { id: item.id, productId: item.productId, index });
                           
                           return (
                             <div key={itemKey} className="border border-gray-200 rounded-lg p-4 bg-white">
@@ -2507,35 +2787,20 @@ const PendingReview: React.FC = () => {
                                     
                                     const existingReplies = (adminPictureReplies && Array.isArray(adminPictureReplies)) 
                                       ? adminPictureReplies.filter((reply: any) => {
-                                          const replyItemId = reply.itemId;
+                                          // Convert to strings for comparison
+                                          const replyItemIdStr = String(reply.itemId || '');
+                                          const itemIdStr = String(item.id || '');
+                                          const productIdStr = String(item.productId || '');
                                           
-                                          // Multiple matching strategies
-                                          const exactMatch = replyItemId === item.id || replyItemId === itemKey;
-                                          const productIdMatch = replyItemId === item.productId;
-                                          const stringMatch = String(replyItemId) === String(item.id) || String(replyItemId) === String(itemKey);
+                                          // STRICT EXACT MATCH ONLY - no fuzzy matching
+                                          const matches = 
+                                            replyItemIdStr === itemIdStr || 
+                                            replyItemIdStr === productIdStr;
                                           
-                                          // Check if replyItemId starts with or contains the item's productId
-                                          const startsWithMatch = replyItemId && item.productId && replyItemId.startsWith(item.productId);
-                                          const containsMatch = replyItemId && item.productId && replyItemId.includes(item.productId);
-                                          
-                                          // Check if replyItemId starts with or contains the item's id
-                                          const startsWithIdMatch = replyItemId && item.id && replyItemId.startsWith(item.id);
-                                          const containsIdMatch = replyItemId && item.id && replyItemId.includes(item.id);
-                                          
-                                          const matches = exactMatch || productIdMatch || stringMatch || startsWithMatch || containsMatch || startsWithIdMatch || containsIdMatch;
-                                          
-                                          console.log('🔍 Enhanced Reply matching:', {
-                                            replyItemId,
+                                          console.log('🔍 Admin Reply matching (exact):', {
+                                            replyItemId: reply.itemId,
                                             itemId: item.id,
-                                            itemKey,
                                             productId: item.productId,
-                                            exactMatch,
-                                            productIdMatch,
-                                            stringMatch,
-                                            startsWithMatch,
-                                            containsMatch,
-                                            startsWithIdMatch,
-                                            containsIdMatch,
                                             matches
                                           });
                                           return matches;
@@ -2569,10 +2834,10 @@ const PendingReview: React.FC = () => {
                                               }
                                               
                                               const customerConfirmation = customerConfirmations?.find((conf: any) => {
-                                                if (reply.itemId === conf.itemId || String(reply.itemId) === String(conf.itemId)) return true;
-                                                if (conf.itemId && reply.itemId && conf.itemId.startsWith(reply.itemId)) return true;
-                                                if (conf.itemId && reply.itemId && conf.itemId.includes(reply.itemId)) return true;
-                                                return false;
+                                                // STRICT EXACT MATCH ONLY - no fuzzy matching
+                                                const confItemIdStr = String(conf.itemId || '');
+                                                const replyItemIdStr = String(reply.itemId || '');
+                                                return confItemIdStr === replyItemIdStr;
                                               });
 
                                               return (
@@ -2733,16 +2998,16 @@ const PendingReview: React.FC = () => {
                                     </div>
                                   )}
 
-                                  {selectedReview.status === 'approved-processing' && (
-                                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                                      <div className="flex items-center space-x-2">
-                                        <CheckCircle className="h-4 w-4 text-green-600" />
-                                        <span className="text-sm font-medium text-green-800">
-                                          Payment received - Design is being processed
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
+                  {selectedReview.status === 'approved-processing' && (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-medium text-emerald-900">
+                          ✓ Payment received - Design is being processed
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                                   {/* Chat-like Upload Section */}
                                   {selectedReview.status === 'needs-changes' && (
@@ -2839,6 +3104,8 @@ const PendingReview: React.FC = () => {
                 <button
                   onClick={() => {
                       setAdminNotes(selectedReview.admin_notes || '')
+                      setTrackingNumber(selectedReview.tracking_number || '')
+                      setShippingCarrier(selectedReview.shipping_carrier || '')
                       setIsStatusModalOpen(true)
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
@@ -2898,34 +3165,66 @@ const PendingReview: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center space-x-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                        selectedReview.status === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                        selectedReview.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'
                       }`}>1</div>
-                      <span className={selectedReview.status === 'pending' ? 'text-blue-800 font-medium' : 'text-gray-600'}>
-                        Review Order & Design
+                      <span className={selectedReview.status === 'pending' ? 'text-amber-800 font-medium' : 'text-gray-600'}>
+                        Pending Review
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                        selectedReview.status === 'needs-changes' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                        selectedReview.status === 'needs-changes' || selectedReview.status === 'picture-reply-pending' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
                       }`}>2</div>
-                      <span className={selectedReview.status === 'needs-changes' ? 'text-blue-800 font-medium' : 'text-gray-600'}>
-                        Upload Picture Reply
+                      <span className={selectedReview.status === 'needs-changes' || selectedReview.status === 'picture-reply-pending' ? 'text-blue-800 font-medium' : 'text-gray-600'}>
+                        Design Review Pending (Upload Picture Reply)
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        selectedReview.status === 'picture-reply-approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                      }`}>3</div>
+                      <span className={selectedReview.status === 'picture-reply-approved' ? 'text-emerald-800 font-medium' : 'text-gray-600'}>
+                        Customer Approves Design
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                         selectedReview.status === 'pending-payment' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'
-                      }`}>3</div>
+                      }`}>4</div>
                       <span className={selectedReview.status === 'pending-payment' ? 'text-orange-800 font-medium' : 'text-gray-600'}>
-                        Customer Approves & Payment Required
+                        Pending Payment
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                         selectedReview.status === 'approved-processing' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                      }`}>4</div>
+                      }`}>5</div>
                       <span className={selectedReview.status === 'approved-processing' ? 'text-green-800 font-medium' : 'text-gray-600'}>
-                        Proceed to Production
+                        Payment Complete - Processing
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        selectedReview.status === 'in-production' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
+                      }`}>6</div>
+                      <span className={selectedReview.status === 'in-production' ? 'text-purple-800 font-medium' : 'text-gray-600'}>
+                        In Production
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        selectedReview.status === 'shipped' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
+                      }`}>7</div>
+                      <span className={selectedReview.status === 'shipped' ? 'text-blue-800 font-medium' : 'text-gray-600'}>
+                        Shipped (Add Tracking Info)
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                        selectedReview.status === 'delivered' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>8</div>
+                      <span className={selectedReview.status === 'delivered' ? 'text-green-800 font-medium' : 'text-gray-600'}>
+                        Delivered (Order Complete)
                       </span>
                     </div>
                   </div>
@@ -2942,24 +3241,74 @@ const PendingReview: React.FC = () => {
                   >
                     <option value="pending">1. Pending Review</option>
                     <option value="needs-changes">2. Design Review Pending</option>
-                    <option value="pending-payment">3. Pending Payment</option>
-                    <option value="approved-processing">4. Approved - Processing Design</option>
-                    <option value="rejected">Rejected - Needs Re-upload</option>
+                    <option value="picture-reply-approved">3. Customer Approves Design</option>
+                    <option value="pending-payment">4. Pending Payment</option>
+                    <option value="approved-processing">5. Payment Complete - Processing</option>
+                    <option value="in-production">6. In Production</option>
+                    <option value="shipped">7. Shipped</option>
+                    <option value="delivered">8. Delivered</option>
+                    <option value="rejected">❌ Rejected - Needs Re-upload</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Admin Notes
-                  </label>
-                  <textarea
-                    value={adminNotes}
-                    onChange={(e) => setAdminNotes(e.target.value)}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Add notes for the customer..."
-                  />
-                </div>
+                {/* Shipping Information - Only show when status is 'shipped' */}
+                {selectedReview.status === 'shipped' && (
+                  <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-900 flex items-center">
+                      <Package className="h-4 w-4 mr-2" />
+                      Shipping Information
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Shipping Carrier / Courier *
+                      </label>
+                      <input
+                        type="text"
+                        value={shippingCarrier}
+                        onChange={(e) => setShippingCarrier(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="e.g., USPS, FedEx, UPS, DHL"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tracking Number *
+                      </label>
+                      <input
+                        type="text"
+                        value={trackingNumber}
+                        onChange={(e) => setTrackingNumber(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter tracking number"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Admin Notes - Only show when status is 'rejected' */}
+                {selectedReview.status === 'rejected' && (
+                  <div className="space-y-4 bg-red-50 p-4 rounded-lg border border-red-200">
+                    <h4 className="font-medium text-red-900 flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Rejection Reason
+                    </h4>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Admin Notes (Required for Rejection) *
+                      </label>
+                      <textarea
+                        value={adminNotes}
+                        onChange={(e) => setAdminNotes(e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        placeholder="Explain why the order is rejected and what the customer needs to do..."
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
@@ -2970,7 +3319,7 @@ const PendingReview: React.FC = () => {
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleStatusUpdate(selectedReview.id, selectedReview.status, adminNotes)}
+                  onClick={() => handleStatusUpdate(selectedReview.id, selectedReview.status, adminNotes, trackingNumber, shippingCarrier)}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Update Status
@@ -3074,6 +3423,31 @@ const PendingReview: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Enlargement Modal */}
+      {enlargedImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4" onClick={() => setEnlargedImage(null)}>
+          <div className="relative max-w-7xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setEnlargedImage(null)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 bg-black bg-opacity-50 rounded-full p-2"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {enlargedImageTitle && (
+              <div className="absolute -top-12 left-0 text-white text-lg font-medium bg-black bg-opacity-50 px-4 py-2 rounded">
+                {enlargedImageTitle}
+              </div>
+            )}
+            <img
+              src={enlargedImage}
+              alt="Enlarged view"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={() => setEnlargedImage(null)}
+            />
           </div>
         </div>
       )}

@@ -31,7 +31,7 @@ export default function Customize() {
     getDesignById,
     resetCustomization
   } = useCustomization()
-  const { add: addToCart, syncWithDatabase } = useCart()
+  const { add: addToCart } = useCart()
   const [currentStep, setCurrentStep] = useState(1)
   const [dragActive, setDragActive] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -629,11 +629,11 @@ export default function Customize() {
 
 
   const steps = [
-    { number: 1, title: 'Pick Your Product', description: 'Choose the color and size you like' },
-    { number: 2, title: 'Upload Design', description: 'Add your logo or artwork' },
-    { number: 3, title: 'Position It', description: 'Show us where to put your design' },
-    { number: 4, title: 'Customize Options', description: 'Pick how you want it embroidered' },
-    { number: 5, title: 'Review & Add to Cart', description: 'Double-check everything looks perfect' }
+    { number: 1, title: 'Choose Color & Size', description: 'Select what you want' },
+    { number: 2, title: 'Upload Your Design', description: 'Add your image or logo' },
+    { number: 3, title: 'Place Your Design', description: 'Show where you want it' },
+    { number: 4, title: 'Select Size', description: 'Choose your design size' },
+    { number: 5, title: 'Submit Order', description: 'Review and place order' }
   ]
 
   const getStepProgress = () => {
@@ -741,6 +741,26 @@ export default function Customize() {
         })
       }
 
+      // Find the matching variant based on selected color and size
+      let selectedVariant = null;
+      if (product.variants && product.variants.length > 0) {
+        selectedVariant = product.variants.find((variant: any) => {
+          const colorMatch = !customizationData.color || variant.color?.toLowerCase() === customizationData.color.toLowerCase();
+          const sizeMatch = !customizationData.size || variant.size?.toLowerCase() === customizationData.size.toLowerCase();
+          return colorMatch && sizeMatch;
+        });
+        
+        console.log('🎯 Found matching variant:', {
+          selectedColor: customizationData.color,
+          selectedSize: customizationData.size,
+          variantFound: !!selectedVariant,
+          variantId: selectedVariant?.id,
+          variantColor: selectedVariant?.color,
+          variantSize: selectedVariant?.size,
+          variantStock: selectedVariant?.stock
+        });
+      }
+
       // Add customized item to cart with stock validation
       console.log('🛒 Calling addToCart with:', {
         productId: product.id.toString(),
@@ -748,7 +768,8 @@ export default function Customize() {
         customization: {
           designsCount: customizationData.designs.length,
           hasLegacyDesign: !!customizationData.design,
-          hasMockup: !!mockupBase64
+          hasMockup: !!mockupBase64,
+          selectedVariantId: selectedVariant?.id
         }
       })
       
@@ -812,6 +833,12 @@ export default function Customize() {
         placement: customizationData.placement,
         size: customizationData.size || 'medium',
         color: customizationData.color,
+        selectedVariant: selectedVariant ? {
+          id: selectedVariant.id,
+          color: selectedVariant.color,
+          size: selectedVariant.size,
+          stock: selectedVariant.stock
+        } : null,
         notes: customizationData.notes,
         designPosition: customizationData.designPosition,
         designScale: customizationData.designScale,
@@ -838,12 +865,9 @@ export default function Customize() {
     }
   }
 
-  const handleViewCart = async () => {
+  const handleViewCart = () => {
     setShowCartConfirmation(false)
-    // Force cart to sync to ensure the latest items are displayed
-    await syncWithDatabase()
-    // Small delay to ensure state propagation
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Navigate directly to cart - addToCart already updated both database and local state
     navigate('/cart')
   }
 
@@ -919,8 +943,8 @@ export default function Customize() {
             </Button>
             <div className="flex-1"></div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Customize Your {product.title}</h1>
-          <p className="text-sm sm:text-base text-gray-600">Create your perfect embroidered design</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Add Your Design to {product.title}</h1>
+          <p className="text-sm sm:text-base text-gray-600">Upload your logo or image and we'll embroider it for you</p>
         </div>
 
         {/* Progress Steps */}
@@ -1004,7 +1028,7 @@ export default function Customize() {
           <div className="space-y-4 sm:space-y-6 flex flex-col items-center justify-start">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 w-full">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-                {showFinalView ? 'Final Product Preview' : 'Product Preview'}
+                {showFinalView ? 'How It Will Look' : 'Product Preview'}
               </h3>
               
               {/* Product Image with Design Overlay */}
@@ -1277,12 +1301,12 @@ export default function Customize() {
             {/* Design Controls */}
             {customizationData.design && currentStep === 3 && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 w-full">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Embroidery Sizing</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Adjust Your Design</h3>
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Length (inches): {embroideryWidth.toFixed(1)}"
+                        Width: {embroideryWidth.toFixed(1)}"
                       </label>
                       <input
                         type="range"
@@ -1296,7 +1320,7 @@ export default function Customize() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Height (inches): {embroideryHeight.toFixed(1)}"
+                        Height: {embroideryHeight.toFixed(1)}"
                       </label>
                       <input
                         type="range"
@@ -1349,7 +1373,7 @@ export default function Customize() {
           {/* Right Side - Customization Options */}
           <div className="space-y-4 sm:space-y-6">
              {/* Step 1: Choose Color & Size */}
-             {currentStep === 1 && product?.hasSizing && (
+             {currentStep === 1 && (getAvailableColors().length > 0 || getAvailableSizes().length > 0) && (
                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                  <h3 className="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Choose Color & Size</h3>
                  
@@ -1455,7 +1479,7 @@ export default function Customize() {
             )}
 
              {/* Step 1: Skip Color & Size for Non-Sizing Products */}
-             {currentStep === 1 && !product?.hasSizing && (
+             {currentStep === 1 && getAvailableColors().length === 0 && getAvailableSizes().length === 0 && (
                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Details</h3>
                  <p className="text-sm sm:text-base text-gray-600 mb-6">
@@ -1922,15 +1946,15 @@ export default function Customize() {
         </div>
       </div>
 
-      {/* Guidelines Modal */}
+      {/* Guidelines Modal - Simplified */}
       {showGuidelines && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center">
                   <Info className="w-6 h-6 mr-2 text-blue-600" />
-                  Design Guidelines
+                  Quick Tips
                 </h2>
                 <button
                   onClick={() => setShowGuidelines(false)}
@@ -1940,72 +1964,37 @@ export default function Customize() {
                 </button>
               </div>
               
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <h3 className="font-semibold text-blue-900 mb-3 flex items-center">
                     <span className="text-lg mr-2">🎨</span>
-                    Design Requirements
+                    Your Image
                   </h3>
                   <ul className="text-sm text-blue-800 space-y-2">
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      <span><strong>No Background:</strong> Your design should have a transparent background (PNG format recommended)</span>
+                      <span>Upload a clear image (PNG or JPG)</span>
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      <span><strong>High Resolution:</strong> Upload at least 300 DPI for best embroidery quality</span>
+                      <span>Make sure it's clear and not blurry</span>
                     </li>
                     <li className="flex items-start">
                       <span className="text-blue-500 mr-2">•</span>
-                      <span><strong>Clear Contrast:</strong> Ensure your design has good contrast against the garment color</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <span><strong>Simple Details:</strong> Avoid very fine details that may not embroider well</span>
+                      <span>File should be under 10MB</span>
                     </li>
                   </ul>
                 </div>
                 
-                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                  <h3 className="font-semibold text-purple-900 mb-3 flex items-center">
-                    <span className="text-lg mr-2">📏</span>
-                    Size Guidelines
-                  </h3>
-                  <ul className="text-sm text-purple-800 space-y-2">
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span><strong>Minimum Size:</strong> At least 2 inches (5cm) in width or height</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span><strong>Maximum Size:</strong> Up to 8 inches (20cm) for most garments</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span><strong>File Size:</strong> Keep under 10MB for best performance</span>
-                    </li>
-                  </ul>
-                </div>
-                
-                <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                  <h3 className="font-semibold text-purple-900 mb-3 flex items-center">
+                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                  <h3 className="font-semibold text-green-900 mb-3 flex items-center">
                     <span className="text-lg mr-2">💡</span>
-                    Pro Tips
+                    Helpful Hint
                   </h3>
-                  <ul className="text-sm text-purple-800 space-y-2">
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span>Use vector graphics (SVG, AI, EPS) for crisp results at any size</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span>Test your design on a white background to check transparency</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-purple-500 mr-2">•</span>
-                      <span>Consider how the design will look on different garment colors</span>
-                    </li>
-                  </ul>
+                  <p className="text-sm text-green-800">
+                    Don't worry! If your design needs adjustments, we'll show you a preview before we make it.
+                    You can approve or request changes.
+                  </p>
                 </div>
               </div>
               
@@ -2032,11 +2021,11 @@ export default function Customize() {
               </div>
               
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Item Added to Cart!
+                Added to Cart!
               </h3>
               
               <p className="text-gray-600 mb-6">
-                Your customized {product?.title} has been successfully added to your cart.
+                Your {product?.title} with your custom design has been added to your cart.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-3">

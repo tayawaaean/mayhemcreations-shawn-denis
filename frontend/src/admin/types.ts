@@ -149,6 +149,18 @@ export type EmbroideryOption = {
   updatedAt: string
 }
 
+export type RecentOrder = {
+  id: string
+  orderNumber: string
+  customer: {
+    name: string
+    email: string
+  }
+  total: number
+  status: string
+  date: string
+}
+
 export type Analytics = {
   totalSales: number
   totalOrders: number
@@ -159,7 +171,7 @@ export type Analytics = {
   customersGrowth: number
   revenueChart: { date: string; revenue: number }[]
   topProducts: { product: AdminProduct; sales: number }[]
-  recentOrders: Order[]
+  recentOrders: RecentOrder[]
   lowStockProducts: AdminProduct[]
 }
 

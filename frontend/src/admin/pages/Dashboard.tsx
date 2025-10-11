@@ -1,6 +1,5 @@
 import React from 'react'
 import { useAdmin } from '../context/AdminContext'
-import NotificationTest from '../components/NotificationTest'
 import { 
   DollarSign, 
   ShoppingCart, 
@@ -82,11 +81,6 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Test Notifications - Only show in development */}
-      {import.meta.env.DEV && (
-        <NotificationTest />
-      )}
-
       {/* Stats grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
@@ -130,50 +124,66 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="h-64 flex items-end space-x-2">
-            {analytics.revenueChart.map((item, index) => {
-              const maxRevenue = Math.max(...analytics.revenueChart.map(i => i.revenue));
-              const height = maxRevenue > 0 ? (item.revenue / maxRevenue) * 200 : 0;
-              return (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div
-                    className="w-full bg-blue-500 rounded-t transition-all duration-300 hover:bg-blue-600"
-                    style={{ height: `${Math.max(height, 4)}px` }}
-                  ></div>
-                  <span className="text-xs text-gray-500 mt-2">
-                    {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              );
-            })}
+            {analytics.revenueChart && analytics.revenueChart.length > 0 ? (
+              analytics.revenueChart.map((item, index) => {
+                const maxRevenue = Math.max(...analytics.revenueChart.map(i => i.revenue));
+                const height = maxRevenue > 0 ? (item.revenue / maxRevenue) * 200 : 4;
+                return (
+                  <div key={index} className="flex-1 flex flex-col items-center">
+                    <div className="relative w-full">
+                      <div
+                        className="w-full bg-blue-500 rounded-t transition-all duration-300 hover:bg-blue-600 cursor-pointer"
+                        style={{ height: `${Math.max(height, 4)}px` }}
+                        title={`$${item.revenue.toFixed(2)}`}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-gray-500 mt-2">
+                      {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex items-center justify-center w-full h-full text-gray-500">
+                <p>No revenue data available for the last 7 days</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Recent Orders */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Recent Paid Orders</h3>
             <button className="text-sm text-gray-500 hover:text-gray-700 font-medium">View all</button>
           </div>
           <div className="space-y-4">
-            {analytics.recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">#{order.id}</p>
-                  <p className="text-sm text-gray-500">{order.customer.name}</p>
+            {analytics.recentOrders && analytics.recentOrders.length > 0 ? (
+              analytics.recentOrders.slice(0, 5).map((order) => (
+                <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{order.orderNumber}</p>
+                    <p className="text-sm text-gray-500">{order.customer.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">${order.total.toFixed(2)}</p>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      order.status.includes('delivered') ? 'bg-green-100 text-green-800' :
+                      order.status.includes('shipped') ? 'bg-indigo-100 text-indigo-800' :
+                      order.status.includes('production') ? 'bg-purple-100 text-purple-800' :
+                      order.status.includes('processing') ? 'bg-emerald-100 text-emerald-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {order.status.replace(/-/g, ' ')}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">${order.total}</p>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    order.status === 'shipped' ? 'bg-green-100 text-green-800' :
-                    order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                    order.status === 'pending' ? 'bg-gray-100 text-gray-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {order.status}
-                  </span>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No paid orders yet</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -275,35 +285,6 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-gray-400 mt-1">All variants have sufficient stock (threshold: ≤10 units)</p>
           </div>
         )}
-      </div>
-
-      {/* Top Products */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Top Selling Products</h3>
-          <button className="text-sm text-gray-500 hover:text-gray-700 font-medium">View all</button>
-        </div>
-        <div className="space-y-4">
-          {analytics.topProducts.map((item, index) => (
-            <div key={item.product.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-              <div className="flex items-center">
-                <span className="text-sm font-medium text-gray-500 w-6">#{index + 1}</span>
-                <img 
-                  src={item.product.primaryImage} 
-                  alt={item.product.title}
-                  className="h-10 w-10 rounded-lg object-cover ml-3"
-                />
-                <div className="ml-3">
-                  <p className="text-sm font-medium text-gray-900">{item.product.title}</p>
-                  <p className="text-sm text-gray-500">${item.product.price}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{item.sales} sold</p>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )

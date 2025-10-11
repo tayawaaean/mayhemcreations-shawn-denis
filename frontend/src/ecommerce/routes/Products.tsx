@@ -491,7 +491,7 @@ export default function Products() {
                                       ? 'text-yellow-600' 
                                       : 'text-green-600'
                                 }`}>
-                                  {product.stock === 0 ? 'Out of Stock' : `${product.stock} in stock`}
+                                  {product.stock === 0 ? 'Out of Stock' : product.stock <= 5 ? 'Low Stock' : 'In Stock'}
                                 </span>
                               </div>
                             )}

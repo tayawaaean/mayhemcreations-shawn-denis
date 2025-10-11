@@ -99,6 +99,12 @@ export type CartItem = {
     placement: 'front' | 'back' | 'left-chest' | 'right-chest' | 'sleeve' | 'manual'
     size: 'small' | 'medium' | 'large' | 'extra-large' | ''
     color: string
+    selectedVariant?: {
+      id: number
+      color?: string
+      size?: string
+      stock: number
+    } | null
     notes: string
     designPosition: {
       x: number
