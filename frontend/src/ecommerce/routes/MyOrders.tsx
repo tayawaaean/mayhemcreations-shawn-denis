@@ -2957,9 +2957,18 @@ export default function MyOrders() {
                         // For now, submit a review for the first product in the order
                         // Filter out custom embroidery items (they don't have a numeric product ID)
                         const reviewableProducts = order.items.filter(item => {
-                          const pid = parseInt(item.productId);
-                          return !isNaN(pid) && item.productId !== 'custom-embroidery';
+                          // Convert productId to string first, then to number
+                          const pidStr = String(item.productId);
+                          const pid = parseInt(pidStr);
+                          return !isNaN(pid) && pidStr !== 'custom-embroidery';
                         });
+
+                        console.log('📦 Order items for review:', order.items.map(item => ({
+                          productId: item.productId,
+                          type: typeof item.productId,
+                          productName: item.productName
+                        })));
+                        console.log('✅ Reviewable products:', reviewableProducts.length);
 
                         if (reviewableProducts.length === 0) {
                           setReviewResultModal({
@@ -2972,7 +2981,37 @@ export default function MyOrders() {
                         }
 
                         const firstProduct = reviewableProducts[0];
-                        const productId = parseInt(firstProduct.productId);
+                        const productIdStr = String(firstProduct.productId);
+                        const productId = parseInt(productIdStr);
+
+                        // Validate productId before sending
+                        if (!productId || isNaN(productId) || productId <= 0) {
+                          console.error('❌ Invalid productId:', { 
+                            productId, 
+                            productIdStr,
+                            firstProduct,
+                            originalProductId: firstProduct.productId 
+                          });
+                          setReviewResultModal({
+                            show: true,
+                            success: false,
+                            title: 'Error',
+                            message: 'Invalid product information. Please try again or contact support.'
+                          });
+                          return;
+                        }
+
+                        console.log('📝 Submitting review with:', {
+                          productId,
+                          productIdType: typeof productId,
+                          orderId: reviewOrderId,
+                          orderIdType: typeof reviewOrderId,
+                          rating,
+                          ratingType: typeof rating,
+                          title: `Review for ${firstProduct.productName}`,
+                          hasComment: !!reviewText,
+                          hasImages: reviewImages.length > 0
+                        });
 
                         const response = await productReviewApiService.createReview({
                           productId,

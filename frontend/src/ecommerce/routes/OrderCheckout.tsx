@@ -412,6 +412,8 @@ export default function OrderCheckout() {
 
   const handleStripeCheckout = async () => {
     try {
+      setIsProcessing(true) // Show loading overlay during redirect
+      
       // Build Stripe Checkout line items
       const lineItems = order.items.map((item) => {
         // Handle both numeric and string product IDs
@@ -484,14 +486,18 @@ export default function OrderCheckout() {
       }
 
       setPaymentError(response.message || 'Failed to create checkout session')
+      setIsProcessing(false) // Reset loading state on error
     } catch (error) {
       console.error('Stripe payment error:', error)
       setPaymentError('Failed to process payment. Please try again.')
+      setIsProcessing(false) // Reset loading state on error
     }
   }
 
   const handlePayPalCheckout = async () => {
     try {
+      setIsProcessing(true) // Show loading overlay during redirect
+      
       // Build PayPal order items
       const items = order.items.map((item) => {
         const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
@@ -558,9 +564,11 @@ export default function OrderCheckout() {
       }
 
       setPaymentError(response.message || 'Failed to create PayPal order')
+      setIsProcessing(false) // Reset loading state on error
     } catch (error) {
       console.error('PayPal payment error:', error)
       setPaymentError('Failed to process payment. Please try again.')
+      setIsProcessing(false) // Reset loading state on error
     }
   }
 
@@ -682,6 +690,69 @@ export default function OrderCheckout() {
   }
 
   return (
+    <>
+      {/* Loading Overlay for Payment Processing */}
+      {isProcessing && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center">
+            {/* Animated Loading Spinner */}
+            <div className="mb-6 flex justify-center">
+              <div className="relative">
+                {/* Outer rotating circle */}
+                <div className="w-20 h-20 border-4 border-purple-200 rounded-full animate-spin border-t-purple-600"></div>
+                {/* Inner pulsing circle */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 bg-purple-100 rounded-full animate-pulse"></div>
+                </div>
+                {/* PayPal icon in center */}
+                {paymentMethod === 'paypal' && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-purple-600" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 0 0-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 0 0-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 0 0 .554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.76-4.852a.932.932 0 0 1 .922-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.743-4.458z"/>
+                    </svg>
+                  </div>
+                )}
+                {/* Credit card icon for Stripe */}
+                {paymentMethod === 'stripe' && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <CreditCard className="w-8 h-8 text-purple-600" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Processing Message */}
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">
+              Processing Payment
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {paymentMethod === 'paypal' 
+                ? 'Please wait while we confirm your PayPal payment...'
+                : 'Please wait while we process your payment...'}
+            </p>
+
+            {/* Security Badge */}
+            <div className="flex items-center justify-center text-sm text-gray-500">
+              <Shield className="w-4 h-4 mr-2 text-green-600" />
+              <span>Secure Payment Processing</span>
+            </div>
+
+            {/* Progress Dots */}
+            <div className="flex justify-center mt-6 space-x-2">
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+
+            {/* Info Text */}
+            <p className="text-xs text-gray-400 mt-6">
+              Do not close this window or press the back button
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Checkout Content */}
     <main className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -1499,5 +1570,6 @@ export default function OrderCheckout() {
         </div>
       </div>
     </main>
+    </>
   )
 }

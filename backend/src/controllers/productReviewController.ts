@@ -27,12 +27,15 @@ export const createReview = async (
   res: Response,
   next: NextFunction
 ): Promise<Response | void> => {
+  // Generate unique request ID for tracking
+  const requestId = `review-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     const userId = req.user?.id;
     const { productId, orderId, rating, title, comment, images } = req.body;
 
     // Log the incoming request for debugging
-    logger.info('📝 Creating review with data:', { 
+    logger.info(`[${requestId}] 📝 Creating review with data:`, { 
       userId, 
       productId: productId,
       productIdType: typeof productId,
@@ -47,7 +50,7 @@ export const createReview = async (
 
     // Validate required fields
     if (!userId) {
-      logger.error('❌ User not authenticated');
+      logger.error(`[${requestId}] ❌ User not authenticated`);
       return res.status(401).json({
         success: false,
         message: 'User not authenticated',
@@ -56,7 +59,7 @@ export const createReview = async (
     }
 
     if (!productId || !orderId || !rating || !title || !comment) {
-      logger.error('❌ Missing required fields:', { 
+      logger.error(`[${requestId}] ❌ Missing required fields:`, { 
         hasProductId: !!productId, 
         hasOrderId: !!orderId, 
         hasRating: !!rating, 
@@ -197,20 +200,93 @@ export const createReview = async (
     
     logger.info('✅ All validations passed, creating review');
 
+    // Ensure productId is a number (convert if string number)
+    const numericProductId = typeof productId === 'string' && !isNaN(Number(productId)) 
+      ? Number(productId) 
+      : productId;
+
     // Prepare review data for insertion
     const reviewData = {
-      productId,
-      userId,
-      orderId,
-      rating,
-      title,
-      comment,
+      productId: numericProductId,
+      userId: userId,
+      orderId: orderId,
+      rating: rating,
+      title: title,
+      comment: comment,
       images: images ? JSON.stringify(images) : null
     };
 
-    logger.info('Inserting review with data:', reviewData);
+    logger.info('📝 Inserting review with data:', {
+      productId: reviewData.productId,
+      productIdType: typeof reviewData.productId,
+      userId: reviewData.userId,
+      userIdType: typeof reviewData.userId,
+      orderId: reviewData.orderId,
+      orderIdType: typeof reviewData.orderId,
+      rating: reviewData.rating,
+      ratingType: typeof reviewData.rating,
+      titleLength: reviewData.title?.length,
+      commentLength: reviewData.comment?.length,
+      hasImages: !!reviewData.images
+    });
+
+    // Validate all required fields are not undefined before insertion
+    if (
+      reviewData.productId === undefined ||
+      reviewData.userId === undefined ||
+      reviewData.orderId === undefined ||
+      reviewData.rating === undefined ||
+      reviewData.title === undefined ||
+      reviewData.comment === undefined
+    ) {
+      logger.error('❌ One or more required fields are undefined:', reviewData);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid review data - missing required fields',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Prepare replacements array and log each value
+    const replacements = [
+      reviewData.productId,
+      reviewData.userId,
+      reviewData.orderId,
+      reviewData.rating,
+      reviewData.title,
+      reviewData.comment,
+      reviewData.images
+    ];
+
+    // Log each replacement value with its position
+    logger.info('🔍 SQL Replacements Array:', replacements.map((val, idx) => ({
+      position: idx,
+      value: val,
+      type: typeof val,
+      isUndefined: val === undefined,
+      isNull: val === null
+    })));
+
+    // Double-check no undefined values
+    const undefinedIndices = replacements
+      .map((val, idx) => val === undefined ? idx : -1)
+      .filter(idx => idx !== -1);
+
+    if (undefinedIndices.length > 0) {
+      logger.error('❌ Found undefined values at positions:', undefinedIndices);
+      logger.error('❌ Full replacements array:', replacements);
+      logger.error('❌ Review data object:', reviewData);
+      return res.status(400).json({
+        success: false,
+        message: 'Internal error: Some review data is missing. Please try again.',
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Create the review
+    logger.info(`[${requestId}] ✅ About to execute SQL INSERT`);
+    logger.info(`[${requestId}] ✅ Replacements being sent to SQL:`, replacements);
+    
     const [result] = await sequelize.query(`
       INSERT INTO product_reviews (
         product_id, user_id, order_id, rating, title, comment,
@@ -218,33 +294,55 @@ export const createReview = async (
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'pending', true, 0, ?, NOW(), NOW())
     `, {
-      replacements: [
-        reviewData.productId,
-        reviewData.userId,
-        reviewData.orderId,
-        reviewData.rating,
-        reviewData.title,
-        reviewData.comment,
-        reviewData.images
-      ]
+      replacements: replacements
     });
 
-    const reviewId = (result as any).insertId;
+    logger.info(`[${requestId}] ✅ SQL INSERT completed successfully`);
+    logger.info(`[${requestId}] 🔍 Result object:`, result);
+    logger.info(`[${requestId}] 🔍 Result type:`, typeof result);
+    logger.info(`[${requestId}] 🔍 Result is array:`, Array.isArray(result));
+
+    // Get the inserted ID - Sequelize raw queries return it differently
+    let reviewId;
+    if (Array.isArray(result) && result.length > 0) {
+      reviewId = (result[0] as any)?.insertId || (result[0] as any);
+    } else if (result && typeof result === 'object') {
+      reviewId = (result as any).insertId || (result as any)[0];
+    }
+
+    logger.info(`[${requestId}] ✅ Got reviewId: ${reviewId}`);
+
+    // If still undefined, query for the last inserted ID
+    if (!reviewId) {
+      logger.warn(`[${requestId}] ⚠️ reviewId is undefined, querying LAST_INSERT_ID()`);
+      const [lastIdResult] = await sequelize.query('SELECT LAST_INSERT_ID() as id');
+      reviewId = Array.isArray(lastIdResult) && lastIdResult.length > 0 
+        ? (lastIdResult[0] as any).id 
+        : undefined;
+      logger.info(`[${requestId}] ✅ LAST_INSERT_ID() returned: ${reviewId}`);
+    }
+
+    if (!reviewId) {
+      throw new Error('Failed to get review ID after insert');
+    }
 
     // Fetch the created review
+    logger.info(`[${requestId}] 🔍 Fetching created review with ID: ${reviewId}`);
     const [createdReview] = await sequelize.query(`
       SELECT * FROM product_reviews WHERE id = ?
     `, {
       replacements: [reviewId]
     });
 
-    logger.info(`Product review created successfully: ${reviewId}`, {
+    logger.info(`[${requestId}] ✅ Product review created successfully: ${reviewId}`, {
       userId,
       productId,
       orderId,
       rating
     });
 
+    logger.info(`[${requestId}] ✅ Sending success response to client`);
+    
     return res.status(201).json({
       success: true,
       data: createdReview[0],
@@ -253,11 +351,20 @@ export const createReview = async (
     });
 
   } catch (error: any) {
-    logger.error('Error creating product review:', error);
+    logger.error(`[${requestId}] ❌ CATCH BLOCK - Error creating product review`);
+    logger.error(`[${requestId}] ❌ Error object:`, JSON.stringify(error, null, 2));
+    logger.error(`[${requestId}] ❌ Error message: "${error?.message || 'NO MESSAGE'}"`);
+    logger.error(`[${requestId}] ❌ Error name: "${error?.name || 'NO NAME'}"`);
+    logger.error(`[${requestId}] ❌ Error stack:`, error?.stack || 'NO STACK');
+    logger.error(`[${requestId}] ❌ Request body:`, JSON.stringify(req.body, null, 2));
+    logger.error(`[${requestId}] ❌ User ID: ${req.user?.id || 'NO USER'}`);
+    logger.error(`[${requestId}] ❌ Error type: ${typeof error}`);
+    logger.error(`[${requestId}] ❌ Error is Error instance: ${error instanceof Error}`);
+    
     return res.status(500).json({
       success: false,
-      message: 'Failed to create review',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      message: 'Failed to create review. Please try again.',
+      error: process.env.NODE_ENV === 'development' ? (error?.message || String(error)) : undefined,
       timestamp: new Date().toISOString(),
     });
   }
