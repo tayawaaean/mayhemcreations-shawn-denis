@@ -14,7 +14,7 @@ export interface OrderReviewAttributes {
   shipping: number;
   tax: number;
   total: number;
-  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout';
+  status: 'pending' | 'approved' | 'rejected' | 'needs-changes' | 'pending-payment' | 'approved-processing' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered';
   submittedAt: Date;
   reviewedAt?: Date | null;
   adminNotes?: string | null;
@@ -22,11 +22,29 @@ export interface OrderReviewAttributes {
   customerConfirmations?: any | null; // JSON data for customer confirmations
   pictureReplyUploadedAt?: Date | null;
   customerConfirmedAt?: Date | null;
+  // Payment and shipping fields
+  shippingAddress?: any | null; // JSON data for shipping address
+  billingAddress?: any | null; // JSON data for billing address
+  paymentMethod?: string | null;
+  paymentStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded' | null;
+  paymentProvider?: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual' | null;
+  paymentIntentId?: string | null;
+  transactionId?: string | null;
+  cardLast4?: string | null;
+  cardBrand?: string | null;
+  orderNumber?: string | null;
+  trackingNumber?: string | null;
+  shippingCarrier?: string | null;
+  shippedAt?: Date | null;
+  deliveredAt?: Date | null;
+  estimatedDeliveryDate?: Date | null;
+  customerNotes?: string | null;
+  internalNotes?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'createdAt' | 'updatedAt'> {}
+export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'shippingAddress' | 'billingAddress' | 'paymentMethod' | 'paymentStatus' | 'paymentProvider' | 'paymentIntentId' | 'transactionId' | 'cardLast4' | 'cardBrand' | 'orderNumber' | 'trackingNumber' | 'shippingCarrier' | 'shippedAt' | 'deliveredAt' | 'estimatedDeliveryDate' | 'customerNotes' | 'internalNotes' | 'createdAt' | 'updatedAt'> {}
 
 export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreationAttributes> implements OrderReviewAttributes {
   public id!: number;
@@ -44,6 +62,24 @@ export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreatio
   public customerConfirmations?: any | null;
   public pictureReplyUploadedAt?: Date | null;
   public customerConfirmedAt?: Date | null;
+  // Payment and shipping fields
+  public shippingAddress?: any | null;
+  public billingAddress?: any | null;
+  public paymentMethod?: string | null;
+  public paymentStatus?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded' | null;
+  public paymentProvider?: 'stripe' | 'paypal' | 'google_pay' | 'apple_pay' | 'square' | 'manual' | null;
+  public paymentIntentId?: string | null;
+  public transactionId?: string | null;
+  public cardLast4?: string | null;
+  public cardBrand?: string | null;
+  public orderNumber?: string | null;
+  public trackingNumber?: string | null;
+  public shippingCarrier?: string | null;
+  public shippedAt?: Date | null;
+  public deliveredAt?: Date | null;
+  public estimatedDeliveryDate?: Date | null;
+  public customerNotes?: string | null;
+  public internalNotes?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -158,7 +194,7 @@ OrderReview.init(
       comment: 'Total order amount',
     },
     status: {
-      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout'),
+      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered'),
       allowNull: false,
       defaultValue: 'pending',
       field: 'status',
@@ -205,6 +241,110 @@ OrderReview.init(
       allowNull: true,
       field: 'customer_confirmed_at',
       comment: 'When customer confirmed the order',
+    },
+    // Payment and shipping fields
+    shippingAddress: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'shipping_address',
+      comment: 'Customer shipping address as JSON',
+    },
+    billingAddress: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'billing_address',
+      comment: 'Customer billing address as JSON',
+    },
+    paymentMethod: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: 'payment_method',
+      comment: 'Payment method used',
+    },
+    paymentStatus: {
+      type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded', 'partially_refunded'),
+      allowNull: true,
+      defaultValue: null,
+      field: 'payment_status',
+      comment: 'Payment processing status',
+    },
+    paymentProvider: {
+      type: DataTypes.ENUM('stripe', 'paypal', 'google_pay', 'apple_pay', 'square', 'manual'),
+      allowNull: true,
+      field: 'payment_provider',
+      comment: 'Payment gateway provider',
+    },
+    paymentIntentId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'payment_intent_id',
+      comment: 'Payment intent ID from provider',
+    },
+    transactionId: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'transaction_id',
+      comment: 'Transaction ID',
+    },
+    cardLast4: {
+      type: DataTypes.STRING(4),
+      allowNull: true,
+      field: 'card_last4',
+      comment: 'Last 4 digits of card',
+    },
+    cardBrand: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: 'card_brand',
+      comment: 'Card brand (Visa, Mastercard, etc.)',
+    },
+    orderNumber: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: 'order_number',
+      comment: 'Unique order number generated after payment',
+    },
+    trackingNumber: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'tracking_number',
+      comment: 'Shipping tracking number',
+    },
+    shippingCarrier: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'shipping_carrier',
+      comment: 'Shipping carrier name',
+    },
+    shippedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'shipped_at',
+      comment: 'When the order was shipped',
+    },
+    deliveredAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'delivered_at',
+      comment: 'When the order was delivered',
+    },
+    estimatedDeliveryDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'estimated_delivery_date',
+      comment: 'Estimated delivery date',
+    },
+    customerNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'customer_notes',
+      comment: 'Notes from customer',
+    },
+    internalNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'internal_notes',
+      comment: 'Internal admin notes',
     },
     createdAt: {
       type: DataTypes.DATE,

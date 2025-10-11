@@ -175,15 +175,62 @@ export const capturePayPalOrderHandler = async (
         if (Array.isArray(orderResult) && orderResult.length > 0) {
           const order = orderResult[0] as any;
           
-          // Update order status to approved-processing (payment completed, ready for design processing)
+          // Extract shipping address from PayPal response
+          const shippingDetails = capture.purchase_units?.[0]?.shipping;
+          const payerInfo = capture.payer;
+          
+          // Format shipping address for database
+          const shippingAddress = shippingDetails ? {
+            name: shippingDetails.name?.full_name || `${payerInfo?.name?.given_name || ''} ${payerInfo?.name?.surname || ''}`.trim(),
+            address_line_1: shippingDetails.address?.address_line_1 || '',
+            address_line_2: shippingDetails.address?.address_line_2 || '',
+            city: shippingDetails.address?.admin_area_2 || '',
+            state: shippingDetails.address?.admin_area_1 || '',
+            postal_code: shippingDetails.address?.postal_code || '',
+            country: shippingDetails.address?.country_code || '',
+          } : null;
+          
+          // Generate order number if not exists
+          const { generateOrderNumber } = await import('../services/paymentRecordService');
+          const orderNumber = generateOrderNumber(order.id);
+          
+          // Extract payer email
+          const payerEmail = payerInfo?.email_address || metadata?.customerEmail || '';
+          const cardBrand = 'paypal'; // PayPal doesn't provide card brand
+          
+          logger.info('💳 Saving PayPal shipping details:', {
+            orderId: order.id,
+            shippingAddress,
+            payerEmail,
+            orderNumber,
+          });
+          
+          // Update order status and payment/shipping details
           await sequelize.query(`
             UPDATE order_reviews 
             SET status = 'approved-processing',
+                order_number = ?,
+                shipping_address = ?,
+                billing_address = ?,
+                payment_method = 'paypal',
+                payment_status = 'completed',
+                payment_provider = 'paypal',
+                payment_intent_id = ?,
+                transaction_id = ?,
+                card_brand = ?,
                 reviewed_at = NOW(),
                 updated_at = NOW()
             WHERE id = ?
           `, {
-            replacements: [order.id]
+            replacements: [
+              orderNumber,
+              shippingAddress ? JSON.stringify(shippingAddress) : null,
+              shippingAddress ? JSON.stringify(shippingAddress) : null, // Use same address for billing
+              capture.id, // PayPal capture ID as payment intent
+              `paypal_${orderId}`,
+              cardBrand,
+              order.id
+            ]
           });
 
           // Create payment record
@@ -414,15 +461,122 @@ export const handlePayPalWebhook = async (
 
 // Webhook event handlers
 const handlePaymentCaptureCompleted = async (event: any) => {
+  const captureResource = event.resource;
+  
   logger.info('Payment capture completed', {
-    captureId: event.resource?.id,
-    amount: event.resource?.amount,
-    payerEmail: event.resource?.payer?.email_address,
+    captureId: captureResource?.id,
+    amount: captureResource?.amount,
+    payerEmail: captureResource?.payer?.email_address,
   });
   
-  // TODO: Update order status in database
-  // TODO: Send confirmation email
-  // TODO: Update inventory
+  try {
+    const { sequelize } = await import('../config/database');
+    
+    // Extract custom_id or supplementary_data to find the order
+    const customId = captureResource?.custom_id;
+    const supplementaryData = captureResource?.supplementary_data;
+    
+    // Try to find order by transaction ID or most recent pending payment
+    // PayPal webhooks might not have order context, so we need to match by timing
+    const [orderResult] = await sequelize.query(`
+      SELECT id, user_id, status, total, subtotal, shipping, tax
+      FROM order_reviews 
+      WHERE status = 'pending-payment'
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `);
+    
+    if (Array.isArray(orderResult) && orderResult.length > 0) {
+      const order = orderResult[0] as any;
+      
+      // Extract shipping address from webhook payload
+      // Note: Webhook might have less detail than direct API call
+      const shippingDetails = supplementaryData?.related_ids?.shipping;
+      const payerInfo = captureResource?.payer;
+      
+      // Retrieve full order details from PayPal to get complete shipping info
+      let fullShippingAddress = null;
+      if (captureResource?.supplementary_data?.related_ids?.order_id) {
+        try {
+          const { retrievePayPalOrder } = await import('../services/paypalService');
+          const fullOrder = await retrievePayPalOrder(captureResource.supplementary_data.related_ids.order_id);
+          const fullShipping = fullOrder.purchase_units?.[0]?.shipping;
+          
+          if (fullShipping) {
+            fullShippingAddress = {
+              name: fullShipping.name?.full_name || `${payerInfo?.name?.given_name || ''} ${payerInfo?.name?.surname || ''}`.trim(),
+              address_line_1: fullShipping.address?.address_line_1 || '',
+              address_line_2: fullShipping.address?.address_line_2 || '',
+              city: fullShipping.address?.admin_area_2 || '',
+              state: fullShipping.address?.admin_area_1 || '',
+              postal_code: fullShipping.address?.postal_code || '',
+              country: fullShipping.address?.country_code || '',
+            };
+          }
+        } catch (retrieveError) {
+          logger.error('Error retrieving full order details from PayPal:', retrieveError);
+        }
+      }
+      
+      // Generate order number if not exists
+      const { generateOrderNumber } = await import('../services/paymentRecordService');
+      const orderNumber = generateOrderNumber(order.id);
+      
+      // Update order with payment and shipping details
+      await sequelize.query(`
+        UPDATE order_reviews 
+        SET status = 'approved-processing',
+            order_number = ?,
+            shipping_address = ?,
+            billing_address = ?,
+            payment_method = 'paypal',
+            payment_status = 'completed',
+            payment_provider = 'paypal',
+            payment_intent_id = ?,
+            transaction_id = ?,
+            card_brand = 'paypal',
+            reviewed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = ?
+      `, {
+        replacements: [
+          orderNumber,
+          fullShippingAddress ? JSON.stringify(fullShippingAddress) : null,
+          fullShippingAddress ? JSON.stringify(fullShippingAddress) : null,
+          captureResource.id,
+          `paypal_webhook_${captureResource.id}`,
+          order.id
+        ]
+      });
+      
+      logger.info('✅ Order updated via PayPal webhook with shipping details', {
+        orderId: order.id,
+        captureId: captureResource.id,
+        shippingAddress: fullShippingAddress,
+      });
+      
+      // Emit WebSocket event for real-time updates
+      try {
+        const { getWebSocketService } = await import('../services/websocketService');
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitOrderStatusChange(order.id, {
+            userId: order.user_id,
+            status: 'approved-processing',
+            originalStatus: 'pending-payment',
+            reviewedAt: new Date().toISOString(),
+            paypalCaptureId: captureResource.id
+          });
+        }
+      } catch (wsError) {
+        logger.error('Error emitting WebSocket event:', wsError);
+      }
+    } else {
+      logger.warn('No pending-payment order found for PayPal webhook');
+    }
+  } catch (error) {
+    logger.error('Error processing PayPal capture webhook:', error);
+  }
 };
 
 const handlePaymentCaptureDenied = async (event: any) => {

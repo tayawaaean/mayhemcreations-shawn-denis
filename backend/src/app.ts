@@ -22,7 +22,6 @@ import messageRoute from './routes/messageRoute';
 import materialCostRoute from './routes/materialCostRoute';
 import customEmbroideryRoute from './routes/customEmbroideryRoute';
 import orderReviewRoute from './routes/orderReviewRoute';
-import orderRoute from './routes/orderRoute';
 import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
 import paymentManagementRoute from './routes/paymentManagementRoute';
@@ -147,7 +146,6 @@ app.use('/api/v1/messages', messageRoute);
 app.use('/api/v1/material-costs', materialCostRoute);
 app.use('/api/v1/custom-embroidery', customEmbroideryRoute);
 app.use('/api/v1/orders', orderReviewRoute);
-app.use('/api/v1/admin/orders', orderRoute); // Admin orders management
 app.use('/api/v1/payments', paymentRoute);
 app.use('/api/v1/payments/paypal', paypalRoute);
 app.use('/api/v1/admin/payments', paymentManagementRoute);

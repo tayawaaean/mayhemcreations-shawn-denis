@@ -60,6 +60,21 @@ export interface PayPalOrderResult {
     method?: string;
   }>;
   approvalUrl?: string;
+  purchase_units?: Array<{
+    shipping?: {
+      name?: {
+        full_name?: string;
+      };
+      address?: {
+        address_line_1?: string;
+        address_line_2?: string;
+        admin_area_2?: string; // City
+        admin_area_1?: string; // State
+        postal_code?: string;
+        country_code?: string;
+      };
+    };
+  }>;
 }
 
 export interface CapturePayPalOrderData {
@@ -82,6 +97,19 @@ export interface PayPalCaptureResult {
     };
   };
   purchase_units?: Array<{
+    shipping?: {
+      name?: {
+        full_name?: string;
+      };
+      address?: {
+        address_line_1?: string;
+        address_line_2?: string;
+        admin_area_2?: string; // City
+        admin_area_1?: string; // State
+        postal_code?: string;
+        country_code?: string;
+      };
+    };
     payments?: {
       captures?: Array<{
         id: string;
@@ -177,6 +205,31 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
  */
 export const capturePayPalOrder = async (data: CapturePayPalOrderData): Promise<PayPalCaptureResult> => {
   try {
+    // First, check if order is already captured by retrieving its status
+    const orderDetails = await retrievePayPalOrder(data.orderId);
+    
+    // If order is already captured or completed, return the existing capture details
+    if (orderDetails.status === 'COMPLETED') {
+      logger.info('PayPal Order already captured, returning existing details', {
+        orderId: data.orderId,
+        status: orderDetails.status,
+      });
+      
+      // Extract capture information from the completed order
+      const existingCapture = orderDetails.purchase_units?.[0]?.payments?.captures?.[0];
+      
+      return {
+        id: existingCapture?.id || orderDetails.id,
+        status: orderDetails.status,
+        amount: existingCapture?.amount || {
+          currency_code: 'USD',
+          value: '0.00'
+        },
+        payer: orderDetails.payer,
+        purchase_units: orderDetails.purchase_units
+      };
+    }
+
     // Create PayPal Capture Request
     const request = new paypal.orders.OrdersCaptureRequest(data.orderId);
     // Request body is optional for capture, use type assertion
@@ -203,15 +256,82 @@ export const capturePayPalOrder = async (data: CapturePayPalOrderData): Promise<
       purchase_units: capture.purchase_units
     };
   } catch (error: any) {
+    // Handle ORDER_ALREADY_CAPTURED error gracefully
+    if (error.message && error.message.includes('ORDER_ALREADY_CAPTURED')) {
+      logger.info('Order already captured, retrieving existing details', {
+        orderId: data.orderId,
+      });
+      
+      // Retrieve the order details to get the capture information
+      try {
+        const orderDetails = await retrievePayPalOrder(data.orderId);
+        const existingCapture = orderDetails.purchase_units?.[0]?.payments?.captures?.[0];
+        
+        return {
+          id: existingCapture?.id || orderDetails.id,
+          status: orderDetails.status,
+          amount: existingCapture?.amount || {
+            currency_code: 'USD',
+            value: '0.00'
+          },
+          payer: orderDetails.payer,
+          purchase_units: orderDetails.purchase_units
+        };
+      } catch (retrieveError: any) {
+        logger.error('Error retrieving already-captured order:', retrieveError);
+        throw new Error(`Order already captured but failed to retrieve details: ${retrieveError.message}`);
+      }
+    }
+    
     logger.error('Error capturing PayPal Order:', error);
     throw new Error(`Failed to capture PayPal order: ${error.message}`);
   }
 };
 
+export interface PayPalOrderDetailsResult {
+  id: string;
+  status: string;
+  amount?: any;
+  payer?: {
+    email_address?: string;
+    name?: {
+      given_name?: string;
+      surname?: string;
+    };
+  };
+  purchase_units?: Array<{
+    shipping?: {
+      name?: {
+        full_name?: string;
+      };
+      address?: {
+        address_line_1?: string;
+        address_line_2?: string;
+        admin_area_2?: string; // City
+        admin_area_1?: string; // State
+        postal_code?: string;
+        country_code?: string;
+      };
+    };
+    payments?: {
+      captures?: Array<{
+        id: string;
+        status: string;
+        amount: {
+          currency_code: string;
+          value: string;
+        };
+      }>;
+    };
+  }>;
+  createTime?: string;
+  updateTime?: string;
+}
+
 /**
  * Retrieve a PayPal Order using real PayPal API
  */
-export const retrievePayPalOrder = async (orderId: string) => {
+export const retrievePayPalOrder = async (orderId: string): Promise<PayPalOrderDetailsResult> => {
   try {
     // Create PayPal Get Order Request
     const request = new paypal.orders.OrdersGetRequest(orderId);
@@ -230,6 +350,7 @@ export const retrievePayPalOrder = async (orderId: string) => {
       status: order.status,
       amount: order.purchase_units?.[0]?.amount,
       payer: order.payer,
+      purchase_units: order.purchase_units, // Include full purchase_units for capture details
       createTime: order.create_time,
       updateTime: order.update_time,
     };

@@ -43,6 +43,8 @@ export interface CreateCheckoutSessionData {
     postal_code: string;
     country: string;
   };
+  shippingCost?: number; // Shipping cost in dollars
+  taxAmount?: number; // Tax amount in dollars
   metadata?: Record<string, string>;
 }
 
@@ -99,9 +101,42 @@ export const createPaymentIntent = async (data: CreatePaymentIntentData): Promis
  */
 export const createCheckoutSession = async (data: CreateCheckoutSessionData): Promise<CheckoutSessionResult> => {
   try {
+    // Start with product line items
+    const allLineItems = [...data.lineItems];
+
+    // Add shipping as a line item if provided
+    if (data.shippingCost && data.shippingCost > 0) {
+      allLineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Shipping',
+            description: 'Standard shipping',
+          },
+          unit_amount: Math.round(data.shippingCost * 100), // Convert to cents
+        },
+        quantity: 1,
+      });
+    }
+
+    // Add tax as a line item if provided
+    if (data.taxAmount && data.taxAmount > 0) {
+      allLineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: 'Tax',
+            description: 'Sales tax (8%)',
+          },
+          unit_amount: Math.round(data.taxAmount * 100), // Convert to cents
+        },
+        quantity: 1,
+      });
+    }
+
     const sessionData: any = {
       payment_method_types: stripeConfig.paymentMethodTypes,
-      line_items: data.lineItems,
+      line_items: allLineItems,
       mode: 'payment',
       success_url: data.successUrl,
       cancel_url: data.cancelUrl,
@@ -118,22 +153,6 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       sessionData.customer = data.customerId;
     } else if (data.customerInfo?.email) {
       sessionData.customer_email = data.customerInfo.email;
-    }
-
-    // Add shipping options if address is provided
-    if (data.shippingAddress) {
-      sessionData.shipping_options = [
-        {
-          shipping_rate_data: {
-            type: 'fixed_amount',
-            fixed_amount: {
-              amount: 0, // Calculated by your system
-              currency: 'usd',
-            },
-            display_name: 'Standard Shipping',
-          },
-        },
-      ];
     }
 
     // Store additional info in metadata for reference
@@ -155,8 +174,11 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
 
     logger.info('Checkout Session created', {
       sessionId: session.id,
-      lineItemsCount: data.lineItems.length,
+      productLineItems: data.lineItems.length,
+      totalLineItems: allLineItems.length,
       hasShippingAddress: !!data.shippingAddress,
+      shippingCost: data.shippingCost || 0,
+      taxAmount: data.taxAmount || 0,
     });
 
     return {

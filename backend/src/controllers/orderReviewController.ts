@@ -381,6 +381,23 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
         order_reviews.customer_confirmations,
         order_reviews.picture_reply_uploaded_at,
         order_reviews.customer_confirmed_at,
+        order_reviews.order_number,
+        order_reviews.shipping_address,
+        order_reviews.billing_address,
+        order_reviews.payment_method,
+        order_reviews.payment_status,
+        order_reviews.payment_provider,
+        order_reviews.payment_intent_id,
+        order_reviews.transaction_id,
+        order_reviews.card_last4,
+        order_reviews.card_brand,
+        order_reviews.tracking_number,
+        order_reviews.shipping_carrier,
+        order_reviews.shipped_at,
+        order_reviews.delivered_at,
+        order_reviews.estimated_delivery_date,
+        order_reviews.customer_notes,
+        order_reviews.internal_notes,
         order_reviews.created_at,
         order_reviews.updated_at
       FROM order_reviews
@@ -445,12 +462,14 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
 export const updateReviewStatus = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { status, adminNotes } = req.body;
+    const { status, adminNotes, trackingNumber, shippingCarrier } = req.body;
 
-    if (!['pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing'].includes(status)) {
+    const validStatuses = ['pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered'];
+    
+    if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status. Must be one of: pending, approved, rejected, needs-changes, pending-payment, approved-processing',
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
         code: 'INVALID_STATUS',
         timestamp: new Date().toISOString(),
       });
@@ -459,15 +478,26 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     // If admin approves, automatically set status to pending-payment
     const finalStatus = status === 'approved' ? 'pending-payment' : status;
     
-    const [result] = await sequelize.query(`
-      UPDATE order_reviews 
-      SET status = ?, 
-          admin_notes = ?,
-          reviewed_at = NOW(),
-          updated_at = NOW()
-      WHERE id = ?
-    `, {
-      replacements: [finalStatus, adminNotes || null, id]
+    // Build update query dynamically based on status
+    let updateQuery = `UPDATE order_reviews SET status = ?, admin_notes = ?, reviewed_at = NOW(), updated_at = NOW()`;
+    let replacements: any[] = [finalStatus, adminNotes || null];
+
+    // If status is 'shipped', update shipping fields
+    if (status === 'shipped') {
+      updateQuery += `, tracking_number = ?, shipping_carrier = ?, shipped_at = NOW()`;
+      replacements.push(trackingNumber || null, shippingCarrier || null);
+    }
+
+    // If status is 'delivered', update delivered_at
+    if (status === 'delivered') {
+      updateQuery += `, delivered_at = NOW()`;
+    }
+
+    updateQuery += ` WHERE id = ?`;
+    replacements.push(id);
+
+    const [result] = await sequelize.query(updateQuery, {
+      replacements
     });
 
     if ((result as any).affectedRows === 0) {
@@ -523,7 +553,11 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
         status: finalStatus,
         originalStatus: status,
         adminNotes,
-        reviewedAt: new Date().toISOString()
+        reviewedAt: new Date().toISOString(),
+        trackingNumber: status === 'shipped' ? trackingNumber : undefined,
+        shippingCarrier: status === 'shipped' ? shippingCarrier : undefined,
+        shippedAt: status === 'shipped' ? new Date().toISOString() : undefined,
+        deliveredAt: status === 'delivered' ? new Date().toISOString() : undefined
       });
     }
 

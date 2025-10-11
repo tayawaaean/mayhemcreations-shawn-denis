@@ -248,10 +248,8 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
         // Don't fail the webhook if payment record creation fails
       }
 
-      // Create actual order record for admin orders management
+      // Update order_reviews with payment and shipping information
       try {
-        const { createOrderFromReview } = await import('../controllers/orderController');
-        
         // Extract shipping details from metadata
         const shippingDetails = {
           firstName: paymentIntent.metadata?.firstName || '',
@@ -265,29 +263,63 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
           country: paymentIntent.metadata?.country || 'US',
         };
 
-        const orderResult = await createOrderFromReview(
-          order.id,
-          {
-            paymentIntentId: paymentIntent.id,
-            transactionId: `stripe_${paymentIntent.id}`,
-            cardLast4: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.last4,
-            cardBrand: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.brand,
-            paymentMethod: 'card',
-            paymentProvider: 'stripe',
-          },
-          shippingDetails
-        );
+        // Generate order number
+        const orderNumber = `ORD-${Date.now()}-${order.id}`;
 
-        if (orderResult.success) {
-          logger.info('Order created successfully from payment', {
-            orderId: orderResult.orderId,
-            orderNumber: orderResult.orderNumber,
-            orderReviewId: order.id,
-          });
-        }
+        // Extract pricing from metadata
+        const subtotal = paymentIntent.metadata?.subtotal ? parseFloat(paymentIntent.metadata.subtotal) : null;
+        const shipping = paymentIntent.metadata?.shipping ? parseFloat(paymentIntent.metadata.shipping) : null;
+        const tax = paymentIntent.metadata?.tax ? parseFloat(paymentIntent.metadata.tax) : null;
+        const total = paymentIntent.metadata?.total ? parseFloat(paymentIntent.metadata.total) : null;
+
+        // Update order_reviews with payment details and pricing
+        await sequelize.query(`
+          UPDATE order_reviews 
+          SET 
+            order_number = ?,
+            shipping_address = ?,
+            billing_address = ?,
+            payment_method = ?,
+            payment_status = ?,
+            payment_provider = ?,
+            payment_intent_id = ?,
+            transaction_id = ?,
+            card_last4 = ?,
+            card_brand = ?,
+            ${subtotal !== null ? 'subtotal = ?,' : ''}
+            ${shipping !== null ? 'shipping = ?,' : ''}
+            ${tax !== null ? 'tax = ?,' : ''}
+            ${total !== null ? 'total = ?,' : ''}
+            updated_at = NOW()
+          WHERE id = ?
+        `, {
+          replacements: [
+            orderNumber,
+            JSON.stringify(shippingDetails),
+            JSON.stringify(shippingDetails), // Use same as shipping for now
+            'card',
+            'completed',
+            'stripe',
+            paymentIntent.id,
+            `stripe_${paymentIntent.id}`,
+            paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.last4 || null,
+            paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.brand || null,
+            ...(subtotal !== null ? [subtotal] : []),
+            ...(shipping !== null ? [shipping] : []),
+            ...(tax !== null ? [tax] : []),
+            ...(total !== null ? [total] : []),
+            order.id
+          ]
+        });
+
+        logger.info('Payment and shipping details added to order review', {
+          orderReviewId: order.id,
+          orderNumber,
+          paymentIntentId: paymentIntent.id,
+        });
       } catch (orderError) {
-        logger.error('Error creating order from payment:', orderError);
-        // Don't fail the webhook if order creation fails
+        logger.error('Error updating order review with payment details:', orderError);
+        // Don't fail the webhook if update fails
       }
 
       logger.info('Order status updated to approved-processing after payment success', {
@@ -463,10 +495,8 @@ const handleCheckoutSessionCompleted = async (session: any) => {
         // Don't fail the webhook if payment record creation fails
       }
 
-      // Create actual order record for admin orders management
+      // Update order_reviews with payment and shipping information
       try {
-        const { createOrderFromReview } = await import('../controllers/orderController');
-        
         // Extract shipping details from metadata
         const shippingDetails = {
           firstName: session.metadata?.firstName || session.customer_details?.name?.split(' ')[0] || '',
@@ -480,29 +510,63 @@ const handleCheckoutSessionCompleted = async (session: any) => {
           country: session.metadata?.country || session.customer_details?.address?.country || 'US',
         };
 
-        const orderResult = await createOrderFromReview(
-          order.id,
-          {
-            paymentIntentId: session.payment_intent || session.id,
-            transactionId: `stripe_session_${session.id}`,
-            cardLast4: session.metadata?.cardLast4,
-            cardBrand: session.metadata?.cardBrand,
-            paymentMethod: 'card',
-            paymentProvider: 'stripe',
-          },
-          shippingDetails
-        );
+        // Generate order number
+        const orderNumber = `ORD-${Date.now()}-${order.id}`;
 
-        if (orderResult.success) {
-          logger.info('Order created successfully from payment', {
-            orderId: orderResult.orderId,
-            orderNumber: orderResult.orderNumber,
-            orderReviewId: order.id,
-          });
-        }
+        // Extract pricing from metadata
+        const subtotal = session.metadata?.subtotal ? parseFloat(session.metadata.subtotal) : null;
+        const shipping = session.metadata?.shipping ? parseFloat(session.metadata.shipping) : null;
+        const tax = session.metadata?.tax ? parseFloat(session.metadata.tax) : null;
+        const total = session.metadata?.total ? parseFloat(session.metadata.total) : null;
+
+        // Update order_reviews with payment details and pricing
+        await sequelize.query(`
+          UPDATE order_reviews 
+          SET 
+            order_number = ?,
+            shipping_address = ?,
+            billing_address = ?,
+            payment_method = ?,
+            payment_status = ?,
+            payment_provider = ?,
+            payment_intent_id = ?,
+            transaction_id = ?,
+            card_last4 = ?,
+            card_brand = ?,
+            ${subtotal !== null ? 'subtotal = ?,' : ''}
+            ${shipping !== null ? 'shipping = ?,' : ''}
+            ${tax !== null ? 'tax = ?,' : ''}
+            ${total !== null ? 'total = ?,' : ''}
+            updated_at = NOW()
+          WHERE id = ?
+        `, {
+          replacements: [
+            orderNumber,
+            JSON.stringify(shippingDetails),
+            JSON.stringify(shippingDetails), // Use same as shipping for now
+            'card',
+            'completed',
+            'stripe',
+            session.payment_intent || session.id,
+            `stripe_session_${session.id}`,
+            session.metadata?.cardLast4 || null,
+            session.metadata?.cardBrand || null,
+            ...(subtotal !== null ? [subtotal] : []),
+            ...(shipping !== null ? [shipping] : []),
+            ...(tax !== null ? [tax] : []),
+            ...(total !== null ? [total] : []),
+            order.id
+          ]
+        });
+
+        logger.info('Payment and shipping details added to order review (checkout session)', {
+          orderReviewId: order.id,
+          orderNumber,
+          sessionId: session.id,
+        });
       } catch (orderError) {
-        logger.error('Error creating order from payment:', orderError);
-        // Don't fail the webhook if order creation fails
+        logger.error('Error updating order review with payment details:', orderError);
+        // Don't fail the webhook if update fails
       }
 
       logger.info('Order status updated to approved-processing after checkout completion', {
