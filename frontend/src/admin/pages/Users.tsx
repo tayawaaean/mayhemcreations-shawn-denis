@@ -4,6 +4,7 @@ import { Search, Filter, Eye, Edit, Users, Shield, Plus } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { UserDetailModal, EditUserModal, AddUserModal } from '../components/modals/UserModals'
 import { User as ApiUser } from '../services/apiService'
+import { formatDateOnly } from '../../utils/dateFormatter'
 
 const UsersPage: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'designer' | 'support' | 'moderator'>('all')
@@ -200,7 +201,7 @@ const UsersPage: React.FC = () => {
                           {user.firstName} {user.lastName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {user.lastLoginAt ? `Last login: ${new Date(user.lastLoginAt).toLocaleDateString()}` : 'Never logged in'}
+                          {user.lastLoginAt ? `Last login: ${formatDateOnly(user.lastLoginAt)}` : 'Never logged in'}
                         </div>
                       </div>
                     </div>

@@ -723,13 +723,37 @@ const PendingReview: React.FC = () => {
   ]
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    if (!dateString) return 'N/A';
+    
+    // Extract date and time parts without timezone conversion
+    const [datePart, timePart] = dateString.split('T');
+    const [year, month, day] = datePart.split('-');
+    
+    // Month names
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthName = monthNames[parseInt(month) - 1];
+    
+    // If there's a time part, extract hour and minute
+    if (timePart) {
+      const [hourMinSec] = timePart.split('.');
+      const [hour24, minute] = hourMinSec.split(':');
+      const hour = parseInt(hour24);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      
+      return `${monthName} ${parseInt(day)}, ${year}, ${hour12}:${minute} ${ampm}`;
+    }
+    
+    return `${monthName} ${parseInt(day)}, ${year}`;
+  }
+
+  // Format date without timezone conversion (date only, no time)
+  const formatDateOnly = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    const [datePart] = dateString.split('T');
+    const [year, month, day] = datePart.split('-');
+    return `${month}/${day}/${year}`;
   }
 
   const formatPrice = (price: number) => {
@@ -1683,7 +1707,7 @@ const PendingReview: React.FC = () => {
                             )}
                             {(selectedReview as any).shipped_at && (
                               <p className="text-base text-gray-700">
-                                <span className="font-medium">Shipped:</span> {new Date((selectedReview as any).shipped_at).toLocaleDateString()}
+                                <span className="font-medium">Shipped:</span> {formatDateOnly((selectedReview as any).shipped_at)}
                               </p>
                             )}
                           </div>
@@ -1866,7 +1890,7 @@ const PendingReview: React.FC = () => {
                     
                     {selectedReview.picture_reply_uploaded_at && (
                       <div className="mt-3 text-sm text-blue-600">
-                        <strong>Last Uploaded:</strong> {new Date(selectedReview.picture_reply_uploaded_at).toLocaleDateString()}
+                        <strong>Last Uploaded:</strong> {formatDate(selectedReview.picture_reply_uploaded_at)}
                       </div>
                     )}
                   </div>
@@ -2944,7 +2968,7 @@ const PendingReview: React.FC = () => {
                                                               <p className="text-sm text-white mb-2">{reply.notes}</p>
                                                             )}
                                                             <p className="text-xs text-blue-200 opacity-75">
-                                                              {reply.uploadedAt ? new Date(reply.uploadedAt).toLocaleString() : 'Unknown time'}
+                                                              {reply.uploadedAt ? formatDate(reply.uploadedAt) : 'Unknown time'}
                                                             </p>
                                                           </div>
                                                         </div>
@@ -2987,7 +3011,7 @@ const PendingReview: React.FC = () => {
                                                             )}
                                                             <p className="text-xs opacity-75">
                                                               {customerConfirmation.confirmedAt ? 
-                                                                new Date(customerConfirmation.confirmedAt).toLocaleString() : 
+                                                                formatDate(customerConfirmation.confirmedAt) : 
                                                                 'Response pending'
                                                               }
                                                             </p>

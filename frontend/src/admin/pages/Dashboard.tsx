@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react'
+import { formatDateShort } from '../../utils/dateFormatter'
 
 const Dashboard: React.FC = () => {
   const { state } = useAdmin()
@@ -138,7 +139,7 @@ const Dashboard: React.FC = () => {
                       ></div>
                     </div>
                     <span className="text-xs text-gray-500 mt-2">
-                      {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {formatDateShort(item.date).replace(/,.*/, '')}
                     </span>
                   </div>
                 );

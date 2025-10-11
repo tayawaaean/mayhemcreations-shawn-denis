@@ -11,6 +11,15 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
 
+// Helper function to format date without timezone conversion issues
+const formatDateWithoutTimezone = (dateString: string): string => {
+  // Parse the date string and extract just the date part (YYYY-MM-DD)
+  const datePart = dateString.split('T')[0]
+  const [year, month, day] = datePart.split('-')
+  // Return in MM/DD/YYYY format
+  return `${month}/${day}/${year}`
+}
+
 interface OrderItem {
   id: string
   productId: string
@@ -1493,12 +1502,12 @@ export default function MyOrders() {
                       <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
-                          <span>Placed {new Date(order.orderDate).toLocaleDateString()}</span>
+                          <span>Placed {formatDateWithoutTimezone(order.orderDate)}</span>
                         </div>
                         {order.reviewedAt && (
                           <div className="flex items-center space-x-1">
                             <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span>Reviewed {new Date(order.reviewedAt).toLocaleDateString()}</span>
+                            <span>Reviewed {formatDateWithoutTimezone(order.reviewedAt)}</span>
                           </div>
                         )}
                       </div>
@@ -1795,7 +1804,7 @@ export default function MyOrders() {
                           {order.shippedAt && (
                             <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                               <span className="text-xs font-medium text-gray-600">Shipped On:</span>
-                              <span className="text-xs text-gray-700">{new Date(order.shippedAt).toLocaleDateString()}</span>
+                              <span className="text-xs text-gray-700">{formatDateWithoutTimezone(order.shippedAt)}</span>
                             </div>
                           )}
                         </div>
@@ -1831,7 +1840,7 @@ export default function MyOrders() {
                           {order.deliveredAt && (
                             <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                               <span className="text-xs font-medium text-gray-600">Delivered On:</span>
-                              <span className="text-xs text-gray-700">{new Date(order.deliveredAt).toLocaleDateString()}</span>
+                              <span className="text-xs text-gray-700">{formatDateWithoutTimezone(order.deliveredAt)}</span>
                             </div>
                           )}
                         </div>
@@ -1918,7 +1927,7 @@ export default function MyOrders() {
                             )}
                             
                             <p className="text-xs text-gray-500 mt-2">
-                              Submitted on {new Date(orderReviews[order.id].createdAt).toLocaleDateString()}
+                              Submitted on {formatDateWithoutTimezone(orderReviews[order.id].createdAt)}
                             </p>
                           </div>
                         ) : (
@@ -1970,7 +1979,7 @@ export default function MyOrders() {
                     <div>
                       <p className="text-sm font-medium text-gray-500">Submitted Date</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {new Date(selectedOrder.orderDate).toLocaleDateString()}
+                        {formatDateWithoutTimezone(selectedOrder.orderDate)}
                       </p>
                     </div>
                     <div>
@@ -1990,7 +1999,7 @@ export default function MyOrders() {
                     <div>
                         <p className="text-sm font-medium text-gray-500">Reviewed Date</p>
                         <p className="text-lg font-semibold text-gray-900">
-                          {new Date(selectedOrder.reviewedAt).toLocaleDateString()}
+                          {formatDateWithoutTimezone(selectedOrder.reviewedAt)}
                         </p>
                       </div>
                     )}

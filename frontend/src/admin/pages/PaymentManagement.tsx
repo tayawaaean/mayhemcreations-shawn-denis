@@ -17,6 +17,7 @@ import { PaymentLog } from '../types/paymentLogs'
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import HelpModal from '../components/modals/HelpModal'
 import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
+import { formatDateOnly } from '../../utils/dateFormatter'
 
 const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -518,7 +519,7 @@ const PaymentManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(payment.createdAt).toLocaleDateString()}
+                    {formatDateOnly(payment.createdAt)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
@@ -601,7 +602,7 @@ const PaymentManagement: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Date</p>
-                        <p className="text-sm text-gray-900">{new Date(payment.createdAt).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-900">{formatDateOnly(payment.createdAt)}</p>
                       </div>
                     </div>
                   </div>

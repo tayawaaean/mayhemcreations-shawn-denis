@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { PaymentLog, PaymentLogStats, PaymentProvider, PaymentStatus, PaymentMethod } from '../types/paymentLogs'
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
+import { formatDateOnly, formatDateTime } from '../../utils/dateFormatter'
 
 const PaymentLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -420,7 +421,7 @@ const PaymentLogs: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(payment.createdAt).toLocaleDateString()}
+                    {formatDateOnly(payment.createdAt)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
@@ -614,7 +615,7 @@ const PaymentLogs: React.FC = () => {
                               </div>
                               <div className="text-sm text-gray-600">{refund.reason}</div>
                               <div className="text-sm text-gray-500">
-                                {new Date(refund.createdAt).toLocaleString()}
+                                {formatDateTime(refund.createdAt)}
                               </div>
                             </div>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${

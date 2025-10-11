@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Star, Search, Filter, Trash2, Check, X, ThumbsUp, Loader, MessageSquare } from 'lucide-react'
 import { productReviewApiService, ProductReview } from '../../shared/productReviewApiService'
+import { formatDateOnly } from '../../utils/dateFormatter'
 
 const Reviews: React.FC = () => {
   const [reviews, setReviews] = useState<ProductReview[]>([])
@@ -271,7 +272,7 @@ const Reviews: React.FC = () => {
                       <div>
                         <h3 className="text-lg font-medium text-gray-900">{review.product_title || 'Product'}</h3>
                         <p className="text-sm text-gray-500">
-                          by {review.first_name} {review.last_name} • {new Date(review.created_at).toLocaleDateString()}
+                          by {review.first_name} {review.last_name} • {formatDateOnly(review.created_at)}
                           {review.is_verified && (
                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                               <Check className="w-3 h-3 mr-1" />
@@ -323,7 +324,7 @@ const Reviews: React.FC = () => {
                         <p className="text-sm text-blue-800">{review.admin_response}</p>
                         {review.admin_responded_at && (
                           <p className="text-xs text-blue-600 mt-1">
-                            {new Date(review.admin_responded_at).toLocaleDateString()}
+                            {formatDateOnly(review.admin_responded_at)}
                           </p>
                         )}
                       </div>
