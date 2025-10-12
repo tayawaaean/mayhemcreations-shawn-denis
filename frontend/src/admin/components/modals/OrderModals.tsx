@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Package, Truck, CheckCircle, XCircle, Clock, User, Mail, Phone, MapPin, CreditCard, DollarSign, AlertCircle } from 'lucide-react'
+import { X, Package, Truck, CheckCircle, XCircle, Clock, User, Mail, Phone, MapPin, CreditCard, DollarSign, AlertCircle, FileText } from 'lucide-react'
 import { Order } from '../../types'
 
 interface OrderDetailModalProps {
@@ -141,6 +141,84 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
               </div>
             </div>
 
+            {/* Customer Notes - Prioritized Section for Design Placement Instructions */}
+            {(() => {
+              // Collect all notes from order items - handling both multi-design and single-design structures
+              const allNotes: Array<{ note: string; product: string; designName?: string }> = [];
+              
+              order.items.forEach((item: any, itemIndex: number) => {
+                const customization = item.customization || {};
+                const productTitle = item.productName || item.product?.title || item.productSnapshot?.title || `Item ${itemIndex + 1}`;
+                
+                // Handle multi-design structure (new format with designs array)
+                if (customization.designs && Array.isArray(customization.designs)) {
+                  customization.designs.forEach((design: any) => {
+                    if (design.notes && design.notes.trim().length > 0) {
+                      allNotes.push({
+                        note: design.notes,
+                        product: productTitle,
+                        designName: design.name || 'Design'
+                      });
+                    }
+                  });
+                }
+                
+                // Handle single-design structure (legacy format)
+                else if (customization.notes && customization.notes.trim().length > 0) {
+                  allNotes.push({
+                    note: customization.notes,
+                    product: productTitle
+                  });
+                }
+              });
+
+              // Combine with order-level notes
+              const orderNotes = order.notes && order.notes.length > 0 ? order.notes : [];
+              const hasAnyNotes = allNotes.length > 0 || orderNotes.length > 0;
+
+              // Only render the section if there are notes
+              return hasAnyNotes ? (
+                <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 shadow-sm">
+                  <h3 className="text-lg font-bold text-blue-900 mb-3 flex items-center">
+                    <FileText className="h-5 w-5 mr-2 text-blue-700" />
+                    Customer Instructions & Design Placement Notes
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-3 font-medium">
+                    Customer-provided instructions for design placement and customization
+                  </p>
+                  <div className="space-y-3">
+                    {/* Display item-specific customization notes with product and design context */}
+                    {allNotes.map((noteData: any, index: number) => (
+                      <div key={`custom-${index}`} className="bg-white border border-blue-200 rounded-md p-3 shadow-sm">
+                        <div className="flex items-start space-x-2 mb-2">
+                          <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-blue-800 mb-0.5">{noteData.product}</p>
+                            {noteData.designName && (
+                              <p className="text-xs text-blue-600 mb-1">{noteData.designName}</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-900 font-medium bg-gray-50 p-2 rounded border border-gray-200">
+                          {noteData.note}
+                        </p>
+                      </div>
+                    ))}
+                    {/* Display order-level notes */}
+                    {orderNotes.map((note: string, index: number) => (
+                      <div key={`order-${index}`} className="bg-white border border-blue-200 rounded-md p-3 shadow-sm">
+                        <div className="flex items-start space-x-2 mb-2">
+                          <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs font-semibold text-blue-800">Order Note</p>
+                        </div>
+                        <p className="text-sm text-gray-900 font-medium bg-gray-50 p-2 rounded border border-gray-200">{note}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
             {/* Payment Information */}
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -249,9 +327,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                               {selectedVariant.size && `, Size: ${selectedVariant.size}`}
                             </p>
                           )}
-                          {customization.notes && (
-                            <p className="text-xs text-gray-400 mt-1">{customization.notes}</p>
-                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -281,20 +356,6 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ isOpen, onCl
                 </div>
               </div>
             </div>
-
-            {/* Order Notes */}
-            {order.notes && order.notes.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Notes</h3>
-                <div className="space-y-2">
-                  {order.notes.map((note, index) => (
-                    <div key={index} className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                      {note}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="flex justify-end space-x-3 p-4 sm:p-6 border-t border-gray-200">

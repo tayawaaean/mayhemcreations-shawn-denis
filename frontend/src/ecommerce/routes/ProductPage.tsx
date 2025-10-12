@@ -185,18 +185,45 @@ export default function ProductPage() {
                 )}
               </div>
 
-              {/* Rating */}
-              <div className="flex items-center space-x-2 mb-6">
-                <div className="flex items-center">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <Star
-                      key={i}
-                      className="h-5 w-5 text-yellow-400 fill-current"
-                    />
-                  ))}
+              {/* Rating - Connected to actual review data */}
+              {reviewStats && reviewStats.totalReviews > 0 ? (
+                <div 
+                  className="flex items-center space-x-2 mb-6 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => {
+                    // Scroll to reviews section
+                    document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                  title="Click to view all reviews"
+                >
+                  <div className="flex items-center">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className={`h-5 w-5 ${
+                          i < Math.round(parseFloat(reviewStats.averageRating))
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-gray-600">
+                    ({parseFloat(reviewStats.averageRating).toFixed(1)}) • {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? 'review' : 'reviews'}
+                  </span>
                 </div>
-                <span className="text-sm text-gray-600">(4.8) • 24 reviews</span>
-              </div>
+              ) : !reviewsLoading && (
+                <div className="flex items-center space-x-2 mb-6 text-gray-500">
+                  <div className="flex items-center">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star
+                        key={i}
+                        className="h-5 w-5 text-gray-300"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm">No reviews yet</span>
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -286,7 +313,7 @@ export default function ProductPage() {
         </div>
 
         {/* Reviews Section */}
-        <div className="container mx-auto px-4 py-12">
+        <div id="reviews-section" className="container mx-auto px-4 py-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-6">Customer Reviews</h2>
           
           {reviewsLoading ? (

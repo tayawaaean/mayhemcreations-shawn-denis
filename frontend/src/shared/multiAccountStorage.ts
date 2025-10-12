@@ -180,7 +180,7 @@ class MultiAccountStorageService {
       // Check if session is expired
       const lastActivity = new Date(accountData.session.lastActivity);
       const now = new Date();
-      const sessionTimeout = 24 * 60 * 60 * 1000; // 24 hours
+      const sessionTimeout = 30 * 24 * 60 * 60 * 1000; // 30 days (increased from 24 hours for better persistence)
 
       return (now.getTime() - lastActivity.getTime()) < sessionTimeout;
     } catch (error) {

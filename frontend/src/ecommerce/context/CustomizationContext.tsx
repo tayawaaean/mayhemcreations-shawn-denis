@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { embroideryOptionApiService, EmbroideryOption as ApiEmbroideryOption } from '../../shared/embroideryOptionApiService'
+import { MaterialPricingService } from '../../shared/materialPricingService'
 
 export interface DesignUpload {
   file: File
@@ -688,10 +689,14 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       return
     }
     
+    // Check if clicking the same style - if so, unselect it
+    const currentSelected = customizationData.selectedStyles[category] as EmbroideryStyle | null
+    const newValue = currentSelected?.id === style.id ? null : style
+    
     setCustomizationData({
       selectedStyles: {
         ...customizationData.selectedStyles,
-        [category]: style
+        [category]: newValue
       }
     })
   }
@@ -870,10 +875,14 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const design = getDesignById(designId)
     if (design) {
+      // Check if clicking the same style - if so, unselect it
+      const currentSelected = design.selectedStyles[category] as EmbroideryStyle | null
+      const newValue = currentSelected?.id === style.id ? null : style
+      
       updateDesign(designId, {
         selectedStyles: {
           ...design.selectedStyles,
-          [category]: style
+          [category]: newValue
         }
       })
     }
@@ -918,19 +927,32 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     const design = getDesignById(designId)
     if (!design) return 0
 
-    // Calculate options price
-    const { selectedStyles } = design
-    let optionsPrice = 0
-    if (selectedStyles.coverage) optionsPrice += Number(selectedStyles.coverage.price) || 0
-    if (selectedStyles.material) optionsPrice += Number(selectedStyles.material.price) || 0
-    if (selectedStyles.border) optionsPrice += Number(selectedStyles.border.price) || 0
-    if (selectedStyles.backing) optionsPrice += Number(selectedStyles.backing.price) || 0
-    if (selectedStyles.cutting) optionsPrice += Number(selectedStyles.cutting.price) || 0
-    
-    selectedStyles.threads.forEach(thread => optionsPrice += Number(thread.price) || 0)
-    selectedStyles.upgrades.forEach(upgrade => optionsPrice += Number(upgrade.price) || 0)
+    // Calculate base material costs from dimensions
+    let totalPrice = 0
+    if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+      try {
+        const materialCosts = MaterialPricingService.calculateMaterialCosts({
+          patchWidth: design.dimensions.width,
+          patchHeight: design.dimensions.height
+        })
+        totalPrice += materialCosts.totalCost
+      } catch (error) {
+        console.warn('Failed to calculate material costs for design:', design.name, error)
+      }
+    }
 
-    return optionsPrice
+    // Calculate options price and add to total
+    const { selectedStyles } = design
+    if (selectedStyles.coverage) totalPrice += Number(selectedStyles.coverage.price) || 0
+    if (selectedStyles.material) totalPrice += Number(selectedStyles.material.price) || 0
+    if (selectedStyles.border) totalPrice += Number(selectedStyles.border.price) || 0
+    if (selectedStyles.backing) totalPrice += Number(selectedStyles.backing.price) || 0
+    if (selectedStyles.cutting) totalPrice += Number(selectedStyles.cutting.price) || 0
+    
+    selectedStyles.threads.forEach(thread => totalPrice += Number(thread.price) || 0)
+    selectedStyles.upgrades.forEach(upgrade => totalPrice += Number(upgrade.price) || 0)
+
+    return totalPrice
   }
 
   return (

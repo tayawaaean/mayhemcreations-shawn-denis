@@ -45,10 +45,9 @@ const createAxiosInstance = (): AxiosInstance => {
   // Response interceptor - Handle token refresh and auth errors
   instance.interceptors.response.use(
     (response: AxiosResponse) => {
-      // Update activity timestamp on successful requests (except auth endpoints)
-      if (!response.config.url?.includes('/auth/')) {
-        updateActivity();
-      }
+      // Update activity timestamp on ALL successful requests
+      // This keeps the session alive as long as user is active
+      updateActivity();
       
       return response;
     },
@@ -66,8 +65,10 @@ const createAxiosInstance = (): AxiosInstance => {
         
         // Check if we've exceeded max retries
         if (globalRetryCount >= MAX_RETRIES) {
-          console.log('🔐 Axios: Too many refresh attempts, clearing auth state');
-          MultiAccountStorageService.clearAllAccounts();
+          console.log('🔐 Axios: Too many refresh attempts, but keeping user logged in');
+          console.log('🔐 Axios: User may need to manually refresh page or re-login if issue persists');
+          // Don't automatically log out - let user try again or manually logout
+          // This prevents accidental logouts due to temporary network issues
           globalRetryCount = 0; // Reset for next time
           return Promise.reject(error);
         }
@@ -82,6 +83,13 @@ const createAxiosInstance = (): AxiosInstance => {
         originalRequest._retry = true;
         
         try {
+          // Get current account data before refresh attempt
+          const currentAccount = MultiAccountStorageService.getCurrentAccountData();
+          if (!currentAccount) {
+            console.log('❌ Axios: No current account found, cannot refresh token');
+            return Promise.reject(error);
+          }
+          
           // Attempt to refresh token using Bearer token authentication
           const refreshResponse = await instance.post('/auth/refresh');
           
@@ -92,20 +100,17 @@ const createAxiosInstance = (): AxiosInstance => {
             globalRetryCount = 0;
             
             // Update token in multi-account storage
-            const currentAccount = MultiAccountStorageService.getCurrentAccountData();
-            if (currentAccount) {
-              MultiAccountStorageService.storeAccountAuthData(
-                currentAccount.user.accountType,
-                {
-                  user: currentAccount.user,
-                  session: {
-                    ...currentAccount.session,
-                    accessToken: refreshResponse.data.data.accessToken,
-                    lastActivity: new Date().toISOString()
-                  }
+            MultiAccountStorageService.storeAccountAuthData(
+              currentAccount.user.accountType,
+              {
+                user: currentAccount.user,
+                session: {
+                  ...currentAccount.session,
+                  accessToken: refreshResponse.data.data.accessToken,
+                  lastActivity: new Date().toISOString()
                 }
-              );
-            }
+              }
+            );
             
             // Update authorization header with new token
             if (originalRequest.headers) {
@@ -116,14 +121,26 @@ const createAxiosInstance = (): AxiosInstance => {
             return instance(originalRequest);
           }
           
-          console.log('❌ Axios: Token refresh failed, clearing auth state');
-          // Clear auth state
-          MultiAccountStorageService.clearAllAccounts();
+          console.log('❌ Axios: Token refresh failed, but keeping user logged in for now');
+          console.log('🔐 Axios: User can try again or manually logout if needed');
+          // Don't automatically log out - token refresh may have failed due to network issues
+          // Let user retry or manually logout if truly unauthorized
           return Promise.reject(error);
-        } catch (refreshError) {
+        } catch (refreshError: any) {
           console.error('❌ Axios: Token refresh error:', refreshError);
-          // Clear auth state
-          MultiAccountStorageService.clearAllAccounts();
+          
+          // Check if this is a network error or server error
+          // Don't log out user for temporary network issues
+          if (refreshError.code === 'ECONNABORTED' || refreshError.code === 'ERR_NETWORK' || !refreshError.response) {
+            console.log('🔐 Axios: Network error during token refresh, keeping user logged in');
+            // Don't clear auth on network errors - user might still be authenticated
+            return Promise.reject(error);
+          }
+          
+          // Keep user logged in even for auth failures
+          // Let them try again - automatic logout is frustrating for users
+          console.log('❌ Axios: Auth error during token refresh, but keeping user logged in');
+          console.log('🔐 Axios: User can manually logout if needed');
           return Promise.reject(error);
         }
       }

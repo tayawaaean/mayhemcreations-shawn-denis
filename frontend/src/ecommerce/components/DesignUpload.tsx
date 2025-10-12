@@ -4,6 +4,7 @@ import Button from '../../components/Button'
 import { embroideryOptionApiService, EmbroideryOption } from '../../shared/embroideryOptionApiService'
 import { MaterialPricingService, CostBreakdown } from '../../shared/materialPricingService'
 import { useCart } from '../context/CartContext'
+import { useAlertModal } from '../context/AlertModalContext'
 
 interface DesignUploadProps {
   onPriceUpdate?: (totalPrice: number, basePrice: number, optionsPrice: number) => void
@@ -22,6 +23,7 @@ const stepCategories = [
 
 const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpdate }) => {
   const { add: addToCart } = useCart()
+  const { showError, showSuccess, showWarning } = useAlertModal()
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [size, setSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
@@ -129,13 +131,13 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please upload an image file')
+        showError('Please upload an image file', 'Invalid File Type')
         return
       }
 
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB')
+        showError('File size must be less than 10MB', 'File Too Large')
         return
       }
 
@@ -216,7 +218,7 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
 
   const handleAddToCart = async () => {
     if (!uploadedFile || !materialCosts || !preview) {
-      alert('Please upload a design and ensure all required fields are completed')
+      showWarning('Please upload a design and ensure all required fields are completed', 'Missing Information')
       return
     }
 
@@ -323,7 +325,7 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
       const success = await addToCart('custom-embroidery', 1, customization)
       
       if (success) {
-        alert('Custom embroidery added to cart successfully! It will be reviewed before checkout.')
+        showSuccess('Custom embroidery added to cart successfully! It will be reviewed before checkout.', 'Added to Cart')
         setShowReview(false)
         // Reset form
         setUploadedFile(null)
@@ -344,11 +346,11 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
           fileInputRef.current.value = ''
         }
       } else {
-        alert('Failed to add to cart. Please try again.')
+        showError('Failed to add to cart. Please try again.', 'Add to Cart Failed')
       }
     } catch (error) {
       console.error('Error adding custom embroidery to cart:', error)
-      alert('An error occurred while adding to cart. Please try again.')
+      showError('An error occurred while adding to cart. Please try again.', 'Error')
     } finally {
       setIsAddingToCart(false)
     }

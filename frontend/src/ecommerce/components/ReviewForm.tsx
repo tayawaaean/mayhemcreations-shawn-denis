@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Star, Upload, X } from 'lucide-react'
 import Button from '../../components/Button'
+import { useAlertModal } from '../context/AlertModalContext'
 
 interface ReviewFormProps {
   productId: string
@@ -20,6 +21,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   onSubmit, 
   onCancel 
 }) => {
+  const { showWarning, showError } = useAlertModal()
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
   const [title, setTitle] = useState('')
@@ -45,17 +47,17 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     e.preventDefault()
     
     if (rating === 0) {
-      alert('Please select a rating')
+      showWarning('Please select a rating', 'Rating Required')
       return
     }
     
     if (!title.trim()) {
-      alert('Please enter a review title')
+      showWarning('Please enter a review title', 'Title Required')
       return
     }
     
     if (!comment.trim()) {
-      alert('Please enter a review comment')
+      showWarning('Please enter a review comment', 'Comment Required')
       return
     }
 
@@ -76,7 +78,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       setImages([])
     } catch (error) {
       console.error('Error submitting review:', error)
-      alert('Failed to submit review. Please try again.')
+      showError('Failed to submit review. Please try again.', 'Submission Failed')
     } finally {
       setIsSubmitting(false)
     }

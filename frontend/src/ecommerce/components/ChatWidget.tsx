@@ -69,14 +69,14 @@ export default function ChatWidget() {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         <button
           onClick={() => setIsOpen(true)}
-          className="w-14 h-14 bg-accent rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group hover:scale-105"
+          className="w-12 h-12 sm:w-14 sm:h-14 bg-accent rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group hover:scale-105"
         >
-          <MessageCircle className="w-6 h-6 text-white" />
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           {unreadCount > 0 && (
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+            <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 bg-red-500 rounded-full flex items-center justify-center">
               <span className="text-xs text-white font-bold">{unreadCount}</span>
             </div>
           )}
@@ -86,10 +86,12 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${
-      isMinimized ? 'w-80 h-16' : 'w-96 h-[500px]'
+    <div className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 transition-all duration-300 ${
+      isMinimized 
+        ? 'w-[calc(100vw-2rem)] sm:w-80 h-16' 
+        : 'w-[calc(100vw-2rem)] sm:w-96 h-[calc(100vh-8rem)] sm:h-[500px] max-w-md'
     }`}>
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col h-full">
+      <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col h-full">
         {/* Header */}
         <div className="bg-accent text-white p-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">

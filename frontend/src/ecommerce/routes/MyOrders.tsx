@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useAlertModal } from '../context/AlertModalContext'
 import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User, Calendar, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
@@ -620,6 +621,7 @@ export default function MyOrders() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isLoggedIn } = useAuth()
+  const { showSuccess, showError, showInfo } = useAlertModal()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -1163,9 +1165,9 @@ export default function MyOrders() {
         }
 
         if (allApproved) {
-          alert('All pictures approved! Order is ready for production.')
+          showSuccess('All pictures approved! Order is ready for production.', 'Approval Complete')
         } else if (anyRejected) {
-          alert('Some pictures were rejected. Admin will upload new designs.')
+          showInfo('Some pictures were rejected. Admin will upload new designs.', 'Revisions Needed')
         }
         
         setPictureConfirmations({})
@@ -1175,11 +1177,11 @@ export default function MyOrders() {
         // Reload orders to get updated data
         loadOrders()
       } else {
-        alert('Failed to submit confirmations. Please try again.')
+        showError('Failed to submit confirmations. Please try again.', 'Submission Failed')
       }
     } catch (error) {
       console.error('Error submitting confirmations:', error)
-      alert('Error submitting confirmations. Please try again.')
+      showError('Error submitting confirmations. Please try again.', 'Error')
     } finally {
       setSubmittingConfirmations(false)
     }
@@ -1295,14 +1297,14 @@ export default function MyOrders() {
 
       // Submit re-upload (you'll need to implement this API endpoint)
       console.log('Re-uploading files:', reuploadData)
-      alert('Re-upload functionality will be implemented with backend API')
+      showInfo('Re-upload functionality will be implemented with backend API', 'Feature Coming Soon')
       
       // Close modal and reload orders
       handleCloseReuploadModal()
       loadOrders()
     } catch (error) {
       console.error('Error re-uploading files:', error)
-      alert('Error re-uploading files. Please try again.')
+      showError('Error re-uploading files. Please try again.', 'Upload Error')
     } finally {
       setSubmittingReupload(false)
     }

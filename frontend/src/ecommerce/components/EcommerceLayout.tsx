@@ -12,9 +12,9 @@ interface EcommerceLayoutProps {
 export default function EcommerceLayout({ children }: EcommerceLayoutProps) {
   return (
     <InventoryProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col w-full">
         <Navbar />
-        <div className="flex-1">
+        <div className="flex-1 w-full">
           <MessageNotification />
           {children}
         </div>

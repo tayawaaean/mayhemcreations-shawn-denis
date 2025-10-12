@@ -3,6 +3,7 @@ import type { CartItem } from '../../types'
 import { productApiService } from '../../shared/productApiService'
 import { cartApiService } from '../../shared/cartApiService'
 import { useAuth } from './AuthContext'
+import { useAlertModal } from './AlertModalContext'
 import { products } from '../../data/products'
 
 type CartContextType = {
@@ -24,6 +25,7 @@ const LOCAL_KEY = 'mayhem_cart_v1'
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoggedIn } = useAuth()
+  const { showError, showWarning, showInfo } = useAlertModal()
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const raw = localStorage.getItem(LOCAL_KEY)
@@ -271,7 +273,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('🛒 localStorage quota exceeded, cart data too large')
         console.error('🛒 Cart items:', items.length, 'items')
         // Optionally clear old data or show warning to user
-        alert('Cart data is too large to save locally. Some items may not persist after refresh.')
+        showWarning('Cart data is too large to save locally. Some items may not persist after refresh.', 'Cart Storage Warning')
       } else {
         console.error('🛒 Error saving cart to localStorage:', error)
       }
@@ -310,11 +312,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentItemsCount: items.length
     })
 
+    // Check if user is logged in before allowing add to cart
+    if (!isLoggedIn) {
+      showInfo('Please sign in to add items to your cart', 'Sign In Required')
+      return false
+    }
+
     // Skip stock validation for customized items (made-to-order)
     if (!customization) {
       const validation = await validateStock(productId, qty)
       if (!validation.valid) {
-        alert(validation.message)
+        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
         return false
       }
     }
@@ -323,119 +331,148 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const product = products.find(p => p.id === productId)
     console.log('🛒 Found product for cart:', product ? { id: product.id, title: product.title } : 'No product found')
 
-    if (isLoggedIn) {
-      console.log('🛒 User is logged in, adding to database...')
-      // Add to database
-      try {
-        const response = await cartApiService.addToCart(productId, qty, customization)
-        console.log('🛒 Database API response:', response)
+    console.log('🛒 User is logged in, adding to database...')
+    // Add to database
+    try {
+      const response = await cartApiService.addToCart(productId, qty, customization)
+      console.log('🛒 Database API response:', response)
+      
+      if (response.success && response.data) {
+        console.log('🛒 Database response for addToCart:', {
+          productId: response.data.productId,
+          hasCustomization: !!response.data.customization,
+          hasMockup: !!response.data.customization?.mockup,
+          mockupSize: response.data.customization?.mockup ? Math.round(response.data.customization.mockup.length / 1024) : 0,
+          customizationKeys: response.data.customization ? Object.keys(response.data.customization) : []
+        })
         
-        if (response.success && response.data) {
-          console.log('🛒 Database response for addToCart:', {
-            productId: response.data.productId,
-            hasCustomization: !!response.data.customization,
-            hasMockup: !!response.data.customization?.mockup,
-            mockupSize: response.data.customization?.mockup ? Math.round(response.data.customization.mockup.length / 1024) : 0,
-            customizationKeys: response.data.customization ? Object.keys(response.data.customization) : []
+        // Update local state with database response
+        const newItems = ((prev: CartItem[]) => {
+          console.log('🛒 Updating local state with database response:', {
+            prevItemsCount: prev.length,
+            hasCustomization: !!customization,
+            newItemData: response.data
           })
           
-          // Update local state with database response
-          const newItems = ((prev: CartItem[]) => {
-            console.log('🛒 Updating local state with database response:', {
-              prevItemsCount: prev.length,
-              hasCustomization: !!customization,
-              newItemData: response.data
-            })
-            
-            // For customized items, always add as new item (don't merge with existing)
-            if (customization) {
-              const newItem = {
-                id: response.data!.id,
-                productId: response.data!.productId,
-                quantity: response.data!.quantity,
-                customization: response.data!.customization,
-                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
-                product: product // Include the full product data
-              }
-              console.log('🛒 Adding new customized item:', newItem)
-              return [...prev, newItem]
+          // For customized items, always add as new item (don't merge with existing)
+          if (customization) {
+            const newItem = {
+              id: response.data!.id,
+              productId: response.data!.productId,
+              quantity: response.data!.quantity,
+              customization: response.data!.customization,
+              reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+              product: product // Include the full product data
             }
-            
-            // For regular items, find existing item without customization
-            const existingIndex = prev.findIndex((p) => p.productId === productId && !p.customization)
-            if (existingIndex >= 0) {
-              // Update existing item
-              const updated = [...prev]
-              updated[existingIndex] = {
-                id: response.data!.id,
-                productId: response.data!.productId,
-                quantity: response.data!.quantity,
-                customization: response.data!.customization,
-                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
-                product: product // Include the full product data
-              }
-              return updated
-            } else {
-              // Add new item
-              return [...prev, {
-                id: response.data!.id,
-                productId: response.data!.productId,
-                quantity: response.data!.quantity,
-                customization: response.data!.customization,
-                reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
-                product: product // Include the full product data
-              }]
-            }
-          })(items)
-          
-          // Update state with new items
-          setItems(newItems)
-          
-          // Force synchronous localStorage update to ensure it's available immediately
-          try {
-            const compressedItems = compressCartData(newItems)
-            localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
-            console.log('🛒 Synchronously saved to localStorage')
-          } catch (error) {
-            console.warn('🛒 Could not save to localStorage:', error)
+            console.log('🛒 Adding new customized item:', newItem)
+            return [...prev, newItem]
           }
           
-          setIsCleared(false) // Reset cleared flag when adding items
-          console.log('🛒 Successfully added item to cart, returning true')
-          return true
-        }
-        console.log('🛒 Database response failed or no data:', response)
-        return false
-      } catch (error) {
-        console.error('❌ Error adding to cart:', error)
-        return false
-      }
-    } else {
-      // Guest user - use localStorage
-      setItems((prev) => {
-        // For customized items, always add as new item (don't merge with existing)
-        if (customization) {
-          return [...prev, { 
-            productId, 
-            quantity: qty, 
-            customization,
-            reviewStatus: 'pending' as const, // Customized items are always pending for guest users
-            product: product // Include the full product data
-          }]
+          // For regular items, find existing item without customization
+          const existingIndex = prev.findIndex((p) => p.productId === productId && !p.customization)
+          if (existingIndex >= 0) {
+            // Update existing item
+            const updated = [...prev]
+            updated[existingIndex] = {
+              id: response.data!.id,
+              productId: response.data!.productId,
+              quantity: response.data!.quantity,
+              customization: response.data!.customization,
+              reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+              product: product // Include the full product data
+            }
+            return updated
+          } else {
+            // Add new item
+            return [...prev, {
+              id: response.data!.id,
+              productId: response.data!.productId,
+              quantity: response.data!.quantity,
+              customization: response.data!.customization,
+              reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
+              product: product // Include the full product data
+            }]
+          }
+        })(items)
+        
+        // Update state with new items
+        setItems(newItems)
+        
+        // Force synchronous localStorage update to ensure it's available immediately
+        try {
+          const compressedItems = compressCartData(newItems)
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+          console.log('🛒 Synchronously saved to localStorage')
+        } catch (error) {
+          console.warn('🛒 Could not save to localStorage:', error)
         }
         
-        // For regular items, merge quantities if same product
-        const found = prev.find((p) => p.productId === productId && !p.customization)
-        if (found) return prev.map((p) => p.productId === productId && !p.customization ? { ...p, quantity: p.quantity + qty } : p)
-        return [...prev, { 
-          productId, 
-          quantity: qty,
-          reviewStatus: 'approved' as const, // Regular items are approved for guest users
-          product: product // Include the full product data
-        }]
-      })
-      setIsCleared(false) // Reset cleared flag when adding items
-      return true
+        setIsCleared(false) // Reset cleared flag when adding items
+        console.log('🛒 Successfully added item to cart, returning true')
+        return true
+      } else {
+        console.log('🛒 Database response failed or no data:', response)
+        
+        // If database add failed but user is still logged in, fall back to localStorage
+        // This prevents losing the item if there's a temporary API issue
+        console.log('⚠️ Falling back to localStorage due to API failure')
+        setItems((prev) => {
+          // For customized items, always add as new item (don't merge with existing)
+          if (customization) {
+            return [...prev, { 
+              productId, 
+              quantity: qty, 
+              customization,
+              reviewStatus: 'pending' as const,
+              product: product
+            }]
+          }
+          
+          // For regular items, merge quantities if same product
+          const found = prev.find((p) => p.productId === productId && !p.customization)
+          if (found) return prev.map((p) => p.productId === productId && !p.customization ? { ...p, quantity: p.quantity + qty } : p)
+          return [...prev, { 
+            productId, 
+            quantity: qty,
+            reviewStatus: 'approved' as const,
+            product: product
+          }]
+        })
+        setIsCleared(false)
+        return true
+      }
+    } catch (error: any) {
+      console.error('❌ Error adding to cart:', error)
+      
+      // Check if the error is an authentication error
+      // If so, don't fail the add to cart - fall back to localStorage
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        console.log('⚠️ Auth error during add to cart, falling back to localStorage')
+        setItems((prev) => {
+          if (customization) {
+            return [...prev, { 
+              productId, 
+              quantity: qty, 
+              customization,
+              reviewStatus: 'pending' as const,
+              product: product
+            }]
+          }
+          const found = prev.find((p) => p.productId === productId && !p.customization)
+          if (found) return prev.map((p) => p.productId === productId && !p.customization ? { ...p, quantity: p.quantity + qty } : p)
+          return [...prev, { 
+            productId, 
+            quantity: qty,
+            reviewStatus: 'approved' as const,
+            product: product
+          }]
+        })
+        setIsCleared(false)
+        return true
+      }
+      
+      // For other errors, return false to indicate failure
+      return false
     }
   }
 
@@ -472,6 +509,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
   
   const update = async (productId: string, qty: number): Promise<boolean> => {
+    // Check if user is logged in
+    if (!isLoggedIn) {
+      showInfo('Please sign in to update cart items', 'Sign In Required')
+      return false
+    }
+
     // Find the item to check if it's customized
     const item = items.find((p) => p.productId === productId)
     
@@ -479,36 +522,29 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!item?.customization) {
       const validation = await validateStock(productId, qty)
       if (!validation.valid) {
-        alert(validation.message)
+        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
         return false
       }
     }
 
-    if (isLoggedIn) {
-      // Update in database
-      try {
-        const item = items.find((p) => p.productId === productId)
-        if (item && item.id) {
-          const response = await cartApiService.updateCartItem(typeof item.id === 'string' ? parseInt(item.id) : item.id, qty, item.customization)
-          if (response.success && response.data) {
-            setItems((prev) => prev.map((p) => p.productId === productId ? {
-              ...p,
-              quantity: response.data!.quantity,
-              customization: response.data!.customization,
-            } : p))
-            return true
-          }
+    // Update in database
+    try {
+      const item = items.find((p) => p.productId === productId)
+      if (item && item.id) {
+        const response = await cartApiService.updateCartItem(typeof item.id === 'string' ? parseInt(item.id) : item.id, qty, item.customization)
+        if (response.success && response.data) {
+          setItems((prev) => prev.map((p) => p.productId === productId ? {
+            ...p,
+            quantity: response.data!.quantity,
+            customization: response.data!.customization,
+          } : p))
+          return true
         }
-        return false
-      } catch (error) {
-        console.error('Error updating cart:', error)
-        return false
       }
-    } else {
-      // Guest user - use localStorage
-      setItems((prev) => prev.map((p) => p.productId === productId ? { ...p, quantity: qty } : p))
-      setIsCleared(false) // Reset cleared flag when updating items
-      return true
+      return false
+    } catch (error) {
+      console.error('Error updating cart:', error)
+      return false
     }
   }
   

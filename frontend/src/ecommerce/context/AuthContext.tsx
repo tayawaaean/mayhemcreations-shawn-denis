@@ -51,30 +51,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Initialize auth state from storage on mount ONLY
   useEffect(() => {
-    // Check for customer account specifically, regardless of current account type
-    const customerData = MultiAccountStorageService.getAccountAuthData('customer');
-    const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
-    
-    if (customerData && isCustomerAuthenticated) {
-      // Convert customer account data to User format
-      const customerUser: User = {
-        id: customerData.user.id,
-        email: customerData.user.email,
-        firstName: customerData.user.firstName || '',
-        lastName: customerData.user.lastName || '',
-        role: customerData.user.role,
-        isEmailVerified: customerData.user.isEmailVerified || false,
-        lastLoginAt: customerData.user.lastLoginAt || new Date().toISOString(),
-        createdAt: customerData.user.createdAt || new Date().toISOString(),
-        avatar: customerData.user.avatar
+    const initializeAuth = () => {
+      // Check for customer account specifically, regardless of current account type
+      // This ensures ecommerce customers remain logged in even when multi-account state changes
+      const customerData = MultiAccountStorageService.getAccountAuthData('customer');
+      const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
+      
+      console.log('🔐 Ecommerce AuthContext: Initializing customer auth state', {
+        hasCustomerData: !!customerData,
+        isCustomerAuthenticated
+      });
+      
+      if (customerData && isCustomerAuthenticated) {
+        // Convert customer account data to User format
+        const customerUser: User = {
+          id: customerData.user.id,
+          email: customerData.user.email,
+          firstName: customerData.user.firstName || '',
+          lastName: customerData.user.lastName || '',
+          role: customerData.user.role,
+          isEmailVerified: customerData.user.isEmailVerified || false,
+          lastLoginAt: customerData.user.lastLoginAt || new Date().toISOString(),
+          createdAt: customerData.user.createdAt || new Date().toISOString(),
+          avatar: customerData.user.avatar
+        }
+        console.log('✅ Ecommerce AuthContext: Setting customer user', {
+          userId: customerUser.id,
+          email: customerUser.email
+        });
+        setUser(customerUser)
+      } else {
+        console.log('⚠️ Ecommerce AuthContext: No valid customer auth found');
+        setUser(null)
       }
-      setUser(customerUser)
-    } else {
+      setIsLoading(false)
+    }
+
+    initializeAuth()
+  }, []) // Empty dependency array - only run on mount
+
+  // Only update if customer account changes (actual login/logout)
+  useEffect(() => {
+    // Only react to currentUser changes if it's a customer account
+    if (currentUser && currentUser.accountType === 'customer') {
+      console.log('🔐 Ecommerce AuthContext: Customer account updated', currentUser);
+      setUser(currentUser as User)
+    } else if (!currentUser) {
+      // Clear user state when currentUser becomes null (logout)
+      console.log('🔐 Ecommerce AuthContext: Customer account cleared');
       setUser(null)
     }
-    setIsLoading(false)
-  }, [currentUser, currentAccountType, isAuthenticated])
+  }, [currentUser])
 
   const login = (userData: User) => {
     // Convert to multi-account user format
@@ -101,13 +130,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       loggingService.logLogout(user.id, user.email, 'customer')
     }
     
+    // Immediately clear user state for instant logout UI update
+    setUser(null)
+    
     // Use multi-account logout for customer account only
     await multiLogout('customer')
   }
 
   const value: AuthContextType = {
     user,
-    isLoggedIn: !!user && currentAccountType === 'customer',
+    isLoggedIn: !!user, // Just check if user exists, don't force currentAccountType check
     login,
     logout,
     isLoading

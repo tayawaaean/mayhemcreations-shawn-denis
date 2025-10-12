@@ -6,6 +6,7 @@ import { CartProvider } from './ecommerce/context/CartContext'
 import { CustomizationProvider } from './ecommerce/context/CustomizationContext'
 import { AuthProvider } from './ecommerce/context/AuthContext'
 import { MultiAccountProvider } from './shared/multiAccountContext'
+import { AlertModalProvider } from './ecommerce/context/AlertModalContext'
 import AdminApp from './admin/AdminApp'
 import SellerApp from './admin/SellerApp'
 import EmployeeApp from './admin/EmployeeApp'
@@ -32,10 +33,11 @@ export default function App() {
   return (
     <MultiAccountProvider>
       <AuthProvider>
-        <CartProvider>
-          <RealTimeChatProvider>
-            <CustomizationProvider>
-            <Routes>
+        <AlertModalProvider>
+          <CartProvider>
+            <RealTimeChatProvider>
+              <CustomizationProvider>
+              <Routes>
             {/* Employee Login Route */}
             <Route path="/employee-login" element={<EmployeeApp />} />
             
@@ -121,10 +123,11 @@ export default function App() {
                     <Route path="/payment/success" element={<PaymentSuccess />} />
                     <Route path="/payment/cancel" element={<PaymentCancel />} />
                     <Route path="/stripe-test" element={<StripeTestSuite />} />
-          </Routes>
-            </CustomizationProvider>
-          </RealTimeChatProvider>
-        </CartProvider>
+            </Routes>
+              </CustomizationProvider>
+            </RealTimeChatProvider>
+          </CartProvider>
+        </AlertModalProvider>
       </AuthProvider>
     </MultiAccountProvider>
   )

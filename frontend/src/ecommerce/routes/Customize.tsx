@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator, Eye } from 'lucide-react'
 import { useCustomization, EmbroideryDesignData } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
+import { useAlertModal } from '../context/AlertModalContext'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
 import { MaterialPricingService, InputParameters, CostBreakdown } from '../../shared/materialPricingService'
@@ -32,6 +33,7 @@ export default function Customize() {
     resetCustomization
   } = useCustomization()
   const { add: addToCart } = useCart()
+  const { showError } = useAlertModal()
   const [currentStep, setCurrentStep] = useState(1)
   const [dragActive, setDragActive] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
@@ -243,12 +245,22 @@ export default function Customize() {
   }
 
   // Helper function to check if all designs have notes
+  // Supports both multi-design format (designs array) and legacy single-design format (design + notes)
   const allDesignsHaveNotes = () => {
-    if (customizationData.designs.length === 0) return false
+    // Check multi-design format (new format with designs array)
+    if (customizationData.designs.length > 0) {
+      return customizationData.designs.every(design => {
+        return design.notes && design.notes.trim().length > 0
+      })
+    }
     
-    return customizationData.designs.every(design => {
-      return design.notes && design.notes.trim().length > 0
-    })
+    // Check legacy single-design format (design object with notes at customization level)
+    if (customizationData.design !== null) {
+      return customizationData.notes && customizationData.notes.trim().length > 0
+    }
+    
+    // No designs uploaded yet
+    return false
   }
 
   // Helper function to get validation messages
@@ -266,8 +278,15 @@ export default function Customize() {
         return null
       case 3:
         if (!allDesignsHaveNotes()) {
-          const missingNotes = customizationData.designs.filter(design => !design.notes || design.notes.trim().length === 0)
-          return `Please add notes for ${missingNotes.length} design${missingNotes.length > 1 ? 's' : ''} (e.g., "Place on front left chest")`
+          // Handle multi-design format
+          if (customizationData.designs.length > 0) {
+            const missingNotes = customizationData.designs.filter(design => !design.notes || design.notes.trim().length === 0)
+            return `Please add placement notes for ${missingNotes.length} design${missingNotes.length > 1 ? 's' : ''} (e.g., "Place on front left chest")`
+          }
+          // Handle legacy single-design format
+          if (customizationData.design !== null) {
+            return 'Please add placement notes for your design (e.g., "Place on front left chest")'
+          }
         }
         return null
       case 4:
@@ -856,7 +875,7 @@ export default function Customize() {
         resetCustomization()
       } else {
         console.error('❌ Failed to add item to cart')
-        alert('Failed to add item to cart. Please try again.')
+        showError('Failed to add item to cart. Please try again.', 'Add to Cart Failed')
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
@@ -865,10 +884,10 @@ export default function Customize() {
     }
   }
 
-  const handleViewCart = () => {
+  const handleViewCart = async () => {
     setShowCartConfirmation(false)
-    // Navigate directly to cart - addToCart already updated both database and local state
-    navigate('/cart')
+    // Navigate to cart with a flag to force refresh
+    navigate('/cart', { state: { forceRefresh: true } })
   }
 
   const handleContinueShopping = () => {

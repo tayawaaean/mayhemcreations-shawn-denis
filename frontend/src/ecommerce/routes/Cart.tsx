@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
+import { useAlertModal } from '../context/AlertModalContext'
 import { products } from '../../data/products'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Eye, X, CheckCircle } from 'lucide-react'
 import Button from '../../components/Button'
 import { orderReviewApiService } from '../../shared/orderReviewApiService'
@@ -10,14 +11,24 @@ import { MaterialPricingService } from '../../shared/materialPricingService'
 
 export default function Cart() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { items, update, remove, clear } = useCart()
+  const { showError, showWarning } = useAlertModal()
   const [selectedItem, setSelectedItem] = useState<typeof enriched[0] | null>(null)
   const [showFinalProductModal, setShowFinalProductModal] = useState(false)
   const [showSubmissionSuccessModal, setShowSubmissionSuccessModal] = useState(false)
   const [submissionData, setSubmissionData] = useState<{orderId: number | string | null}>({orderId: null})
+  const [key, setKey] = useState(0)
   
   // Import useAuth to check login status
   const { isLoggedIn, user } = useAuth()
+
+  // Force re-render when cart page is visited to show latest items
+  useEffect(() => {
+    console.log('🛒 Cart page loaded, triggering refresh...')
+    // Force component re-render to pick up latest cart state
+    setKey(prev => prev + 1)
+  }, [location.pathname])
   
   // Debug logging
   console.log('🛒 Cart component - Raw items:', items)
@@ -200,7 +211,7 @@ export default function Cart() {
       const pendingItems = enriched.filter(item => item.reviewStatus === 'pending')
       
       if (pendingItems.length === 0) {
-        alert('No items to submit for review')
+        showWarning('No items to submit for review', 'No Pending Items')
         return
       }
 
@@ -462,12 +473,12 @@ export default function Cart() {
         // Clear localStorage as well to prevent reloading
         localStorage.removeItem('mayhem_cart_v1')
       } else {
-        alert('Failed to submit for review. Please try again.')
+        showError('Failed to submit for review. Please try again.', 'Submission Failed')
       }
       
     } catch (error) {
       console.error('Error submitting for review:', error)
-      alert('Failed to submit for review. Please try again.')
+      showError('Failed to submit for review. Please try again.', 'Error')
     }
   }
 
