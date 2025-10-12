@@ -203,10 +203,24 @@ export default function Customize() {
     calculateEmbroideryPricing()
   }, [embroideryWidth, embroideryHeight])
 
-  // Get available colors from variants
+  // Get all available colors (considering currently selected size if any)
   const getAvailableColors = () => {
     if (!product?.variants) return []
     
+    // If a size is already selected, show only colors available for that size
+    if (customizationData.size) {
+      const colors = product.variants
+        .filter((variant: any) => 
+          variant.stock > 0 && 
+          variant.isActive && 
+          variant.size?.toLowerCase() === customizationData.size.toLowerCase()
+        )
+        .map((variant: any) => variant.color)
+        .filter((color: string, index: number, arr: string[]) => arr.indexOf(color) === index)
+      return colors
+    }
+    
+    // If no size selected yet, show all colors that have stock in at least one size
     const colors = product.variants
       .filter((variant: any) => variant.stock > 0 && variant.isActive)
       .map((variant: any) => variant.color)
@@ -215,16 +229,43 @@ export default function Customize() {
     return colors
   }
 
-  // Get available sizes from variants
+  // Get all available sizes (considering currently selected color if any)
   const getAvailableSizes = () => {
     if (!product?.variants) return []
     
+    // If a color is already selected, show only sizes available for that color
+    if (customizationData.color) {
+      const sizes = product.variants
+        .filter((variant: any) => 
+          variant.stock > 0 && 
+          variant.isActive && 
+          variant.color?.toLowerCase() === customizationData.color.toLowerCase()
+        )
+        .map((variant: any) => variant.size)
+        .filter((size: string, index: number, arr: string[]) => arr.indexOf(size) === index)
+      return sizes
+    }
+    
+    // If no color selected yet, show all sizes that have stock in at least one color
     const sizes = product.variants
       .filter((variant: any) => variant.stock > 0 && variant.isActive)
       .map((variant: any) => variant.size)
       .filter((size: string, index: number, arr: string[]) => arr.indexOf(size) === index)
     
     return sizes
+  }
+  
+  // Check if a specific color+size combination is in stock
+  const isVariantInStock = (color: string, size: string): boolean => {
+    if (!product?.variants) return false
+    
+    const variant = product.variants.find((v: any) => 
+      v.color?.toLowerCase() === color.toLowerCase() &&
+      v.size?.toLowerCase() === size.toLowerCase() &&
+      v.isActive
+    )
+    
+    return variant ? variant.stock > 0 : false
   }
 
   // Helper function to check if all designs have required embroidery options
@@ -270,6 +311,12 @@ export default function Customize() {
         if (!product?.hasSizing) return null
         if (customizationData.color === '') return "Please select a color"
         if (customizationData.size === '') return "Please select a size"
+        // Check if the selected combination is actually in stock
+        if (customizationData.color && customizationData.size) {
+          if (!isVariantInStock(customizationData.color, customizationData.size)) {
+            return `Sorry, ${customizationData.color} / ${customizationData.size} is out of stock. Please select a different combination.`
+          }
+        }
         return null
       case 2:
         if (customizationData.designs.length === 0 && customizationData.design === null) {
@@ -311,7 +358,11 @@ export default function Customize() {
         if (!product?.hasSizing) {
           return true
         }
-        return customizationData.color !== '' && customizationData.size !== ''
+        // Check that both color and size are selected AND the combination is in stock
+        if (customizationData.color === '' || customizationData.size === '') {
+          return false
+        }
+        return isVariantInStock(customizationData.color, customizationData.size)
       case 2:
         // Allow proceeding if there are designs uploaded (either multi-design or legacy single design)
         return customizationData.designs.length > 0 || customizationData.design !== null

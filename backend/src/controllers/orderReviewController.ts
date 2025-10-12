@@ -500,6 +500,27 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
       });
     }
 
+    // Fetch current order status before updating (needed for stock deduction logic)
+    const [orderResult] = await sequelize.query(`
+      SELECT id, status 
+      FROM order_reviews 
+      WHERE id = ?
+    `, {
+      replacements: [id]
+    });
+
+    if (!Array.isArray(orderResult) || orderResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order review not found',
+        code: 'NOT_FOUND',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const currentOrder = orderResult[0] as any;
+    const previousStatus = currentOrder.status;
+
     // If admin approves, automatically set status to pending-payment
     const finalStatus = status === 'approved' ? 'pending-payment' : status;
     
@@ -528,20 +549,26 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     if ((result as any).affectedRows === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Order review not found',
-        code: 'NOT_FOUND',
+        message: 'Failed to update order review',
+        code: 'UPDATE_FAILED',
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Deduct stock when order enters production (best practice for custom orders)
-    // This happens after design approval but before shipping
-    if (status === 'in-production') {
+    // Deduct stock when order is approved/processing (before production starts)
+    // This reserves the inventory as soon as the order is confirmed
+    // Only deduct once - check if previous status was NOT already approved or processing
+    const shouldDeductStock = (finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment') && 
+                              previousStatus !== 'approved' && 
+                              previousStatus !== 'processing' &&
+                              previousStatus !== 'pending-payment';
+    
+    if (shouldDeductStock) {
       try {
         const { deductStockForOrder } = await import('../services/stockService');
         const stockDeducted = await deductStockForOrder(parseInt(id));
         if (stockDeducted) {
-          logger.info(`✅ Stock deducted successfully for order ${id} entering production`);
+          logger.info(`✅ Stock deducted successfully for order ${id} (status: ${previousStatus} → ${finalStatus})`);
         } else {
           logger.warn(`⚠️ Failed to deduct stock for order ${id}`);
         }
@@ -550,6 +577,9 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
         // Don't fail the status update if stock deduction fails
         // Admin can manually adjust inventory if needed
       }
+    } else if ((finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment') && 
+               (previousStatus === 'approved' || previousStatus === 'processing' || previousStatus === 'pending-payment')) {
+      logger.info(`⏭️ Skipping stock deduction for order ${id} - already deducted (status: ${previousStatus} → ${finalStatus})`);
     }
     
     // Note: Custom embroidery items don't have stock limits (made-to-order)

@@ -2148,6 +2148,18 @@ const PendingReview: React.FC = () => {
                                                             )}
                                                           </div>
                                                         )}
+                                                        {/* Customer Placement Notes - Most Important */}
+                                                        {design.notes && design.notes.trim().length > 0 && (
+                                                          <div className="mt-2 bg-amber-50 border border-amber-300 rounded p-2">
+                                                            <div className="flex items-start space-x-2">
+                                                              <MessageSquare className="h-3 w-3 text-amber-700 mt-0.5 flex-shrink-0" />
+                                                              <div className="flex-1 min-w-0">
+                                                                <p className="text-xs font-semibold text-amber-900 mb-0.5">Placement Instructions:</p>
+                                                                <p className="text-xs text-amber-800 whitespace-pre-wrap break-words">{design.notes}</p>
+                                                              </div>
+                                                            </div>
+                                                          </div>
+                                                        )}
                                                       </div>
                                                       
                                                       {/* Download Button */}
@@ -2234,6 +2246,18 @@ const PendingReview: React.FC = () => {
                                                     <MousePointer className="h-3 w-3 text-gray-500" />
                                                     <span className="text-gray-600 font-medium">Placement:</span>
                                                     <span className="text-gray-900 capitalize">{item.customization.placement.replace('-', ' ')}</span>
+                                                  </div>
+                                                )}
+                                                {/* Legacy Single Design Notes */}
+                                                {item.customization.notes && item.customization.notes.trim().length > 0 && (
+                                                  <div className="mt-2 bg-amber-50 border border-amber-300 rounded p-2">
+                                                    <div className="flex items-start space-x-2">
+                                                      <MessageSquare className="h-3 w-3 text-amber-700 mt-0.5 flex-shrink-0" />
+                                                      <div className="flex-1 min-w-0">
+                                                        <p className="text-xs font-semibold text-amber-900 mb-0.5">Placement Instructions:</p>
+                                                        <p className="text-xs text-amber-800 whitespace-pre-wrap break-words">{item.customization.notes}</p>
+                                                      </div>
+                                                    </div>
                                                   </div>
                                                 )}
                                               </div>

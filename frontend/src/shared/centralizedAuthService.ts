@@ -54,23 +54,9 @@ class CentralizedAuthService {
     // Get the current active account from multi-account storage
     const currentAccount = MultiAccountStorageService.getCurrentAccountData();
     
-    // Check if current account is customer but we have a valid employee account with admin role
-    if (currentAccount && currentAccount.user.role === 'customer') {
-      const employeeAccount = MultiAccountStorageService.getAccountAuthData('employee');
-      if (employeeAccount && MultiAccountStorageService.isAccountAuthenticated('employee')) {
-        // Check if employee has admin role
-        if (employeeAccount.user.role === 'admin' || employeeAccount.user.role === 'manager') {
-          console.log('🔄 Auto-switching to employee account (admin role detected)');
-          MultiAccountStorageService.switchAccount('employee');
-          // Re-get the current account after switching
-          const newCurrentAccount = MultiAccountStorageService.getCurrentAccountData();
-          if (newCurrentAccount) {
-            this.initializeFromAccount(newCurrentAccount);
-            return;
-          }
-        }
-      }
-    }
+    // DO NOT auto-switch accounts on initialization
+    // Let each context (admin/ecommerce) manage their own account type
+    // This prevents the ecommerce section from being logged out when page refreshes
     
     if (currentAccount) {
       this.initializeFromAccount(currentAccount);
@@ -166,23 +152,9 @@ class CentralizedAuthService {
       return false;
     }
 
-    // Check if we need to auto-switch to employee account
-    if (currentAccount.user.role === 'customer') {
-      const employeeAccount = MultiAccountStorageService.getAccountAuthData('employee');
-      if (employeeAccount && MultiAccountStorageService.isAccountAuthenticated('employee')) {
-        if (employeeAccount.user.role === 'admin' || employeeAccount.user.role === 'manager') {
-          console.log('🔄 Auto-switching to employee account during validation');
-          MultiAccountStorageService.switchAccount('employee');
-          // Re-get the current account after switching
-          const newCurrentAccount = MultiAccountStorageService.getCurrentAccountData();
-          if (newCurrentAccount) {
-            this.initializeFromAccount(newCurrentAccount);
-            return this.authState.isAuthenticated;
-          }
-        }
-      }
-    }
-
+    // DO NOT auto-switch accounts during validation
+    // Let each context handle their own account type preferences
+    
     // If we have stored data but no current auth state, initialize it
     if (!this.authState.user && currentAccount.user) {
       console.log('🔐 validateSession: Initializing auth state from multi-account storage');
@@ -283,7 +255,8 @@ class CentralizedAuthService {
   }
 
   /**
-   * Clear authentication state and localStorage
+   * Clear authentication state (without clearing all accounts in storage)
+   * Only clears the in-memory auth state
    */
   private clearAuthState(): void {
     console.log('🧹 Clearing authentication state');
@@ -294,8 +267,9 @@ class CentralizedAuthService {
       lastChecked: Date.now()
     };
     
-    // Clear multi-account storage
-    MultiAccountStorageService.clearAllAccounts();
+    // DO NOT clear multi-account storage here
+    // Let the specific context (admin/ecommerce) handle logout
+    // This preserves other account types when one context clears its state
     
     this.notifyListeners();
   }
@@ -363,11 +337,11 @@ class CentralizedAuthService {
   }
 
   /**
-   * Logout user
+   * Logout user from current account
    */
   public async logout(): Promise<void> {
     try {
-      console.log('🔐 Logging out...');
+      console.log('🔐 Logging out from current account...');
       
       // Log logout before clearing data
       if (this.authState.user) {
@@ -385,7 +359,10 @@ class CentralizedAuthService {
         console.warn('Backend logout failed, but continuing with local cleanup:', error);
       }
       
-      // Clear local state and storage
+      // Logout from current account in multi-account storage
+      await MultiAccountStorageService.logoutCurrentAccount();
+      
+      // Clear local auth state
       this.clearAuthState();
       
     } catch (error) {

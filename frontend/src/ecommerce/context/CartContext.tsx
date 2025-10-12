@@ -280,13 +280,43 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [items])
 
-  const validateStock = async (productId: string, quantity: number): Promise<{ valid: boolean; message?: string }> => {
+  // Validate stock for a product, optionally checking a specific variant
+  const validateStock = async (
+    productId: string, 
+    quantity: number, 
+    variantId?: number
+  ): Promise<{ valid: boolean; message?: string }> => {
     try {
       const response = await productApiService.getProductById(parseInt(productId))
       const product = response.data
       
-      // Calculate total stock from variants
-      const totalStock = product?.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
+      // If a specific variant is requested, check that variant's stock
+      if (variantId && product?.variants) {
+        const variant = product.variants.find((v: any) => v.id === variantId)
+        
+        if (!variant) {
+          return { valid: false, message: 'Selected variant not found' }
+        }
+        
+        if (!variant.isActive) {
+          return { valid: false, message: 'This variant is no longer available' }
+        }
+        
+        if (variant.stock === 0) {
+          return { valid: false, message: `This ${variant.color} / ${variant.size} variant is out of stock` }
+        }
+        
+        if (variant.stock < quantity) {
+          return { valid: false, message: `Only ${variant.stock} items available for ${variant.color} / ${variant.size}` }
+        }
+        
+        return { valid: true }
+      }
+      
+      // Otherwise, calculate total stock from all active variants
+      const totalStock = product?.variants?.reduce((sum: number, variant: any) => {
+        return sum + (variant.isActive ? (variant.stock || 0) : 0)
+      }, 0) || 0
       
       if (totalStock === 0) {
         return { valid: false, message: 'This product is out of stock' }
@@ -318,13 +348,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false
     }
 
-    // Skip stock validation for customized items (made-to-order)
-    if (!customization) {
-      const validation = await validateStock(productId, qty)
-      if (!validation.valid) {
-        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
-        return false
-      }
+    // Validate stock - check specific variant if one was selected
+    const selectedVariantId = customization?.selectedVariant?.id
+    
+    // Always validate stock, even for customized items with variants
+    const validation = await validateStock(productId, qty, selectedVariantId)
+    if (!validation.valid) {
+      showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
+      return false
     }
 
     // Find the product to include in cart item
@@ -515,16 +546,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false
     }
 
-    // Find the item to check if it's customized
+    // Find the item to get variant information
     const item = items.find((p) => p.productId === productId)
+    const selectedVariantId = item?.customization?.selectedVariant?.id
     
-    // Skip stock validation for customized items (made-to-order)
-    if (!item?.customization) {
-      const validation = await validateStock(productId, qty)
-      if (!validation.valid) {
-        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
-        return false
-      }
+    // Always validate stock, even for customized items with variants
+    const validation = await validateStock(productId, qty, selectedVariantId)
+    if (!validation.valid) {
+      showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
+      return false
     }
 
     // Update in database
