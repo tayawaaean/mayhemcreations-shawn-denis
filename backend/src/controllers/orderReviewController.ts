@@ -558,10 +558,11 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     // Deduct stock when order is approved/processing (before production starts)
     // This reserves the inventory as soon as the order is confirmed
     // Only deduct once - check if previous status was NOT already approved or processing
-    const shouldDeductStock = (finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment') && 
+    const shouldDeductStock = (finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment' || finalStatus === 'approved-processing') && 
                               previousStatus !== 'approved' && 
                               previousStatus !== 'processing' &&
-                              previousStatus !== 'pending-payment';
+                              previousStatus !== 'pending-payment' &&
+                              previousStatus !== 'approved-processing';
     
     if (shouldDeductStock) {
       try {
@@ -577,8 +578,8 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
         // Don't fail the status update if stock deduction fails
         // Admin can manually adjust inventory if needed
       }
-    } else if ((finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment') && 
-               (previousStatus === 'approved' || previousStatus === 'processing' || previousStatus === 'pending-payment')) {
+    } else if ((finalStatus === 'approved' || finalStatus === 'processing' || finalStatus === 'pending-payment' || finalStatus === 'approved-processing') && 
+               (previousStatus === 'approved' || previousStatus === 'processing' || previousStatus === 'pending-payment' || previousStatus === 'approved-processing')) {
       logger.info(`⏭️ Skipping stock deduction for order ${id} - already deducted (status: ${previousStatus} → ${finalStatus})`);
     }
     

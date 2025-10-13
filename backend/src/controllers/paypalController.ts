@@ -271,8 +271,20 @@ export const capturePayPalOrderHandler = async (
             ]
           });
 
-          // Note: Stock will be deducted when order status changes to 'delivered'
-          // This allows for order modifications during production
+          // Deduct stock after successful payment
+          try {
+            const { deductStockForOrder } = await import('../services/stockService');
+            const stockDeducted = await deductStockForOrder(order.id);
+            if (stockDeducted) {
+              logger.info(`✅ Stock deducted successfully for order ${order.id} after PayPal payment`);
+            } else {
+              logger.warn(`⚠️ Failed to deduct stock for order ${order.id}`);
+            }
+          } catch (stockError) {
+            logger.error(`❌ Error deducting stock for order ${order.id}:`, stockError);
+            // Don't fail the payment processing if stock deduction fails
+            // Admin can manually adjust inventory if needed
+          }
 
           // Create payment record
           try {

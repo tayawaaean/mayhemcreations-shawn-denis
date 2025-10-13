@@ -69,7 +69,7 @@ export default function App() {
               </EcommerceLayout>
             } />
             <Route path="/customized-embroidery" element={
-              <ProtectedRoute fallbackPath="/contact">
+              <ProtectedRoute fallbackPath="/">
                 <EcommerceLayout>
                   <CustomizedEmbroidery />
                 </EcommerceLayout>
@@ -111,7 +111,7 @@ export default function App() {
               </EcommerceLayout>
             } />
             <Route path="/my-orders" element={
-              <ProtectedRoute fallbackPath="/contact">
+              <ProtectedRoute fallbackPath="/">
                 <EcommerceLayout>
                   <MyOrders />
                 </EcommerceLayout>

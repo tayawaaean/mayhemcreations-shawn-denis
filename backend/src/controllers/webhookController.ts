@@ -199,8 +199,20 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
         replacements: [order.id]
       });
 
-      // Note: Stock will be deducted when order status changes to 'delivered'
-      // This allows for order modifications during production
+      // Deduct stock after successful payment
+      try {
+        const { deductStockForOrder } = await import('../services/stockService');
+        const stockDeducted = await deductStockForOrder(order.id);
+        if (stockDeducted) {
+          logger.info(`✅ Stock deducted successfully for order ${order.id} after payment`);
+        } else {
+          logger.warn(`⚠️ Failed to deduct stock for order ${order.id}`);
+        }
+      } catch (stockError) {
+        logger.error(`❌ Error deducting stock for order ${order.id}:`, stockError);
+        // Don't fail the payment processing if stock deduction fails
+        // Admin can manually adjust inventory if needed
+      }
 
       // Emit notification to admin room about paid order
       try {
@@ -526,8 +538,20 @@ const handleCheckoutSessionCompleted = async (session: any) => {
         replacements: [order.id]
       });
 
-      // Note: Stock will be deducted when order status changes to 'delivered'
-      // This allows for order modifications during production
+      // Deduct stock after successful payment
+      try {
+        const { deductStockForOrder } = await import('../services/stockService');
+        const stockDeducted = await deductStockForOrder(order.id);
+        if (stockDeducted) {
+          logger.info(`✅ Stock deducted successfully for order ${order.id} after payment`);
+        } else {
+          logger.warn(`⚠️ Failed to deduct stock for order ${order.id}`);
+        }
+      } catch (stockError) {
+        logger.error(`❌ Error deducting stock for order ${order.id}:`, stockError);
+        // Don't fail the payment processing if stock deduction fails
+        // Admin can manually adjust inventory if needed
+      }
 
       // Emit notification to admin room about paid order
       try {

@@ -1428,7 +1428,7 @@ export default function Cart() {
                   variant="primary"
                   onClick={() => {
                     setShowSubmissionSuccessModal(false)
-                    window.location.href = '/my-orders'
+                    navigate('/my-orders')
                   }}
                   className="flex-1"
                 >
