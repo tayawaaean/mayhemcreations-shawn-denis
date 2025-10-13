@@ -2385,9 +2385,16 @@ export default function MyOrders() {
                                     <div>
                                       <p><strong>Designs:</strong> {(item.customization as any).designs.length} uploaded</p>
                                       {(item.customization as any).designs.map((design: any, index: number) => (
-                                        <p key={design.id || index} className="ml-4 text-xs">
-                                          • {design.name || `Design ${index + 1}`}
-                                        </p>
+                                        <div key={design.id || index} className="ml-4 mb-2">
+                                          <p className="text-xs font-medium text-gray-700">
+                                            • {design.name || `Design ${index + 1}`}
+                                          </p>
+                                          {design.notes && (
+                                            <p className="text-xs text-gray-600 ml-4 mt-1 italic">
+                                              <strong>Placement:</strong> {design.notes}
+                                            </p>
+                                          )}
+                                        </div>
                                       ))}
                                     </div>
                                   ) : item.customization.design && (
