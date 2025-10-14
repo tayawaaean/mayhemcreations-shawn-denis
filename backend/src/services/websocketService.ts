@@ -3,6 +3,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from '../utils/logger';
 import Message from '../models/messageModel';
 import { sequelize } from '../config/database';
+import { emailWebhookService } from './emailWebhookService';
 
 export class WebSocketService {
   private io: SocketIOServer;
@@ -122,6 +123,13 @@ export class WebSocketService {
           timestamp: new Date().toISOString()
         });
 
+        // Send webhook to email service for chat connection
+        emailWebhookService.sendChatConnectedWebhook({
+          customerId,
+          name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
+          email: profile?.email || null
+        });
+
         // Send recent chat history directly to this socket (supports both user IDs and guest IDs)
         try {
           const rows = await Message.findAll({
@@ -156,6 +164,11 @@ export class WebSocketService {
         this.io.to('admin_room').emit('chat_disconnected', {
           customerId,
           timestamp: new Date().toISOString()
+        });
+
+        // Send webhook to email service for chat disconnection
+        emailWebhookService.sendChatDisconnectedWebhook({
+          customerId
         });
       });
 
@@ -285,6 +298,20 @@ export class WebSocketService {
           name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
           email: profile?.email || null
         });
+
+        // Send webhook to email service for notifications
+        if (data.text && data.text.trim().length > 0) {
+          emailWebhookService.sendChatMessageWebhook({
+            messageId: data.messageId,
+            text: data.text,
+            sender,
+            customerId: data.customerId,
+            type: data.type ?? 'text',
+            attachment: data.attachment ?? null,
+            name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
+            email: profile?.email || null
+          });
+        }
       });
 
       // Handle typing status
