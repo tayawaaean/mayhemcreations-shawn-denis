@@ -25,7 +25,7 @@ import MaterialCostsTest from './pages/MaterialCostsTest'
 import Analytics from './pages/Analytics'
 import PaymentLogs from './pages/PaymentLogs'
 import PaymentManagement from './pages/PaymentManagement'
-import ShipStationManagement from './pages/ShipStationManagement'
+import ShippingManagement from './pages/ShippingManagement'
 import RefundManagement from './pages/RefundManagement'
 import SystemLogs from './pages/SystemLogs'
 import Profile from './pages/Profile'
@@ -57,7 +57,7 @@ const AdminApp: React.FC = () => {
                         <Route path="material-costs" element={<MaterialCosts />} />
                         <Route path="material-costs-test" element={<MaterialCostsTest />} />
                         <Route path="analytics" element={<Analytics />} />
-                        <Route path="shipstation" element={<ShipStationManagement />} />
+                        <Route path="shipping" element={<ShippingManagement />} />
                         <Route path="payment-management" element={<PaymentManagement />} />
                         <Route path="payment-logs" element={<PaymentLogs />} />
                         <Route path="refund-management" element={<RefundManagement />} />

@@ -496,10 +496,18 @@ const PaymentManagement: React.FC = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    ${Number(payment.amount).toFixed(2)}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {/* Display amount with color coding for refunds */}
+                    <div className={`text-sm font-bold ${Number(payment.amount) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {Number(payment.amount) < 0 ? '-' : ''}${Math.abs(Number(payment.amount)).toFixed(2)}
+                    </div>
+                    {Number(payment.amount) < 0 && (
+                      <div className="text-xs text-red-500 font-medium mt-1">
+                        Refund Transaction
+                      </div>
+                    )}
                     {payment.refundAmount && (
-                      <div className="text-xs text-red-600">
+                      <div className="text-xs text-orange-600 font-medium mt-1">
                         Refunded: ${Number(payment.refundAmount).toFixed(2)}
                       </div>
                     )}
@@ -585,7 +593,12 @@ const PaymentManagement: React.FC = () => {
                     <div className="mt-3 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-500">Amount</p>
-                        <p className="text-sm font-medium text-gray-900">${Number(payment.amount).toFixed(2)}</p>
+                        <p className={`text-sm font-bold ${Number(payment.amount) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                          {Number(payment.amount) < 0 ? '-' : ''}${Math.abs(Number(payment.amount)).toFixed(2)}
+                        </p>
+                        {Number(payment.amount) < 0 && (
+                          <p className="text-xs text-red-500 font-medium">Refund</p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Provider</p>

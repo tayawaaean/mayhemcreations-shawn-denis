@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, Package, Home, Info, HelpCircle, Mail, Shirt, Crown, Palette, Sparkles, LifeBuoy } from 'lucide-react'
+import { ShoppingCart, Menu, X, Search, ChevronDown, ChevronRight, User, LogIn, Package, Home, Info, HelpCircle, Mail, Shirt, Crown, Palette, Sparkles, LifeBuoy, RotateCcw, Star } from 'lucide-react'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from '../../components/AuthModal'
@@ -465,7 +465,11 @@ export default function Navbar() {
             )}
             <NavItem to="/about">Support</NavItem>
             {isLoggedIn && (
-              <NavItem to="/my-orders">Orders</NavItem>
+              <>
+                <NavItem to="/my-orders">Orders</NavItem>
+                <NavItem to="/my-refunds">Refunds</NavItem>
+                <NavItem to="/my-reviews">Reviews</NavItem>
+              </>
             )}
           </nav>
 
@@ -646,12 +650,26 @@ export default function Navbar() {
 
                 {/* Orders (if logged in) */}
                 {isLoggedIn && (
-                  <MobileNavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
-                    <div className="flex items-center space-x-3">
-                      <Package className="w-5 h-5 text-gray-600" />
-                      <span>My Orders</span>
-                    </div>
-                  </MobileNavItem>
+                  <>
+                    <MobileNavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                      <div className="flex items-center space-x-3">
+                        <Package className="w-5 h-5 text-gray-600" />
+                        <span>My Orders</span>
+                      </div>
+                    </MobileNavItem>
+                    <MobileNavItem to="/my-refunds" onClick={() => setMobileMenuOpen(false)}>
+                      <div className="flex items-center space-x-3">
+                        <RotateCcw className="w-5 h-5 text-gray-600" />
+                        <span>My Refunds</span>
+                      </div>
+                    </MobileNavItem>
+                    <MobileNavItem to="/my-reviews" onClick={() => setMobileMenuOpen(false)}>
+                      <div className="flex items-center space-x-3">
+                        <Star className="w-5 h-5 text-gray-600" />
+                        <span>My Reviews</span>
+                      </div>
+                    </MobileNavItem>
+                  </>
                 )}
 
                 {/* Mobile Auth */}

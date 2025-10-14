@@ -5,6 +5,7 @@ import { useAlertModal } from '../context/AlertModalContext'
 import { Package, Truck, CheckCircle, Clock, XCircle, Search, Filter, X, CreditCard, DollarSign, AlertCircle, RotateCcw, Eye, MessageSquare, Image as ImageIcon, Upload, Check, User, Calendar, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import RefundRequestModal, { RefundRequest } from '../components/RefundRequestModal'
+import RefundRequestModalEnhanced from '../components/RefundRequestModalEnhanced'
 import { orderReviewApiService, OrderReview, PictureReply, CustomerConfirmation } from '../../shared/orderReviewApiService'
 import { productReviewApiService } from '../../shared/productReviewApiService'
 import { MaterialPricingService } from '../../shared/materialPricingService'
@@ -58,6 +59,9 @@ interface Order {
   status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered'
   orderDate: string
   total: number
+  subtotal?: number
+  shipping?: number
+  tax?: number
   items: OrderItem[]
   adminNotes?: string
   reviewedAt?: string
@@ -69,6 +73,11 @@ interface Order {
   shippingCarrier?: string
   shippedAt?: string
   deliveredAt?: string
+  orderReceived?: boolean
+  orderReceivedAt?: string
+  refundStatus?: 'none' | 'requested' | 'partial' | 'full'
+  refundedAmount?: number
+  refundRequestedAt?: string
   originalOrderData?: any[] // Store original order data for matching
 }
 
@@ -381,6 +390,9 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     status: mapStatus(orderReview.status),
     orderDate: orderReview.submitted_at,
     total: calculatedTotal, // Use calculated total instead of stored total
+    subtotal: orderReview.subtotal || calculatedTotal,
+    shipping: orderReview.shipping || 0,
+    tax: orderReview.tax || 0,
     items: convertedItems,
     adminNotes: orderReview.admin_notes,
     reviewedAt: orderReview.reviewed_at,
@@ -414,6 +426,9 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     shippingCarrier: orderReview.shipping_carrier,
     shippedAt: orderReview.shipped_at,
     deliveredAt: orderReview.delivered_at,
+    refundStatus: (orderReview as any).refund_status || 'none',
+    refundedAmount: (orderReview as any).refunded_amount || 0,
+    refundRequestedAt: (orderReview as any).refund_requested_at,
     originalOrderData: orderData // Store original order data for matching
   };
 
@@ -432,32 +447,33 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
   return convertedOrder;
 };
 
+// Professional status icon mapping with better visual hierarchy
 const getStatusIcon = (status: Order['status']) => {
   switch (status) {
     case 'pending-review':
-      return <Clock className="w-5 h-5 text-yellow-500" />
+      return <Clock className="w-5 h-5 text-amber-600" />
     case 'rejected-needs-upload':
-      return <XCircle className="w-5 h-5 text-red-500" />
+      return <XCircle className="w-5 h-5 text-red-600" />
     case 'picture-reply-pending':
-      return <ImageIcon className="w-5 h-5 text-blue-500" />
+      return <ImageIcon className="w-5 h-5 text-cyan-600" />
     case 'picture-reply-rejected':
-      return <XCircle className="w-5 h-5 text-red-500" />
+      return <XCircle className="w-5 h-5 text-red-600" />
     case 'picture-reply-approved':
-      return <CheckCircle className="w-5 h-5 text-green-500" />
+      return <CheckCircle className="w-5 h-5 text-emerald-600" />
     case 'pending-payment':
-      return <CreditCard className="w-5 h-5 text-orange-500" />
+      return <DollarSign className="w-5 h-5 text-orange-600" />
     case 'approved-processing':
-      return <CheckCircle className="w-5 h-5 text-green-500" />
+      return <Package className="w-5 h-5 text-blue-600" />
     case 'ready-for-production':
-      return <AlertCircle className="w-5 h-5 text-orange-500" />
+      return <AlertCircle className="w-5 h-5 text-indigo-600" />
     case 'in-production':
-      return <Truck className="w-5 h-5 text-blue-500" />
+      return <Package className="w-5 h-5 text-violet-600" />
     case 'ready-for-checkout':
-      return <CreditCard className="w-5 h-5 text-purple-500" />
+      return <CreditCard className="w-5 h-5 text-purple-600" />
     case 'shipped':
-      return <Package className="w-5 h-5 text-purple-500" />
+      return <Truck className="w-5 h-5 text-blue-600" />
     case 'delivered':
-      return <CheckCircle className="w-5 h-5 text-green-500" />
+      return <CheckCircle className="w-5 h-5 text-green-600" />
     default:
       return <Clock className="w-5 h-5 text-gray-500" />
   }
@@ -494,34 +510,147 @@ const getStatusText = (status: Order['status']) => {
   }
 }
 
+// Professional status badge colors with improved contrast and readability
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
     case 'pending-review':
-      return 'bg-yellow-100 text-yellow-800'
+      return 'bg-amber-100 text-amber-800 border border-amber-200'
     case 'rejected-needs-upload':
-      return 'bg-red-100 text-red-800'
+      return 'bg-red-100 text-red-800 border border-red-200'
     case 'picture-reply-pending':
-      return 'bg-blue-100 text-blue-800'
+      return 'bg-cyan-100 text-cyan-800 border border-cyan-200'
     case 'picture-reply-rejected':
-      return 'bg-red-100 text-red-800'
+      return 'bg-red-100 text-red-800 border border-red-200'
     case 'picture-reply-approved':
-      return 'bg-green-100 text-green-800'
+      return 'bg-emerald-100 text-emerald-800 border border-emerald-200'
     case 'pending-payment':
-      return 'bg-orange-100 text-orange-800'
+      return 'bg-orange-100 text-orange-800 border border-orange-200'
     case 'approved-processing':
-      return 'bg-green-100 text-green-800'
+      return 'bg-blue-100 text-blue-800 border border-blue-200'
     case 'ready-for-production':
-      return 'bg-orange-100 text-orange-800'
+      return 'bg-indigo-100 text-indigo-800 border border-indigo-200'
     case 'in-production':
-      return 'bg-blue-100 text-blue-800'
+      return 'bg-violet-100 text-violet-800 border border-violet-200'
     case 'ready-for-checkout':
-      return 'bg-purple-100 text-purple-800'
+      return 'bg-purple-100 text-purple-800 border border-purple-200'
     case 'shipped':
-      return 'bg-purple-100 text-purple-800'
+      return 'bg-blue-100 text-blue-800 border border-blue-200'
     case 'delivered':
-      return 'bg-green-100 text-green-800'
+      return 'bg-green-100 text-green-800 border border-green-200'
     default:
-      return 'bg-gray-100 text-gray-800'
+      return 'bg-gray-100 text-gray-800 border border-gray-200'
+  }
+}
+
+// Card border and background styling based on order status
+const getCardStyling = (order: Order) => {
+  // Priority 1: Refund status takes precedence
+  if (order.refundStatus === 'requested') {
+    return 'bg-red-50 border-2 border-red-400 shadow-red-100'
+  }
+  if (order.refundStatus === 'partial' || order.refundStatus === 'full') {
+    return 'bg-orange-50 border-2 border-orange-300 shadow-orange-100'
+  }
+  
+  // Priority 2: Status-based styling
+  switch (order.status) {
+    case 'rejected-needs-upload':
+    case 'picture-reply-rejected':
+      return 'bg-red-50 border-2 border-red-300 shadow-red-100'
+    case 'pending-payment':
+      return 'bg-orange-50 border-2 border-orange-200 shadow-orange-100'
+    case 'delivered':
+      return 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 shadow-green-100'
+    case 'shipped':
+      return 'bg-blue-50 border-2 border-blue-200 shadow-blue-100'
+    case 'picture-reply-pending':
+      return 'bg-cyan-50 border-2 border-cyan-200 shadow-cyan-100'
+    case 'in-production':
+      return 'bg-violet-50 border-2 border-violet-200 shadow-violet-100'
+    default:
+      return 'bg-white border border-gray-200 shadow-gray-100'
+  }
+}
+
+// Status icon background color for better visual hierarchy
+const getIconBackgroundColor = (status: Order['status']) => {
+  switch (status) {
+    case 'pending-review':
+      return 'bg-amber-100 border-amber-300'
+    case 'rejected-needs-upload':
+    case 'picture-reply-rejected':
+      return 'bg-red-100 border-red-300'
+    case 'picture-reply-pending':
+      return 'bg-cyan-100 border-cyan-300'
+    case 'picture-reply-approved':
+      return 'bg-emerald-100 border-emerald-300'
+    case 'pending-payment':
+      return 'bg-orange-100 border-orange-300'
+    case 'approved-processing':
+      return 'bg-blue-100 border-blue-300'
+    case 'ready-for-production':
+      return 'bg-indigo-100 border-indigo-300'
+    case 'in-production':
+      return 'bg-violet-100 border-violet-300'
+    case 'ready-for-checkout':
+      return 'bg-purple-100 border-purple-300'
+    case 'shipped':
+      return 'bg-blue-100 border-blue-300'
+    case 'delivered':
+      return 'bg-green-100 border-green-300'
+    default:
+      return 'bg-gray-100 border-gray-300'
+  }
+}
+
+// Get order progress percentage for visual progress bar
+const getOrderProgress = (status: Order['status']): number => {
+  switch (status) {
+    case 'pending-review':
+      return 10
+    case 'rejected-needs-upload':
+      return 15
+    case 'picture-reply-pending':
+      return 25
+    case 'picture-reply-rejected':
+      return 20
+    case 'picture-reply-approved':
+      return 40
+    case 'pending-payment':
+      return 50
+    case 'approved-processing':
+      return 60
+    case 'ready-for-production':
+      return 65
+    case 'in-production':
+      return 75
+    case 'ready-for-checkout':
+      return 45
+    case 'shipped':
+      return 90
+    case 'delivered':
+      return 100
+    default:
+      return 5
+  }
+}
+
+// Get progress bar color based on status
+const getProgressBarColor = (status: Order['status']): string => {
+  switch (status) {
+    case 'rejected-needs-upload':
+    case 'picture-reply-rejected':
+      return 'bg-red-500'
+    case 'pending-payment':
+      return 'bg-orange-500'
+    case 'delivered':
+      return 'bg-green-500'
+    case 'shipped':
+      return 'bg-blue-500'
+    case 'in-production':
+      return 'bg-violet-500'
+    default:
+      return 'bg-blue-500'
   }
 }
 
@@ -663,10 +792,47 @@ export default function MyOrders() {
     message: ''
   })
   const [backendProducts, setBackendProducts] = useState<any[]>([])
-  const [orderReviews, setOrderReviews] = useState<Record<number, any>>({}) // Store reviews by order ID
+  // REMOVED: Old order-level review tracking - now using item-level reviews with reviewedItems state
+  
+  // Refund modal state
+  const [showRefundModal, setShowRefundModal] = useState(false)
+  const [refundOrderId, setRefundOrderId] = useState<number | null>(null)
+  const [refundOrderNumber, setRefundOrderNumber] = useState<string>('')
+  const [refundOrderTotal, setRefundOrderTotal] = useState<number>(0)
+  const [refundOrderSubtotal, setRefundOrderSubtotal] = useState<number>(0)
+  const [refundOrderShipping, setRefundOrderShipping] = useState<number>(0)
+  const [refundOrderTax, setRefundOrderTax] = useState<number>(0)
+  const [refundOrderItems, setRefundOrderItems] = useState<OrderItem[]>([])
+  
+  // Item-level review state
+  const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set())
+  const [submittedReviews, setSubmittedReviews] = useState<Map<string, any>>(new Map()) // Store full review data
+  const [reviewItem, setReviewItem] = useState<{
+    orderId: number;
+    productId: string;
+    productName: string;
+    productImage: string;
+  } | null>(null)
+  
+  // Order received confirmations
+  const [receivedOrders, setReceivedOrders] = useState<Set<number>>(new Set())
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useWebSocket()
+
+  // Load received orders from localStorage
+  const loadReceivedOrders = () => {
+    try {
+      const stored = localStorage.getItem('receivedOrders')
+      if (stored) {
+        const receivedArray = JSON.parse(stored)
+        setReceivedOrders(new Set(receivedArray))
+        console.log('📦 Loaded received orders:', receivedArray.length)
+      }
+    } catch (error) {
+      console.error('Error loading received orders:', error)
+    }
+  }
 
   // Load backend products
   const loadBackendProducts = async () => {
@@ -682,22 +848,8 @@ export default function MyOrders() {
   }
 
   // Load user reviews
-  const loadUserReviews = async () => {
-    try {
-      const response = await productReviewApiService.getMyReviews()
-      if (response.success && response.data) {
-        // Organize reviews by order ID for quick lookup
-        const reviewsByOrder: Record<number, any> = {}
-        response.data.forEach((review: any) => {
-          reviewsByOrder[review.orderId] = review
-        })
-        setOrderReviews(reviewsByOrder)
-        console.log('📝 Loaded user reviews:', response.data.length)
-      }
-    } catch (error) {
-      console.error('Error loading user reviews:', error)
-    }
-  }
+  // REMOVED: Old loadUserReviews function - replaced with loadExistingReviews for item-level tracking
+  // This function was causing conflicts with the new item-level review system
 
   // Check for payment success from checkout redirect
   useEffect(() => {
@@ -720,9 +872,10 @@ export default function MyOrders() {
   // Load orders on component mount
   useEffect(() => {
     if (isLoggedIn) {
+      loadReceivedOrders()
       loadOrders()
       loadBackendProducts()
-      loadUserReviews()
+      // REMOVED: loadUserReviews() - using loadExistingReviews() instead (called from loadOrders)
     }
   }, [isLoggedIn])
 
@@ -797,6 +950,11 @@ export default function MyOrders() {
         const convertedOrders = response.data.map((orderReview: OrderReview) => convertOrderReviewToOrder(orderReview, backendProducts))
         console.log('✅ Orders loaded:', convertedOrders)
         setOrders(convertedOrders)
+        
+        // Load existing reviews after orders are set
+        if (convertedOrders.length > 0) {
+          setTimeout(() => loadExistingReviews(), 500)
+        }
       } else {
         console.log('❌ Failed to load orders:', response.message)
         setOrders([])
@@ -1055,6 +1213,125 @@ export default function MyOrders() {
       totalPrice: baseProduct
     };
   };
+
+  // Handler for opening refund modal
+  const handleRequestRefund = (order: Order) => {
+    // Check if refund already requested
+    if (order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full') {
+      showInfo('A refund has already been requested or processed for this order.')
+      return
+    }
+    
+    // Set modal state and open
+    setRefundOrderId(order.id)
+    setRefundOrderNumber(order.orderNumber)
+    setRefundOrderTotal(Number(order.total) || 0)
+    setRefundOrderSubtotal(Number(order.subtotal) || Number(order.total) || 0)
+    setRefundOrderShipping(Number(order.shipping) || 0)
+    setRefundOrderTax(Number(order.tax) || 0)
+    setRefundOrderItems(order.items)
+    setShowRefundModal(true)
+  }
+
+  // Handler for successful refund submission
+  const handleRefundSuccess = () => {
+    // Don't close modal here - let the modal handle its own success state display
+    // Just refresh orders to show updated refund status
+    loadOrders()
+  }
+
+  // Load existing reviews to track which items have been reviewed
+  const loadExistingReviews = async () => {
+    const reviewedSet = new Set<string>()
+    const reviewsMap = new Map<string, any>()
+    
+    try {
+      // Get all user's reviews
+      const response = await productReviewApiService.getMyReviews()
+      
+      console.log('📝 Loading existing reviews:', response)
+      
+      if (response.success && response.data) {
+        response.data.forEach((review: any) => {
+          // Create unique key: orderId-productId
+          // Backend returns camelCase properties (orderId, productId)
+          const key = `${review.orderId}-${review.productId}`
+          reviewedSet.add(key)
+          reviewsMap.set(key, review) // Store full review data
+          console.log('✅ Marking as reviewed:', key, {
+            orderId: review.orderId,
+            productId: review.productId,
+            productTitle: review.productTitle,
+            status: review.status
+          })
+        })
+      }
+      
+      console.log('📊 Total reviewed items:', reviewedSet.size, Array.from(reviewedSet))
+    } catch (error) {
+      // Silently fail - reviews are optional
+      console.log('⚠️ Could not load existing reviews:', error)
+    }
+    
+    setReviewedItems(reviewedSet)
+    setSubmittedReviews(reviewsMap)
+  }
+
+  // Check if a specific item has been reviewed
+  const isItemReviewed = (orderId: number, productId: string): boolean => {
+    const key = `${orderId}-${productId}`
+    return reviewedItems.has(key)
+  }
+
+  // Get the submitted review for a specific item
+  const getItemReview = (orderId: number, productId: string): any | null => {
+    const key = `${orderId}-${productId}`
+    return submittedReviews.get(key) || null
+  }
+
+  // Handler for confirming order received
+  const handleOrderReceived = (orderId: number) => {
+    // Add to received orders set
+    setReceivedOrders(prev => {
+      const newSet = new Set(prev)
+      newSet.add(orderId)
+      return newSet
+    })
+    
+    // Store in localStorage for persistence
+    const stored = localStorage.getItem('receivedOrders') || '[]'
+    const receivedArray = JSON.parse(stored)
+    if (!receivedArray.includes(orderId)) {
+      receivedArray.push(orderId)
+      localStorage.setItem('receivedOrders', JSON.stringify(receivedArray))
+    }
+    
+    // Show success message
+    showSuccess('Order confirmed as received! You can now leave reviews for your items.')
+    
+    // Load reviews after confirming receipt
+    setTimeout(() => loadExistingReviews(), 500)
+  }
+
+  // Check if order has been confirmed as received
+  const isOrderReceived = (orderId: number): boolean => {
+    return receivedOrders.has(orderId)
+  }
+
+  // Handler for leaving a review on a specific item
+  const handleLeaveItemReview = (item: OrderItem, orderId: number, orderNumber: string) => {
+    setReviewItem({
+      orderId: orderId,
+      productId: item.productId,
+      productName: item.productName,
+      productImage: item.productImage
+    })
+    setReviewOrderId(orderId)
+    setRating(5)
+    setReviewText('')
+    setReviewImages([])
+    setShowReviewModal(true)
+  }
 
   const handleViewDetails = (order: Order) => {
     console.log('🔍 Opening order details:', {
@@ -1404,64 +1681,83 @@ export default function MyOrders() {
         </div>
       )}
 
-      <div className="mb-8">
-        <div className="flex items-center space-x-4">
-          <h1 className="text-3xl font-bold text-gray-900">My Orders</h1>
-          {/* WebSocket connection status */}
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm text-gray-600">
-              {isConnected ? 'Live Updates' : 'Offline'}
-            </span>
+      <div className="mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-100 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center space-x-4 mb-2">
+              <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">My Orders</h1>
+              {/* WebSocket connection status */}
+              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full ${
+                isConnected ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className={`text-xs font-bold ${isConnected ? 'text-green-700' : 'text-red-700'}`}>
+                  {isConnected ? 'Live Updates Active' : 'Offline Mode'}
+                </span>
+              </div>
+            </div>
+            <p className="text-gray-700 font-medium">Track and manage all your orders in one place</p>
           </div>
+          <Package className="w-16 h-16 text-blue-400 opacity-50" />
         </div>
-        <p className="text-gray-600">Track and manage your orders</p>
       </div>
 
       {/* Search and Filters */}
-      <div className="mb-6 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:justify-between">
-        <div className="flex-1 max-w-lg">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search orders..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-            />
+      <div className="mb-8 bg-white rounded-xl p-5 shadow-sm border border-gray-200">
+        <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+          <div className="flex-1 max-w-lg">
+            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Search Orders</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search by order number or product..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="flex space-x-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-          >
-            <option value="all">All Orders</option>
-            <option value="pending-review">Being Reviewed</option>
-            <option value="rejected-needs-upload">Needs Your Attention</option>
-            <option value="picture-reply-pending">Design Sample Ready</option>
-            <option value="picture-reply-rejected">We're Making Adjustments</option>
-            <option value="picture-reply-approved">Design Approved</option>
-            <option value="pending-payment">Ready for Payment</option>
-            <option value="approved-processing">Being Prepared</option>
-            <option value="ready-for-production">Ready to Make</option>
-            <option value="in-production">Being Made</option>
-            <option value="shipped">On the Way</option>
-            <option value="delivered">Delivered</option>
-            <option value="ready-for-checkout">Ready to Order</option>
-          </select>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Status Filter</label>
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="pl-10 pr-8 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
+                >
+                  <option value="all">All Orders</option>
+                  <option value="pending-review">Being Reviewed</option>
+                  <option value="rejected-needs-upload">Needs Your Attention</option>
+                  <option value="picture-reply-pending">Design Sample Ready</option>
+                  <option value="picture-reply-rejected">We're Making Adjustments</option>
+                  <option value="picture-reply-approved">Design Approved</option>
+                  <option value="pending-payment">Ready for Payment</option>
+                  <option value="approved-processing">Being Prepared</option>
+                  <option value="ready-for-production">Ready to Make</option>
+                  <option value="in-production">Being Made</option>
+                  <option value="shipped">On the Way</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="ready-for-checkout">Ready to Order</option>
+                </select>
+              </div>
+            </div>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-            className="px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-accent focus:border-accent"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-          </select>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Sort By</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
+                className="px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
+              >
+                <option value="newest">⬇️ Newest First</option>
+                <option value="oldest">⬆️ Oldest First</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1480,36 +1776,48 @@ export default function MyOrders() {
           </div>
         ) : (
           filteredOrders.map((order) => (
-            <div key={order.id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+            <div key={order.id} className={`rounded-xl hover:shadow-lg transition-all duration-300 overflow-hidden ${getCardStyling(order)}`}>
               {/* Order Header */}
-              <div className="px-6 py-5 border-b border-gray-100">
+              <div className="px-6 py-5 border-b border-gray-200">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
                   {/* Left Section - Order Info */}
                   <div className="flex items-start space-x-4">
                     {/* Status Badge */}
-                    <div className="flex flex-col items-center space-y-2">
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gray-50 border-2 border-gray-200">
+                    <div className="flex flex-col items-center space-y-2.5">
+                      <div className={`flex items-center justify-center w-14 h-14 rounded-full border-2 shadow-sm ${getIconBackgroundColor(order.status)}`}>
                         {getStatusIcon(order.status)}
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wide ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
                       </span>
+                      {order.refundStatus && order.refundStatus !== 'none' && (
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 ${
+                          order.refundStatus === 'requested' ? 'bg-red-100 text-red-800 border border-red-300' :
+                          order.refundStatus === 'partial' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                          'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        }`}>
+                          <RotateCcw className="w-3 h-3" />
+                          {order.refundStatus === 'requested' ? 'Refund Pending' :
+                           order.refundStatus === 'partial' ? 'Partial Refund' :
+                           'Full Refund'}
+                        </span>
+                      )}
                     </div>
                     
                     {/* Order Details */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">
                         Order #{order.orderNumber}
                       </h3>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>Placed {formatDateWithoutTimezone(order.orderDate)}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-5 text-sm">
+                        <div className="flex items-center space-x-2 text-gray-600">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                          <span className="font-medium">Placed {formatDateWithoutTimezone(order.orderDate)}</span>
                         </div>
                         {order.reviewedAt && (
-                          <div className="flex items-center space-x-1">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span>Reviewed {formatDateWithoutTimezone(order.reviewedAt)}</span>
+                          <div className="flex items-center space-x-2 text-emerald-700">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <span className="font-medium">Reviewed {formatDateWithoutTimezone(order.reviewedAt)}</span>
                           </div>
                         )}
                       </div>
@@ -1519,27 +1827,84 @@ export default function MyOrders() {
                   {/* Right Section - Total & Actions */}
                   <div className="flex flex-col sm:items-end space-y-3">
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">${(Number(order.total) || 0).toFixed(2)}</p>
-                      <p className="text-sm text-gray-500">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Order Total</p>
+                      <p className="text-3xl font-bold text-gray-900 tracking-tight">${(Number(order.total) || 0).toFixed(2)}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-semibold">{order.items.length}</span> item{order.items.length !== 1 ? 's' : ''}
+                      </p>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleViewDetails(order)}
-                      className="w-full sm:w-auto"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Details
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewDetails(order)}
+                        className="w-full sm:w-auto bg-white hover:bg-gray-50 border-gray-300 text-gray-700 font-semibold shadow-sm"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </Button>
+                      
+                      {/* Order Received button - show only for delivered orders not yet confirmed and no refund */}
+                      {order.status === 'delivered' && 
+                       !isOrderReceived(order.id) && 
+                       (!order.refundStatus || order.refundStatus === 'none') && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleOrderReceived(order.id)}
+                          className="w-full sm:w-auto bg-green-50 text-green-700 border-green-500 hover:bg-green-100 font-bold shadow-sm"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Confirm Received
+                        </Button>
+                      )}
+                      
+                      {/* Refund button - show only if order not received yet and no refund requested */}
+                      {(order.status === 'delivered' || order.status === 'shipped') && !isOrderReceived(order.id) && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleRequestRefund(order)}
+                          disabled={order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full'}
+                          className={`w-full sm:w-auto font-bold shadow-sm ${
+                            order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full'
+                              ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                              : 'bg-blue-50 text-blue-700 border-blue-500 hover:bg-blue-100'
+                          }`}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          {order.refundStatus === 'requested' ? 'Refund Pending' : 
+                           order.refundStatus === 'partial' || order.refundStatus === 'full' ? 'Refund Processed' : 
+                           'Request Refund'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Progress Bar */}
+              <div className="px-6 py-3 bg-white border-b border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Order Progress</span>
+                  <span className="text-xs font-bold text-gray-900">{getOrderProgress(order.status)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(order.status)}`}
+                    style={{ width: `${getOrderProgress(order.status)}%` }}
+                  >
+                    <div className="h-full w-full bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
                   </div>
                 </div>
               </div>
 
               {/* Order Items Preview */}
-              <div className="px-6 py-4">
-                <div className="space-y-4">
+              <div className="px-6 py-4 bg-gradient-to-b from-white to-gray-50">
+                <h4 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Order Items</h4>
+                <div className="space-y-3">
                   {order.items.slice(0, 2).map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
+                    <div key={item.id} className="flex items-center space-x-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                       <div className="relative flex space-x-2">
                         {/* Final Product Image (with design overlays) */}
                         <div className="relative">
@@ -1672,38 +2037,41 @@ export default function MyOrders() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-semibold text-gray-900 truncate">{item.productName}</h4>
-                        <p className="text-xs text-gray-500 mb-2">${item.price.toFixed(2)} each</p>
+                        <h4 className="text-base font-bold text-gray-900 truncate mb-1">{item.productName}</h4>
+                        <p className="text-sm text-gray-600 font-medium mb-2">
+                          ${item.price.toFixed(2)} <span className="text-gray-400">×</span> {item.quantity}
+                        </p>
                         
                         {/* Simplified Customization Display */}
                         {item.customization && (
-                          <div className="flex flex-wrap gap-1">
+                          <div className="flex flex-wrap gap-1.5">
                             {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {(item.customization as any).designs.length} Design{(item.customization as any).designs.length !== 1 ? 's' : ''}
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                🎨 {(item.customization as any).designs.length} Design{(item.customization as any).designs.length !== 1 ? 's' : ''}
                               </span>
                             ) : item.customization.design ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                Custom Design
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                🎨 Custom Design
                               </span>
                             ) : null}
                             
                             {item.customization.placement && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                {item.customization.placement.replace('-', ' ')}
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                📍 {item.customization.placement.replace('-', ' ')}
                               </span>
                             )}
                             
                             {item.customization.size && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                {item.customization.size}
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                📏 {item.customization.size}
                               </span>
                             )}
                           </div>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-xs font-medium text-gray-500 mb-1">Item Total</p>
+                        <p className="text-lg font-bold text-gray-900">
                           ${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}
                         </p>
                       </div>
@@ -1712,14 +2080,167 @@ export default function MyOrders() {
                   
                   {/* Show more items indicator */}
                   {order.items.length > 2 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-gray-500 font-medium">
-                        +{order.items.length - 2} more item{order.items.length - 2 !== 1 ? 's' : ''}
-                      </span>
+                    <div className="text-center py-3">
+                      <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full border border-gray-300">
+                        <Package className="w-4 h-4 text-gray-600 mr-2" />
+                        <span className="text-sm text-gray-700 font-bold">
+                          +{order.items.length - 2} more item{order.items.length - 2 !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Item Reviews Section - Only show after customer confirms order received and no refund */}
+              {order.status === 'delivered' && 
+               isOrderReceived(order.id) && 
+               (!order.refundStatus || order.refundStatus === 'none') && (
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-gray-700">Review Items:</p>
+                    <p className="text-xs text-gray-500">
+                      {order.items.filter(item => {
+                        const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                        return isReviewable && isItemReviewed(order.id, item.productId)
+                      }).length} of {order.items.filter(item => !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery').length} reviewed
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {order.items.map((item) => {
+                      const itemReviewed = isItemReviewed(order.id, item.productId)
+                      const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                      
+                      if (!isReviewable) return null
+                      
+                      {
+                        const review = getItemReview(order.id, item.productId)
+                        
+                        return (
+                          <div key={item.id} className={`rounded border ${
+                            itemReviewed 
+                              ? 'bg-green-50 border-green-200' 
+                              : 'bg-white border-gray-200'
+                          }`}>
+                            {/* Item Header */}
+                            <div className="flex items-center justify-between p-2">
+                              <div className="flex items-center flex-1 min-w-0">
+                                <img 
+                                  src={item.productImage} 
+                                  alt={item.productName}
+                                  className="w-10 h-10 rounded object-cover flex-shrink-0"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'https://via.placeholder.com/40/f3f4f6/9ca3af?text=?';
+                                  }}
+                                />
+                                <span className="ml-2 text-sm text-gray-900 truncate">{item.productName}</span>
+                              </div>
+                              
+                              {itemReviewed ? (
+                                <span className="text-xs text-green-600 flex items-center flex-shrink-0 ml-2 font-medium">
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Reviewed
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleLeaveItemReview(item, order.id, order.orderNumber)}
+                                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center flex-shrink-0 ml-2 px-3 py-1 border border-blue-600 rounded hover:bg-blue-50"
+                                >
+                                  <Star className="w-3 h-3 mr-1" />
+                                  Review
+                                </button>
+                              )}
+                            </div>
+                            
+                            {/* Show Review Content if Reviewed */}
+                            {itemReviewed && review && (
+                              <div className="px-3 pb-3 pt-1 border-t border-green-200 bg-white">
+                                {/* Rating */}
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="flex">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <Star
+                                        key={star}
+                                        className={`w-4 h-4 ${
+                                          star <= review.rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                        }`}
+                                      />
+                                    ))}
+                                  </div>
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    review.status === 'approved' 
+                                      ? 'bg-green-100 text-green-700' 
+                                      : review.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-red-100 text-red-700'
+                                  }`}>
+                                    {review.status === 'approved' ? '✓ Published' : review.status === 'pending' ? '⏱ Pending' : '✗ Not Approved'}
+                                  </span>
+                                </div>
+                                
+                                {/* Review Comment */}
+                                {review.comment && (
+                                  <p className="text-sm text-gray-700 mb-2 line-clamp-2">
+                                    "{review.comment}"
+                                  </p>
+                                )}
+                                
+                                {/* Review Images */}
+                                {review.images && review.images.length > 0 && (
+                                  <div className="flex space-x-1 mb-2">
+                                    {review.images.slice(0, 3).map((image: string, idx: number) => (
+                                      <img
+                                        key={idx}
+                                        src={image}
+                                        alt={`Review ${idx + 1}`}
+                                        className="w-12 h-12 rounded object-cover border border-gray-200"
+                                      />
+                                    ))}
+                                    {review.images.length > 3 && (
+                                      <div className="w-12 h-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center text-xs text-gray-600">
+                                        +{review.images.length - 3}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Admin Response */}
+                                {review.adminResponse && (
+                                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                                    <p className="font-medium text-blue-900 mb-1">Store Response:</p>
+                                    <p className="text-blue-800">{review.adminResponse}</p>
+                                  </div>
+                                )}
+                                
+                                {/* Link to full review */}
+                                <div className="mt-2">
+                                  <button
+                                    onClick={() => navigate('/my-reviews')}
+                                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                                  >
+                                    View full review →
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+                    })}
+                  </div>
+                  {order.items.filter(item => {
+                    const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                    return isReviewable && !isItemReviewed(order.id, item.productId)
+                  }).length === 0 && (
+                    <div className="mt-2 p-3 bg-green-100 border border-green-200 rounded-lg text-center">
+                      <p className="text-sm text-green-800 font-medium">
+                        ✓ All items reviewed - Thank you!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Admin Notes - Red styling for rejected orders */}
               {order.adminNotes && (
@@ -1851,101 +2372,6 @@ export default function MyOrders() {
                           <p className="text-sm text-gray-600 italic">Tracking information not available.</p>
                         </div>
                       )}
-                      
-                      {/* Review Section */}
-                      <div className="mt-4">
-                        {orderReviews[order.id] ? (
-                          // Show submitted review
-                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center space-x-2">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                                <h4 className="font-semibold text-gray-900">Your Review</h4>
-                              </div>
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                orderReviews[order.id].status === 'approved' ? 'bg-green-100 text-green-800' :
-                                orderReviews[order.id].status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {orderReviews[order.id].status === 'approved' ? 'Approved' :
-                                 orderReviews[order.id].status === 'rejected' ? 'Rejected' :
-                                 'Pending Review'}
-                              </span>
-                            </div>
-                            
-                            {/* Star Rating */}
-                            <div className="flex items-center space-x-1 mb-2">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`w-4 h-4 ${
-                                    i < orderReviews[order.id].rating
-                                      ? 'fill-yellow-400 text-yellow-400'
-                                      : 'text-gray-300'
-                                  }`}
-                                />
-                              ))}
-                              <span className="text-sm text-gray-600 ml-2">
-                                {orderReviews[order.id].rating} out of 5
-                              </span>
-                            </div>
-                            
-                            {/* Review Title */}
-                            <h5 className="font-medium text-gray-900 mb-1">
-                              {orderReviews[order.id].title}
-                            </h5>
-                            
-                            {/* Review Comment */}
-                            <p className="text-sm text-gray-700 mb-2">
-                              {orderReviews[order.id].comment}
-                            </p>
-                            
-                            {/* Review Images */}
-                            {orderReviews[order.id].images && orderReviews[order.id].images.length > 0 && (
-                              <div className="flex space-x-2 mt-2">
-                                {orderReviews[order.id].images.map((img: string, idx: number) => (
-                                  <img
-                                    key={idx}
-                                    src={img}
-                                    alt={`Review ${idx + 1}`}
-                                    className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80"
-                                    onClick={() => {
-                                      setEnlargedImage(img);
-                                      setEnlargedImageTitle(`Review Image ${idx + 1}`);
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Admin Response */}
-                            {orderReviews[order.id].adminResponse && (
-                              <div className="mt-3 bg-blue-50 rounded p-3 border-l-4 border-blue-500">
-                                <p className="text-xs font-semibold text-blue-900 mb-1">Admin Response:</p>
-                                <p className="text-sm text-blue-800">
-                                  {orderReviews[order.id].adminResponse}
-                                </p>
-                              </div>
-                            )}
-                            
-                            <p className="text-xs text-gray-500 mt-2">
-                              Submitted on {formatDateWithoutTimezone(orderReviews[order.id].createdAt)}
-                            </p>
-                          </div>
-                        ) : (
-                          // Show "Leave a Review" button
-                          <Button
-                            onClick={() => {
-                              setReviewOrderId(order.id);
-                              setShowReviewModal(true);
-                            }}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white flex items-center justify-center space-x-2"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            <span>Leave a Review</span>
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -2848,7 +3274,9 @@ export default function MyOrders() {
             
             <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Write a Review</h3>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {reviewItem ? `Review: ${reviewItem.productName}` : 'Write a Review'}
+                </h3>
                 <button
                   onClick={() => setShowReviewModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -2856,6 +3284,21 @@ export default function MyOrders() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Show product image in modal */}
+              {reviewItem && (
+                <div className="flex justify-center mb-4">
+                  <img 
+                    src={reviewItem.productImage}
+                    alt={reviewItem.productName}
+                    className="w-24 h-24 object-cover rounded-lg shadow-md"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = 'https://via.placeholder.com/100/f3f4f6/9ca3af?text=Product';
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="space-y-4">
                 {/* Rating */}
@@ -2957,49 +3400,11 @@ export default function MyOrders() {
                   </Button>
                   <Button
                     onClick={async () => {
-                      if (!reviewOrderId) return;
+                      if (!reviewItem || !reviewOrderId) return;
                       setSubmittingReview(true);
                       try {
-                        // Get the order to find the product ID
-                        const order = orders.find(o => o.id === reviewOrderId);
-                        if (!order || order.items.length === 0) {
-                          setReviewResultModal({
-                            show: true,
-                            success: false,
-                            title: 'Error',
-                            message: 'Could not find order details. Please try again.'
-                          });
-                          return;
-                        }
-
-                        // For now, submit a review for the first product in the order
-                        // Filter out custom embroidery items (they don't have a numeric product ID)
-                        const reviewableProducts = order.items.filter(item => {
-                          // Convert productId to string first, then to number
-                          const pidStr = String(item.productId);
-                          const pid = parseInt(pidStr);
-                          return !isNaN(pid) && pidStr !== 'custom-embroidery';
-                        });
-
-                        console.log('📦 Order items for review:', order.items.map(item => ({
-                          productId: item.productId,
-                          type: typeof item.productId,
-                          productName: item.productName
-                        })));
-                        console.log('✅ Reviewable products:', reviewableProducts.length);
-
-                        if (reviewableProducts.length === 0) {
-                          setReviewResultModal({
-                            show: true,
-                            success: false,
-                            title: 'Unable to Review',
-                            message: 'This order contains only custom items that cannot be reviewed individually. Please contact us for feedback!'
-                          });
-                          return;
-                        }
-
-                        const firstProduct = reviewableProducts[0];
-                        const productIdStr = String(firstProduct.productId);
+                        // Use the specific product from reviewItem
+                        const productIdStr = String(reviewItem.productId);
                         const productId = parseInt(productIdStr);
 
                         // Validate productId before sending
@@ -3007,8 +3412,7 @@ export default function MyOrders() {
                           console.error('❌ Invalid productId:', { 
                             productId, 
                             productIdStr,
-                            firstProduct,
-                            originalProductId: firstProduct.productId 
+                            reviewItem
                           });
                           setReviewResultModal({
                             show: true,
@@ -3019,14 +3423,11 @@ export default function MyOrders() {
                           return;
                         }
 
-                        console.log('📝 Submitting review with:', {
+                        console.log('📝 Submitting review for specific item:', {
                           productId,
-                          productIdType: typeof productId,
+                          productName: reviewItem.productName,
                           orderId: reviewOrderId,
-                          orderIdType: typeof reviewOrderId,
                           rating,
-                          ratingType: typeof rating,
-                          title: `Review for ${firstProduct.productName}`,
                           hasComment: !!reviewText,
                           hasImages: reviewImages.length > 0
                         });
@@ -3035,23 +3436,33 @@ export default function MyOrders() {
                           productId,
                           orderId: reviewOrderId,
                           rating,
-                          title: `Review for ${firstProduct.productName}`,
+                          title: `Review for ${reviewItem.productName}`,
                           comment: reviewText,
                           images: reviewImages.length > 0 ? reviewImages : undefined,
                         });
 
                         if (response.success) {
+                          // Mark this specific item as reviewed
+                          if (reviewItem) {
+                            setReviewedItems(prev => {
+                              const newSet = new Set(prev)
+                              newSet.add(`${reviewItem.orderId}-${reviewItem.productId}`)
+                              return newSet
+                            })
+                          }
+                          
                           setShowReviewModal(false);
                           setRating(5);
                           setReviewText('');
                           setReviewImages([]);
+                          setReviewItem(null);
                           // Reload reviews to update the UI
-                          loadUserReviews();
+                          loadExistingReviews();
                           setReviewResultModal({
                             show: true,
                             success: true,
                             title: 'Review Submitted!',
-                            message: 'Thank you for your review! It will be published after admin approval.'
+                            message: `Thank you for reviewing ${reviewItem?.productName || 'this product'}! It will be published after admin approval.`
                           });
                         } else {
                           setReviewResultModal({
@@ -3132,6 +3543,22 @@ export default function MyOrders() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Refund Request Modal - Enhanced with item selection */}
+      {showRefundModal && refundOrderId && (
+        <RefundRequestModalEnhanced
+          isOpen={showRefundModal}
+          onClose={() => setShowRefundModal(false)}
+          orderId={refundOrderId}
+          orderNumber={refundOrderNumber}
+          orderTotal={refundOrderTotal}
+          orderSubtotal={refundOrderSubtotal}
+          orderShipping={refundOrderShipping}
+          orderTax={refundOrderTax}
+          orderItems={refundOrderItems}
+          onSuccess={handleRefundSuccess}
+        />
       )}
 
     </main>

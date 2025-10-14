@@ -132,6 +132,28 @@ export const getPaymentStats = async (
       ORDER BY month DESC
     `);
 
+    // Get refund statistics
+    const [refundStats] = await sequelize.query(`
+      SELECT 
+        COUNT(*) as total_refunds,
+        SUM(CASE WHEN status = 'refunded' THEN ABS(amount) ELSE 0 END) as total_refunded_amount,
+        SUM(CASE WHEN status = 'pending' AND amount < 0 THEN 1 ELSE 0 END) as pending_refunds,
+        SUM(CASE WHEN status = 'failed' AND amount < 0 THEN 1 ELSE 0 END) as failed_refunds
+      FROM payments
+      WHERE amount < 0
+    `);
+
+    // Get payment vs refund summary
+    const [paymentVsRefund] = await sequelize.query(`
+      SELECT 
+        SUM(CASE WHEN amount > 0 AND status = 'completed' THEN amount ELSE 0 END) as total_payments,
+        SUM(CASE WHEN amount < 0 AND status = 'refunded' THEN ABS(amount) ELSE 0 END) as total_refunds,
+        SUM(CASE WHEN amount > 0 AND status = 'completed' THEN amount 
+                  WHEN amount < 0 AND status = 'refunded' THEN amount 
+                  ELSE 0 END) as net_revenue
+      FROM payments
+    `);
+
     res.status(200).json({
       success: true,
       data: {
@@ -139,6 +161,17 @@ export const getPaymentStats = async (
         byProvider: byProvider,
         recent: (recentStats as any[])[0] || { count: 0, total_amount: 0, total_fees: 0, total_net: 0 },
         monthlyRevenue: monthlyRevenue,
+        refunds: (refundStats as any[])[0] || { 
+          total_refunds: 0, 
+          total_refunded_amount: 0, 
+          pending_refunds: 0, 
+          failed_refunds: 0 
+        },
+        summary: (paymentVsRefund as any[])[0] || { 
+          total_payments: 0, 
+          total_refunds: 0, 
+          net_revenue: 0 
+        }
       },
       message: 'Payment statistics retrieved successfully',
       timestamp: new Date().toISOString(),

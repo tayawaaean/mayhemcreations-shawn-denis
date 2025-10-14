@@ -273,6 +273,11 @@ const Reviews: React.FC = () => {
                         <h3 className="text-lg font-medium text-gray-900">{review.product_title || 'Product'}</h3>
                         <p className="text-sm text-gray-500">
                           by {review.first_name} {review.last_name} • {formatDateOnly(review.created_at)}
+                          {review.order_id && (
+                            <span className="ml-2 text-xs text-gray-400">
+                              (Order #MC-{review.order_id})
+                            </span>
+                          )}
                           {review.is_verified && (
                             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                               <Check className="w-3 h-3 mr-1" />

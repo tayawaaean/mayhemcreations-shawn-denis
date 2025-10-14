@@ -14,6 +14,7 @@ import Message, { MessageAttributes, MessageCreationAttributes } from './message
 import { OrderReview, OrderReviewAttributes, OrderReviewCreationAttributes } from './orderReviewModel';
 import { Payment, PaymentAttributes, PaymentCreationAttributes } from './paymentModel';
 import ProductReview, { ProductReviewAttributes, ProductReviewCreationAttributes } from './productReviewModel';
+import { RefundRequest, RefundRequestAttributes, RefundRequestCreationAttributes } from './refundRequestModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -201,6 +202,44 @@ const setupAssociations = (): void => {
     foreignKey: 'customerId',
     as: 'payments',
   });
+
+  // RefundRequest associations
+  
+  // RefundRequest belongs to OrderReview
+  RefundRequest.belongsTo(OrderReview, {
+    foreignKey: 'orderId',
+    as: 'order',
+  });
+
+  // OrderReview has many RefundRequests
+  OrderReview.hasMany(RefundRequest, {
+    foreignKey: 'orderId',
+    as: 'refundRequests',
+  });
+
+  // RefundRequest belongs to User
+  RefundRequest.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+  });
+
+  // User has many RefundRequests
+  User.hasMany(RefundRequest, {
+    foreignKey: 'userId',
+    as: 'refundRequests',
+  });
+
+  // RefundRequest belongs to Payment (optional - for tracking which payment is being refunded)
+  RefundRequest.belongsTo(Payment, {
+    foreignKey: 'paymentId',
+    as: 'payment',
+  });
+
+  // Payment has many RefundRequests (one payment can have multiple refund attempts)
+  Payment.hasMany(RefundRequest, {
+    foreignKey: 'paymentId',
+    as: 'refundRequests',
+  });
 };
 
 // Initialize associations
@@ -257,6 +296,9 @@ export {
   ProductReview,
   ProductReviewAttributes,
   ProductReviewCreationAttributes,
+  RefundRequest,
+  RefundRequestAttributes,
+  RefundRequestCreationAttributes,
 };
 
 // Export all models for easy access
@@ -276,6 +318,7 @@ export const models = {
   OrderReview,
   Payment,
   ProductReview,
+  RefundRequest,
 };
 
 // Database synchronization function

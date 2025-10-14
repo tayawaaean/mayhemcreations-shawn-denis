@@ -1,47 +1,55 @@
-import React, { useState } from 'react'
-import { X, Upload, Image as ImageIcon, AlertCircle, CheckCircle } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, Upload, Image as ImageIcon, AlertCircle, CheckCircle, Package } from 'lucide-react'
 import Button from '../../components/Button'
 import { RefundApiService } from '../../shared/refundApiService'
 
-interface RefundRequestModalProps {
+interface OrderItem {
+  id: string
+  productId: string
+  productName: string
+  productImage: string
+  quantity: number
+  price: number
+  variantId?: string
+  variantName?: string
+}
+
+interface RefundRequestModalEnhancedProps {
   isOpen: boolean
   onClose: () => void
   orderId: number
   orderNumber: string
   orderTotal: number
+  orderSubtotal: number
+  orderShipping: number
+  orderTax: number
+  orderItems: OrderItem[]
   onSuccess?: () => void
 }
 
-// Legacy interface for backward compatibility
-export interface RefundRequest {
-  id: string
-  orderId: string
-  customerId: string
-  customerEmail: string
-  amount: number
-  reason: string
-  description: string
-  images: File[]
-  status: 'pending' | 'approved' | 'rejected' | 'processing'
-  requestedAt: Date
-  processedAt?: Date
-  adminNotes?: string
-}
-
-const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
+const RefundRequestModalEnhanced: React.FC<RefundRequestModalEnhancedProps> = ({
   isOpen,
   onClose,
   orderId,
   orderNumber,
   orderTotal,
+  orderSubtotal,
+  orderShipping,
+  orderTax,
+  orderItems,
   onSuccess
 }) => {
   const [formData, setFormData] = useState({
     reason: '',
     description: '',
-    refundType: 'full' as 'full' | 'partial',
-    refundAmount: orderTotal
+    refundType: 'full' as 'full' | 'partial'
   })
+  
+  // Item selection for partial refunds
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [calculatedRefund, setCalculatedRefund] = useState(orderTotal)
+  
+  // Image upload state
   const [images, setImages] = useState<File[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -60,6 +68,45 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
     { value: 'other', label: 'Other reason' }
   ]
 
+  // Auto-select all items when refund type is 'full'
+  useEffect(() => {
+    if (formData.refundType === 'full') {
+      setSelectedItems(new Set(orderItems.map(item => item.id)))
+    }
+  }, [formData.refundType, orderItems])
+
+  // Calculate refund amount when items or type changes
+  useEffect(() => {
+    if (formData.refundType === 'full') {
+      setCalculatedRefund(orderTotal)
+    } else {
+      // Calculate partial refund based on selected items
+      const itemsSubtotal = orderItems
+        .filter(item => selectedItems.has(item.id))
+        .reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      
+      if (itemsSubtotal === 0) {
+        setCalculatedRefund(0)
+        return
+      }
+      
+      // Check if ALL items are selected (even in "partial" mode)
+      const allItemsSelected = selectedItems.size === orderItems.length && orderItems.length > 0
+      
+      if (allItemsSelected) {
+        // If all items selected, treat as full refund (include shipping + all tax)
+        setCalculatedRefund(orderTotal)
+      } else {
+        // True partial refund: Only refund item price + proportional tax
+        // Shipping is NOT refunded because customer still receives other items
+        const proportionalTax = (itemsSubtotal / orderSubtotal) * orderTax
+        
+        const total = itemsSubtotal + proportionalTax
+        setCalculatedRefund(total)
+      }
+    }
+  }, [formData.refundType, selectedItems, orderItems, orderTotal, orderSubtotal, orderTax, orderShipping])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -68,19 +115,29 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
     }))
   }
 
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
+  }
+
   const handleImageUpload = async (files: FileList | null) => {
     if (!files) return
 
-    const newImages = Array.from(files).slice(0, 5 - images.length) // Max 5 images
+    const newImages = Array.from(files).slice(0, 5 - images.length)
     setImages(prev => [...prev, ...newImages])
 
-    // Convert to base64 for sending to backend
+    // Convert to base64
     const promises = newImages.map(file => {
       return new Promise<string>((resolve) => {
         const reader = new FileReader()
-        reader.onloadend = () => {
-          resolve(reader.result as string)
-        }
+        reader.onloadend = () => resolve(reader.result as string)
         reader.readAsDataURL(file)
       })
     })
@@ -128,8 +185,13 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
       return
     }
 
-    if (formData.refundType === 'partial' && formData.refundAmount >= orderTotal) {
-      setSubmitError('Partial refund amount must be less than the total')
+    if (formData.refundType === 'partial' && selectedItems.size === 0) {
+      setSubmitError('Please select at least one item to refund')
+      return
+    }
+
+    if (formData.refundType === 'partial' && selectedItems.size === orderItems.length) {
+      setSubmitError('All items selected - please use Full Refund instead')
       return
     }
 
@@ -137,28 +199,41 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
     setSubmitError(null)
 
     try {
+      // Prepare refund items data
+      const refundItemsData = orderItems
+        .filter(item => selectedItems.has(item.id))
+        .map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          price: item.price,
+          subtotal: item.price * item.quantity
+        }))
+
       // Submit refund request to API
       const response = await RefundApiService.createRefundRequest({
         orderId: orderId,
         reason: formData.reason,
         description: formData.description,
         refundType: formData.refundType,
-        refundAmount: formData.refundType === 'partial' ? formData.refundAmount : undefined,
+        refundAmount: calculatedRefund,
+        refundItems: formData.refundType === 'partial' ? refundItemsData : undefined,
         imagesUrls: imageUrls.length > 0 ? imageUrls : undefined
       })
 
       if (response.success) {
         setSubmitSuccess(true)
         
-        // Call success callback if provided
+        // Call onSuccess callback to refresh orders and show alert
         if (onSuccess) {
           onSuccess()
         }
 
-        // Close modal after 2 seconds
+        // Auto-close after 5 seconds (increased from 2)
         setTimeout(() => {
           handleClose()
-        }, 2000)
+        }, 5000)
       } else {
         setSubmitError(response.message || 'Failed to submit refund request')
       }
@@ -171,13 +246,12 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
   }
 
   const handleClose = () => {
-    // Reset form
     setFormData({
       reason: '',
       description: '',
-      refundType: 'full',
-      refundAmount: orderTotal
+      refundType: 'full'
     })
+    setSelectedItems(new Set())
     setImages([])
     setImageUrls([])
     setSubmitSuccess(false)
@@ -189,7 +263,7 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">Request Refund</h2>
@@ -204,13 +278,40 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
         {/* Success Message */}
         {submitSuccess ? (
           <div className="p-8 text-center">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Refund Request Submitted!</h3>
-            <p className="text-gray-600">
-              Your refund request has been submitted successfully. We'll review it and get back to you soon.
+            <div className="bg-green-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-12 h-12 text-green-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">Refund Request Submitted!</h3>
+            <p className="text-gray-700 mb-2">
+              Your refund request for <span className="font-semibold">{selectedItems.size} item(s)</span> has been submitted successfully.
             </p>
-            <p className="text-sm text-gray-500 mt-4">
-              You can track your refund status in "My Refunds"
+            <p className="text-gray-600 mb-6">
+              Order #{orderNumber} • ${calculatedRefund.toFixed(2)}
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-900 font-medium mb-1">
+                ⏱️ What's Next?
+              </p>
+              <p className="text-sm text-blue-800">
+                Our team will review your request within 1-2 business days. You can track the status in "My Refunds".
+              </p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => window.location.href = '/my-refunds'}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                View My Refunds
+              </button>
+              <button
+                onClick={handleClose}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-4">
+              This window will close automatically in 5 seconds
             </p>
           </div>
         ) : (
@@ -225,6 +326,10 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                 <div>
                   <p className="text-sm font-medium text-gray-700">Order Total</p>
                   <p className="text-sm text-gray-900">${orderTotal.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Items in Order</p>
+                  <p className="text-sm text-gray-900">{orderItems.length} item(s)</p>
                 </div>
               </div>
             </div>
@@ -260,7 +365,8 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                       : 'border-gray-300'
                   }`}>
                     <p className="font-medium text-gray-900">Full Refund</p>
-                    <p className="text-sm text-gray-500">${orderTotal.toFixed(2)}</p>
+                    <p className="text-sm text-gray-500">All {orderItems.length} items</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-2">${orderTotal.toFixed(2)}</p>
                   </div>
                 </label>
                 <label className="relative flex items-center cursor-pointer">
@@ -278,35 +384,85 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                       : 'border-gray-300'
                   }`}>
                     <p className="font-medium text-gray-900">Partial Refund</p>
-                    <p className="text-sm text-gray-500">Custom amount</p>
+                    <p className="text-sm text-gray-500">Select specific items</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-2">${calculatedRefund.toFixed(2)}</p>
                   </div>
                 </label>
               </div>
             </div>
 
-            {/* Partial Amount */}
+            {/* Item Selection (for partial refunds) */}
             {formData.refundType === 'partial' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Refund Amount
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Select Items to Refund <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                  <input
-                    type="number"
-                    name="refundAmount"
-                    value={formData.refundAmount}
-                    onChange={handleInputChange}
-                    min="0.01"
-                    max={orderTotal}
-                    step="0.01"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
+                <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  {orderItems.map(item => {
+                    const isSelected = selectedItems.has(item.id)
+                    const itemTotal = item.price * item.quantity
+                    
+                    return (
+                      <label
+                        key={item.id}
+                        className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleItemSelection(item.id)}
+                          className="w-4 h-4 text-blue-600"
+                        />
+                        <img
+                          src={item.productImage}
+                          alt={item.productName}
+                          className="w-12 h-12 ml-3 object-cover rounded"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = 'https://via.placeholder.com/100/f3f4f6/9ca3af?text=No+Image'
+                          }}
+                        />
+                        <div className="ml-3 flex-1">
+                          <p className="font-medium text-gray-900">{item.productName}</p>
+                          {item.variantName && (
+                            <p className="text-xs text-gray-500">{item.variantName}</p>
+                          )}
+                          <p className="text-sm text-gray-600">
+                            ${item.price.toFixed(2)} × {item.quantity}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-gray-900">
+                          ${itemTotal.toFixed(2)}
+                        </p>
+                      </label>
+                    )
+                  })}
                 </div>
-                <p className="mt-1 text-sm text-gray-500">
-                  Maximum: ${orderTotal.toFixed(2)}
-                </p>
+
+                {/* Refund Calculation Summary */}
+                <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-700">Items Selected:</span>
+                      <span className="font-medium text-gray-900">
+                        {selectedItems.size} of {orderItems.length}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-lg font-bold text-blue-900 pt-2 border-t border-blue-300">
+                      <span>Refund Amount:</span>
+                      <span>${calculatedRefund.toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 italic">
+                      {formData.refundType === 'full' || selectedItems.size === orderItems.length
+                        ? 'Includes all tax and shipping' 
+                        : 'Includes proportional tax (shipping not refunded for partial refunds)'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -342,11 +498,15 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                 onChange={handleInputChange}
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Please provide details about why you're requesting a refund..."
+                placeholder={
+                  formData.refundType === 'partial'
+                    ? 'Explain which items have issues and why...'
+                    : 'Please provide details about why you\'re requesting a refund...'
+                }
                 required
               />
               <p className="mt-1 text-sm text-gray-500">
-                Be as specific as possible to help us process your request faster
+                Be specific about which items have issues
               </p>
             </div>
 
@@ -359,7 +519,6 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                 Add photos to support your refund request (max 5 images)
               </p>
               
-              {/* Drag and Drop Area */}
               <div
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
@@ -378,10 +537,7 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                   className="hidden"
                   disabled={images.length >= 5}
                 />
-                <label
-                  htmlFor="image-upload"
-                  className="cursor-pointer"
-                >
+                <label htmlFor="image-upload" className="cursor-pointer">
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">
                     Drag and drop images here, or click to browse
@@ -392,7 +548,6 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                 </label>
               </div>
 
-              {/* Image Previews */}
               {images.length > 0 && (
                 <div className="mt-4 grid grid-cols-5 gap-2">
                   {images.map((image, index) => (
@@ -422,10 +577,12 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
                 <div className="ml-3">
                   <h4 className="text-sm font-medium text-yellow-800">Important Information</h4>
                   <div className="mt-2 text-sm text-yellow-700 space-y-1">
-                    <p>• Refund requests are typically reviewed within 2-3 business days</p>
-                    <p>• Approved refunds will be processed to your original payment method</p>
-                    <p>• Refunds may take 3-10 business days to appear in your account</p>
-                    <p>• You'll receive email notifications about your refund status</p>
+                    <p>• Refund requests are reviewed within 2-3 business days</p>
+                    <p>• Refunds processed to your original payment method</p>
+                    <p>• Allow 3-10 business days for refund to appear</p>
+                    {formData.refundType === 'partial' && (
+                      <p>• Only selected items will be refunded</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -444,10 +601,16 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
               </Button>
               <Button
                 type="submit"
-                disabled={isLoading || !formData.reason || !formData.description}
+                disabled={
+                  isLoading || 
+                  !formData.reason || 
+                  !formData.description ||
+                  (formData.refundType === 'partial' && selectedItems.size === 0) ||
+                  calculatedRefund === 0
+                }
                 className="flex-1"
               >
-                {isLoading ? 'Submitting...' : 'Submit Refund Request'}
+                {isLoading ? 'Submitting...' : `Submit Refund ($${calculatedRefund.toFixed(2)})`}
               </Button>
             </div>
           </form>
@@ -457,4 +620,5 @@ const RefundRequestModal: React.FC<RefundRequestModalProps> = ({
   )
 }
 
-export default RefundRequestModal
+export default RefundRequestModalEnhanced
+

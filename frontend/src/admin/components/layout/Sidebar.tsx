@@ -76,14 +76,15 @@ const navigationSections = [
     icon: DollarSign,
     items: [
       { name: 'Payment Management', href: '/admin/payment-management', icon: DollarSign, adminOnly: false },
-      { name: 'Payment Logs', href: '/admin/payment-logs', icon: CreditCard, adminOnly: true }
+      { name: 'Payment Logs', href: '/admin/payment-logs', icon: CreditCard, adminOnly: true },
+      { name: 'Refund Management', href: '/admin/refund-management', icon: RotateCcw, adminOnly: false }
     ]
   },
   {
     name: 'Shipping',
     icon: Truck,
     items: [
-      { name: 'ShipStation', href: '/admin/shipstation', icon: Truck, adminOnly: false }
+      { name: 'Shipping Management', href: '/admin/shipping', icon: Truck, adminOnly: false }
     ]
   },
   {

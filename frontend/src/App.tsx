@@ -23,6 +23,8 @@ import Cart from './ecommerce/routes/Cart'
 import Checkout from './ecommerce/routes/Checkout'
 import OrderCheckout from './ecommerce/routes/OrderCheckout'
 import MyOrders from './ecommerce/routes/MyOrders'
+import RefundTracking from './ecommerce/routes/RefundTracking'
+import MyReviews from './ecommerce/routes/MyReviews'
 import VerifyEmail from './pages/VerifyEmail'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentCancel from './pages/PaymentCancel'
@@ -114,6 +116,20 @@ export default function App() {
               <ProtectedRoute fallbackPath="/">
                 <EcommerceLayout>
                   <MyOrders />
+                </EcommerceLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/my-refunds" element={
+              <ProtectedRoute fallbackPath="/">
+                <EcommerceLayout>
+                  <RefundTracking />
+                </EcommerceLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/my-reviews" element={
+              <ProtectedRoute fallbackPath="/">
+                <EcommerceLayout>
+                  <MyReviews />
                 </EcommerceLayout>
               </ProtectedRoute>
             } />

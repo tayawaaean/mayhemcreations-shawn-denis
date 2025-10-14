@@ -330,6 +330,9 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
         shipping_carrier,
         shipped_at,
         delivered_at,
+        refund_status,
+        refunded_amount,
+        refund_requested_at,
         created_at,
         updated_at
       FROM order_reviews 

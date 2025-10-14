@@ -34,17 +34,24 @@ export interface OrderReviewAttributes {
   cardBrand?: string | null;
   orderNumber?: string | null;
   trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  labelUrl?: string | null;
   shippingCarrier?: string | null;
+  shippingMethod?: any | null; // JSON data for selected shipping method
   shippedAt?: Date | null;
   deliveredAt?: Date | null;
   estimatedDeliveryDate?: Date | null;
   customerNotes?: string | null;
   internalNotes?: string | null;
+  // Refund fields
+  refundStatus?: 'none' | 'requested' | 'partial' | 'full';
+  refundedAmount?: number;
+  refundRequestedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'shippingAddress' | 'billingAddress' | 'paymentMethod' | 'paymentStatus' | 'paymentProvider' | 'paymentIntentId' | 'transactionId' | 'cardLast4' | 'cardBrand' | 'orderNumber' | 'trackingNumber' | 'shippingCarrier' | 'shippedAt' | 'deliveredAt' | 'estimatedDeliveryDate' | 'customerNotes' | 'internalNotes' | 'createdAt' | 'updatedAt'> {}
+export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'shippingAddress' | 'billingAddress' | 'paymentMethod' | 'paymentStatus' | 'paymentProvider' | 'paymentIntentId' | 'transactionId' | 'cardLast4' | 'cardBrand' | 'orderNumber' | 'trackingNumber' | 'trackingUrl' | 'labelUrl' | 'shippingCarrier' | 'shippingMethod' | 'shippedAt' | 'deliveredAt' | 'estimatedDeliveryDate' | 'customerNotes' | 'internalNotes' | 'refundStatus' | 'refundedAmount' | 'refundRequestedAt' | 'createdAt' | 'updatedAt'> {}
 
 export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreationAttributes> implements OrderReviewAttributes {
   public id!: number;
@@ -74,12 +81,19 @@ export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreatio
   public cardBrand?: string | null;
   public orderNumber?: string | null;
   public trackingNumber?: string | null;
+  public trackingUrl?: string | null;
+  public labelUrl?: string | null;
   public shippingCarrier?: string | null;
+  public shippingMethod?: any | null;
   public shippedAt?: Date | null;
   public deliveredAt?: Date | null;
   public estimatedDeliveryDate?: Date | null;
   public customerNotes?: string | null;
   public internalNotes?: string | null;
+  // Refund fields
+  public refundStatus?: 'none' | 'requested' | 'partial' | 'full';
+  public refundedAmount?: number;
+  public refundRequestedAt?: Date | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
@@ -345,6 +359,27 @@ OrderReview.init(
       allowNull: true,
       field: 'internal_notes',
       comment: 'Internal admin notes',
+    },
+    // Refund fields
+    refundStatus: {
+      type: DataTypes.ENUM('none', 'requested', 'partial', 'full'),
+      allowNull: false,
+      defaultValue: 'none',
+      field: 'refund_status',
+      comment: 'Refund status of the order',
+    },
+    refundedAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.00,
+      field: 'refunded_amount',
+      comment: 'Total amount refunded',
+    },
+    refundRequestedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'refund_requested_at',
+      comment: 'When first refund was requested',
     },
     createdAt: {
       type: DataTypes.DATE,

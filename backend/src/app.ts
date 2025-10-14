@@ -27,8 +27,8 @@ import paymentRoute from './routes/paymentRoute';
 import paypalRoute from './routes/paypalRoute';
 import paymentManagementRoute from './routes/paymentManagementRoute';
 import paymentLogRoute from './routes/paymentLogRoute';
-import shipStationRoute from './routes/shipStationRoute';
 import shippingRoute from './routes/shippingRoute';
+import refundRoute from './routes/refundRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
 
 // Import middlewares
@@ -154,7 +154,8 @@ app.use('/api/v1/payments/paypal', paypalRoute);
 app.use('/api/v1/admin/payments', paymentManagementRoute);
 app.use('/api/v1/admin/payment-logs', paymentLogRoute);
 app.use('/api/v1/shipping', shippingRoute);
-app.use('/api/v1/shipstation', shipStationRoute);
+app.use('/api/v1/shipments', require('./routes/shipmentRoute').default);
+app.use('/api/v1/refunds', refundRoute);
 
 // Database maintenance endpoint
 app.post('/api/v1/admin/clean-indexes', cleanIndexes);
