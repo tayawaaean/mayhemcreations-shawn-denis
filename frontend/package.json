@@ -1,0 +1,35 @@
+{
+    "name": "mayhem-creation",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview",
+      "type-check": "tsc --noEmit"
+    },
+    "dependencies": {
+      "@paypal/react-paypal-js": "^8.9.1",
+      "@stripe/react-stripe-js": "^4.0.2",
+      "@stripe/stripe-js": "^7.9.0",
+      "axios": "^1.12.2",
+      "html2canvas": "^1.4.1",
+      "lucide-react": "^0.257.0",
+      "react": "^18.2.0",
+      "react-dom": "^18.2.0",
+      "react-router-dom": "^6.14.1",
+      "socket.io-client": "^4.8.1"
+    },
+    "devDependencies": {
+      "@types/react": "^18.2.21",
+      "@types/react-dom": "^18.2.7",
+      "@types/react-router-dom": "^5.3.3",
+      "@vitejs/plugin-react": "^4.0.3",
+      "autoprefixer": "^10.4.14",
+      "postcss": "^8.4.24",
+      "tailwindcss": "^3.4.0",
+      "typescript": "^5.6.2",
+      "vite": "^5.2.0"
+    }
+  }
