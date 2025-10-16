@@ -23,13 +23,17 @@ import {
   MousePointer,
   Maximize2,
   MapPin,
-  Truck
+  Truck,
+  FileText,
+  Printer,
+  RotateCcw
 } from 'lucide-react'
 import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiService' // Updated with new status types
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import { useAdminWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
+import { apiAuthService } from '../../shared/apiAuthService'
 
 const PendingReview: React.FC = () => {
   const [reviews, setReviews] = useState<OrderReview[]>([])
@@ -44,6 +48,9 @@ const PendingReview: React.FC = () => {
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
   const [enlargedImageTitle, setEnlargedImageTitle] = useState<string>('')
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
+  // Success modal state
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const [isImageModalOpen, setIsImageModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<{src: string, alt: string, type: string} | null>(null)
   const [adminNotes, setAdminNotes] = useState('')
@@ -55,6 +62,11 @@ const PendingReview: React.FC = () => {
   const [uploadingPictures, setUploadingPictures] = useState(false)
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set())
   const [backendProducts, setBackendProducts] = useState<any[]>([])
+  
+  // Label creation state
+  const [creatingLabel, setCreatingLabel] = useState(false)
+  const [labelData, setLabelData] = useState<any>(null)
+  const [isLabelModalOpen, setIsLabelModalOpen] = useState(false)
   
   // WebSocket hook for real-time updates
   const { subscribe, isConnected } = useAdminWebSocket()
@@ -261,9 +273,9 @@ const PendingReview: React.FC = () => {
         return;
       }
 
-      // Validate shipping info if status is shipped
-      if (status === 'shipped' && (!tracking || !carrier)) {
-        alert('Please provide both tracking number and shipping carrier for shipped orders');
+      // Validate shipping info if status is shipped and no label has been created
+      if (status === 'shipped' && !selectedReview?.tracking_number && (!tracking || !carrier)) {
+        alert('Please create a shipping label first or manually enter tracking number and carrier');
         return;
       }
 
@@ -384,7 +396,8 @@ const PendingReview: React.FC = () => {
       console.log('📥 API response:', response);
       
       if (response.success) {
-        alert('Picture replies uploaded successfully!')
+        setSuccessMessage('Picture replies uploaded successfully!')
+        setIsSuccessModalOpen(true)
         setPictureReplies({})
         loadReviews() // Refresh the reviews
         setIsDetailModalOpen(false) // Close the modal after successful upload
@@ -399,7 +412,108 @@ const PendingReview: React.FC = () => {
     }
   }
 
+  // Handler for creating shipping label
+  const handleCreateLabel = async (orderId: number, rateId?: string) => {
+    try {
+      setCreatingLabel(true)
+      
+      console.log('📦 Creating label for order:', orderId)
+      
+      // Call the label creation API using apiAuthService
+      const response = await apiAuthService.post<{
+        orderId: number
+        orderNumber: string
+        trackingNumber: string
+        labelDownloadPdf: string
+        labelDownloadPng: string
+        carrierCode: string
+        serviceCode: string
+        shipmentCost: number
+        wasUpdate: boolean
+        previousTrackingNumber?: string
+      }>('/labels/create', { orderId, rateId }, true)
 
+      console.log('✅ Label API response:', response)
+
+      if (response.success && response.data) {
+        // Store label data
+        setLabelData(response.data)
+        
+        // Log if this was an update
+        if (response.data.wasUpdate) {
+          console.log(`🔄 Label updated for order ${orderId}`)
+          console.log(`📦 Previous tracking: ${response.data.previousTrackingNumber}`)
+          console.log(`📦 New tracking: ${response.data.trackingNumber}`)
+        } else {
+          console.log(`✅ New label created for order ${orderId}`)
+        }
+        
+        // Refresh reviews to show updated tracking info
+        await loadReviews()
+        
+        // Show success modal with label info
+        setIsLabelModalOpen(true)
+      } else {
+        throw new Error(response.message || 'Failed to create label')
+      }
+    } catch (error: any) {
+      console.error('❌ Label creation error:', error)
+      alert(`Failed to create shipping label: ${error.message || 'Unknown error'}`)
+    } finally {
+      setCreatingLabel(false)
+    }
+  }
+
+  // Handler to download label PDF (handles both base64 data URIs and regular URLs)
+  const handleDownloadLabel = (pdfUrl: string) => {
+    if (!pdfUrl) {
+      console.error('❌ No PDF URL provided - this may be a backend issue where the URL was not saved')
+      alert('PDF URL not available. This may be a backend issue. Please contact support or try creating a new label.')
+      return
+    }
+
+    // Check if it's a base64 data URI
+    if (pdfUrl.startsWith('data:application/pdf;base64,')) {
+      try {
+        // Extract the base64 content
+        const base64Content = pdfUrl.split(',')[1]
+        
+        // Convert base64 to binary
+        const binaryString = window.atob(base64Content)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        
+        // Create a blob from the binary data
+        const blob = new Blob([bytes], { type: 'application/pdf' })
+        
+        // Create a download link
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = `shipping-label-${Date.now()}.pdf`
+        
+        // Trigger download
+        document.body.appendChild(link)
+        link.click()
+        
+        // Cleanup
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(downloadUrl)
+        
+        console.log('✅ PDF download triggered successfully')
+      } catch (error) {
+        console.error('❌ Error downloading base64 PDF:', error)
+        alert('Failed to download PDF. Please try again.')
+      }
+    } else {
+      // Regular URL - open in new tab
+      window.open(pdfUrl, '_blank')
+    }
+  }
+
+  
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
@@ -423,6 +537,8 @@ const PendingReview: React.FC = () => {
       case 'ready-for-checkout':
       case 'pending-payment':
         return <DollarSign className="h-4 w-4" />
+      case 'refunded':
+        return <RotateCcw className="h-4 w-4" />
       default:
         return <Clock className="h-4 w-4" />
     }
@@ -452,6 +568,8 @@ const PendingReview: React.FC = () => {
       case 'ready-for-checkout':
       case 'pending-payment':
         return 'bg-orange-50 text-orange-800 border border-orange-200'
+      case 'refunded':
+        return 'bg-yellow-50 text-yellow-800 border border-yellow-200'
       default:
         return 'bg-gray-100 text-gray-800 border border-gray-200'
     }
@@ -712,6 +830,9 @@ const PendingReview: React.FC = () => {
     { value: 'needs-changes', label: '🎨 Awaiting Customer Feedback' },
     { value: 'pending-payment', label: '💳 Ready for Payment' },
     { value: 'approved-processing', label: '✅ Approved & Processing' },
+    { value: 'shipped', label: '📦 Shipped' },
+    { value: 'delivered', label: '✅ Delivered' },
+    { value: 'refunded', label: '💰 Refunded' },
     { value: 'rejected', label: '🔄 Needs Re-submission' }
   ]
 
@@ -1027,13 +1148,16 @@ const PendingReview: React.FC = () => {
         }
       }
       
+      // Recalculate total price with the corrected base price
+      const correctTotalPrice = baseProductPrice + storedEmbroideryPrice + storedOptionsPrice;
+      
       const result = {
         baseProductPrice: baseProductPrice,
         embroideryPrice: storedEmbroideryPrice,
         embroideryOptionsPrice: storedOptionsPrice,
-        totalPrice: storedTotalPrice
+        totalPrice: correctTotalPrice
       };
-      console.log('🔍 getPricingBreakdown - Using stored pricingBreakdown:', result);
+      console.log('🔍 getPricingBreakdown - Using stored pricingBreakdown (recalculated total):', result);
       return result;
     }
 
@@ -1752,6 +1876,52 @@ const PendingReview: React.FC = () => {
                     return null;
                   }
                 })()}
+
+                {/* Tracking Information - Show when label is created */}
+                {(selectedReview.tracking_number || selectedReview.shipping_label_url) && (
+                  <div className="bg-white p-4 rounded-lg border border-green-300 shadow-sm">
+                    <h4 className="font-semibold text-gray-900 mb-4 pb-2 border-b border-green-200 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-green-600" />
+                      Shipping Label Created
+                    </h4>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <div className="space-y-3">
+                        {selectedReview.tracking_number && (
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Tracking Number</p>
+                            <p className="font-mono text-lg font-semibold text-gray-900">{selectedReview.tracking_number}</p>
+                          </div>
+                        )}
+                        {selectedReview.carrier_code && (
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Carrier</p>
+                            <p className="text-sm font-medium text-gray-700 capitalize">{selectedReview.carrier_code.replace('_', ' ')}</p>
+                          </div>
+                        )}
+                        {selectedReview.service_code && (
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Service</p>
+                            <p className="text-sm text-gray-700 capitalize">{selectedReview.service_code.replace('_', ' ')}</p>
+                          </div>
+                        )}
+                        {selectedReview.tracking_number && (
+                          <div className="pt-2 border-t border-green-200">
+                            <button
+                              onClick={() => handleDownloadLabel(selectedReview.shipping_label_url || '')}
+                              className="w-full px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              <span>Download Shipping Label (PDF)</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      Label generated via ShipEngine. Use this to ship the package.
+                    </p>
+                  </div>
+                )}
 
                 {/* Customer Notes - ALWAYS SHOW (NEW) */}
                 {(selectedReview as any).customer_notes && (
@@ -3246,21 +3416,31 @@ const PendingReview: React.FC = () => {
                                             
                                             {/* File Upload */}
                                             <div className="mb-3">
-                                              <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={(e) => {
-                                                  console.log('📁 File input changed for item:', itemKey);
-                                                  const file = e.target.files?.[0]
-                                                  console.log('📁 Selected file:', file);
-                                                  if (file) {
-                                                    handlePictureReplyUpload(itemKey, file)
-                                                  } else {
-                                                    console.log('❌ No file selected');
-                                                  }
-                                                }}
-                                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                              />
+                                              <div className="relative">
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  onChange={(e) => {
+                                                    console.log('📁 File input changed for item:', itemKey);
+                                                    const file = e.target.files?.[0]
+                                                    console.log('📁 Selected file:', file);
+                                                    if (file) {
+                                                      handlePictureReplyUpload(itemKey, file)
+                                                    } else {
+                                                      console.log('❌ No file selected');
+                                                    }
+                                                  }}
+                                                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                  id={`file-input-${itemKey}`}
+                                                />
+                                                <label
+                                                  htmlFor={`file-input-${itemKey}`}
+                                                  className="block w-full px-4 py-2 text-sm font-medium text-center text-blue-700 bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-100 hover:border-blue-400 transition-colors"
+                                                >
+                                                  <Upload className="h-4 w-4 inline mr-2" />
+                                                  Choose File to Upload
+                                                </label>
+                                              </div>
                                               {pictureReplies[itemKey]?.image && (
                                                 <div className="flex items-center space-x-2 text-green-600 mt-2">
                                                   <Check className="h-4 w-4" />
@@ -3323,6 +3503,42 @@ const PendingReview: React.FC = () => {
                 >
                   Close
                 </button>
+                  
+                  {/* Create/Update Label Button - Show when approved/ready to ship */}
+                  {(selectedReview.status === 'approved' || 
+                    selectedReview.status === 'approved-processing' || 
+                    selectedReview.status === 'ready-for-production') && (
+                    <button
+                      onClick={() => handleCreateLabel(selectedReview.id)}
+                      disabled={creatingLabel}
+                      title={selectedReview.tracking_number 
+                        ? 'Create a new shipping label and update the existing one' 
+                        : 'Create a shipping label for this order'
+                      }
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <Printer className="h-4 w-4" />
+                      <span>
+                        {creatingLabel 
+                          ? 'Creating...' 
+                          : selectedReview.tracking_number 
+                            ? 'Update Label' 
+                            : 'Create Label'
+                        }
+                      </span>
+                    </button>
+                  )}
+
+                  {/* View/Download Label Button - Show when label exists */}
+                  {selectedReview.tracking_number && (
+                    <button
+                      onClick={() => handleDownloadLabel(selectedReview.shipping_label_url || '')}
+                      className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>Download Label</span>
+                    </button>
+                  )}
                   
                   {/* Status Update Button - Show for all statuses */}
                 <button
@@ -3471,6 +3687,7 @@ const PendingReview: React.FC = () => {
                     <option value="in-production">6. In Production</option>
                     <option value="shipped">7. Shipped</option>
                     <option value="delivered">8. Delivered</option>
+                    <option value="refunded">💰 Refunded</option>
                     <option value="rejected">❌ Rejected - Needs Re-upload</option>
                   </select>
                 </div>
@@ -3672,6 +3889,184 @@ const PendingReview: React.FC = () => {
               className="max-w-full max-h-[90vh] object-contain rounded-lg"
               onClick={() => setEnlargedImage(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Label Created Success Modal */}
+      {isLabelModalOpen && labelData && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity bg-black bg-opacity-50" onClick={() => setIsLabelModalOpen(false)}></div>
+
+            <div className="inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              {/* Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-12 h-12 bg-white rounded-full">
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">
+                        {labelData.wasUpdate ? 'Label Updated Successfully!' : 'Label Created Successfully!'}
+                      </h3>
+                      <p className="text-sm text-green-100">
+                        {labelData.wasUpdate ? 'Your shipping label has been updated' : 'Your shipping label is ready'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsLabelModalOpen(false)}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-6 space-y-6">
+                {/* Tracking Number */}
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-gray-600 mb-2">Tracking Number</p>
+                    <div className="flex items-center justify-center space-x-2 mb-3">
+                      <Package className="w-6 h-6 text-blue-600" />
+                      <p className="text-2xl font-bold text-gray-900 font-mono tracking-wide">
+                        {labelData.trackingNumber}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(labelData.trackingNumber)
+                        alert('Tracking number copied to clipboard!')
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center space-x-1 mx-auto"
+                    >
+                      <span>📋 Copy Tracking Number</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Shipping Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Order Number</p>
+                    <p className="text-lg font-semibold text-gray-900">{labelData.orderNumber}</p>
+                  </div>
+                  
+                  {labelData.carrierCode && (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Carrier</p>
+                      <p className="text-lg font-semibold text-gray-900 capitalize">
+                        {labelData.carrierCode.replace('_', ' ')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {labelData.serviceCode && (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Service</p>
+                      <p className="text-sm font-medium text-gray-700 capitalize">
+                        {labelData.serviceCode.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {labelData.shipmentCost && (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Shipping Cost</p>
+                      <p className="text-lg font-semibold text-green-600">
+                        ${Number(labelData.shipmentCost).toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Download Buttons */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleDownloadLabel(labelData.labelDownloadPdf)}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-lg hover:shadow-xl flex items-center justify-center space-x-3"
+                  >
+                    <Download className="w-5 h-5" />
+                    <span>Download Label (PDF)</span>
+                  </button>
+
+                  {labelData.labelDownloadPng && (
+                    <button
+                      onClick={() => handleDownloadLabel(labelData.labelDownloadPng)}
+                      className="w-full px-6 py-3 bg-white text-gray-700 border-2 border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium flex items-center justify-center space-x-3"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                      <span>Download Label (PNG)</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Info Box */}
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium mb-1">Next Steps:</p>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>Print the shipping label</li>
+                        <li>Attach it securely to the package</li>
+                        <li>Ship the package via the selected carrier</li>
+                        <li>The tracking number will update automatically</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => setIsLabelModalOpen(false)}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDownloadLabel(labelData.labelDownloadPdf)
+                      setIsLabelModalOpen(false)
+                    }}
+                    className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download & Close</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {isSuccessModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-green-100 rounded-full mb-4">
+              <CheckCircle className="w-10 h-10 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">
+              Success!
+            </h3>
+            <p className="text-gray-600 text-center mb-6">
+              {successMessage}
+            </p>
+            <button
+              onClick={() => setIsSuccessModalOpen(false)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

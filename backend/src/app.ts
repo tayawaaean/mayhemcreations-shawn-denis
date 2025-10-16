@@ -29,6 +29,7 @@ import paymentManagementRoute from './routes/paymentManagementRoute';
 import paymentLogRoute from './routes/paymentLogRoute';
 import shippingRoute from './routes/shippingRoute';
 import refundRoute from './routes/refundRoute';
+import labelRoute from './routes/labelRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
 
 // Import middlewares
@@ -156,6 +157,7 @@ app.use('/api/v1/admin/payment-logs', paymentLogRoute);
 app.use('/api/v1/shipping', shippingRoute);
 app.use('/api/v1/shipments', require('./routes/shipmentRoute').default);
 app.use('/api/v1/refunds', refundRoute);
+app.use('/api/v1/labels', labelRoute);
 
 // Database maintenance endpoint
 app.post('/api/v1/admin/clean-indexes', cleanIndexes);

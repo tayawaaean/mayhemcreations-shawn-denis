@@ -549,7 +549,7 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     const { id } = req.params;
     const { status, adminNotes, trackingNumber, shippingCarrier } = req.body;
 
-    const validStatuses = ['pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered'];
+    const validStatuses = ['pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered', 'refunded'];
     
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
@@ -588,10 +588,16 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
     let updateQuery = `UPDATE order_reviews SET status = ?, admin_notes = ?, reviewed_at = NOW(), updated_at = NOW()`;
     let replacements: any[] = [finalStatus, adminNotes || null];
 
-    // If status is 'shipped', update shipping fields
+    // If status is 'shipped', set shipped_at timestamp
+    // Tracking info should already be set from label creation
     if (status === 'shipped') {
-      updateQuery += `, tracking_number = ?, shipping_carrier = ?, shipped_at = NOW()`;
-      replacements.push(trackingNumber || null, shippingCarrier || null);
+      updateQuery += `, shipped_at = NOW()`;
+      // Note: tracking_number and carrier_code are already set when label is created
+      // If manual tracking info is provided, update it
+      if (trackingNumber || shippingCarrier) {
+        updateQuery += `, tracking_number = COALESCE(?, tracking_number), shipping_carrier = COALESCE(?, shipping_carrier)`;
+        replacements.push(trackingNumber || null, shippingCarrier || null);
+      }
     }
 
     // If status is 'delivered', update delivered_at

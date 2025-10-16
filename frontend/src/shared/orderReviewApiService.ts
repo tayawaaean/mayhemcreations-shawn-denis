@@ -49,6 +49,9 @@ export interface OrderReview {
   card_brand?: string;
   tracking_number?: string;
   shipping_carrier?: string;
+  shipping_label_url?: string; // PDF download URL for shipping label
+  carrier_code?: string; // Carrier code from ShipEngine (e.g., 'usps', 'ups')
+  service_code?: string; // Service code from ShipEngine (e.g., 'usps_priority_mail')
   shipped_at?: string;
   delivered_at?: string;
   estimated_delivery_date?: string;

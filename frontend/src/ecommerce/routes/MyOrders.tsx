@@ -56,7 +56,7 @@ interface OrderItem {
 interface Order {
   id: number
   orderNumber: string
-  status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered'
+  status: 'pending-review' | 'rejected-needs-upload' | 'picture-reply-pending' | 'picture-reply-rejected' | 'picture-reply-approved' | 'pending-payment' | 'approved-processing' | 'ready-for-production' | 'in-production' | 'ready-for-checkout' | 'shipped' | 'delivered' | 'refunded'
   orderDate: string
   total: number
   subtotal?: number
@@ -106,6 +106,8 @@ const mapStatus = (oldStatus: string): Order['status'] => {
       return 'shipped'
     case 'delivered':
       return 'delivered'
+    case 'refunded':
+      return 'refunded'
     default:
       return oldStatus as Order['status']
   }
@@ -568,6 +570,8 @@ const getStatusIcon = (status: Order['status']) => {
       return <Truck className="w-5 h-5 text-blue-600" />
     case 'delivered':
       return <CheckCircle className="w-5 h-5 text-green-600" />
+    case 'refunded':
+      return <RotateCcw className="w-5 h-5 text-yellow-600" />
     default:
       return <Clock className="w-5 h-5 text-gray-500" />
   }
@@ -599,6 +603,8 @@ const getStatusText = (status: Order['status']) => {
       return 'On the Way'
     case 'delivered':
       return 'Delivered'
+    case 'refunded':
+      return 'Refunded'
     default:
       return 'In Progress'
   }
@@ -631,6 +637,8 @@ const getStatusColor = (status: Order['status']) => {
       return 'bg-blue-100 text-blue-800 border border-blue-200'
     case 'delivered':
       return 'bg-green-100 text-green-800 border border-green-200'
+    case 'refunded':
+      return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
     default:
       return 'bg-gray-100 text-gray-800 border border-gray-200'
   }
@@ -691,6 +699,8 @@ const getIconBackgroundColor = (status: Order['status']) => {
       return 'bg-blue-100 border-blue-300'
     case 'delivered':
       return 'bg-green-100 border-green-300'
+    case 'refunded':
+      return 'bg-yellow-100 border-yellow-300'
     default:
       return 'bg-gray-100 border-gray-300'
   }
@@ -723,6 +733,8 @@ const getOrderProgress = (status: Order['status']): number => {
       return 90
     case 'delivered':
       return 100
+    case 'refunded':
+      return 100  // Refunded orders show as complete (100%)
     default:
       return 5
   }
@@ -742,6 +754,8 @@ const getProgressBarColor = (status: Order['status']): string => {
       return 'bg-blue-500'
     case 'in-production':
       return 'bg-violet-500'
+    case 'refunded':
+      return 'bg-yellow-500'
     default:
       return 'bg-blue-500'
   }
@@ -1586,11 +1600,9 @@ export default function MyOrders() {
 
   // Handle proceed to checkout
   const handleProceedToCheckout = (order: Order) => {
-    console.log('Proceeding to checkout for order:', order)
-    // Store order data in sessionStorage for the checkout page
-    sessionStorage.setItem('checkoutOrder', JSON.stringify(order))
-    // Navigate to checkout page
-    navigate('/order-checkout')
+    console.log('Proceeding to payment for order:', order)
+    // Navigate to new streamlined payment page with order ID
+    navigate(`/payment?orderId=${order.id}`)
   }
 
   // Handle re-upload modal
@@ -2159,7 +2171,7 @@ export default function MyOrders() {
                       <div className="flex-1 min-w-0">
                         <h4 className="text-base font-bold text-gray-900 truncate mb-1">{item.productName}</h4>
                         <p className="text-sm text-gray-600 font-medium mb-2">
-                          ${item.price.toFixed(2)} <span className="text-gray-400">×</span> {item.quantity}
+                          ${getPricingBreakdown(item, backendProducts).totalPrice.toFixed(2)} <span className="text-gray-400">×</span> {item.quantity}
                         </p>
                         
                         {/* Simplified Customization Display */}
@@ -2192,7 +2204,7 @@ export default function MyOrders() {
                       <div className="text-right">
                         <p className="text-xs font-medium text-gray-500 mb-1">Item Total</p>
                         <p className="text-lg font-bold text-gray-900">
-                          ${((Number(item.price) || 0) * (item.quantity || 1)).toFixed(2)}
+                          ${(getPricingBreakdown(item, backendProducts).totalPrice * (item.quantity || 1)).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -3080,11 +3092,21 @@ export default function MyOrders() {
                                                 <img
                                                   src={reply.image}
                                                   alt="Your design sample"
-                                                  className="w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-all hover:scale-105 border-2 border-white shadow-md"
-                                                  onClick={() => window.open(reply.image, '_blank')}
-                                                  title="Click to view full size"
+                                                  className={`w-20 h-20 object-cover rounded-lg border-2 border-white shadow-md ${
+                                                    selectedOrder.status !== 'refunded' 
+                                                      ? 'cursor-pointer hover:opacity-90 transition-all hover:scale-105' 
+                                                      : 'opacity-75 cursor-not-allowed'
+                                                  }`}
+                                                  onClick={() => {
+                                                    if (selectedOrder.status !== 'refunded') {
+                                                      window.open(reply.image, '_blank')
+                                                    }
+                                                  }}
+                                                  title={selectedOrder.status !== 'refunded' ? "Click to view full size" : "Design samples not available for refunded orders"}
                                                 />
-                                                <p className="text-xs text-center text-blue-100 mt-1">Click to enlarge</p>
+                                                {selectedOrder.status !== 'refunded' && (
+                                                  <p className="text-xs text-center text-blue-100 mt-1">Click to enlarge</p>
+                                                )}
                                               </div>
                                               <div className="flex-1 min-w-0">
                                                 <div className="flex items-center space-x-2 mb-1">

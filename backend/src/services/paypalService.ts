@@ -475,8 +475,10 @@ export const validatePayPalOrderData = (data: CreatePayPalOrderData): { isValid:
     errors.push('Minimum amount is $0.01');
   }
 
-  if (data.amount > 10000) {
-    errors.push('Maximum amount is $10,000');
+  // PayPal standard checkout supports up to $25,000 per transaction
+  // For higher amounts, contact PayPal to increase limits or use PayPal Commerce Platform
+  if (data.amount > 25000) {
+    errors.push('Maximum amount is $25,000 per transaction. For higher amounts, please contact us directly.');
   }
 
   if (data.items) {

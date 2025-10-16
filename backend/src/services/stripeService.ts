@@ -147,10 +147,55 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       },
     };
 
+    // Create or update customer with shipping address to enable pre-fill
+    let customerId = data.customerId;
+    
+    if (data.customerInfo && data.shippingAddress) {
+      try {
+        // Try to find existing customer by email
+        const customers = await stripe.customers.list({
+          email: data.customerInfo.email,
+          limit: 1
+        });
+        
+        const customerData: any = {
+          name: data.customerInfo.name,
+          email: data.customerInfo.email,
+          phone: data.customerInfo.phone || undefined,
+          shipping: {
+            name: data.customerInfo.name,
+            address: {
+              line1: data.shippingAddress.line1,
+              line2: data.shippingAddress.line2 || undefined,
+              city: data.shippingAddress.city,
+              state: data.shippingAddress.state,
+              postal_code: data.shippingAddress.postal_code,
+              country: data.shippingAddress.country
+            }
+          }
+        };
+        
+        if (customers.data.length > 0) {
+          // Update existing customer with shipping address
+          const customer = await stripe.customers.update(customers.data[0].id, customerData);
+          customerId = customer.id;
+          logger.info('Updated existing Stripe customer with shipping address:', customer.id);
+        } else {
+          // Create new customer with shipping address
+          const customer = await stripe.customers.create(customerData);
+          customerId = customer.id;
+          logger.info('Created new Stripe customer with shipping address:', customer.id);
+        }
+      } catch (error: any) {
+        logger.warn('Failed to create/update Stripe customer:', error.message);
+        // Continue without customer - will use customer_email instead
+      }
+    }
+    
     // Set customer OR customer_email (not both)
-    // If customer exists, Stripe will pre-fill shipping from customer.shipping
-    if (data.customerId) {
-      sessionData.customer = data.customerId;
+    // Using customer will pre-fill shipping address from customer.shipping
+    if (customerId) {
+      sessionData.customer = customerId;
     } else if (data.customerInfo?.email) {
       sessionData.customer_email = data.customerInfo.email;
     }

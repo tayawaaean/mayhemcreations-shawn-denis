@@ -36,6 +36,9 @@ export interface OrderReviewAttributes {
   trackingNumber?: string | null;
   trackingUrl?: string | null;
   labelUrl?: string | null;
+  shippingLabelUrl?: string | null; // ShipEngine label PDF download URL
+  carrierCode?: string | null; // ShipEngine carrier code (e.g., 'usps', 'ups')
+  serviceCode?: string | null; // ShipEngine service code (e.g., 'usps_priority_mail')
   shippingCarrier?: string | null;
   shippingMethod?: any | null; // JSON data for selected shipping method
   shippedAt?: Date | null;
@@ -51,7 +54,7 @@ export interface OrderReviewAttributes {
   updatedAt: Date;
 }
 
-export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'shippingAddress' | 'billingAddress' | 'paymentMethod' | 'paymentStatus' | 'paymentProvider' | 'paymentIntentId' | 'transactionId' | 'cardLast4' | 'cardBrand' | 'orderNumber' | 'trackingNumber' | 'trackingUrl' | 'labelUrl' | 'shippingCarrier' | 'shippingMethod' | 'shippedAt' | 'deliveredAt' | 'estimatedDeliveryDate' | 'customerNotes' | 'internalNotes' | 'refundStatus' | 'refundedAmount' | 'refundRequestedAt' | 'createdAt' | 'updatedAt'> {}
+export interface OrderReviewCreationAttributes extends Optional<OrderReviewAttributes, 'id' | 'reviewedAt' | 'adminNotes' | 'adminPictureReplies' | 'customerConfirmations' | 'pictureReplyUploadedAt' | 'customerConfirmedAt' | 'shippingAddress' | 'billingAddress' | 'paymentMethod' | 'paymentStatus' | 'paymentProvider' | 'paymentIntentId' | 'transactionId' | 'cardLast4' | 'cardBrand' | 'orderNumber' | 'trackingNumber' | 'trackingUrl' | 'labelUrl' | 'shippingLabelUrl' | 'carrierCode' | 'serviceCode' | 'shippingCarrier' | 'shippingMethod' | 'shippedAt' | 'deliveredAt' | 'estimatedDeliveryDate' | 'customerNotes' | 'internalNotes' | 'refundStatus' | 'refundedAmount' | 'refundRequestedAt' | 'createdAt' | 'updatedAt'> {}
 
 export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreationAttributes> implements OrderReviewAttributes {
   public id!: number;
@@ -83,6 +86,9 @@ export class OrderReview extends Model<OrderReviewAttributes, OrderReviewCreatio
   public trackingNumber?: string | null;
   public trackingUrl?: string | null;
   public labelUrl?: string | null;
+  public shippingLabelUrl?: string | null;
+  public carrierCode?: string | null;
+  public serviceCode?: string | null;
   public shippingCarrier?: string | null;
   public shippingMethod?: any | null;
   public shippedAt?: Date | null;
@@ -208,7 +214,7 @@ OrderReview.init(
       comment: 'Total order amount',
     },
     status: {
-      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered'),
+      type: DataTypes.ENUM('pending', 'approved', 'rejected', 'needs-changes', 'pending-payment', 'approved-processing', 'picture-reply-pending', 'picture-reply-rejected', 'picture-reply-approved', 'ready-for-production', 'in-production', 'ready-for-checkout', 'shipped', 'delivered', 'refunded'),
       allowNull: false,
       defaultValue: 'pending',
       field: 'status',
@@ -324,6 +330,24 @@ OrderReview.init(
       field: 'tracking_number',
       comment: 'Shipping tracking number',
     },
+    shippingLabelUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'shipping_label_url',
+      comment: 'ShipEngine label PDF download URL',
+    },
+    carrierCode: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: 'carrier_code',
+      comment: 'ShipEngine carrier code (e.g., usps, ups, fedex)',
+    },
+    serviceCode: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: 'service_code',
+      comment: 'ShipEngine service code (e.g., usps_priority_mail, ups_ground)',
+    },
     shippingCarrier: {
       type: DataTypes.STRING(100),
       allowNull: true,
@@ -409,6 +433,14 @@ OrderReview.init(
       {
         name: 'idx_order_reviews_shipping_carrier',
         fields: ['shipping_carrier']
+      },
+      {
+        name: 'idx_order_reviews_tracking_number',
+        fields: ['tracking_number']
+      },
+      {
+        name: 'idx_order_reviews_carrier_code',
+        fields: ['carrier_code']
       }
     ]
   }

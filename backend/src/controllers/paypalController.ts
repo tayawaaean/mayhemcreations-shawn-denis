@@ -163,8 +163,10 @@ export const capturePayPalOrderHandler = async (
         const { sequelize } = await import('../config/database');
         
         // Find the most recent order review for this user that's in pending-payment status
+        logger.info('🔍 Looking for pending-payment order for user:', userId);
+        
         const [orderResult] = await sequelize.query(`
-          SELECT id, user_id, status, total, subtotal, shipping, tax
+          SELECT id, user_id, status, total, subtotal, shipping, tax, payment_status
           FROM order_reviews 
           WHERE user_id = ? AND status = 'pending-payment'
           ORDER BY created_at DESC 
@@ -173,8 +175,19 @@ export const capturePayPalOrderHandler = async (
           replacements: [userId]
         });
 
+        logger.info('🔍 Found orders:', {
+          count: Array.isArray(orderResult) ? orderResult.length : 0,
+          orders: orderResult
+        });
+
         if (Array.isArray(orderResult) && orderResult.length > 0) {
           const order = orderResult[0] as any;
+          
+          logger.info('✅ Found order to update:', {
+            orderId: order.id,
+            currentStatus: order.status,
+            currentPaymentStatus: order.payment_status
+          });
           
           // Prioritize form data (metadata) over PayPal shipping address
           // This ensures consistent address usage like Stripe
@@ -221,6 +234,16 @@ export const capturePayPalOrderHandler = async (
           const payerEmail = payerInfo?.email_address || metadata?.customerEmail || '';
           const cardBrand = 'paypal'; // PayPal doesn't provide card brand
           
+          // Extract the actual PayPal capture ID (needed for refunds)
+          // The capture.id is the order ID, but the actual capture ID is in purchase_units
+          const paypalCaptureId = capture.purchase_units?.[0]?.payments?.captures?.[0]?.id || capture.id;
+          
+          logger.info('🔍 PayPal IDs:', {
+            orderId: capture.id, // Order ID (e.g., 5O123456789)
+            captureId: paypalCaptureId, // Capture ID (e.g., 3Y0953011T443932D) - this is what we need for refunds
+            captureIdLocation: capture.purchase_units?.[0]?.payments?.captures?.[0]?.id ? 'purchase_units' : 'fallback'
+          });
+          
           // Extract pricing information from metadata (passed from frontend)
           const subtotal = metadata?.subtotal ? parseFloat(metadata.subtotal) : order.subtotal || null;
           const shipping = metadata?.shipping ? parseFloat(metadata.shipping) : order.shipping || null;
@@ -232,11 +255,23 @@ export const capturePayPalOrderHandler = async (
             shippingAddress,
             payerEmail,
             orderNumber,
-            pricing: { subtotal, shipping, tax, total }
+            pricing: { subtotal, shipping, tax, total },
+            paypalCaptureId // Log the capture ID being saved
           });
           
           // Update order status and payment/shipping details with pricing
-          await sequelize.query(`
+          logger.info('💾 Updating order in database:', {
+            orderId: order.id,
+            newStatus: 'approved-processing',
+            paymentStatus: 'completed',
+            orderNumber,
+            subtotal,
+            shipping,
+            tax,
+            total
+          });
+          
+          const [updateResult] = await sequelize.query(`
             UPDATE order_reviews 
             SET status = 'approved-processing',
                 order_number = ?,
@@ -260,7 +295,7 @@ export const capturePayPalOrderHandler = async (
               orderNumber,
               shippingAddress ? JSON.stringify(shippingAddress) : null,
               shippingAddress ? JSON.stringify(shippingAddress) : null, // Use same address for billing
-              capture.id, // PayPal capture ID as payment intent
+              paypalCaptureId, // ✅ PayPal capture ID (used for refunds)
               `paypal_${orderId}`,
               cardBrand,
               subtotal,
@@ -270,6 +305,22 @@ export const capturePayPalOrderHandler = async (
               order.id
             ]
           });
+          
+          logger.info('✅ Order update result:', {
+            affectedRows: (updateResult as any).affectedRows,
+            orderId: order.id
+          });
+          
+          // Verify the update by querying the order again
+          const [verifyResult] = await sequelize.query(`
+            SELECT id, status, payment_status, payment_method, payment_provider
+            FROM order_reviews 
+            WHERE id = ?
+          `, {
+            replacements: [order.id]
+          });
+          
+          logger.info('✅ Order status after update:', verifyResult[0]);
 
           // Deduct stock after successful payment
           try {
