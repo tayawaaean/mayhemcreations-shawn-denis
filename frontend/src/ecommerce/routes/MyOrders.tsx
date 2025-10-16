@@ -193,7 +193,41 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
       }
       // PRIORITY 4: For multiple designs with individual pricing (new format)
       else if (item.customization?.designs && item.customization.designs.length > 0) {
-        let basePrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
+        // Try multiple sources for base price with proper ID matching
+        let basePrice = 0;
+        
+        // First try item.product.price
+        if (item.product?.price) {
+          basePrice = Number(item.product.price);
+        }
+        // Then try resolvedProduct.price
+        else if (resolvedProduct?.price) {
+          basePrice = Number(resolvedProduct.price);
+        }
+        // Finally, search products array with proper ID matching
+        else {
+          const productId = item.productId;
+          // Try direct match first
+          let product = products.find((p: any) => p.id === productId);
+          
+          // If not found and productId is numeric, try mayhem-XXX format
+          if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+            const paddedId = `mayhem-${productId.padStart(3, '0')}`;
+            product = products.find((p: any) => p.id === paddedId);
+          }
+          
+          // If not found and productId is mayhem-XXX, try numeric format
+          if (!product && typeof productId === 'string' && productId.startsWith('mayhem-')) {
+            const numericId = parseInt(productId.replace('mayhem-', ''), 10);
+            product = products.find((p: any) => p.id === numericId || p.id === numericId.toString());
+          }
+          
+          if (product?.price) {
+            basePrice = Number(product.price);
+            console.log('💰 Found base price from products array:', { productId, basePrice, foundProduct: product.id });
+          }
+        }
+        
         let totalCustomizationCost = 0;
         
         item.customization.designs.forEach((design: any) => {
@@ -225,7 +259,40 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
       }
       // PRIORITY 5: For regular products with customization, calculate total price including customization costs (legacy)
       else if (item.customization?.selectedStyles) {
-        let basePrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
+        // Try multiple sources for base price with proper ID matching
+        let basePrice = 0;
+        
+        // First try item.product.price
+        if (item.product?.price) {
+          basePrice = Number(item.product.price);
+        }
+        // Then try resolvedProduct.price
+        else if (resolvedProduct?.price) {
+          basePrice = Number(resolvedProduct.price);
+        }
+        // Finally, search products array with proper ID matching
+        else {
+          const productId = item.productId;
+          // Try direct match first
+          let product = products.find((p: any) => p.id === productId);
+          
+          // If not found and productId is numeric, try mayhem-XXX format
+          if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+            const paddedId = `mayhem-${productId.padStart(3, '0')}`;
+            product = products.find((p: any) => p.id === paddedId);
+          }
+          
+          // If not found and productId is mayhem-XXX, try numeric format
+          if (!product && typeof productId === 'string' && productId.startsWith('mayhem-')) {
+            const numericId = parseInt(productId.replace('mayhem-', ''), 10);
+            product = products.find((p: any) => p.id === numericId || p.id === numericId.toString());
+          }
+          
+          if (product?.price) {
+            basePrice = Number(product.price);
+          }
+        }
+        
         let customizationCost = 0;
         
         // Add costs from selected styles
@@ -251,7 +318,34 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
       }
       // PRIORITY 6: For regular products without customization, use base price
       else {
-        itemPrice = Number(item.product?.price ?? resolvedProduct?.price) || 0;
+        // Try multiple sources for base price with proper ID matching
+        if (item.product?.price) {
+          itemPrice = Number(item.product.price);
+        }
+        else if (resolvedProduct?.price) {
+          itemPrice = Number(resolvedProduct.price);
+        }
+        else {
+          const productId = item.productId;
+          // Try direct match first
+          let product = products.find((p: any) => p.id === productId);
+          
+          // If not found and productId is numeric, try mayhem-XXX format
+          if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+            const paddedId = `mayhem-${productId.padStart(3, '0')}`;
+            product = products.find((p: any) => p.id === paddedId);
+          }
+          
+          // If not found and productId is mayhem-XXX, try numeric format
+          if (!product && typeof productId === 'string' && productId.startsWith('mayhem-')) {
+            const numericId = parseInt(productId.replace('mayhem-', ''), 10);
+            product = products.find((p: any) => p.id === numericId || p.id === numericId.toString());
+          }
+          
+          if (product?.price) {
+            itemPrice = Number(product.price);
+          }
+        }
         console.log('💰 Regular product without customization:', itemPrice);
       }
       
@@ -541,7 +635,6 @@ const getStatusColor = (status: Order['status']) => {
       return 'bg-gray-100 text-gray-800 border border-gray-200'
   }
 }
-
 // Card border and background styling based on order status
 const getCardStyling = (order: Order) => {
   // Priority 1: Refund status takes precedence
@@ -1214,6 +1307,24 @@ export default function MyOrders() {
     };
   };
 
+  // Calculate correct order total from line items
+  const calculateCorrectOrderTotal = (order: Order, backendProductsParam?: any[]): number => {
+    // Sum up all line item totals (quantity × item price)
+    const itemsTotal = order.items.reduce((total, item) => {
+      // Use getPricingBreakdown to get the correct total price (includes base + embroidery + options)
+      // This ensures consistency with the detailed item breakdown display
+      const pricing = getPricingBreakdown(item, backendProductsParam || backendProducts);
+      const lineTotal = pricing.totalPrice * (item.quantity || 1);
+      return total + lineTotal;
+    }, 0);
+    
+    // Add shipping and tax (these should be correct in the order)
+    const shipping = Number(order.shipping) || 0;
+    const tax = Number(order.tax) || 0;
+    
+    return itemsTotal + shipping + tax;
+  };
+
   // Handler for opening refund modal
   const handleRequestRefund = (order: Order) => {
     // Check if refund already requested
@@ -1222,11 +1333,20 @@ export default function MyOrders() {
       return
     }
     
+    // Calculate correct totals for refund modal
+    const correctTotal = calculateCorrectOrderTotal(order)
+    const itemsSubtotal = order.items.reduce((total, item) => {
+      const itemPrice = item.customization?.embroideryData 
+        ? Number((item.customization.embroideryData as any).totalPrice) || 0
+        : Number(item.price) || 0
+      return total + (itemPrice * (item.quantity || 1))
+    }, 0)
+    
     // Set modal state and open
     setRefundOrderId(order.id)
     setRefundOrderNumber(order.orderNumber)
-    setRefundOrderTotal(Number(order.total) || 0)
-    setRefundOrderSubtotal(Number(order.subtotal) || Number(order.total) || 0)
+    setRefundOrderTotal(correctTotal)
+    setRefundOrderSubtotal(itemsSubtotal)
     setRefundOrderShipping(Number(order.shipping) || 0)
     setRefundOrderTax(Number(order.tax) || 0)
     setRefundOrderItems(order.items)
@@ -1828,7 +1948,7 @@ export default function MyOrders() {
                   <div className="flex flex-col sm:items-end space-y-3">
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-500 mb-1">Order Total</p>
-                      <p className="text-3xl font-bold text-gray-900 tracking-tight">${(Number(order.total) || 0).toFixed(2)}</p>
+                      <p className="text-3xl font-bold text-gray-900 tracking-tight">${calculateCorrectOrderTotal(order).toFixed(2)}</p>
                       <p className="text-sm text-gray-600 mt-1">
                         <span className="font-semibold">{order.items.length}</span> item{order.items.length !== 1 ? 's' : ''}
                       </p>
@@ -2421,7 +2541,31 @@ export default function MyOrders() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Total</p>
-                      <p className="text-lg font-semibold text-gray-900">${(Number(selectedOrder.total) || 0).toFixed(2)}</p>
+                      <p className="text-lg font-semibold text-gray-900">${calculateCorrectOrderTotal(selectedOrder, backendProducts).toFixed(2)}</p>
+                      
+                      {/* Order Total Breakdown */}
+                      <div className="mt-2 text-xs text-gray-600 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Items Subtotal:</span>
+                          <span>${selectedOrder.items.reduce((total, item) => {
+                            // Use getPricingBreakdown to get the correct total price (includes base + embroidery + options)
+                            const pricing = getPricingBreakdown(item, backendProducts);
+                            return total + (pricing.totalPrice * (item.quantity || 1))
+                          }, 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Shipping:</span>
+                          <span>${(Number(selectedOrder.shipping) || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Tax:</span>
+                          <span>${(Number(selectedOrder.tax) || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between font-medium border-t border-gray-200 pt-1">
+                          <span>Order Total:</span>
+                          <span>${calculateCorrectOrderTotal(selectedOrder, backendProducts).toFixed(2)}</span>
+                        </div>
+                      </div>
                     </div>
                     {selectedOrder.reviewedAt && (
                     <div>

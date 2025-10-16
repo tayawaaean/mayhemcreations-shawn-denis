@@ -90,7 +90,7 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
 export const submitForReview = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
     const userId = req.user?.id;
-    const { items, subtotal, shipping, tax, total, submittedAt } = req.body;
+    const { items, subtotal, shipping, tax, total, submittedAt, shippingAddress, shippingMethod, customerNotes } = req.body;
 
     console.log('🔍 Submit for review request:', {
       userId,
@@ -152,6 +152,31 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       });
     }
 
+    // Validate shipping information
+    if (!shippingAddress || !shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Complete shipping address is required (street, city, state, zipCode)',
+        code: 'MISSING_SHIPPING_ADDRESS',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (!shippingMethod || shipping === undefined || shipping < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid shipping method must be selected',
+        code: 'MISSING_SHIPPING_METHOD',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    console.log('🔍 Shipping information:', {
+      shippingAddress,
+      shippingMethod,
+      customerNotes: customerNotes || 'none'
+    });
+
     // Create order review record using raw query with proper insertId handling
     const replacements = [
       userId,
@@ -160,7 +185,11 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       shipping || 0, // Handle undefined shipping as 0
       tax || 0, // Handle undefined tax as 0 (column is NOT NULL)
       total,
-      submittedAt ? new Date(submittedAt) : new Date()
+      submittedAt ? new Date(submittedAt) : new Date(),
+      JSON.stringify(shippingAddress), // NEW: shipping address
+      JSON.stringify(shippingMethod), // NEW: shipping method
+      customerNotes || null, // NEW: customer notes
+      shippingMethod.carrier || null // NEW: shipping carrier for indexing
     ];
     
     console.log('🔍 SQL replacements:', replacements);
@@ -176,9 +205,13 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         total, 
         status, 
         submitted_at,
+        shipping_address,
+        shipping_method,
+        customer_notes,
+        shipping_carrier,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, NOW(), NOW())
+      ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, NOW(), NOW())
     `, {
       replacements: replacements
     });
@@ -247,7 +280,17 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
         orderReviewId,
         status: 'pending',
         submittedAt: submittedAt || new Date().toISOString(),
-        itemCount: items.length
+        itemCount: items.length,
+        total,
+        shipping: {
+          cost: shipping,
+          method: shippingMethod,
+          address: shippingAddress,
+          estimatedDelivery: shippingMethod.estimatedDeliveryDate || 
+            (shippingMethod.estimatedDeliveryDays 
+              ? new Date(Date.now() + shippingMethod.estimatedDeliveryDays * 24 * 60 * 60 * 1000).toISOString()
+              : null)
+        }
       },
       message: 'Order submitted for review successfully',
       timestamp: new Date().toISOString(),
@@ -257,7 +300,10 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       userId,
       orderReviewId,
       itemCount: items.length,
-      total
+      total,
+      shipping,
+      shippingCarrier: shippingMethod.carrier,
+      shippingService: shippingMethod.serviceName
     });
 
     // Emit notification to admin room about new pending review order
@@ -270,8 +316,13 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
           userId,
           itemCount: items.length,
           total,
+          shipping: {
+            carrier: shippingMethod.carrier,
+            cost: shipping,
+            service: shippingMethod.serviceName
+          },
           status: 'pending',
-          message: `New order submitted for review (${items.length} items, $${total})`,
+          message: `New order submitted for review (${items.length} items, $${total} with ${shippingMethod.carrier} shipping)`,
           timestamp: new Date().toISOString()
         });
         logger.info(`📢 Emitted new order notification for order ${orderReviewId}`);
@@ -326,10 +377,15 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
         customer_confirmations,
         picture_reply_uploaded_at,
         customer_confirmed_at,
+        shipping_address,
+        billing_address,
+        shipping_method,
+        customer_notes,
         tracking_number,
         shipping_carrier,
         shipped_at,
         delivered_at,
+        estimated_delivery_date,
         refund_status,
         refunded_amount,
         refund_requested_at,
@@ -412,6 +468,7 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
         order_reviews.order_number,
         order_reviews.shipping_address,
         order_reviews.billing_address,
+        order_reviews.shipping_method,
         order_reviews.payment_method,
         order_reviews.payment_status,
         order_reviews.payment_provider,

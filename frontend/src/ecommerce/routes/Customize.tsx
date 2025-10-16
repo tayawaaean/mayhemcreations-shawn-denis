@@ -203,6 +203,35 @@ export default function Customize() {
     calculateEmbroideryPricing()
   }, [embroideryWidth, embroideryHeight])
 
+  // Monitor step changes and ensure proper rendering
+  useEffect(() => {
+    console.log(`🔄 Step changed to ${currentStep}`)
+    console.log(`📊 Current designs count: ${customizationData.designs.length}`)
+    
+    // Scroll to top when step changes to ensure visibility
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    
+    // Verify step 4 has required data
+    if (currentStep === 4) {
+      if (customizationData.designs.length === 0) {
+        console.error('⚠️ WARNING: Reached step 4 but no designs found! Redirecting back to step 2.')
+        setCurrentStep(2)
+      } else {
+        console.log('✅ Step 4 loaded with', customizationData.designs.length, 'designs')
+        customizationData.designs.forEach((design, index) => {
+          console.log(`  Design ${index + 1}:`, {
+            id: design.id,
+            name: design.name,
+            hasStyles: !!design.selectedStyles,
+            coverage: design.selectedStyles?.coverage?.name || 'Not selected',
+            material: design.selectedStyles?.material?.name || 'Not selected',
+            border: design.selectedStyles?.border?.name || 'Not selected'
+          })
+        })
+      }
+    }
+  }, [currentStep])
+
   // Get all available colors (considering currently selected size if any)
   const getAvailableColors = () => {
     if (!product?.variants) return []
@@ -702,8 +731,8 @@ export default function Customize() {
     { number: 1, title: 'Choose Color & Size', description: 'Select what you want' },
     { number: 2, title: 'Upload Your Design', description: 'Add your image or logo' },
     { number: 3, title: 'Place Your Design', description: 'Show where you want it' },
-    { number: 4, title: 'Select Size', description: 'Choose your design size' },
-    { number: 5, title: 'Submit Order', description: 'Review and place order' }
+    { number: 4, title: 'Embroidery Options', description: 'Choose how to embroider it' },
+    { number: 5, title: 'Review & Submit', description: 'Review and place order' }
   ]
 
   const getStepProgress = () => {
@@ -717,17 +746,30 @@ export default function Customize() {
         // Show final view for clean capture
         const wasInFinalView = showFinalView
         if (!wasInFinalView) setShowFinalView(true)
+        
+        // Wait for DOM to update before capturing
         await new Promise(resolve => setTimeout(resolve, 100))
+        
         const mockupBase64 = await captureElementAsBase64(productRef.current, { backgroundColor: '#ffffff' })
         setCustomizationData({ mockup: mockupBase64 })
+        
+        // Restore previous view state
         if (!wasInFinalView) setShowFinalView(false)
+        
+        // Wait for state to settle before moving to next step
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
         console.log('💾 Mockup captured and saved to localStorage')
       } catch (e) {
         console.error('Failed to capture mockup at step 3:', e)
+        // Even if mockup capture fails, ensure we restore the view state
+        setShowFinalView(false)
       }
     }
 
+    // Move to next step after async operations complete
     if (currentStep < steps.length) {
+      console.log(`📍 Moving from step ${currentStep} to step ${currentStep + 1}`)
       setCurrentStep(currentStep + 1)
     }
   }
@@ -856,6 +898,27 @@ export default function Customize() {
         designs: customizationData.designs.length > 0 ? customizationData.designs.map(design => {
           // Calculate total price for this design
           let designTotalPrice = 0
+          
+          // FIRST: Calculate material costs from dimensions (Embroidery Base Cost)
+          if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+            try {
+              const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                patchWidth: design.dimensions.width,
+                patchHeight: design.dimensions.height
+              });
+              designTotalPrice += materialCosts.totalCost;
+              console.log('🔧 Customize: Adding material cost to design total:', {
+                designName: design.name,
+                dimensions: design.dimensions,
+                materialCost: materialCosts.totalCost,
+                currentTotal: designTotalPrice
+              });
+            } catch (error) {
+              console.warn('Failed to calculate material costs for design:', design.name, error);
+            }
+          }
+          
+          // SECOND: Add style options
           if (design.selectedStyles) {
             const { selectedStyles } = design
             if (selectedStyles.coverage) designTotalPrice += Number(selectedStyles.coverage.price) || 0
@@ -876,6 +939,11 @@ export default function Customize() {
             }
           }
           
+          console.log('🛒 Customize: Design final total price:', {
+            designName: design.name,
+            totalPrice: designTotalPrice
+          });
+          
           return {
             id: design.id,
             name: design.name,
@@ -886,7 +954,7 @@ export default function Customize() {
             rotation: design.rotation,
             notes: design.notes,
             selectedStyles: design.selectedStyles,
-            totalPrice: designTotalPrice // Include calculated total price
+            totalPrice: designTotalPrice // Include calculated total price (material cost + style options)
           }
         }) : null,
         
@@ -1756,8 +1824,9 @@ export default function Customize() {
             {/* Step 4: Choose Embroidery */}
             {currentStep === 4 && (
                 <PerDesignCustomization 
+                  key="embroidery-step"
                   onComplete={nextStep} 
-                onBack={() => setCurrentStep(3)}
+               onBack={() => setCurrentStep(3)}
                 />
             )}
 

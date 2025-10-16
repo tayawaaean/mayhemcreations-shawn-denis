@@ -110,65 +110,38 @@ export const calculateShipEngineRates = async (
         carriers: [...new Set(ratesResult.rates.map(r => r.carrier))],
       });
     } else {
-      // Use fallback rates if API fails
-      logger.warn('Using fallback shipping rates', {
+      // Return error instead of fallback rates
+      logger.error('ShipEngine API failed to calculate rates', {
         userId: req.user?.id,
-        reason: ratesResult.error,
+        error: ratesResult.error,
+        warning: ratesResult.warning,
       });
 
-      const fallbackRates = getFallbackShippingRates(address.state);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          rates: fallbackRates,
-          recommendedRate: fallbackRates[0],
-          warning: 'Using estimated shipping rates. Actual rates may vary.',
-          origin: {
-            city: 'Newark',
-            state: 'OH',
-            postalCode: '43055',
-          },
-        },
-        message: 'Shipping rates calculated (estimated)',
+      res.status(400).json({
+        success: false,
+        message: ratesResult.error || 'Failed to calculate shipping rates',
+        warning: ratesResult.warning,
+        code: 'SHIPPING_CALCULATION_FAILED',
         timestamp: new Date().toISOString(),
       });
+      return;
     }
   } catch (error: any) {
     logger.error('Calculate ShipEngine shipping rates error:', {
       error: error.message,
       stack: error.stack,
       userId: req.user?.id,
+      address: req.body.address,
     });
 
-    // Return fallback rates on error
-    try {
-      const fallbackRates = getFallbackShippingRates(req.body.address?.state || 'OH');
-
-      res.status(200).json({
-        success: true,
-        data: {
-          rates: fallbackRates,
-          recommendedRate: fallbackRates[0],
-          warning:
-            'Using estimated shipping rates due to temporary service unavailability.',
-          origin: {
-            city: 'Newark',
-            state: 'OH',
-            postalCode: '43055',
-          },
-        },
-        message: 'Shipping rates calculated (estimated)',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (fallbackError) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to calculate shipping rates',
-        code: 'SHIPPING_CALCULATION_ERROR',
-        timestamp: new Date().toISOString(),
-      });
-    }
+    // Return error to client instead of fallback rates
+    res.status(500).json({
+      success: false,
+      message: 'Shipping service is temporarily unavailable. Please try again in a few moments.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      code: 'SHIPPING_SERVICE_ERROR',
+      timestamp: new Date().toISOString(),
+    });
   }
 };
 

@@ -109,6 +109,55 @@ export default function OrderCheckout() {
         console.log('✅ Parsed order data:', parsedOrder)
         setOrder(parsedOrder)
         
+        // Pre-fill form with saved shipping address if available
+        if (parsedOrder.shippingAddress || parsedOrder.shipping_address) {
+          const savedAddress = parsedOrder.shippingAddress || parsedOrder.shipping_address
+          setFormData(prev => ({
+            ...prev,
+            firstName: savedAddress.firstName || authUser?.firstName || '',
+            lastName: savedAddress.lastName || authUser?.lastName || '',
+            email: savedAddress.email || authUser?.email || '',
+            phone: savedAddress.phone || authUser?.phone || '',
+            address: savedAddress.street || '',
+            apartment: savedAddress.apartment || '',
+            city: savedAddress.city || '',
+            state: savedAddress.state || '',
+            zipCode: savedAddress.zipCode || '',
+            country: savedAddress.country || 'United States',
+            notes: parsedOrder.customerNotes || parsedOrder.customer_notes || ''
+          }))
+          console.log('✅ Pre-filled form with saved shipping address')
+        }
+        
+        // Set shipping rate from stored method if available
+        if (parsedOrder.shippingMethod || parsedOrder.shipping_method) {
+          const savedMethod = parsedOrder.shippingMethod || parsedOrder.shipping_method
+          const shippingCost = parsedOrder.shipping || savedMethod.cost || 0
+          setSelectedShippingRate({
+            serviceName: savedMethod.serviceName,
+            serviceCode: savedMethod.serviceCode,
+            carrier: savedMethod.carrier,
+            carrierCode: savedMethod.carrierCode || savedMethod.carrier?.toLowerCase(),
+            totalCost: shippingCost,
+            shipmentCost: shippingCost,
+            otherCost: 0,
+            estimatedDeliveryDays: savedMethod.estimatedDeliveryDays,
+            estimatedDeliveryDate: savedMethod.estimatedDeliveryDate
+          })
+          setShippingRates([{
+            serviceName: savedMethod.serviceName,
+            serviceCode: savedMethod.serviceCode,
+            carrier: savedMethod.carrier,
+            carrierCode: savedMethod.carrierCode || savedMethod.carrier?.toLowerCase(),
+            totalCost: shippingCost,
+            shipmentCost: shippingCost,
+            otherCost: 0,
+            estimatedDeliveryDays: savedMethod.estimatedDeliveryDays,
+            estimatedDeliveryDate: savedMethod.estimatedDeliveryDate
+          }])
+          console.log('✅ Pre-loaded shipping rate from stored method')
+        }
+        
         // Also load saved form data if returning from PayPal
         const savedFormData = sessionStorage.getItem('checkoutFormData')
         if (savedFormData) {
@@ -129,7 +178,7 @@ export default function OrderCheckout() {
       // No order data found, redirect to orders page
       navigate('/my-orders')
     }
-  }, [navigate])
+  }, [navigate, authUser])
 
   // Handle Stripe/PayPal Checkout success/cancel redirects
   useEffect(() => {
@@ -981,6 +1030,7 @@ export default function OrderCheckout() {
                           🇺🇸 United States
                         </div>
                         <input type="hidden" name="country" value="United States" />
+                        <p className="mt-1 text-xs text-gray-500">Currently shipping to United States only</p>
                       </div>
                     </div>
                   </div>

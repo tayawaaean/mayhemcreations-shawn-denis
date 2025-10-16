@@ -679,26 +679,25 @@ export default function Cart() {
                   </div>
 
                   <div className="mt-4 sm:mt-6 space-y-3">
-                    {/* Submit for review - this is the only action in cart */}
+                    {/* Proceed to Checkout */}
                     <div className="space-y-3">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
-                          All items require admin review before processing. 
-                          Submit your order for review and approval.
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p className="text-sm text-green-800">
+                          Ready to checkout? We'll calculate shipping rates and prepare your order for review.
                         </p>
                       </div>
                       <Button 
                         size="lg" 
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        onClick={handleSubmitForReview}
+                        className="w-full bg-accent hover:bg-accent/90"
+                        onClick={() => navigate('/checkout')}
                       >
-                        Submit for Review
+                        Proceed to Checkout
                       </Button>
                     </div>
                     
                     <div className="text-center">
                       <span className="text-xs sm:text-sm text-gray-600">
-                        Shipping will be calculated based on your location during checkout
+                        Shipping rates will be calculated based on your address
                       </span>
                     </div>
                   </div>
@@ -1078,7 +1077,22 @@ export default function Cart() {
                         {/* Multiple Designs Pricing */}
                         {selectedItem.customization.designs && selectedItem.customization.designs.length > 0 ? (
                           <>
-                            {selectedItem.customization.designs.map((design: any, index: number) => (
+                            {selectedItem.customization.designs.map((design: any, index: number) => {
+                              // Calculate material cost from dimensions
+                              let materialCost = 0;
+                              if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+                                try {
+                                  const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                                    patchWidth: design.dimensions.width,
+                                    patchHeight: design.dimensions.height
+                                  });
+                                  materialCost = materialCosts.totalCost;
+                                } catch (error) {
+                                  console.warn('Failed to calculate material costs for display:', error);
+                                }
+                              }
+                              
+                              return (
                               <div key={design.id || index} className="ml-4 space-y-1">
                                 <div className="flex justify-between text-sm">
                                   <span className="text-gray-600">Design {index + 1}: {design.name}</span>
@@ -1086,6 +1100,22 @@ export default function Cart() {
                                     ${formatPrice(design.totalPrice || 0)}
                                   </span>
                                 </div>
+                                
+                                {/* Show material cost from dimensions if present */}
+                                {materialCost > 0 && (
+                                  <div className="ml-4">
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-gray-500">Embroidery Base Cost:</span>
+                                      <span>+${formatPrice(materialCost)}</span>
+                                    </div>
+                                    {design.dimensions && (
+                                      <div className="text-xs text-gray-400 ml-4">
+                                        {design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}"
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
                                 {design.selectedStyles && (
                                   <div className="ml-4 space-y-1">
                                     {design.selectedStyles.coverage && (
@@ -1098,6 +1128,24 @@ export default function Cart() {
                                       <div className="flex justify-between text-xs">
                                         <span className="text-gray-500">Material:</span>
                                         <span>+${formatPrice(design.selectedStyles.material.price)}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.border && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Border:</span>
+                                        <span>+${formatPrice(design.selectedStyles.border.price)}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.backing && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Backing:</span>
+                                        <span>+${formatPrice(design.selectedStyles.backing.price)}</span>
+                                      </div>
+                                    )}
+                                    {design.selectedStyles.cutting && (
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-gray-500">Cutting:</span>
+                                        <span>+${formatPrice(design.selectedStyles.cutting.price)}</span>
                                       </div>
                                     )}
                                     {design.selectedStyles.threads && design.selectedStyles.threads.length > 0 && (
@@ -1115,7 +1163,8 @@ export default function Cart() {
                                   </div>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                             <div className="flex justify-between">
                               <span className="text-gray-600">All Designs Total:</span>
                               <span className="font-medium">

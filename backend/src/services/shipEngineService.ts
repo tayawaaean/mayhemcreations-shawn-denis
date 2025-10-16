@@ -307,21 +307,41 @@ export const getShipEngineRates = async (
       };
     }
 
-    // Check for errors
+    // Check for errors but only fail if we have NO rates at all
     if (rateResponse.errors && rateResponse.errors.length > 0) {
-      console.log('>>> ERROR: ShipEngine returned errors in response');
+      console.log('>>> WARNING: ShipEngine returned errors for some carriers:');
       console.log(JSON.stringify(rateResponse.errors, null, 2));
       
-      logger.error('ShipEngine rate errors:', rateResponse.errors);
-      return {
-        success: false,
-        error: rateResponse.errors[0]?.message || 'Failed to get shipping rates',
-      };
+      logger.warn('ShipEngine rate errors (some carriers failed):', {
+        errorCount: rateResponse.errors.length,
+        failedCarriers: rateResponse.errors.map((e: any) => e.carrier_name || e.carrier_code),
+        availableRatesCount: rateResponse.rates?.length || 0
+      });
+      
+      // Only return error if we have NO successful rates
+      if (!rateResponse.rates || rateResponse.rates.length === 0) {
+        console.log('>>> CRITICAL: No rates available from any carrier');
+        logger.error('All carriers failed to return rates');
+        return {
+          success: false,
+          error: 'No shipping carriers available for this address. Please verify your address is correct.',
+          warning: rateResponse.errors[0]?.message || 'All carriers failed'
+        };
+      }
+      
+      // If we have some rates, continue but log the errors
+      console.log(`>>> SUCCESS: ${rateResponse.rates.length} rates available despite ${rateResponse.errors.length} carrier error(s)`);
     }
 
     // Transform ShipEngine rates to simplified format
     const simplifiedRates: SimplifiedRate[] = rateResponse.rates
-      .filter(rate => !rate.error_messages || rate.error_messages.length === 0)
+      .filter(rate => {
+        const hasErrors = rate.error_messages && rate.error_messages.length > 0;
+        if (hasErrors) {
+          console.log(`>>> Filtering out failed rate: ${rate.carrier_friendly_name} - ${rate.service_type}`);
+        }
+        return !hasErrors;
+      })
       .map(rate => ({
         serviceName: rate.service_type,
         serviceCode: rate.service_code,
@@ -344,15 +364,21 @@ export const getShipEngineRates = async (
     // Sort by cost (cheapest first)
     simplifiedRates.sort((a, b) => a.totalCost - b.totalCost);
 
+    console.log(`>>> FINAL RESULT: ${simplifiedRates.length} valid rates from ${[...new Set(simplifiedRates.map(r => r.carrier))].join(', ')}`);
+
     logger.info('ShipEngine rates retrieved successfully', {
       ratesCount: simplifiedRates.length,
       cheapestRate: simplifiedRates[0]?.totalCost,
       carriers: [...new Set(simplifiedRates.map(r => r.carrier))],
+      failedCarriers: rateResponse.errors?.map((e: any) => e.carrier_name).filter(Boolean) || []
     });
 
     return {
       success: true,
       rates: simplifiedRates,
+      warning: rateResponse.errors?.length > 0 
+        ? `Some carriers unavailable: ${rateResponse.errors.map((e: any) => e.carrier_name).join(', ')}` 
+        : undefined
     };
   } catch (error: any) {
     // Log FULL error details with raw JSON

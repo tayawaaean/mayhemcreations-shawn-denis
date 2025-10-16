@@ -23,6 +23,24 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
   )
   const [copyFromDesignId, setCopyFromDesignId] = useState<string | null>(null)
 
+  // Ensure activeDesignId is valid when component mounts or designs change
+  React.useEffect(() => {
+    console.log('🎨 PerDesignCustomization mounted with', customizationData.designs.length, 'designs')
+    
+    if (customizationData.designs.length > 0) {
+      // If no active design or current active design is not in the list, select the first one
+      const isActiveDesignValid = activeDesignId && customizationData.designs.some(d => d.id === activeDesignId)
+      
+      if (!isActiveDesignValid) {
+        console.log('⚠️ Active design ID is invalid, setting to first design:', customizationData.designs[0].id)
+        setActiveDesignId(customizationData.designs[0].id)
+      }
+    } else {
+      console.warn('⚠️ No designs available in PerDesignCustomization')
+      setActiveDesignId(null)
+    }
+  }, [customizationData.designs.length])
+
   const activeDesign = activeDesignId ? customizationData.designs.find(d => d.id === activeDesignId) : null
 
   const handleCopyOptions = () => {

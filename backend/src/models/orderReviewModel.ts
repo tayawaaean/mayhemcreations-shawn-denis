@@ -330,6 +330,12 @@ OrderReview.init(
       field: 'shipping_carrier',
       comment: 'Shipping carrier name',
     },
+    shippingMethod: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      field: 'shipping_method',
+      comment: 'Selected shipping method details as JSON (carrier, service, cost, delivery time)',
+    },
     shippedAt: {
       type: DataTypes.DATE,
       allowNull: true,
@@ -399,7 +405,12 @@ OrderReview.init(
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    indexes: [] // Temporarily disabled to fix "too many keys" error
+    indexes: [
+      {
+        name: 'idx_order_reviews_shipping_carrier',
+        fields: ['shipping_carrier']
+      }
+    ]
   }
 );
 

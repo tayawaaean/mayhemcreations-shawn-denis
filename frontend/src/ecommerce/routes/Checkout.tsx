@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, 
@@ -18,24 +18,71 @@ import { useCart } from '../context/CartContext'
 import { products } from '../../data/products'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import Button from '../../components/Button'
-import StripePaymentForm from '../../components/StripePaymentForm'
-import PayPalButton from '../../components/PayPalButton'
-import { paymentService, PaymentData, PaymentResult } from '../../shared/paymentService'
 import { calculateShippingRates, ShippingRate } from '../../shared/shippingApiService'
+import { orderReviewApiService } from '../../shared/orderReviewApiService'
+import { useAlertModal } from '../context/AlertModalContext'
+import { useAuth } from '../context/AuthContext'
 
 export default function Checkout() {
   const navigate = useNavigate()
   const { items, clear } = useCart()
+  const { showError, showSuccess, showWarning } = useAlertModal()
+  const { user, isLoggedIn } = useAuth()
+
+  // Helper function to find product by ID (handles different ID formats)
+  const findProductById = (productId: string | number) => {
+    let product = null
+    
+    // Try direct match first
+    product = products.find(p => p.id === productId)
+    
+    // If not found, try numeric conversion
+    if (!product) {
+      const numericId = typeof productId === 'string' && !isNaN(Number(productId)) ? Number(productId) : productId
+      product = products.find(p => p.id === numericId)
+    }
+    
+    // If still not found, try mapping numeric IDs to mayhem IDs
+    if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+      const numId = Number(productId)
+      const mayhemId = `mayhem-${String(numId).padStart(3, '0')}` // Convert 9 to "mayhem-009"
+      product = products.find(p => p.id === mayhemId)
+    }
+    
+    return product
+  }
   const [currentStep, setCurrentStep] = useState(1)
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal' | 'google'>('stripe')
   const [isProcessing, setIsProcessing] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
   const [paymentError, setPaymentError] = useState<string | null>(null)
-  const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
   const [isCalculatingShipping, setIsCalculatingShipping] = useState(false)
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([])
   const [selectedShippingRate, setSelectedShippingRate] = useState<ShippingRate | null>(null)
   const [shippingError, setShippingError] = useState<string | null>(null)
+
+  // Debug cart items on mount
+  useEffect(() => {
+    console.log('🛒 Checkout: Cart items loaded:', items.length)
+    console.log('🛒 Checkout: Cart items (full details):', JSON.stringify(items, null, 2))
+    if (items.length > 0) {
+      const subtotal = calculateSubtotal()
+      console.log('💰 Checkout: Calculated subtotal:', subtotal)
+      items.forEach((item, index) => {
+        const price = calculateItemPrice(item)
+        console.log(`💰 Item ${index + 1}:`, {
+          productId: item.productId,
+          quantity: item.quantity,
+          storedPrice: (item as any).price,
+          hasProduct: !!item.product,
+          productTitle: item.product?.title || 'Not found',
+          calculatedPrice: price,
+          total: price * item.quantity
+        })
+      })
+    } else {
+      console.warn('⚠️ No cart items found in Checkout!')
+    }
+  }, [items])
 
   // Form states
   const [formData, setFormData] = useState({
@@ -65,9 +112,9 @@ export default function Checkout() {
   })
 
   const steps = [
-    { number: 1, title: 'Shipping', description: 'Delivery information' },
-    { number: 2, title: 'Payment', description: 'Payment method' },
-    { number: 3, title: 'Review', description: 'Order summary' }
+    { number: 1, title: 'Shipping', description: 'Address & shipping method' },
+    { number: 2, title: 'Review Order', description: 'Verify all details' },
+    { number: 3, title: 'Submit', description: 'Submit for review' }
   ]
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -80,21 +127,68 @@ export default function Checkout() {
 
   // Helper function to calculate item price including customization costs
   const calculateItemPrice = (item: any) => {
-    // Handle both numeric and string product IDs
-    const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-    const product = products.find(p => {
-      // Check both string and numeric ID matches
-      return p.id === item.productId || p.id === numericId;
-    });
-    if (!product) return 0
+    // For custom embroidery items, use the total price from embroideryData
+    if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+      return Number(item.customization.embroideryData.totalPrice) || 0;
+    }
     
-    let itemPrice = product.price
+    // If pricingBreakdown exists (from cart or previous calculation), use it directly
+    if (item.pricingBreakdown && item.pricingBreakdown.totalPrice) {
+      console.log('✅ Using existing pricingBreakdown for item:', {
+        productId: item.productId,
+        totalPrice: item.pricingBreakdown.totalPrice
+      });
+      return Number(item.pricingBreakdown.totalPrice) || 0;
+    }
+    
+    // Try to get product from item first (if it was stored with the cart item)
+    let product = item.product;
+    
+    // If no product in item, search by productId
+    if (!product) {
+      // Convert productId to string for comparison (products have string IDs like 'mayhem-001')
+      const productIdStr = String(item.productId);
+      product = products.find(p => {
+        // Compare as strings
+        return String(p.id) === productIdStr || p.id === item.productId;
+      });
+    }
+    
+    if (!product) {
+      console.error('❌ Product not found for item:', {
+        productId: item.productId,
+        productIdType: typeof item.productId,
+        itemKeys: Object.keys(item),
+        hasProduct: !!item.product,
+        storedPrice: item.price,
+        pricingBreakdown: item.pricingBreakdown,
+        availableProductIds: products.slice(0, 3).map(p => ({ id: p.id, type: typeof p.id }))
+      });
+      // Fallback: Use pricingBreakdown totalPrice if available
+      if (item.pricingBreakdown && item.pricingBreakdown.totalPrice) {
+        console.warn('⚠️ Using pricingBreakdown totalPrice as fallback:', item.pricingBreakdown.totalPrice);
+        return Number(item.pricingBreakdown.totalPrice) || 0;
+      }
+      // Fallback: Use stored price if available
+      if (item.price && typeof item.price === 'number') {
+        console.warn('⚠️ Using stored price as fallback:', item.price);
+        return item.price;
+      }
+      return 0;
+    }
+    
+    // Use Number() wrapper to prevent NaN issues
+    let itemPrice = Number(product.price || 0) || 0
     
     // Add customization costs if present
     if (item.customization) {
       // Handle multiple designs (new format)
       if (item.customization.designs && item.customization.designs.length > 0) {
         item.customization.designs.forEach((design: any) => {
+          // Check if totalPrice is already calculated for this design
+          if (design.totalPrice) {
+            itemPrice += Number(design.totalPrice) || 0
+          } else if (design.selectedStyles) {
           // Calculate material costs for this design if dimensions are available
           if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
             try {
@@ -108,30 +202,46 @@ export default function Checkout() {
             }
           }
           
-          if (design.selectedStyles) {
+            // Calculate design-specific pricing
             const { selectedStyles } = design;
             // All selected styles are embroidery options, not material costs
-            if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price;
-            if (selectedStyles.material) itemPrice += selectedStyles.material.price;
-            if (selectedStyles.border) itemPrice += selectedStyles.border.price;
-            if (selectedStyles.backing) itemPrice += selectedStyles.backing.price;
-            if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price;
+            if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0;
+            if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0;
+            if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0;
+            if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0;
+            if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0;
             
-            selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price);
-            selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price);
+            if (selectedStyles.threads) {
+              selectedStyles.threads.forEach((thread: any) => {
+                itemPrice += Number(thread.price) || 0;
+              });
+            }
+            if (selectedStyles.upgrades) {
+              selectedStyles.upgrades.forEach((upgrade: any) => {
+                itemPrice += Number(upgrade.price) || 0;
+              });
+            }
           }
         });
       } else {
         // Legacy single design format
         const { selectedStyles } = item.customization;
-        if (selectedStyles.coverage) itemPrice += selectedStyles.coverage.price;
-        if (selectedStyles.material) itemPrice += selectedStyles.material.price;
-        if (selectedStyles.border) itemPrice += selectedStyles.border.price;
-        if (selectedStyles.backing) itemPrice += selectedStyles.backing.price;
-        if (selectedStyles.cutting) itemPrice += selectedStyles.cutting.price;
+        if (selectedStyles.coverage) itemPrice += Number(selectedStyles.coverage.price) || 0;
+        if (selectedStyles.material) itemPrice += Number(selectedStyles.material.price) || 0;
+        if (selectedStyles.border) itemPrice += Number(selectedStyles.border.price) || 0;
+        if (selectedStyles.backing) itemPrice += Number(selectedStyles.backing.price) || 0;
+        if (selectedStyles.cutting) itemPrice += Number(selectedStyles.cutting.price) || 0;
         
-        selectedStyles.threads?.forEach((thread: any) => itemPrice += thread.price);
-        selectedStyles.upgrades?.forEach((upgrade: any) => itemPrice += upgrade.price);
+        if (selectedStyles.threads) {
+          selectedStyles.threads.forEach((thread: any) => {
+            itemPrice += Number(thread.price) || 0;
+          });
+        }
+        if (selectedStyles.upgrades) {
+          selectedStyles.upgrades.forEach((upgrade: any) => {
+            itemPrice += Number(upgrade.price) || 0;
+          });
+        }
       }
     }
     
@@ -141,22 +251,51 @@ export default function Checkout() {
   const calculateSubtotal = () => {
     return items.reduce((total, item) => {
       const itemPrice = calculateItemPrice(item)
-      return total + (itemPrice * item.quantity)
+      const itemTotal = (Number(itemPrice) || 0) * (Number(item.quantity) || 0)
+      return total + itemTotal
     }, 0)
   }
 
-  const calculateTax = () => calculateSubtotal() * 0.08 // 8% tax
+  const calculateTax = () => {
+    const subtotal = calculateSubtotal()
+    return (Number(subtotal) || 0) * 0.08 // 8% tax
+  }
+  
   const calculateShipping = () => {
     // Use selected shipping rate if available
-    if (selectedShippingRate) return selectedShippingRate.totalCost
+    if (selectedShippingRate) return Number(selectedShippingRate.totalCost) || 0
     // Otherwise use default
-    return calculateSubtotal() > 50 ? 0 : 9.99
+    const subtotal = calculateSubtotal()
+    return (Number(subtotal) || 0) > 50 ? 0 : 9.99
   }
-  const calculateTotal = () => calculateSubtotal() + calculateTax() + calculateShipping()
+  
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal()
+    const tax = calculateTax()
+    const shipping = calculateShipping()
+    return (Number(subtotal) || 0) + (Number(tax) || 0) + (Number(shipping) || 0)
+  }
 
   // Calculate shipping rates via backend API
   const calculateShippingRate = async () => {
     console.log('🚚 Starting shipping calculation...')
+    console.log('👤 User Authentication Status:', {
+      isLoggedIn,
+      userId: user?.id,
+      userEmail: user?.email,
+      userRole: user?.role
+    })
+    console.log('📦 Form Data:', formData)
+    console.log('📦 Cart Items:', items)
+    
+    // Check if user is authenticated
+    if (!isLoggedIn) {
+      console.error('❌ User not authenticated! Shipping API requires authentication.')
+      showError('Please log in to calculate shipping rates', 'Authentication Required')
+      setIsCalculatingShipping(false)
+      return
+    }
+    
     setIsCalculatingShipping(true)
     setShippingError(null)
     setPaymentError(null)
@@ -167,6 +306,41 @@ export default function Checkout() {
     try {
       console.log('🚚 Calculating shipping rates via API... (state should be loading now)')
       
+      // Prepare shipping address with ALL required fields
+      const shippingAddress = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        name: `${formData.firstName} ${formData.lastName}`.trim(),
+        phone: formData.phone,
+        street: formData.address,
+        street1: formData.address,
+        apartment: formData.apartment,
+        street2: formData.apartment,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        postalCode: formData.zipCode,
+        country: 'US'
+      }
+      
+      console.log('📍 Shipping Address Being Sent:', shippingAddress)
+      
+      // Validate address has required fields
+      if (!shippingAddress.street1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode) {
+        console.error('❌ Missing required address fields:', {
+          hasFirstName: !!shippingAddress.firstName,
+          hasLastName: !!shippingAddress.lastName,
+          hasName: !!shippingAddress.name,
+          hasStreet: !!shippingAddress.street1,
+          hasCity: !!shippingAddress.city,
+          hasState: !!shippingAddress.state,
+          hasZip: !!shippingAddress.postalCode
+        })
+      }
+      
+      console.log('📝 Full Name for ShipEngine:', shippingAddress.name)
+      console.log('📫 Full Address for ShipEngine:', `${shippingAddress.street1}${shippingAddress.street2 ? ' ' + shippingAddress.street2 : ''}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`)
+      
       // Prepare cart items for shipping calculation
       const cartItems = items.map((item) => {
         const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
@@ -175,7 +349,7 @@ export default function Checkout() {
         
         return {
           id: item.productId.toString(),
-          name: product?.name || `Product ${item.productId}`,
+          name: product?.title || `Product ${item.productId}`,
           quantity: item.quantity,
           price: itemPrice,
           weight: {
@@ -184,23 +358,34 @@ export default function Checkout() {
           }
         }
       })
+      
+      console.log('📦 Cart Items Being Sent:', cartItems)
+      console.log('📦 Total items:', cartItems.length)
+      console.log('📦 Total quantity:', cartItems.reduce((sum, item) => sum + item.quantity, 0))
+
+      console.log('🌐 Calling ShipEngine API with:', {
+        address: shippingAddress,
+        items: cartItems
+      })
 
       // Call backend API to get shipping rates
-      const response = await calculateShippingRates(
-        {
-          street1: formData.address,
-          street2: formData.apartment,
-          city: formData.city,
-          state: formData.state,
-          postalCode: formData.zipCode,
-          country: formData.country
-        },
-        cartItems
-      )
+      const response = await calculateShippingRates(shippingAddress, cartItems)
 
       console.log('✅ Shipping rates response:', response)
+      console.log('📊 Response structure:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        ratesCount: response.data?.rates?.length || 0,
+        hasRecommendedRate: !!response.data?.recommendedRate,
+        message: response.message,
+        error: response.error
+      })
 
       if (response.success && response.data) {
+        console.log('✅ API call successful, processing rates...')
+        console.log('📋 Available rates:', response.data.rates)
+        
         setShippingRates(response.data.rates)
         
         // Auto-select recommended rate
@@ -213,29 +398,59 @@ export default function Checkout() {
         }
 
         if (response.data.warning) {
-          setShippingError(response.data.warning)
+          console.warn('⚠️ API returned warning:', response.data.warning)
+          // Show warning but don't block progress (we have rates)
+          if (response.data.warning.includes('carriers unavailable')) {
+            setShippingError(`Note: ${response.data.warning}. Showing available options.`)
+          }
         }
       } else {
-        throw new Error(response.message || 'Failed to calculate shipping rates')
+        console.error('❌ API returned unsuccessful response:', {
+          success: response.success,
+          message: response.message,
+          error: response.error,
+          fullResponse: response
+        })
+        throw new Error(response.message || response.error || 'Failed to calculate shipping rates')
       }
-    } catch (error) {
-      console.error('❌ Shipping calculation error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to calculate shipping rate'
-      setShippingError(errorMessage)
+    } catch (error: any) {
+      console.error('❌ Shipping calculation error (FULL DETAILS):')
+      console.error('Error type:', typeof error)
+      console.error('Error instance:', error)
+      console.error('Error message:', error?.message)
+      console.error('Error details:', error?.errorDetails)
+      console.error('Error status code:', error?.statusCode)
       
-      // Set a fallback rate
-      const fallbackRate: ShippingRate = {
-        serviceName: 'Standard Shipping',
-        serviceCode: 'standard',
-        shipmentCost: 9.99,
-        otherCost: 0,
-        totalCost: 9.99,
-        estimatedDeliveryDays: 5,
-        carrier: 'USPS'
+      // Build user-friendly error message
+      let userMessage = error?.message || 'Failed to calculate shipping rates. Please try again.';
+      
+      // Add specific guidance based on error type
+      if (error?.statusCode === 401) {
+        userMessage = 'You must be logged in to calculate shipping rates. Please log in and try again.';
+        showError(userMessage, 'Authentication Required');
+      } else if (error?.statusCode === 400 && error?.errorDetails) {
+        userMessage = `${error.message}\n\nDetails: ${error.errorDetails}`;
+        showError(userMessage, 'Invalid Address');
+      } else if (error?.statusCode === 500) {
+        userMessage = 'Our shipping service is temporarily unavailable. Please try again in a few moments.';
+        showError(userMessage, 'Service Error');
+      } else if (error?.message?.includes('address')) {
+        showError(error.message, 'Address Validation Failed');
+      } else {
+        showError(userMessage, 'Shipping Error');
       }
-      setShippingRates([fallbackRate])
-      setSelectedShippingRate(fallbackRate)
-      console.log('⚠️ Using fallback shipping rate:', fallbackRate)
+      
+      console.error('📝 Showing error to user:', userMessage)
+      setShippingError(userMessage)
+      
+      // Clear shipping rates - force user to fix the issue
+      setShippingRates([])
+      setSelectedShippingRate(null)
+      
+      // Keep user on Step 1 so they can fix the address
+      setCurrentStep(1)
+      
+      console.error('❌ NO FALLBACK RATES - User must fix the error')
     } finally {
       console.log('🚚 Shipping calculation complete, hiding loading screen')
       setIsCalculatingShipping(false)
@@ -245,15 +460,15 @@ export default function Checkout() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
+        // Step 1: Only validate form fields are filled (shipping will be calculated when clicking Continue)
         return formData.firstName && formData.lastName && formData.email && 
                formData.phone && formData.address && formData.city && 
                formData.state && formData.zipCode
       case 2:
-        if (paymentMethod === 'stripe') {
-          return formData.cardNumber && formData.expiryDate && formData.cvv && formData.cardName
-        }
-        return true // PayPal and Google Pay don't need card details
+        // Step 2: Must have shipping rate selected to proceed to final review
+        return selectedShippingRate !== null
       case 3:
+        // Step 3: Ready to submit (all previous validation passed)
         return true
       default:
         return false
@@ -261,8 +476,8 @@ export default function Checkout() {
   }
 
   const handleNext = async () => {
-    if (currentStep < 3) {
-      // Calculate shipping rate when moving from step 1 (shipping info) to step 2 (payment)
+    if (currentStep < steps.length) {
+      // Calculate shipping rate when moving from step 1 (shipping info) to step 2 (review)
       if (currentStep === 1) {
         console.log('📦 Moving from step 1 to step 2, calculating shipping...')
         // Set loading state first and force a render before starting calculation
@@ -283,7 +498,7 @@ export default function Checkout() {
   }
 
   const handlePlaceOrder = async () => {
-    console.log('💳 Starting payment processing...')
+    console.log('📦 Starting order submission for review...')
     setIsProcessing(true)
     setPaymentError(null)
     
@@ -291,149 +506,214 @@ export default function Checkout() {
     await new Promise(resolve => setTimeout(resolve, 100))
     
     try {
-      console.log('💳 Processing payment... (loading screen should be visible)')
-      // Prepare payment data
-      const paymentData: PaymentData = {
-        amount: Math.round(calculateTotal() * 100), // Convert to cents
-        currency: 'usd',
-        customerEmail: formData.email,
-        customerName: `${formData.firstName} ${formData.lastName}`,
-        description: `Order for ${items.length} item(s)`,
-        billingAddress: {
-          line1: formData.address,
-          line2: formData.apartment,
-          city: formData.city,
-          state: formData.state,
-          postal_code: formData.zipCode,
-          country: formData.country
-        },
+      console.log('📦 Submitting order for review... (loading screen should be visible)')
+      
+      // Prepare order data for review
+      const orderData = {
         items: items.map((item, index) => {
-          // Handle both numeric and string product IDs
-          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-          const product = products.find(p => {
-            // Check both string and numeric ID matches
-            return p.id === item.productId || p.id === numericId;
+          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
+          const product = products.find(p => p.id === item.productId || p.id === numericId)
+          
+          // Calculate pricing breakdown (matches Cart.tsx structure)
+          const baseProductPrice = Number(product?.price) || 0;
+          let embroideryPrice = 0;  // Material costs from dimensions
+          let embroideryOptionsPrice = 0;  // Style options (coverage, material, border, etc.)
+          
+          // Custom embroidery pricing
+          if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+            embroideryPrice = Number(item.customization.embroideryData.materialCosts?.totalCost) || 0;
+            embroideryOptionsPrice = Number(item.customization.embroideryData.optionsPrice) || 0;
+          }
+          // Multi-design pricing (new format)
+          else if (item.customization?.designs && item.customization.designs.length > 0) {
+            // Calculate total embroidery price and options from all designs
+            item.customization.designs.forEach((design: any) => {
+              // Calculate material costs for this design if dimensions are available
+              if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+                try {
+                  const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                    patchWidth: design.dimensions.width,
+                    patchHeight: design.dimensions.height
+                  });
+                  embroideryPrice += materialCosts.totalCost;
+                  console.log('🔧 Checkout: Calculated material cost for design:', {
+                    designName: design.name,
+                    dimensions: design.dimensions,
+                    materialCost: materialCosts.totalCost
+                  });
+                } catch (error) {
+                  console.warn('Failed to calculate material costs for design:', design.name, error);
+                }
+              }
+              
+              if (design.selectedStyles) {
+                const { selectedStyles } = design;
+                // All selected styles are embroidery options, not material costs
+                if (selectedStyles.coverage) embroideryOptionsPrice += Number(selectedStyles.coverage.price) || 0;
+                if (selectedStyles.material) embroideryOptionsPrice += Number(selectedStyles.material.price) || 0;
+                
+                // Embroidery options: border, backing, cutting, threads, upgrades
+                if (selectedStyles.border) embroideryOptionsPrice += Number(selectedStyles.border.price) || 0;
+                if (selectedStyles.backing) embroideryOptionsPrice += Number(selectedStyles.backing.price) || 0;
+                if (selectedStyles.cutting) embroideryOptionsPrice += Number(selectedStyles.cutting.price) || 0;
+                
+                if (selectedStyles.threads) {
+                  selectedStyles.threads.forEach((thread: any) => {
+                    embroideryOptionsPrice += Number(thread.price) || 0;
+                  });
+                }
+                if (selectedStyles.upgrades) {
+                  selectedStyles.upgrades.forEach((upgrade: any) => {
+                    embroideryOptionsPrice += Number(upgrade.price) || 0;
+                  });
+                }
+              }
+            });
+          }
+          // Legacy single design format
+          else if (item.customization?.selectedStyles) {
+            const { selectedStyles } = item.customization;
+            if (selectedStyles.coverage) embroideryOptionsPrice += Number(selectedStyles.coverage.price) || 0;
+            if (selectedStyles.material) embroideryOptionsPrice += Number(selectedStyles.material.price) || 0;
+            if (selectedStyles.border) embroideryOptionsPrice += Number(selectedStyles.border.price) || 0;
+            if (selectedStyles.backing) embroideryOptionsPrice += Number(selectedStyles.backing.price) || 0;
+            if (selectedStyles.cutting) embroideryOptionsPrice += Number(selectedStyles.cutting.price) || 0;
+            
+            if (selectedStyles.threads) {
+              selectedStyles.threads.forEach((thread: any) => {
+                embroideryOptionsPrice += Number(thread.price) || 0;
+              });
+            }
+            if (selectedStyles.upgrades) {
+              selectedStyles.upgrades.forEach((upgrade: any) => {
+                embroideryOptionsPrice += Number(upgrade.price) || 0;
+              });
+            }
+          }
+          
+          const totalPrice = baseProductPrice + embroideryPrice + embroideryOptionsPrice;
+          
+          console.log(`📊 Checkout: Item ${index + 1} pricing:`, {
+            baseProductPrice,
+            embroideryPrice,
+            embroideryOptionsPrice,
+            totalPrice
           });
-          const itemPrice = calculateItemPrice(item)
           
           return {
-            name: product?.name || `Product ${item.productId}`,
+            id: `${item.productId}-${Date.now()}-${index}`,
+            productId: item.productId,
             quantity: item.quantity,
-            price: itemPrice,
-            currency: 'usd'
+            customization: item.customization,
+            reviewStatus: 'pending' as const,
+            product: item.product || product,
+            productName: product?.title || `Product ${item.productId}`,
+            productSnapshot: product ? {
+              id: product.id,
+              title: product.title,
+              price: product.price,
+              image: product.image
+            } : null,
+            pricingBreakdown: {
+              baseProductPrice,
+              embroideryPrice,
+              embroideryOptionsPrice,
+              totalPrice
+            }
           }
         }),
-        metadata: {
-          orderId: `order-${Date.now()}`,
-          customerPhone: formData.phone,
-          notes: formData.notes
-        }
-      }
-
-      // Process payment
-      const result = await paymentService.processPayment(paymentMethod, paymentData)
-      setPaymentResult(result)
-
-      if (result.success) {
-        // Create order with payment information
-        const orderData = {
-          id: `order-${Date.now()}`,
-          orderNumber: `MC-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
-          status: 'processing',
-          orderDate: new Date().toISOString().split('T')[0],
-          estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        subtotal: calculateSubtotal(),
+        shipping: selectedShippingRate?.totalCost || 0,
+        tax: calculateTax(),
           total: calculateTotal(),
-          items: items.map((item, index) => ({
-            id: `item-${index}`,
-            productId: item.productId,
-            productName: `Product ${item.productId}`,
-            productImage: 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=Product',
-            quantity: item.quantity,
-            price: item.price,
-            customization: item.customization
-          })),
+        submittedAt: new Date().toISOString(),
+        
+        // NEW: Shipping information
           shippingAddress: {
-            name: `${formData.firstName} ${formData.lastName}`,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
             street: formData.address,
+          apartment: formData.apartment,
             city: formData.city,
             state: formData.state,
-            zipCode: formData.zipCode
-          },
-          paymentMethod: paymentMethod === 'stripe' ? 'Credit Card' : 
-                        paymentMethod === 'paypal' ? 'PayPal' : 
-                        paymentMethod === 'google' ? 'Google Pay' : 'Credit Card',
-          paymentStatus: 'completed',
-          paymentProvider: paymentMethod,
-          paymentDetails: {
-            transactionId: result.paymentId || `txn_${Date.now()}`,
-            providerTransactionId: result.paymentId || `${paymentMethod}_${Date.now()}`,
-            processedAt: new Date().toISOString(),
-            ...(result.payerEmail && { payerEmail: result.payerEmail }),
-            ...(result.payerName && { payerName: result.payerName })
-          }
-        }
-        
-        // In a real app, this would be sent to your backend
-        console.log('Order created:', orderData)
-        
+          zipCode: formData.zipCode,
+          country: 'United States' // Hardcoded to US only
+        },
+        shippingMethod: selectedShippingRate ? {
+          serviceName: selectedShippingRate.serviceName,
+          serviceCode: selectedShippingRate.serviceCode,
+          carrier: selectedShippingRate.carrier,
+          cost: selectedShippingRate.totalCost,
+          estimatedDeliveryDays: selectedShippingRate.estimatedDeliveryDays,
+          estimatedDeliveryDate: selectedShippingRate.estimatedDeliveryDays 
+            ? new Date(Date.now() + selectedShippingRate.estimatedDeliveryDays * 24 * 60 * 60 * 1000).toISOString()
+            : null
+        } : null,
+        customerNotes: formData.notes
+      }
+
+      // Submit for review via API
+      const response = await orderReviewApiService.submitForReview(orderData)
+      
+      if (response.success) {
         setIsComplete(true)
         
-        // Clear cart after successful order
+        // Clear cart after successful submission
+        await clear()
+        localStorage.removeItem('mayhem_cart_v1')
+        
+        showSuccess(
+          `Your order has been submitted for review. Order ID: ${response.data?.orderReviewId}`,
+          'Order Submitted Successfully'
+        )
+        
+        // Navigate to orders page
         setTimeout(() => {
-          clear()
-          navigate('/')
-        }, 3000)
+          navigate('/my-orders', {
+            state: {
+              submissionSuccess: true,
+              orderReviewId: response.data?.orderReviewId
+            }
+          })
+        }, 2000)
       } else {
-        setPaymentError(result.error || 'Payment failed')
+        setPaymentError(response.message || 'Failed to submit order for review')
+        showError(response.message || 'Failed to submit order', 'Submission Failed')
       }
     } catch (error) {
-      console.error('Payment processing error:', error)
-      setPaymentError(error instanceof Error ? error.message : 'Payment processing failed')
+      console.error('Order submission error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Order submission failed'
+      setPaymentError(errorMessage)
+      showError(errorMessage, 'Error')
     } finally {
-      console.log('💳 Payment processing complete, hiding loading screen')
+      console.log('📦 Order submission complete, hiding loading screen')
       setIsProcessing(false)
     }
   }
 
-  const handlePaymentSuccess = (result: PaymentResult) => {
-    setPaymentResult(result)
-    if (result.success) {
-      handlePlaceOrder()
-    } else {
-      setPaymentError(result.error || 'Payment failed')
-    }
-  }
-
-  const handlePaymentError = (error: any) => {
-    console.error('Payment error:', error)
-    setPaymentError(error instanceof Error ? error.message : 'Payment failed')
-  }
 
   if (isComplete) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-purple-600" />
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Submitted for Review!</h1>
           <p className="text-gray-600 mb-6">
-            Your order has been confirmed and will be processed shortly. 
-            You'll receive an email confirmation soon.
+            Your order has been submitted and will be reviewed by our team. 
+            You'll be notified once it's approved and ready for payment.
           </p>
           <div className="space-y-2 text-sm text-gray-500">
-            <p>Order ID: #MAY-{Date.now().toString().slice(-6)}</p>
-            <p>Payment Method: {paymentMethod === 'stripe' ? 'Credit Card' : 
-                               paymentMethod === 'paypal' ? 'PayPal' : 
-                               paymentMethod === 'google' ? 'Google Pay' : 'Credit Card'}</p>
-            <p>Payment Status: {paymentResult?.success ? 'Completed' : 'Failed'}</p>
-            {paymentResult?.paymentId && (
-              <p>Transaction ID: {paymentResult.paymentId}</p>
+            <p>Subtotal: ${calculateSubtotal().toFixed(2)}</p>
+            <p>Shipping: ${calculateShipping().toFixed(2)} ({selectedShippingRate?.serviceName})</p>
+            <p>Tax: ${calculateTax().toFixed(2)}</p>
+            <p className="font-semibold text-gray-900">Total: ${calculateTotal().toFixed(2)}</p>
+            {selectedShippingRate?.estimatedDeliveryDays && (
+              <p>Estimated delivery: {selectedShippingRate.estimatedDeliveryDays} business days after approval</p>
             )}
-            {paymentResult?.payerEmail && (
-              <p>Payer Email: {paymentResult.payerEmail}</p>
-            )}
-            <p>Estimated delivery: 3-5 business days</p>
           </div>
         </div>
       </main>
@@ -466,29 +746,29 @@ export default function Checkout() {
     )
   }
 
-  // Loading screen for payment processing
+  // Loading screen for order submission
   if (isProcessing) {
-    console.log('🎨 Rendering payment processing loading screen')
+    console.log('🎨 Rendering order submission loading screen')
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
           <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-6"></div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Processing Payment</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Submitting Order</h2>
           <p className="text-gray-600">
-            Please wait while we securely process your payment...
+            Please wait while we submit your order for review...
           </p>
           <div className="mt-6 space-y-2 text-sm text-gray-500">
             <div className="flex items-center justify-center">
-              <Lock className="w-4 h-4 mr-2" />
-              <span>Securing transaction</span>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              <span>Preparing order details</span>
             </div>
             <div className="flex items-center justify-center">
               <Shield className="w-4 h-4 mr-2" />
-              <span>Verifying payment details</span>
+              <span>Securing your information</span>
             </div>
             <div className="flex items-center justify-center">
-              <CreditCard className="w-4 h-4 mr-2" />
-              <span>Confirming order</span>
+              <Truck className="w-4 h-4 mr-2" />
+              <span>Confirming shipping details</span>
             </div>
           </div>
           <p className="mt-6 text-xs text-gray-500">
@@ -744,17 +1024,14 @@ export default function Checkout() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Country
                         </label>
-                        <select
+                        <input
+                          type="text"
                           name="country"
-                          value={formData.country}
-                          onChange={handleInputChange}
-                          className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent text-base"
-                        >
-                          <option value="United States">United States</option>
-                          <option value="Canada">Canada</option>
-                          <option value="United Kingdom">United Kingdom</option>
-                          <option value="Australia">Australia</option>
-                        </select>
+                          value="United States"
+                          disabled
+                          className="w-full px-3 py-2 sm:px-4 sm:py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed text-base"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Currently shipping to United States only</p>
                       </div>
                     </div>
                   </div>
@@ -773,325 +1050,613 @@ export default function Checkout() {
                       placeholder="Any special delivery instructions..."
                     />
                   </div>
+
+                  {/* Shipping Error/Warning Display */}
+                  {shippingError && (
+                    <div className={`border-2 rounded-lg p-4 ${
+                      shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-start">
+                        <AlertCircle className={`w-6 h-6 mt-0.5 mr-3 flex-shrink-0 ${
+                          shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                        }`} />
+                        <div className="flex-1">
+                          <h4 className={`font-semibold mb-1 ${
+                            shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                              ? 'text-amber-900'
+                              : 'text-red-900'
+                          }`}>
+                            {shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                              ? 'Information'
+                              : 'Shipping Calculation Failed'}
+                          </h4>
+                          <p className={`text-sm whitespace-pre-line ${
+                            shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                              ? 'text-amber-700'
+                              : 'text-red-700'
+                          }`}>{shippingError}</p>
+                          
+                          {/* Only show verification checklist for actual errors, not warnings */}
+                          {!shippingError.includes('Note:') && !shippingError.includes('carriers unavailable') && (
+                            <div className="mt-3 space-y-2">
+                              <p className="text-sm text-red-800 font-medium">Please verify:</p>
+                              <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
+                                <li>Street address is complete and correct</li>
+                                <li>City and state match the ZIP code</li>
+                                <li>ZIP code is valid (5 digits)</li>
+                                <li>Address is a real US location</li>
+                              </ul>
+                          </div>
+                          )}
+                          
+                          <button
+                            onClick={() => {
+                              setShippingError(null)
+                              console.log('🔄 User dismissed message')
+                            }}
+                            className={`mt-3 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${
+                              shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                                ? 'bg-amber-600 hover:bg-amber-700'
+                                : 'bg-red-600 hover:bg-red-700'
+                            }`}
+                          >
+                            {shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
+                              ? 'Got It'
+                              : 'Dismiss & Try Again'}
+                          </button>
+                          </div>
+                          </div>
+                        </div>
+                          )}
                 </div>
               </div>
             )}
 
-            {/* Step 2: Payment Method */}
+            {/* Step 2: Review Order & Submit */}
             {currentStep === 2 && (
               <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
-                  <CreditCard className="w-5 h-5 mr-2 text-accent" />
-                  Payment Method
+                  <CheckCircle className="w-5 h-5 mr-2 text-accent" />
+                  Review Order
                 </h2>
                 
                 <div className="space-y-4 sm:space-y-6">
-                  {/* Payment Options */}
-                  <div className="space-y-3 sm:space-y-4">
-                    <h3 className="text-base sm:text-lg font-medium text-gray-900">Choose Payment Method</h3>
+                  {/* Shipping Method Selection */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-base sm:text-lg font-medium text-gray-900 flex items-center">
+                        <Truck className="w-5 h-5 mr-2 text-accent" />
+                        Selected Shipping Method
+                      </h3>
+                      <button
+                        onClick={() => setCurrentStep(1)}
+                        className="text-sm text-accent hover:underline"
+                      >
+                        Change Address
+                      </button>
+                          </div>
                     
-                    {/* Stripe */}
-                    <div 
-                      className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'stripe' 
-                          ? 'border-accent bg-accent/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setPaymentMethod('stripe')}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
-                            <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                          </div>
+                    {selectedShippingRate && (
+                      <div className="border-2 border-accent bg-accent/5 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
                           <div>
-                            <h4 className="text-sm sm:text-base font-medium text-gray-900">Credit/Debit Card</h4>
-                            <p className="text-xs sm:text-sm text-gray-600">Visa, Mastercard, American Express</p>
+                            <h4 className="font-medium text-gray-900">{selectedShippingRate.serviceName}</h4>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {selectedShippingRate.carrier} • {selectedShippingRate.estimatedDeliveryDays ? `${selectedShippingRate.estimatedDeliveryDays} business days` : 'Standard delivery'}
+                        </p>
                           </div>
+                          <span className="text-lg font-semibold text-gray-900">
+                            ${selectedShippingRate.totalCost.toFixed(2)}
+                          </span>
                         </div>
-                        <div className={`w-5 h-5 rounded-full border-2 ${
-                          paymentMethod === 'stripe' 
-                            ? 'border-accent bg-accent' 
-                            : 'border-gray-300'
-                        }`}>
-                          {paymentMethod === 'stripe' && (
-                            <div className="w-full h-full rounded-full bg-white scale-50"></div>
-                          )}
                         </div>
-                      </div>
+                  )}
+
+                    {shippingError && (
+                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-sm text-amber-800">{shippingError}</p>
+                          </div>
+            )}
                     </div>
 
-                    {/* PayPal */}
-                    <div 
-                      className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'paypal' 
-                          ? 'border-accent bg-accent/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setPaymentMethod('paypal')}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
-                            <span className="text-white font-bold text-xs sm:text-sm">PP</span>
-                          </div>
+                  {/* Order Items Review */}
                           <div>
-                            <h4 className="text-sm sm:text-base font-medium text-gray-900">PayPal</h4>
-                            <p className="text-xs sm:text-sm text-gray-600">Pay with your PayPal account</p>
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Order Items</h3>
+                    <div className="space-y-3 sm:space-y-4">
+                      {items.map((item, index) => {
+                        const product = findProductById(item.productId)
+                        if (!product) return null
+                        
+                        const itemPrice = calculateItemPrice(item)
+                        
+                        return (
+                          <div key={index} className="border-2 border-gray-300 rounded-lg p-3 sm:p-4 bg-gradient-to-br from-white to-gray-50">
+                            {/* Product Header */}
+                            <div className="flex items-start space-x-3 sm:space-x-4 mb-3">
+                              <img
+                                src={item.customization?.mockup || product.image}
+                                alt={product.title}
+                                className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0 border-2 border-accent"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm sm:text-base font-semibold text-gray-900">{product.title}</h4>
+                                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                                  Quantity: <span className="font-medium">{item.quantity}</span>
+                                </p>
+                                {item.customization && (
+                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Customized Product
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs sm:text-sm text-gray-600">Item Total</p>
+                                <p className="font-bold text-lg text-accent">
+                                  ${(itemPrice * item.quantity).toFixed(2)}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Customization Details */}
+                            {item.customization && (
+                              <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                                {/* Color and Size */}
+                                {(item.customization.color || item.customization.size) && (
+                                  <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+                                    {item.customization.color && (
+                                      <div>
+                                        <span className="text-gray-600">Color: </span>
+                                        <span className="font-medium capitalize">{item.customization.color}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.size && (
+                                      <div>
+                                        <span className="text-gray-600">Size: </span>
+                                        <span className="font-medium uppercase">{item.customization.size}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Designs Count */}
+                                {item.customization.designs && item.customization.designs.length > 0 && (
+                                  <div className="text-xs sm:text-sm">
+                                    <span className="text-gray-600">Embroidery Designs: </span>
+                                    <span className="font-medium">{item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
+                                  </div>
+                                )}
+
+                                {/* Price Breakdown */}
+                                <div className="bg-white rounded-lg p-3 space-y-2 text-xs sm:text-sm">
+                                  <div className="font-medium text-gray-900 mb-2">Price Breakdown</div>
+                                  <div className="flex justify-between text-gray-600">
+                                    <span>Base Price:</span>
+                                    <span className="font-medium">${Number(product.price || 0).toFixed(2)}</span>
+                                  </div>
+                                  
+                                  {/* Embroidery Details */}
+                                  {item.customization.designs && item.customization.designs.map((design: any, designIndex: number) => {
+                                    // Calculate material cost
+                                    let materialCost = 0
+                                    if (design.dimensions) {
+                                      try {
+                                        const pricing = MaterialPricingService.calculateMaterialCosts({
+                                          patchWidth: design.dimensions.width * (design.scale || 1),
+                                          patchHeight: design.dimensions.height * (design.scale || 1)
+                                        })
+                                        materialCost = pricing.totalCost
+                                      } catch (e) {
+                                        console.error('Error calculating material cost:', e)
+                                      }
+                                    }
+
+                                    // Calculate style options cost
+                                    let stylesCost = 0
+                                    if (design.selectedStyles) {
+                                      const styles = design.selectedStyles
+                                      if (styles.coverage) stylesCost += Number(styles.coverage.price) || 0
+                                      if (styles.material) stylesCost += Number(styles.material.price) || 0
+                                      if (styles.border) stylesCost += Number(styles.border.price) || 0
+                                      if (styles.backing) stylesCost += Number(styles.backing.price) || 0
+                                      if (styles.cutting) stylesCost += Number(styles.cutting.price) || 0
+                                      if (styles.threads) styles.threads.forEach((t: any) => stylesCost += Number(t.price) || 0)
+                                      if (styles.upgrades) styles.upgrades.forEach((u: any) => stylesCost += Number(u.price) || 0)
+                                    }
+
+                                    const designTotal = materialCost + stylesCost
+
+                                    return (
+                                      <div key={designIndex} className="pl-3 border-l-2 border-accent/30 space-y-1">
+                                        <div className="text-gray-700 font-medium">Design {designIndex + 1}: {design.name}</div>
+                                        <div className="flex justify-between text-gray-600 text-xs">
+                                          <span>Material Cost:</span>
+                                          <span>${materialCost.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-gray-600 text-xs">
+                                          <span>Style Options:</span>
+                                          <span>${stylesCost.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between font-medium text-xs">
+                                          <span>Design Total:</span>
+                                          <span className="text-accent">${designTotal.toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-sm">
+                                    <span>Unit Price:</span>
+                                    <span className="text-accent">${itemPrice.toFixed(2)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 ${
-                          paymentMethod === 'paypal' 
-                            ? 'border-accent bg-accent' 
-                            : 'border-gray-300'
-                        }`}>
-                          {paymentMethod === 'paypal' && (
-                            <div className="w-full h-full rounded-full bg-white scale-50"></div>
-                          )}
-                        </div>
-                      </div>
+                        )
+                      })}
+                    </div>
                     </div>
 
-                    {/* Google Pay */}
-                    <div 
-                      className={`border-2 rounded-lg p-3 sm:p-4 cursor-pointer transition-all ${
-                        paymentMethod === 'google' 
-                          ? 'border-accent bg-accent/5' 
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setPaymentMethod('google')}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gray-900 rounded-lg flex items-center justify-center mr-3 sm:mr-4">
-                            <span className="text-white font-bold text-xs sm:text-sm">G</span>
-                          </div>
-                          <div>
-                            <h4 className="text-sm sm:text-base font-medium text-gray-900">Google Pay</h4>
-                            <p className="text-xs sm:text-sm text-gray-600">Pay with Google Pay</p>
-                          </div>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 ${
-                          paymentMethod === 'google' 
-                            ? 'border-accent bg-accent' 
-                            : 'border-gray-300'
-                        }`}>
-                          {paymentMethod === 'google' && (
-                            <div className="w-full h-full rounded-full bg-white scale-50"></div>
-                          )}
-                        </div>
+                  {/* Important Notice */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-medium text-blue-900">Order Review Process</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Your order will be submitted for admin review. Once approved, you'll receive a notification and can proceed to payment.
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Payment Forms */}
-                  {paymentMethod === 'stripe' && (
-                    <div className="border-t pt-4 sm:pt-6">
-                      <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Card Details</h3>
-                      <StripePaymentForm
-                        paymentData={{
-                          amount: Math.round(calculateTotal() * 100),
-                          currency: 'usd',
-                          customerEmail: formData.email,
-                          customerName: `${formData.firstName} ${formData.lastName}`,
-                          billingAddress: {
-                            line1: formData.address,
-                            line2: formData.apartment,
-                            city: formData.city,
-                            state: formData.state,
-                            postal_code: formData.zipCode,
-                            country: formData.country
-                          },
-                          metadata: {
-                            orderId: `order-${Date.now()}`,
-                            customerPhone: formData.phone,
-                            notes: formData.notes
-                          }
-                        }}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                        disabled={isProcessing}
-                      />
-                    </div>
-                  )}
-
-                  {paymentMethod === 'paypal' && (
-                    <div className="border-t pt-4 sm:pt-6">
-                      <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">PayPal Payment</h3>
-                      <PayPalButton
-                        paymentData={{
-                          amount: calculateTotal(),
-                          currency: 'usd',
-                          description: `Order for ${items.length} item(s)`,
-                          customerEmail: formData.email,
-                          customerName: `${formData.firstName} ${formData.lastName}`,
-                          items: items.map((item, index) => {
-                            // Handle both numeric and string product IDs
-                            const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-                            const product = products.find(p => {
-                              // Check both string and numeric ID matches
-                              return p.id === item.productId || p.id === numericId;
-                            });
-                            const itemPrice = calculateItemPrice(item)
-                            
-                            return {
-                              name: product?.name || `Product ${item.productId}`,
-                              quantity: item.quantity,
-                              price: itemPrice,
-                              currency: 'usd'
-                            }
-                          })
-                        }}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                        onCancel={(data) => console.log('PayPal payment cancelled:', data)}
-                        disabled={isProcessing}
-                        style={{
-                          layout: 'vertical',
-                          color: 'blue',
-                          shape: 'rect',
-                          label: 'paypal',
-                          height: 50
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {paymentMethod === 'google' && (
-                    <div className="border-t pt-4 sm:pt-6">
-                      <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Google Pay</h3>
-                      <div className="p-6 bg-gray-50 rounded-lg text-center">
-                        <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <span className="text-white font-bold text-xl">G</span>
-                        </div>
-                        <p className="text-gray-600 mb-4">Google Pay integration coming soon</p>
-                        <p className="text-sm text-gray-500">
-                          For now, please use Credit Card or PayPal payment methods.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Payment Error Display */}
+                  {/* Error Display */}
                   {paymentError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                       <div className="flex items-start">
                         <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                         <div>
-                          <h4 className="font-medium text-red-900">Payment Error</h4>
+                          <h4 className="font-medium text-red-900">Submission Error</h4>
                           <p className="text-sm text-red-700 mt-1">{paymentError}</p>
                         </div>
                       </div>
                     </div>
                   )}
-
-                  {/* Security Notice */}
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-purple-600 mt-0.5 mr-3" />
-                      <div>
-                        <h4 className="font-medium text-purple-900">Secure Payment</h4>
-                        <p className="text-sm text-purple-700 mt-1">
-                          Your payment information is encrypted and secure. We never store your card details.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
 
-            {/* Step 3: Order Review */}
+            {/* Step 3: Final Order Summary & Submit */}
             {currentStep === 3 && (
               <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
                   <CheckCircle className="w-5 h-5 mr-2 text-accent" />
-                  Order Review
+                  Order Summary
                 </h2>
                 
-                <div className="space-y-4 sm:space-y-6">
-                  {/* Order Summary */}
+                <div className="space-y-6">
+                  {/* Order Items Section - Always show */}
                   <div>
-                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Order Summary</h3>
-                    <div className="space-y-3 sm:space-y-4">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Order Items ({items.length})</h3>
+                    
+                    
+                    <div className="space-y-4">
+                      {items.length === 0 && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                          <p className="text-yellow-800">⚠️ No items found in cart</p>
+                        </div>
+                      )}
+                      
                       {items.map((item, index) => {
-                        // Handle both numeric and string product IDs
-                        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
-                        const product = products.find(p => {
-                          // Check both string and numeric ID matches
-                          return p.id === item.productId || p.id === numericId;
-                        });
-                        if (!product) return null
+                    const product = findProductById(item.productId)
                         
-                        // Calculate item price including customization costs
-                        const itemPrice = calculateItemPrice(item)
+                        if (!product) {
+                          return (
+                            <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-4">
+                              <p className="text-red-800">❌ Product not found: {item.productId}</p>
+                            </div>
+                          )
+                        }
                         
+                    return (
+                      <div key={index} className="border-2 border-gray-300 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 shadow-md">
+                        {/* Product Header with Image */}
+                        <div className="flex items-start space-x-3 sm:space-x-4 mb-3">
+                          {/* Product/Design Image */}
+                          <div className="flex-shrink-0">
+                            {(() => {
+                              // PRIORITY 1: Show final product mockup if available
+                              if (item.customization?.mockup) {
+                                return (
+                                  <div className="relative">
+                                    <img
+                                      src={item.customization.mockup}
+                                      alt="Final Product"
+                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                    />
+                                    <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                      ✓
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              
+                              // PRIORITY 2: For multiple designs - show first design preview with count
+                              if (item.customization?.designs && item.customization.designs.length > 0) {
+                                const firstDesign = item.customization.designs[0];
                         return (
-                          <div key={index} className="border border-gray-200 rounded-lg p-3 sm:p-4">
-                            <div className="flex items-start space-x-3 sm:space-x-4">
+                                  <div className="relative">
+                                    <img
+                                      src={firstDesign.preview || product.image}
+                                      alt={firstDesign.name || 'Design 1'}
+                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                    />
+                                    {item.customization.designs.length > 1 && (
+                                      <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                        +{item.customization.designs.length - 1}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              
+                              // PRIORITY 3: For custom embroidery - show uploaded design
+                              if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+                                const embroideryData = item.customization.embroideryData as any;
+                                if (embroideryData.designImage) {
+                                  return (
+                                    <img
+                                      src={embroideryData.designImage}
+                                      alt="Uploaded Design"
+                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                    />
+                                  );
+                                }
+                              }
+                              
+                              // PRIORITY 4: Regular product image
+                              return (
                               <img
                                 src={product.image}
                                 alt={product.title}
-                                className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg flex-shrink-0"
+                                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300"
                               />
+                              );
+                            })()}
+                          </div>
+                          
+                          {/* Product Title and Quantity */}
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm sm:text-base font-medium text-gray-900 truncate">{product.title}</h4>
-                                <p className="text-xs sm:text-sm text-gray-600">Quantity: {item.quantity}</p>
-                                
-                                {item.customization && (
+                            <h3 className="font-bold text-gray-900 text-lg mb-1">
+                              {product.title}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-2">
+                              Quantity: <span className="font-medium">{item.quantity}</span>
+                            </p>
+                            
+                            {/* Customization Badge */}
+                            {item.customization && (
+                              <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Customized Product
+                                {item.customization.designs && item.customization.designs.length > 0 && (
+                                  <span className="ml-1">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Design Names List */}
+                            {item.customization?.designs && item.customization.designs.length > 0 && (
                                   <div className="mt-2 space-y-1">
-                                    <p className="text-sm font-medium text-gray-700">Customization:</p>
-                                    {item.customization.design && (
-                                      <p className="text-xs text-gray-600">
-                                        Design: {item.customization.design.name}
-                                      </p>
+                                {item.customization.designs.map((design: any, designIndex: number) => (
+                                  <div key={designIndex} className="flex items-center text-xs text-gray-600">
+                                    <span className="inline-block w-2 h-2 bg-accent rounded-full mr-2"></span>
+                                    <span className="font-medium">{design.name || `Design ${designIndex + 1}`}</span>
+                                    {design.dimensions && (
+                                      <span className="ml-2 text-gray-400">
+                                        ({design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}")
+                                      </span>
                                     )}
-                                    <p className="text-xs text-gray-600">
-                                      Placement: {item.customization.placement}
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      Size: {item.customization.size}
-                                    </p>
-                                    <p className="text-xs text-gray-600">
-                                      Color: {item.customization.color}
-                                    </p>
+                                  </div>
+                                ))}
                                   </div>
                                 )}
                               </div>
-                              <div className="text-right">
-                                <p className="font-medium text-gray-900">
-                                  ${(itemPrice * item.quantity).toFixed(2)}
+                              
+                              {/* Item Total Display */}
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-xs sm:text-sm text-gray-600">Item Total</p>
+                                <p className="font-bold text-lg sm:text-xl text-accent">
+                                  ${(calculateItemPrice(item) * item.quantity).toFixed(2)}
                                 </p>
-                                {item.customization && (
-                                  <p className="text-xs text-gray-500">
-                                    ${itemPrice.toFixed(2)} each
-                                  </p>
-                                )}
                               </div>
+                        </div>
+                        
+                        {/* Color and Size Info */}
+                        {item.customization && (item.customization.color || item.customization.size) && (
+                          <div className="border-t border-gray-200 pt-3 mt-3">
+                            <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+                              {item.customization.color && (
+                                <div>
+                                  <span className="text-gray-600">Color: </span>
+                                  <span className="font-medium capitalize">{item.customization.color}</span>
+                                </div>
+                              )}
+                              {item.customization.size && (
+                                <div>
+                                  <span className="text-gray-600">Size: </span>
+                                  <span className="font-medium uppercase">{item.customization.size}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )
+                        )}
+                        
+                        {/* Pricing Breakdown */}
+                        <div className="border-t border-gray-200 pt-4 mt-3 space-y-2 text-sm">
+                          <div className="font-medium text-gray-900 mb-3 text-base">Detailed Price Breakdown</div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Base Product Price:</span>
+                            <span className="font-medium">${Number(product.price).toFixed(2)}</span>
+                          </div>
+                          
+                          {/* Customization Breakdown */}
+                          {item.customization?.designs && item.customization.designs.length > 0 && (
+                            <>
+                              {/* All Design Previews Gallery */}
+                              {item.customization.designs.length > 1 && (
+                                <div className="mb-3 pb-3 border-b border-gray-200">
+                                  <p className="text-xs font-medium text-gray-700 mb-2">All Designs:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {item.customization.designs.map((design: any, designIndex: number) => (
+                                      <div key={designIndex} className="relative group">
+                                        <img
+                                          src={design.preview}
+                                          alt={design.name || `Design ${designIndex + 1}`}
+                                          className="w-16 h-16 object-cover rounded border-2 border-gray-300 group-hover:border-accent transition-colors"
+                                        />
+                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded flex items-center justify-center">
+                                          <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100">
+                                            {designIndex + 1}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Individual Design Pricing */}
+                              <div className="space-y-3 mt-3">
+                                {item.customization.designs.map((design: any, designIndex: number) => {
+                                  // Calculate material cost
+                                  let materialCost = 0;
+                                  if (design.dimensions && design.dimensions.width > 0 && design.dimensions.height > 0) {
+                                    try {
+                                      const materialCosts = MaterialPricingService.calculateMaterialCosts({
+                                        patchWidth: design.dimensions.width * (design.scale || 1),
+                                        patchHeight: design.dimensions.height * (design.scale || 1)
+                                      });
+                                      materialCost = materialCosts.totalCost;
+                                    } catch (error) {
+                                      console.warn('Failed to calculate material costs:', error);
+                                    }
+                                  }
+                                  
+                                  // Calculate style options cost
+                                  let stylesCost = 0
+                                  if (design.selectedStyles) {
+                                    const styles = design.selectedStyles
+                                    if (styles.coverage) stylesCost += Number(styles.coverage.price) || 0
+                                    if (styles.material) stylesCost += Number(styles.material.price) || 0
+                                    if (styles.border) stylesCost += Number(styles.border.price) || 0
+                                    if (styles.backing) stylesCost += Number(styles.backing.price) || 0
+                                    if (styles.cutting) stylesCost += Number(styles.cutting.price) || 0
+                                    if (styles.threads) styles.threads.forEach((t: any) => stylesCost += Number(t.price) || 0)
+                                    if (styles.upgrades) styles.upgrades.forEach((u: any) => stylesCost += Number(u.price) || 0)
+                                  }
+                                  
+                                  const designTotal = materialCost + stylesCost
+                                  
+                                  return (
+                                    <div key={designIndex} className="pl-3 border-l-2 border-accent/30 bg-white rounded-lg p-3 space-y-2">
+                                      {/* Design Header */}
+                                      <div className="text-gray-700 font-semibold text-sm mb-2">
+                                        Design {designIndex + 1}: {design.name}
+                                      </div>
+                                    
+                                      {/* Material Cost */}
+                                      <div className="flex justify-between text-gray-600 text-xs">
+                                        <span>Material Cost:</span>
+                                        <span>${materialCost.toFixed(2)}</span>
+                                      </div>
+                                      
+                                      {/* Style Options Cost */}
+                                      <div className="flex justify-between text-gray-600 text-xs">
+                                        <span>Style Options:</span>
+                                        <span>${stylesCost.toFixed(2)}</span>
+                                      </div>
+                                      
+                                      {/* Design Total */}
+                                      <div className="flex justify-between font-medium text-xs pt-2 border-t border-gray-200">
+                                        <span>Design Total:</span>
+                                        <span className="text-accent">${designTotal.toFixed(2)}</span>
+                                      </div>
+                                    </div>
+                                );
                       })}
                     </div>
-                  </div>
-
-                  {/* Terms and Conditions */}
-                  <div className="border-t pt-6">
-                    <div className="flex items-start">
-                      <input
-                        type="checkbox"
-                        id="terms"
-                        className="mt-1 mr-3"
-                        required
-                      />
-                      <label htmlFor="terms" className="text-sm text-gray-600">
-                        I agree to the{' '}
-                        <a href="#" className="text-accent hover:underline">Terms of Service</a>
-                        {' '}and{' '}
-                        <a href="#" className="text-accent hover:underline">Privacy Policy</a>
-                      </label>
+                            </>
+                          )}
+                          
+                          {/* Unit Price */}
+                          <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-sm mt-2">
+                            <span>Unit Price:</span>
+                            <span className="text-accent">${calculateItemPrice(item).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                      
                     </div>
                   </div>
+                  
+                  {/* Final Totals */}
+                  <div className="border-t-2 border-gray-300 pt-4 space-y-2">
+                    <div className="flex justify-between text-base">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base">
+                      <span className="text-gray-600">Shipping:</span>
+                      <span className="font-medium">${(selectedShippingRate?.totalCost || 0).toFixed(2)}</span>
+                    </div>
+                    {selectedShippingRate && (
+                      <div className="text-sm text-gray-500 ml-4">
+                        {selectedShippingRate.serviceName} • {selectedShippingRate.carrier}
+                      </div>
+                    )}
+                    <div className="flex justify-between text-base">
+                      <span className="text-gray-600">Tax (8%):</span>
+                      <span className="font-medium">${calculateTax().toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                      <span className="text-gray-900">Order Total:</span>
+                      <span className="text-accent">${calculateTotal().toFixed(2)}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Important Notice */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <div>
+                        <h4 className="font-medium text-blue-900">Ready to Submit?</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          By clicking "Submit for Review", your order will be sent to our team for approval. Once approved, you'll receive a notification and can proceed to payment.
+                        </p>
+                    </div>
+                  </div>
+                  </div>
+                  
+                  {/* Error Display */}
+                  {paymentError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-medium text-red-900">Submission Error</h4>
+                          <p className="text-sm text-red-700 mt-1">{paymentError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1114,7 +1679,9 @@ export default function Checkout() {
                   isLoading={isCalculatingShipping}
                   className="w-full sm:w-auto"
                 >
-                  {isCalculatingShipping ? 'Calculating...' : 'Continue'}
+                  {currentStep === 1 && isCalculatingShipping ? 'Calculating...' : 
+                   currentStep === 1 ? 'Continue to Shipping' :
+                   'Review Order Summary'}
                   {!isCalculatingShipping && <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />}
                 </Button>
               ) : (
@@ -1125,8 +1692,8 @@ export default function Checkout() {
                   isLoading={isProcessing}
                   className="w-full sm:w-auto"
                 >
-                  {isProcessing ? 'Processing...' : 'Place Order'}
-                  <Lock className="w-4 h-4 ml-2" />
+                  {isProcessing ? 'Submitting...' : 'Submit for Review'}
+                  <CheckCircle className="w-4 h-4 ml-2" />
                 </Button>
               )}
             </div>
@@ -1137,19 +1704,53 @@ export default function Checkout() {
             <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6 lg:sticky lg:top-8 w-full">
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Order Summary</h3>
               
-                <div className="space-y-3 sm:space-y-4">
+              {/* Order Items List */}
+              <div className="mb-4 space-y-3 max-h-64 overflow-y-auto">
+                {items.map((item, index) => {
+                  const product = findProductById(item.productId)
+                  if (!product) return null
+                  
+                  const itemPrice = calculateItemPrice(item)
+                  
+                  return (
+                    <div key={index} className="flex items-start space-x-3 pb-3 border-b border-gray-100 last:border-0">
+                      <img
+                        src={item.customization?.mockup || product.image}
+                        alt={product.title}
+                        className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-gray-200"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{product.title}</h4>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-gray-600">Qty: {item.quantity}</span>
+                          <span className="text-xs font-semibold text-accent">${(itemPrice * item.quantity).toFixed(2)}</span>
+                        </div>
+                        {item.customization && (
+                          <div className="mt-1 flex items-center text-xs text-accent">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            <span>Customized</span>
+                          </div>
+                        )}
+                        {item.customization?.designs && item.customization.designs.length > 0 && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {item.customization.designs.length} embroidery design{item.customization.designs.length > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Price Summary */}
+                <div className="space-y-3 sm:space-y-4 pt-3 border-t-2 border-gray-200">
                 <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Subtotal</span>
+                  <span className="text-gray-600">Subtotal:</span>
                   <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Tax (8%)</span>
-                  <span className="font-medium">${calculateTax().toFixed(2)}</span>
-                </div>
-                
-                <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Shipping</span>
+                  <span className="text-gray-600">Shipping:</span>
                   <span className="font-medium text-right ml-2 flex-shrink-0">
                     {selectedShippingRate === null ? 'TBD' : 
                      selectedShippingRate.totalCost === 0 ? 'Free' : 
@@ -1158,11 +1759,11 @@ export default function Checkout() {
                 </div>
                 
                 {selectedShippingRate && selectedShippingRate.serviceName && (
-                  <div className="flex items-center text-xs text-gray-500 flex-wrap">
+                  <div className="flex items-center text-xs text-gray-500 flex-wrap -mt-2">
                     <Truck className="w-3 h-3 mr-1 flex-shrink-0" />
                     <span className="break-words">{selectedShippingRate.serviceName}</span>
-                    {selectedShippingRate.estimatedDeliveryDays && (
-                      <span className="ml-1 whitespace-nowrap">({selectedShippingRate.estimatedDeliveryDays} days)</span>
+                    {selectedShippingRate.carrier && (
+                      <span className="ml-1">• {selectedShippingRate.carrier}</span>
                     )}
                   </div>
                 )}
@@ -1174,10 +1775,15 @@ export default function Checkout() {
                   </div>
                 )}
                 
-                <div className="border-t pt-3 sm:pt-4">
-                  <div className="flex justify-between text-base sm:text-lg font-semibold">
-                    <span>Total</span>
-                    <span>${calculateTotal().toFixed(2)}</span>
+                <div className="flex justify-between text-sm sm:text-base">
+                  <span className="text-gray-600">Tax (8%):</span>
+                  <span className="font-medium">${calculateTax().toFixed(2)}</span>
+                </div>
+                
+                <div className="border-t-2 border-gray-300 pt-3 sm:pt-4">
+                  <div className="flex justify-between text-base sm:text-lg font-bold">
+                    <span className="text-gray-900">Order Total:</span>
+                    <span className="text-accent">${calculateTotal().toFixed(2)}</span>
                   </div>
                 </div>
               </div>

@@ -21,7 +21,9 @@ import {
   Download,
   Layers,
   MousePointer,
-  Maximize2
+  Maximize2,
+  MapPin,
+  Truck
 } from 'lucide-react'
 import { orderReviewApiService, OrderReview } from '../../shared/orderReviewApiService' // Updated with new status types
 import { MaterialPricingService } from '../../shared/materialPricingService'
@@ -957,7 +959,7 @@ const PendingReview: React.FC = () => {
   }
 
   // Helper function to get pricing breakdown for display (matches cart structure)
-  const getPricingBreakdown = (item: any): {
+  const getPricingBreakdown = (item: any, backendProductsParam?: any[]): {
     baseProductPrice: number;
     embroideryPrice: number;
     embroideryOptionsPrice: number;
@@ -988,11 +990,48 @@ const PendingReview: React.FC = () => {
 
     // Use stored pricing breakdown if available (matches cart structure)
     if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
+      let storedBasePrice = Number(item.pricingBreakdown.baseProductPrice) || 0;
+      const storedEmbroideryPrice = Number(item.pricingBreakdown.embroideryPrice) || 0;
+      const storedOptionsPrice = Number(item.pricingBreakdown.embroideryOptionsPrice) || 0;
+      const storedTotalPrice = Number(item.pricingBreakdown.totalPrice) || 0;
+      
+      // If base product price is 0 but we have embroidery costs, calculate the missing base price
+      let baseProductPrice = storedBasePrice;
+      if (baseProductPrice === 0 && (storedEmbroideryPrice > 0 || storedOptionsPrice > 0)) {
+        // Calculate base price as: total - embroidery - options
+        baseProductPrice = storedTotalPrice - storedEmbroideryPrice - storedOptionsPrice;
+        console.log('🔧 Calculated missing base product price:', {
+          total: storedTotalPrice,
+          embroidery: storedEmbroideryPrice,
+          options: storedOptionsPrice,
+          calculatedBase: baseProductPrice
+        });
+        // If still not positive, fallback to catalog base price
+        if (!(baseProductPrice > 0)) {
+          const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId;
+          let catalogProduct = (backendProductsParam || backendProducts).find((p: any) => p.id === numericId);
+          
+          // If not found in backend products, try frontend products as fallback
+          if (!catalogProduct) {
+            catalogProduct = products.find((p: any) => p.id === item.productId || p.id === numericId);
+          }
+          
+          if (catalogProduct?.price) {
+            baseProductPrice = Number(catalogProduct.price) || 0;
+            console.log('🔧 Retrieved base product price from catalog:', {
+              productId: item.productId,
+              catalogPrice: baseProductPrice,
+              catalogTitle: catalogProduct.title || catalogProduct.name
+            });
+          }
+        }
+      }
+      
       const result = {
-        baseProductPrice: Number(item.pricingBreakdown.baseProductPrice) || 0,
-        embroideryPrice: Number(item.pricingBreakdown.embroideryPrice) || 0,
-        embroideryOptionsPrice: Number(item.pricingBreakdown.embroideryOptionsPrice) || 0,
-        totalPrice: Number(item.pricingBreakdown.totalPrice) || 0
+        baseProductPrice: baseProductPrice,
+        embroideryPrice: storedEmbroideryPrice,
+        embroideryOptionsPrice: storedOptionsPrice,
+        totalPrice: storedTotalPrice
       };
       console.log('🔍 getPricingBreakdown - Using stored pricingBreakdown:', result);
       return result;
@@ -1010,6 +1049,50 @@ const PendingReview: React.FC = () => {
 
     // Calculate pricing for multiple designs with individual embroidery options
     let baseProduct = Number(item.product?.price) || 0;
+    
+    // If product price not found in item.product, try other sources
+    if (baseProduct === 0) {
+      // Try productSnapshot
+      if (item.productSnapshot?.price) {
+        baseProduct = Number(item.productSnapshot.price) || 0;
+        console.log('✅ Using productSnapshot price:', baseProduct);
+      } 
+      // Try looking up in backend products first, then frontend products
+      else if (item.productId && item.productId !== 'custom-embroidery') {
+        // First try backend products (numeric ID)
+        const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) 
+          ? Number(item.productId) 
+          : item.productId;
+        let foundProduct = (backendProductsParam || backendProducts).find((p: any) => p.id === numericId);
+        
+        // If not found in backend products, try frontend products with comprehensive ID matching
+        if (!foundProduct) {
+          const productId = item.productId;
+          // Try direct match first
+          foundProduct = products.find((p: any) => p.id === productId);
+          
+          // If not found and productId is numeric, try mayhem-XXX format
+          if (!foundProduct && typeof productId === 'string' && !isNaN(Number(productId))) {
+            const paddedId = `mayhem-${productId.padStart(3, '0')}`;
+            foundProduct = products.find((p: any) => p.id === paddedId);
+          }
+          
+          // If not found and productId is mayhem-XXX, try numeric format
+          if (!foundProduct && typeof productId === 'string' && productId.startsWith('mayhem-')) {
+            const numId = parseInt(productId.replace('mayhem-', ''), 10);
+            foundProduct = products.find((p: any) => p.id === numId || p.id === numId.toString());
+          }
+        }
+        
+        if (foundProduct) {
+          baseProduct = Number(foundProduct.price) || 0;
+          console.log('✅ Found product via lookup:', foundProduct.title || foundProduct.name, baseProduct);
+        } else {
+          console.warn('⚠️ Product not found for productId:', item.productId);
+        }
+      }
+    }
+    
     let totalEmbroideryPrice = 0;
     let totalOptions = 0;
     let designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> = [];
@@ -1588,6 +1671,106 @@ const PendingReview: React.FC = () => {
                   <p><strong>Email:</strong> {selectedReview.user_email}</p>
                 </div>
 
+                {/* Shipping Address - ALWAYS SHOW (moved from payment section) */}
+                {(selectedReview as any).shipping_address && (() => {
+                  try {
+                    const address = typeof (selectedReview as any).shipping_address === 'string' 
+                      ? JSON.parse((selectedReview as any).shipping_address)
+                      : (selectedReview as any).shipping_address;
+                    
+                    return (
+                      <div className="bg-white p-4 rounded-lg border border-gray-300">
+                        <h4 className="font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                          <MapPin className="h-5 w-5 text-gray-600" />
+                          Shipping Address
+                        </h4>
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="text-base text-gray-900 space-y-1">
+                            <p className="font-medium text-lg">{address.firstName} {address.lastName}</p>
+                            {address.phone && <p className="text-sm text-gray-600">📞 {address.phone}</p>}
+                            {address.email && <p className="text-sm text-gray-600">✉️ {address.email}</p>}
+                            <p className="mt-2">{address.street}</p>
+                            {address.apartment && <p className="text-sm text-gray-500">{address.apartment}</p>}
+                            <p>{address.city}, {address.state} {address.zipCode}</p>
+                            <p className="font-medium">{address.country || 'United States'}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 italic">
+                          Shipping address provided during checkout. Use for order fulfillment.
+                        </p>
+                      </div>
+                    );
+                  } catch (e) {
+                    console.error('Error parsing shipping address:', e);
+                    return null;
+                  }
+                })()}
+
+                {/* Shipping Method - ALWAYS SHOW (NEW) */}
+                {(selectedReview as any).shipping_method && (() => {
+                  try {
+                    const method = typeof (selectedReview as any).shipping_method === 'string' 
+                      ? JSON.parse((selectedReview as any).shipping_method)
+                      : (selectedReview as any).shipping_method;
+                    
+                    return (
+                      <div className="bg-white p-4 rounded-lg border border-gray-300">
+                        <h4 className="font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                          <Truck className="h-5 w-5 text-gray-600" />
+                          Selected Shipping Method
+                        </h4>
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold text-lg text-gray-900">{method.serviceName}</p>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {method.carrier || method.carrierCode}
+                                  {method.estimatedDeliveryDays && ` • ${method.estimatedDeliveryDays} business days`}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-2xl font-bold text-gray-900">${Number(method.cost || selectedReview.shipping || 0).toFixed(2)}</p>
+                                <p className="text-xs text-gray-500">Shipping Cost</p>
+                              </div>
+                            </div>
+                            {method.estimatedDeliveryDate && (
+                              <p className="text-sm text-gray-600">
+                                <Calendar className="h-4 w-4 inline mr-1" />
+                                Estimated Delivery: {new Date(method.estimatedDeliveryDate).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 italic">
+                          Customer selected this shipping method during checkout.
+                        </p>
+                      </div>
+                    );
+                  } catch (e) {
+                    console.error('Error parsing shipping method:', e);
+                    return null;
+                  }
+                })()}
+
+                {/* Customer Notes - ALWAYS SHOW (NEW) */}
+                {(selectedReview as any).customer_notes && (
+                  <div className="bg-white p-4 rounded-lg border border-gray-300">
+                    <h4 className="font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200 flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-gray-600" />
+                      Customer Notes
+                    </h4>
+                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                      <p className="text-sm text-gray-700 whitespace-pre-line">
+                        {(selectedReview as any).customer_notes}
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      Special delivery instructions from customer.
+                    </p>
+                  </div>
+                )}
+
                 {/* Payment and Shipping Info (only shown after payment) */}
                 {(selectedReview as any).order_number && (
                   <div className="bg-white p-4 rounded-lg border border-gray-300">
@@ -1653,44 +1836,6 @@ const PendingReview: React.FC = () => {
                           </div>
                         </div>
                       </div>
-
-                      {/* Shipping Address */}
-                      {(selectedReview as any).shipping_address && (() => {
-                        try {
-                          const address = typeof (selectedReview as any).shipping_address === 'string' 
-                            ? JSON.parse((selectedReview as any).shipping_address)
-                            : (selectedReview as any).shipping_address;
-                          
-                          return (
-                            <div className="pt-4 border-t border-gray-200">
-                              <div className="flex items-center justify-between mb-3">
-                                <p className="text-sm font-medium text-gray-600">Shipping Address</p>
-                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                                  <svg className="h-3 w-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
-                                  Verified by Customer
-                                </span>
-                              </div>
-                              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                                <div className="text-base text-gray-900 space-y-1">
-                                  <p className="font-medium">{address.firstName} {address.lastName}</p>
-                                  {address.phone && <p className="text-sm text-gray-600">📞 {address.phone}</p>}
-                                  <p>{address.street}</p>
-                                  {address.apartment && <p className="text-sm text-gray-500">{address.apartment}</p>}
-                                  <p>{address.city}, {address.state} {address.zipCode}</p>
-                                  <p className="font-medium">{address.country}</p>
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-2 italic">
-                                This is the shipping address provided by the customer during checkout. Use this address for order fulfillment.
-                              </p>
-                            </div>
-                          );
-                        } catch (e) {
-                          return null;
-                        }
-                      })()}
 
                       {/* Tracking Info */}
                       {(selectedReview as any).tracking_number && (
@@ -2369,9 +2514,9 @@ const PendingReview: React.FC = () => {
                   })()}
                 </div>
 
-                {/* Order Pricing */}
+                {/* Detailed Item Breakdown */}
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">Order Pricing</h4>
+                  <h4 className="font-medium text-gray-900 mb-2">Detailed Item Breakdown</h4>
                   {/* Detailed Pricing Breakdown for All Items */}
                   {(() => {
                     try {
@@ -2383,7 +2528,7 @@ const PendingReview: React.FC = () => {
                       
                       // Get all items that have embroidery options or custom pricing
                       const itemsWithOptions = orderData.filter((item: any) => {
-                        const pricing = getPricingBreakdown(item);
+                        const pricing = getPricingBreakdown(item, backendProducts);
                         console.log('🔍 Order Summary - Item pricing:', {
                           productId: item.productId,
                           pricing,
@@ -2398,60 +2543,10 @@ const PendingReview: React.FC = () => {
                       console.log('🔍 Order Summary - Items with options:', itemsWithOptions.length);
                       
                       if (itemsWithOptions.length > 0) {
-                        // Calculate totals for summary (excluding tax and shipping)
-                        const totalBaseProduct = itemsWithOptions.reduce((sum: number, item: any) => {
-                          const pricing = getPricingBreakdown(item);
-                          return sum + pricing.baseProductPrice;
-                        }, 0);
-                        
-                        const totalEmbroideryPrice = itemsWithOptions.reduce((sum: number, item: any) => {
-                          const pricing = getPricingBreakdown(item);
-                          return sum + pricing.embroideryPrice;
-                        }, 0);
-                        
-                        const totalEmbroideryOptions = itemsWithOptions.reduce((sum: number, item: any) => {
-                          const pricing = getPricingBreakdown(item);
-                          return sum + pricing.embroideryOptionsPrice;
-                        }, 0);
-                        
-                        // Subtotal only (no tax or shipping)
-                        const subtotal = totalBaseProduct + totalEmbroideryPrice + totalEmbroideryOptions;
-                        
                         return (
                           <div className="mt-4">
-                            {/* Pricing Summary */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
-                              <h5 className="font-semibold text-blue-900 mb-3 flex items-center">
-                                <DollarSign className="h-5 w-5 mr-2" />
-                                Pricing Summary
-                              </h5>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-blue-700">Base Product Price:</span>
-                                    <span className="font-medium text-blue-900">${totalBaseProduct.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-blue-700">Embroidery Price:</span>
-                                    <span className="font-medium text-blue-900">${totalEmbroideryPrice.toFixed(2)}</span>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between">
-                                    <span className="text-blue-700">Embroidery Options:</span>
-                                    <span className="font-medium text-blue-900">${totalEmbroideryOptions.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between border-t border-blue-300 pt-2">
-                                    <span className="font-semibold text-blue-800">Subtotal:</span>
-                                    <span className="font-bold text-blue-900">${subtotal.toFixed(2)}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <h5 className="font-medium text-gray-900 mb-2">Detailed Item Breakdown</h5>
                             {itemsWithOptions.map((item: any, index: number) => {
-                              const pricing = getPricingBreakdown(item);
+                              const pricing = getPricingBreakdown(item, backendProducts);
                               const itemName = getItemName(item);
                               
                               return (
