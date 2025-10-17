@@ -340,7 +340,6 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
           upgrades: [],
           cutting: null
         })
-        setCurrentStep(0)
         setMaterialCosts(null)
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
@@ -357,60 +356,134 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
   }
 
   if (showReview) {
+    // Calculate options price from selected styles
+    const allSelectedOptions = [
+      selectedStyles.coverage,
+      selectedStyles.material,
+      selectedStyles.border,
+      selectedStyles.backing,
+      selectedStyles.cutting,
+      ...selectedStyles.threads,
+      ...selectedStyles.upgrades
+    ].filter(Boolean) as EmbroideryOption[]
+
+    const optionsPrice = allSelectedOptions.reduce((sum, option) => {
+      const price = option.price || 0
+      return sum + (typeof price === 'string' ? parseFloat(price) || 0 : price)
+    }, 0)
+
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">Review Your Selections</h3>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+            <CheckCircle className="w-6 h-6 mr-2 text-green-500" />
+            Review Your Custom Embroidery
+          </h3>
 
-          <div className="space-y-6">
-            {stepCategories.map((category) => {
-              const selected = selectedStyles[category.key as keyof typeof selectedStyles]
-              if (!selected || (Array.isArray(selected) && selected.length === 0)) return null
+          {/* Compact 2-Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left: Design Preview */}
+            <div className="space-y-4">
+              <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt="Your design"
+                    className="w-full h-64 object-contain"
+                  />
+                ) : (
+                  <div className="w-full h-64 flex items-center justify-center">
+                    <ImageIcon className="w-16 h-16 text-gray-300" />
+                  </div>
+                )}
+              </div>
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Design:</span> {uploadedFile?.name}
+                </p>
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Size:</span> {size.width}" × {size.height}" ({(size.width * size.height).toFixed(2)} sq in)
+                </p>
+              </div>
+            </div>
 
-              return (
-                <div key={category.key} className="border-b border-gray-200 pb-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">{category.title}</h4>
-                  <div className="space-y-2">
-                    {Array.isArray(selected) ? (
-                      selected.map((style) => (
-                        <div key={style.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                              <CheckCircle className="w-4 h-4 text-purple-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-900">{style.name}</p>
-                              <p className="text-sm text-gray-600">{style.description}</p>
-                            </div>
-                          </div>
-                          <p className="font-semibold text-accent">
-                            {style.price === 0 ? 'Free' : `+${formatPrice(style.price)}`}
-                          </p>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <CheckCircle className="w-4 h-4 text-purple-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{selected.name}</p>
-                            <p className="text-sm text-gray-600">{selected.description}</p>
-                          </div>
-                        </div>
-                        <p className="font-semibold text-accent">
-                          {selected.price === 0 ? 'Free' : `+${formatPrice(selected.price)}`}
-                        </p>
-                      </div>
-                    )}
+            {/* Right: Pricing Breakdown */}
+            <div className="space-y-4">
+              {/* Price Summary */}
+              <div className="bg-gradient-to-br from-accent/5 to-accent/10 rounded-lg p-4 border border-accent/20">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <DollarSign className="w-5 h-5 mr-1 text-accent" />
+                  Price Breakdown
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700">Base Embroidery Cost:</span>
+                    <span className="font-semibold text-gray-900">
+                      {formatPrice(materialCosts?.totalCost || 0)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 ml-4">
+                    Based on {size.width}" × {size.height}" dimensions
+                  </div>
+                  <div className="border-t border-gray-300 pt-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-700">Embroidery Options:</span>
+                      <span className="font-semibold text-gray-900">
+                        +{formatPrice(optionsPrice)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="border-t-2 border-accent/30 pt-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-gray-900">Total Price:</span>
+                      <span className="text-2xl font-bold text-accent">
+                        {formatPrice((materialCosts?.totalCost || 0) + optionsPrice)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )
-            })}
+              </div>
+
+              {/* Selected Options Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-3 text-sm">Selected Options:</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {stepCategories.map((category) => {
+                    const selected = selectedStyles[category.key as keyof typeof selectedStyles]
+                    if (!selected || (Array.isArray(selected) && selected.length === 0)) return null
+
+                    return (
+                      <div key={category.key} className="text-sm">
+                        <span className="font-medium text-gray-700">{category.title}:</span>
+                        {Array.isArray(selected) ? (
+                          <div className="ml-3 text-gray-600">
+                            {selected.map((style, idx) => (
+                              <div key={style.id} className="flex justify-between">
+                                <span>• {style.name}</span>
+                                <span className="text-accent">
+                                  {style.price === 0 ? 'Free' : `+${formatPrice(style.price)}`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="ml-3 flex justify-between text-gray-600">
+                            <span>• {selected.name}</span>
+                            <span className="text-accent">
+                              {selected.price === 0 ? 'Free' : `+${formatPrice(selected.price)}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-8 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+          {/* Action Buttons */}
+          <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0 pt-6 border-t border-gray-200">
             <Button
               variant="outline"
               onClick={() => setShowReview(false)}
@@ -422,7 +495,7 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
             <Button
               onClick={handleAddToCart}
               disabled={!uploadedFile || !materialCosts || materialCosts.totalCost === 0 || isAddingToCart}
-              className="w-full sm:w-auto group"
+              className="w-full sm:w-auto group bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70"
             >
               {isAddingToCart ? 'Adding to Cart...' : 'Add to Cart'}
               <ShoppingCart className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />

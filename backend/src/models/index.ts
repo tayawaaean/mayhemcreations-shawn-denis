@@ -161,14 +161,18 @@ const setupAssociations = (): void => {
   });
 
   // ProductReview associations
+  // Note: productId can be numeric (product ID) or string (e.g., 'custom-embroidery')
+  // No foreign key constraint to support mixed productId types
   ProductReview.belongsTo(Product, {
     foreignKey: 'productId',
     as: 'product',
+    constraints: false, // No foreign key constraint for string ID support
   });
 
   Product.hasMany(ProductReview, {
     foreignKey: 'productId',
     as: 'reviews',
+    constraints: false, // No foreign key constraint for string ID support
   });
 
   ProductReview.belongsTo(User, {

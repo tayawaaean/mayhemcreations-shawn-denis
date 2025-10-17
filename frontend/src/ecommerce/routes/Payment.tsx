@@ -106,6 +106,21 @@ export default function Payment() {
     embroideryOptionsPrice: number
     totalPrice: number
   } => {
+    // Special handling for custom embroidery items
+    if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+      const embroideryData = item.customization.embroideryData
+      const baseEmbroideryPrice = Number(embroideryData.materialCosts?.totalCost) || 0
+      const optionsPrice = Number(embroideryData.optionsPrice) || 0
+      const totalPrice = baseEmbroideryPrice + optionsPrice
+      
+      return {
+        baseProductPrice: baseEmbroideryPrice, // For custom embroidery, the base is the material cost
+        embroideryPrice: 0, // No separate embroidery cost (it's the base)
+        embroideryOptionsPrice: optionsPrice,
+        totalPrice
+      }
+    }
+    
     // Use stored pricing breakdown if available
     if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
       let storedBasePrice = Number(item.pricingBreakdown.baseProductPrice) || 0
@@ -173,13 +188,18 @@ export default function Payment() {
     // Handle Stripe success
     if (success === 'true' && orderId) {
       console.log('✅ Stripe payment success')
-      navigate('/my-orders', {
-        state: {
-          paymentSuccess: true,
-          paymentMethod: 'stripe',
-          orderId: orderId
-        }
-      })
+      showSuccess('Payment completed successfully! Redirecting to your orders...')
+      
+      // Add a small delay to ensure the success message is visible
+      setTimeout(() => {
+        navigate('/my-orders', {
+          state: {
+            paymentSuccess: true,
+            paymentMethod: 'stripe',
+            orderId: orderId
+          }
+        })
+      }, 1500)
     }
     // Handle Stripe cancel
     else if (canceled === 'true') {
@@ -388,17 +408,39 @@ export default function Payment() {
       
       // Build Stripe Checkout line items
       const lineItems = orderData.items.map((item) => {
-        const product = findProductById(item.productId)
+        // Handle custom embroidery items specially
+        const isCustomEmbroidery = item.productId === 'custom-embroidery'
+        const product = isCustomEmbroidery ? null : findProductById(item.productId)
+        
         // Use getPricingBreakdown for accurate pricing
         const pricing = getPricingBreakdown(item)
         const itemPrice = pricing.totalPrice
+        
+        // Determine product name and description
+        let productName = 'Custom Product'
+        let productDescription = `Qty ${item.quantity}`
+        
+        if (isCustomEmbroidery && item.customization?.embroideryData) {
+          productName = 'Custom Embroidery'
+          const dimensions = item.customization.embroideryData.dimensions
+          if (dimensions) {
+            productDescription = `${dimensions.width}" × ${dimensions.height}" - Qty ${item.quantity}`
+          }
+        } else if (product) {
+          productName = product.title
+          if (item.customization) {
+            productDescription = `Customized - Qty ${item.quantity}`
+          }
+        } else if (item.productName) {
+          productName = item.productName
+        }
         
         return {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: product?.title || item.productName || 'Custom Product',
-              description: `Qty ${item.quantity}`,
+              name: productName,
+              description: productDescription,
               images: product?.image ? [product.image] : undefined,
             },
             unit_amount: Math.round(itemPrice * 100), // Stripe expects amount in cents
@@ -416,6 +458,8 @@ export default function Payment() {
         shippingAddress: orderData.shippingAddress
       })
 
+      console.log('💳 Stripe lineItems being sent:', JSON.stringify(lineItems, null, 2))
+      
       const response = await paymentsApiService.createCheckoutSession({
         lineItems,
         successUrl,
@@ -445,17 +489,25 @@ export default function Payment() {
         },
       })
 
+      console.log('💳 Stripe response:', response)
+
       if (response.success && response.data?.url) {
         // Redirect to hosted Stripe Checkout
         window.location.href = response.data.url
         return
       }
 
+      console.error('❌ Stripe checkout failed:', response)
       showError(response.message || 'Failed to create checkout session')
       setIsProcessing(false)
-    } catch (error) {
-      console.error('Stripe payment error:', error)
-      showError('Failed to process payment. Please try again.')
+    } catch (error: any) {
+      console.error('❌ Stripe payment error:', error)
+      console.error('Error details:', {
+        message: error?.message,
+        response: error?.response?.data,
+        stack: error?.stack
+      })
+      showError(error?.response?.data?.message || error?.message || 'Failed to process payment. Please try again.')
       setIsProcessing(false)
     }
   }
@@ -475,13 +527,34 @@ export default function Payment() {
       
       // Build PayPal order items
       const items = orderData.items.map((item) => {
-        const product = findProductById(item.productId)
+        // Handle custom embroidery items specially
+        const isCustomEmbroidery = item.productId === 'custom-embroidery'
+        const product = isCustomEmbroidery ? null : findProductById(item.productId)
+        
         // Use getPricingBreakdown for accurate pricing
         const pricing = getPricingBreakdown(item)
         const itemPrice = pricing.totalPrice
         
+        // Determine product name
+        let productName = 'Custom Product'
+        
+        if (isCustomEmbroidery && item.customization?.embroideryData) {
+          productName = 'Custom Embroidery'
+          const dimensions = item.customization.embroideryData.dimensions
+          if (dimensions) {
+            productName = `Custom Embroidery (${dimensions.width}" × ${dimensions.height}")`
+          }
+        } else if (product) {
+          productName = product.title
+          if (item.customization) {
+            productName = `${product.title} (Customized)`
+          }
+        } else if (item.productName) {
+          productName = item.productName
+        }
+        
         return {
-          name: product?.title || item.productName || 'Custom Product',
+          name: productName,
           quantity: item.quantity,
           unitAmount: itemPrice,
           currency: 'usd'
@@ -522,7 +595,8 @@ export default function Payment() {
         amount: paypalPayload.amount,
         shippingAddress: paypalPayload.shippingAddress,
         customerInfo: paypalPayload.customerInfo,
-        itemsCount: paypalPayload.items.length
+        itemsCount: paypalPayload.items.length,
+        items: JSON.stringify(paypalPayload.items, null, 2)
       })
 
       const response = await paymentsApiService.createPayPalOrder(paypalPayload)
@@ -641,13 +715,18 @@ export default function Payment() {
         sessionStorage.removeItem('paypal_return_timestamp')
         console.log('🧹 Cleared PayPal sessionStorage data')
         
-        navigate('/my-orders', {
-          state: {
-            paymentSuccess: true,
-            paymentMethod: 'paypal',
-            orderId: orderData.id
-          }
-        })
+        showSuccess('Payment completed successfully! Redirecting to your orders...')
+        
+        // Add a small delay to ensure the success message is visible
+        setTimeout(() => {
+          navigate('/my-orders', {
+            state: {
+              paymentSuccess: true,
+              paymentMethod: 'paypal',
+              orderId: orderData.id
+            }
+          })
+        }, 1500)
       } else {
         console.error('❌ PayPal capture failed:', response.message)
         showError(response.message || 'Failed to capture PayPal payment')
@@ -939,9 +1018,12 @@ export default function Payment() {
                     </h3>
                     <div className="space-y-3">
                       {orderData.items.map((item: any, index: number) => {
-                        const product = findProductById(item.productId)
+                        // Handle custom embroidery items specially
+                        const isCustomEmbroidery = item.productId === 'custom-embroidery'
+                        const product = isCustomEmbroidery ? null : findProductById(item.productId)
                         
-                        if (!product) {
+                        // Only show error for non-custom-embroidery items that can't be found
+                        if (!product && !isCustomEmbroidery) {
                           return (
                             <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3">
                               <p className="text-red-800 text-sm">Product not found: {item.productId}</p>
@@ -952,19 +1034,36 @@ export default function Payment() {
                         // Use getPricingBreakdown for accurate pricing
                         const pricing = getPricingBreakdown(item)
                         const itemPrice = pricing.totalPrice
+                        
+                        // For custom embroidery, create a virtual product display
+                        const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product!.title
+                        const displayImage = item.customization?.embroideryData?.designImage || 
+                                           item.customization?.mockup || 
+                                           (product ? product.image : '/demo-images/embroidery-placeholder.jpg')
 
                         return (
                           <div key={index} className="border border-gray-200 rounded-lg p-4">
                             <div className="flex items-start space-x-4">
                               <img
-                                src={item.customization?.mockup || product.image}
-                                alt={product.title}
+                                src={displayImage}
+                                alt={displayTitle}
                                 className="w-16 h-16 object-cover rounded-lg border border-gray-200"
                               />
                               <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{product.title}</h4>
+                                <h4 className="font-medium text-gray-900">{displayTitle}</h4>
                                 <p className="text-sm text-gray-600 mt-1">Qty: {item.quantity}</p>
-                                {item.customization && (
+                                {isCustomEmbroidery && item.customization?.embroideryData && (
+                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                                    <CheckCircle className="w-3 h-3 mr-1" />
+                                    Custom Embroidery
+                                    {item.customization.embroideryData.dimensions && (
+                                      <span className="ml-1">
+                                        • {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {item.customization && !isCustomEmbroidery && (
                                   <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
                                     <CheckCircle className="w-3 h-3 mr-1" />
                                     Customized
@@ -1052,22 +1151,37 @@ export default function Payment() {
               {/* Items List */}
               <div className="mb-4 space-y-3 max-h-64 overflow-y-auto">
                 {orderData.items.map((item: any, index: number) => {
-                  const product = findProductById(item.productId)
-                  if (!product) return null
+                  // Handle custom embroidery items specially
+                  const isCustomEmbroidery = item.productId === 'custom-embroidery'
+                  const product = isCustomEmbroidery ? null : findProductById(item.productId)
+                  
+                  // Only skip if not custom embroidery and product not found
+                  if (!product && !isCustomEmbroidery) return null
                   
                   // Use getPricingBreakdown for accurate pricing
                   const pricing = getPricingBreakdown(item)
                   const itemPrice = pricing.totalPrice
                   
+                  // For custom embroidery, create virtual product display
+                  const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product!.title
+                  const displayImage = item.customization?.embroideryData?.designImage || 
+                                     item.customization?.mockup || 
+                                     (product ? product.image : '/demo-images/embroidery-placeholder.jpg')
+                  
                   return (
                     <div key={index} className="flex items-start space-x-3 pb-3 border-b border-gray-100 last:border-0">
                       <img
-                        src={item.customization?.mockup || product.image}
-                        alt={product.title}
+                        src={displayImage}
+                        alt={displayTitle}
                         className="w-12 h-12 object-cover rounded-lg border border-gray-200"
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{product.title}</h4>
+                        <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{displayTitle}</h4>
+                        {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
+                          <p className="text-xs text-purple-600 mt-0.5">
+                            {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                          </p>
+                        )}
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-600">Qty: {item.quantity}</span>
                           <span className="text-xs font-semibold text-accent">${(itemPrice * item.quantity).toFixed(2)}</span>

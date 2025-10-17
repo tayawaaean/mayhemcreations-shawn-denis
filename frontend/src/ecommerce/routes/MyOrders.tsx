@@ -1991,8 +1991,8 @@ export default function MyOrders() {
                         </Button>
                       )}
                       
-                      {/* Refund button - show only if order not received yet and no refund requested */}
-                      {(order.status === 'delivered' || order.status === 'shipped') && !isOrderReceived(order.id) && (
+                      {/* Refund button - show only for delivered orders that haven't been marked as received */}
+                      {order.status === 'delivered' && !isOrderReceived(order.id) && (
                         <Button 
                           variant="outline" 
                           size="sm"
@@ -2233,15 +2233,17 @@ export default function MyOrders() {
                     <p className="text-sm font-medium text-gray-700">Review Items:</p>
                     <p className="text-xs text-gray-500">
                       {order.items.filter(item => {
-                        const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                        // Custom embroidery is reviewable, non-numeric IDs (except custom-embroidery) are not
+                        const isReviewable = item.productId === 'custom-embroidery' || !isNaN(parseInt(String(item.productId)))
                         return isReviewable && isItemReviewed(order.id, item.productId)
-                      }).length} of {order.items.filter(item => !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery').length} reviewed
+                      }).length} of {order.items.filter(item => item.productId === 'custom-embroidery' || !isNaN(parseInt(String(item.productId)))).length} reviewed
                     </p>
                   </div>
                   <div className="space-y-2">
                     {order.items.map((item) => {
                       const itemReviewed = isItemReviewed(order.id, item.productId)
-                      const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                      // Custom embroidery is reviewable, non-numeric IDs (except custom-embroidery) are not
+                      const isReviewable = item.productId === 'custom-embroidery' || !isNaN(parseInt(String(item.productId)))
                       
                       if (!isReviewable) return null
                       
@@ -2362,7 +2364,8 @@ export default function MyOrders() {
                     })}
                   </div>
                   {order.items.filter(item => {
-                    const isReviewable = !isNaN(parseInt(String(item.productId))) && String(item.productId) !== 'custom-embroidery'
+                    // Custom embroidery is reviewable, non-numeric IDs (except custom-embroidery) are not
+                    const isReviewable = item.productId === 'custom-embroidery' || !isNaN(parseInt(String(item.productId)))
                     return isReviewable && !isItemReviewed(order.id, item.productId)
                   }).length === 0 && (
                     <div className="mt-2 p-3 bg-green-100 border border-green-200 rounded-lg text-center">
@@ -3571,22 +3574,29 @@ export default function MyOrders() {
                       try {
                         // Use the specific product from reviewItem
                         const productIdStr = String(reviewItem.productId);
-                        const productId = parseInt(productIdStr);
-
-                        // Validate productId before sending
-                        if (!productId || isNaN(productId) || productId <= 0) {
-                          console.error('❌ Invalid productId:', { 
-                            productId, 
-                            productIdStr,
-                            reviewItem
-                          });
-                          setReviewResultModal({
-                            show: true,
-                            success: false,
-                            title: 'Error',
-                            message: 'Invalid product information. Please try again or contact support.'
-                          });
-                          return;
+                        
+                        // Handle custom embroidery specially (it uses string ID 'custom-embroidery')
+                        let productId: number | string;
+                        if (productIdStr === 'custom-embroidery') {
+                          productId = 'custom-embroidery';
+                        } else {
+                          productId = parseInt(productIdStr);
+                          
+                          // Validate numeric productId before sending
+                          if (!productId || isNaN(productId) || productId <= 0) {
+                            console.error('❌ Invalid productId:', { 
+                              productId, 
+                              productIdStr,
+                              reviewItem
+                            });
+                            setReviewResultModal({
+                              show: true,
+                              success: false,
+                              title: 'Error',
+                              message: 'Invalid product information. Please try again or contact support.'
+                            });
+                            return;
+                          }
                         }
 
                         console.log('📝 Submitting review for specific item:', {
@@ -3599,7 +3609,7 @@ export default function MyOrders() {
                         });
 
                         const response = await productReviewApiService.createReview({
-                          productId,
+                          productId: productId as any, // Type assertion since API interface expects number but accepts string for custom-embroidery
                           orderId: reviewOrderId,
                           rating,
                           title: `Review for ${reviewItem.productName}`,

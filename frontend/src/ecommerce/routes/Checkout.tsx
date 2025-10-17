@@ -59,6 +59,15 @@ export default function Checkout() {
   const [shippingRates, setShippingRates] = useState<ShippingRate[]>([])
   const [selectedShippingRate, setSelectedShippingRate] = useState<ShippingRate | null>(null)
   const [shippingError, setShippingError] = useState<string | null>(null)
+  // Store order totals before cart is cleared for success screen display
+  const [completedOrderTotals, setCompletedOrderTotals] = useState<{
+    subtotal: number
+    shipping: number
+    tax: number
+    total: number
+    shippingServiceName: string | null
+    estimatedDeliveryDays: number | null
+  } | null>(null)
 
   // Debug cart items on mount
   useEffect(() => {
@@ -658,6 +667,17 @@ export default function Checkout() {
       const response = await orderReviewApiService.submitForReview(orderData)
       
       if (response.success) {
+        // Save order totals BEFORE clearing the cart
+        const orderTotals = {
+          subtotal: calculateSubtotal(),
+          shipping: calculateShipping(),
+          tax: calculateTax(),
+          total: calculateTotal(),
+          shippingServiceName: selectedShippingRate?.serviceName || null,
+          estimatedDeliveryDays: selectedShippingRate?.estimatedDeliveryDays || null
+        }
+        setCompletedOrderTotals(orderTotals)
+        
         setIsComplete(true)
         
         // Clear cart after successful submission
@@ -706,15 +726,17 @@ export default function Checkout() {
             Your order has been submitted and will be reviewed by our team. 
             You'll be notified once it's approved and ready for payment.
           </p>
-          <div className="space-y-2 text-sm text-gray-500">
-            <p>Subtotal: ${calculateSubtotal().toFixed(2)}</p>
-            <p>Shipping: ${calculateShipping().toFixed(2)} ({selectedShippingRate?.serviceName})</p>
-            <p>Tax: ${calculateTax().toFixed(2)}</p>
-            <p className="font-semibold text-gray-900">Total: ${calculateTotal().toFixed(2)}</p>
-            {selectedShippingRate?.estimatedDeliveryDays && (
-              <p>Estimated delivery: {selectedShippingRate.estimatedDeliveryDays} business days after approval</p>
-            )}
-          </div>
+          {completedOrderTotals && (
+            <div className="space-y-2 text-sm text-gray-500">
+              <p>Subtotal: ${completedOrderTotals.subtotal.toFixed(2)}</p>
+              <p>Shipping: ${completedOrderTotals.shipping.toFixed(2)} {completedOrderTotals.shippingServiceName && `(${completedOrderTotals.shippingServiceName})`}</p>
+              <p>Tax: ${completedOrderTotals.tax.toFixed(2)}</p>
+              <p className="font-semibold text-gray-900">Total: ${completedOrderTotals.total.toFixed(2)}</p>
+              {completedOrderTotals.estimatedDeliveryDays && (
+                <p>Estimated delivery: {completedOrderTotals.estimatedDeliveryDays} business days after approval</p>
+              )}
+            </div>
+          )}
         </div>
       </main>
     )
@@ -1168,29 +1190,44 @@ export default function Checkout() {
                     <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">Order Items</h3>
                     <div className="space-y-3 sm:space-y-4">
                       {items.map((item, index) => {
-                        const product = findProductById(item.productId)
-                        if (!product) return null
+                        // Handle custom embroidery items specially
+                        const isCustomEmbroidery = item.productId === 'custom-embroidery'
+                        const product = isCustomEmbroidery ? null : findProductById(item.productId)
+                        
+                        // Skip only if it's NOT custom embroidery AND product not found
+                        if (!product && !isCustomEmbroidery) return null
                         
                         const itemPrice = calculateItemPrice(item)
+                        
+                        // Determine display values
+                        const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product?.title || 'Unknown Product'
+                        const displayImage = isCustomEmbroidery 
+                          ? ((item.customization?.embroideryData as any)?.designImage || item.customization?.mockup)
+                          : (item.customization?.mockup || product?.image)
                         
                         return (
                           <div key={index} className="border-2 border-gray-300 rounded-lg p-3 sm:p-4 bg-gradient-to-br from-white to-gray-50">
                             {/* Product Header */}
                             <div className="flex items-start space-x-3 sm:space-x-4 mb-3">
                               <img
-                                src={item.customization?.mockup || product.image}
-                                alt={product.title}
+                                src={displayImage}
+                                alt={displayTitle}
                                 className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0 border-2 border-accent"
                               />
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-sm sm:text-base font-semibold text-gray-900">{product.title}</h4>
+                                <h4 className="text-sm sm:text-base font-semibold text-gray-900">{displayTitle}</h4>
+                                {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
+                                  <p className="text-xs sm:text-sm text-purple-600 font-medium mt-1">
+                                    {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                                  </p>
+                                )}
                                 <p className="text-xs sm:text-sm text-gray-600 mt-1">
                                   Quantity: <span className="font-medium">{item.quantity}</span>
                                 </p>
                                 {item.customization && (
                                   <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
                                     <CheckCircle className="w-3 h-3 mr-1" />
-                                    Customized Product
+                                    {isCustomEmbroidery ? 'Custom Embroidery' : 'Customized Product'}
                                   </div>
                                 )}
                               </div>
@@ -1236,7 +1273,7 @@ export default function Checkout() {
                                   <div className="font-medium text-gray-900 mb-2">Price Breakdown</div>
                                   <div className="flex justify-between text-gray-600">
                                     <span>Base Price:</span>
-                                    <span className="font-medium">${Number(product.price || 0).toFixed(2)}</span>
+                                    <span className="font-medium">${Number(product?.price || 0).toFixed(2)}</span>
                                   </div>
                                   
                                   {/* Embroidery Details */}
@@ -1353,15 +1390,21 @@ export default function Checkout() {
                       )}
                       
                       {items.map((item, index) => {
-                    const product = findProductById(item.productId)
+                        // Handle custom embroidery items specially
+                        const isCustomEmbroidery = item.productId === 'custom-embroidery'
+                        const product = isCustomEmbroidery ? null : findProductById(item.productId)
                         
-                        if (!product) {
+                        // Skip only if it's NOT custom embroidery AND product not found
+                        if (!product && !isCustomEmbroidery) {
                           return (
                             <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-4">
                               <p className="text-red-800">❌ Product not found: {item.productId}</p>
                             </div>
                           )
                         }
+                        
+                        // Determine display values
+                        const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product?.title || 'Unknown Product'
                         
                     return (
                       <div key={index} className="border-2 border-gray-300 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 shadow-md">
@@ -1392,7 +1435,7 @@ export default function Checkout() {
                         return (
                                   <div className="relative">
                                     <img
-                                      src={firstDesign.preview || product.image}
+                                      src={firstDesign.preview || product?.image}
                                       alt={firstDesign.name || 'Design 1'}
                                       className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
                                     />
@@ -1406,7 +1449,7 @@ export default function Checkout() {
                               }
                               
                               // PRIORITY 3: For custom embroidery - show uploaded design
-                              if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+                              if (isCustomEmbroidery && item.customization?.embroideryData) {
                                 const embroideryData = item.customization.embroideryData as any;
                                 if (embroideryData.designImage) {
                                   return (
@@ -1422,8 +1465,8 @@ export default function Checkout() {
                               // PRIORITY 4: Regular product image
                               return (
                               <img
-                                src={product.image}
-                                alt={product.title}
+                                src={product?.image}
+                                alt={displayTitle}
                                   className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300"
                               />
                               );
@@ -1433,8 +1476,13 @@ export default function Checkout() {
                           {/* Product Title and Quantity */}
                               <div className="flex-1 min-w-0">
                             <h3 className="font-bold text-gray-900 text-lg mb-1">
-                              {product.title}
+                              {displayTitle}
                             </h3>
+                            {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
+                              <p className="text-sm text-purple-600 font-medium mb-1">
+                                {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                              </p>
+                            )}
                             <p className="text-sm text-gray-600 mb-2">
                               Quantity: <span className="font-medium">{item.quantity}</span>
                             </p>
@@ -1500,10 +1548,18 @@ export default function Checkout() {
                         {/* Pricing Breakdown */}
                         <div className="border-t border-gray-200 pt-4 mt-3 space-y-2 text-sm">
                           <div className="font-medium text-gray-900 mb-3 text-base">Detailed Price Breakdown</div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Base Product Price:</span>
-                            <span className="font-medium">${Number(product.price).toFixed(2)}</span>
-                          </div>
+                          {/* For custom embroidery, show base embroidery price instead of product price */}
+                          {item.productId === 'custom-embroidery' && item.customization?.embroideryData ? (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Base Embroidery Price:</span>
+                              <span className="font-medium">${Number(item.customization.embroideryData.materialCosts?.totalCost || 0).toFixed(2)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Base Product Price:</span>
+                              <span className="font-medium">${Number(product?.price || 0).toFixed(2)}</span>
+                            </div>
+                          )}
                           
                           {/* Customization Breakdown */}
                           {item.customization?.designs && item.customization.designs.length > 0 && (
@@ -1707,20 +1763,35 @@ export default function Checkout() {
               {/* Order Items List */}
               <div className="mb-4 space-y-3 max-h-64 overflow-y-auto">
                 {items.map((item, index) => {
-                  const product = findProductById(item.productId)
-                  if (!product) return null
+                  // Handle custom embroidery items specially
+                  const isCustomEmbroidery = item.productId === 'custom-embroidery'
+                  const product = isCustomEmbroidery ? null : findProductById(item.productId)
+                  
+                  // Skip only if it's NOT custom embroidery AND product not found
+                  if (!product && !isCustomEmbroidery) return null
                   
                   const itemPrice = calculateItemPrice(item)
+                  
+                  // Determine display values
+                  const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product?.title || 'Unknown Product'
+                  const displayImage = isCustomEmbroidery 
+                    ? ((item.customization?.embroideryData as any)?.designImage || item.customization?.mockup)
+                    : (item.customization?.mockup || product?.image)
                   
                   return (
                     <div key={index} className="flex items-start space-x-3 pb-3 border-b border-gray-100 last:border-0">
                       <img
-                        src={item.customization?.mockup || product.image}
-                        alt={product.title}
+                        src={displayImage}
+                        alt={displayTitle}
                         className="w-12 h-12 object-cover rounded-lg flex-shrink-0 border border-gray-200"
                       />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{product.title}</h4>
+                        <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{displayTitle}</h4>
+                        {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
+                          <p className="text-xs text-purple-600 font-medium mt-0.5">
+                            {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                          </p>
+                        )}
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-600">Qty: {item.quantity}</span>
                           <span className="text-xs font-semibold text-accent">${(itemPrice * item.quantity).toFixed(2)}</span>

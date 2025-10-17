@@ -348,14 +348,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false
     }
 
-    // Validate stock - check specific variant if one was selected
-    const selectedVariantId = customization?.selectedVariant?.id
-    
-    // Always validate stock, even for customized items with variants
-    const validation = await validateStock(productId, qty, selectedVariantId)
-    if (!validation.valid) {
-      showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
-      return false
+    // Skip stock validation for special product IDs like 'custom-embroidery'
+    // These don't exist in the products database
+    if (productId !== 'custom-embroidery') {
+      // Validate stock - check specific variant if one was selected
+      const selectedVariantId = customization?.selectedVariant?.id
+      
+      // Always validate stock, even for customized items with variants
+      const validation = await validateStock(productId, qty, selectedVariantId)
+      if (!validation.valid) {
+        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
+        return false
+      }
     }
 
     // Find the product to include in cart item
@@ -548,13 +552,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Find the item to get variant information
     const item = items.find((p) => p.productId === productId)
-    const selectedVariantId = item?.customization?.selectedVariant?.id
     
-    // Always validate stock, even for customized items with variants
-    const validation = await validateStock(productId, qty, selectedVariantId)
-    if (!validation.valid) {
-      showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
-      return false
+    // Skip stock validation for special product IDs like 'custom-embroidery'
+    // These are made-to-order and don't have inventory constraints
+    if (productId !== 'custom-embroidery') {
+      const selectedVariantId = item?.customization?.selectedVariant?.id
+      
+      // Validate stock for regular items, even customized items with variants
+      const validation = await validateStock(productId, qty, selectedVariantId)
+      if (!validation.valid) {
+        showWarning(validation.message || 'Product is out of stock', 'Stock Unavailable')
+        return false
+      }
     }
 
     // Update in database

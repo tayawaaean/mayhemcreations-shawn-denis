@@ -9,7 +9,7 @@ import { sequelize } from '../config/database';
 // Define interface for ProductReview attributes
 export interface ProductReviewAttributes {
   id: number;
-  productId: number;
+  productId: number | string; // Support both numeric IDs and string IDs like 'custom-embroidery'
   userId: number;
   orderId: number;
   rating: number;
@@ -31,7 +31,7 @@ export interface ProductReviewCreationAttributes extends Optional<ProductReviewA
 // Define the ProductReview class extending Sequelize Model
 export class ProductReview extends Model<ProductReviewAttributes, ProductReviewCreationAttributes> implements ProductReviewAttributes {
   public id!: number;
-  public productId!: number;
+  public productId!: number | string; // Support both numeric IDs and string IDs like 'custom-embroidery'
   public userId!: number;
   public orderId!: number;
   public rating!: number;
@@ -57,10 +57,10 @@ ProductReview.init(
       comment: 'Primary key for product review',
     },
     productId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(255),
       allowNull: false,
       field: 'product_id',
-      comment: 'Foreign key to products table',
+      comment: 'Product ID - supports both numeric IDs and string IDs like "custom-embroidery"',
     },
     userId: {
       type: DataTypes.INTEGER,

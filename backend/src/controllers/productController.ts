@@ -172,7 +172,17 @@ export const getProductById = async (req: Request, res: Response): Promise<void>
   try {
     const { id } = req.params;
 
-    const product = await Product.findByPk(parseInt(id), {
+    // Validate that the ID is a valid number before attempting to parse it
+    const productId = parseInt(id);
+    if (isNaN(productId)) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid product ID format'
+      });
+      return;
+    }
+
+    const product = await Product.findByPk(productId, {
       include: [
         {
           model: Category,

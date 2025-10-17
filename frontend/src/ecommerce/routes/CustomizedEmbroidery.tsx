@@ -1,13 +1,48 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight, Sparkles, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import DesignUpload from '../components/DesignUpload'
+import Reviews from '../components/Reviews'
+import { productReviewApiService, ProductReview, ReviewStats } from '../../shared/productReviewApiService'
 
 export default function CustomizedEmbroidery() {
   const [uploadedDesign, setUploadedDesign] = useState<File | null>(null)
   const [designPreview, setDesignPreview] = useState<string | null>(null)
   const [quotePrice, setQuotePrice] = useState<{total: number, base: number, options: number} | null>(null)
+  const [reviews, setReviews] = useState<ProductReview[]>([])
+  const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null)
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+
+  // Fetch reviews for custom embroidery on component mount
+  useEffect(() => {
+    const fetchCustomEmbroideryReviews = async () => {
+      try {
+        setReviewsLoading(true)
+        // Use a special query to get reviews for custom-embroidery product ID
+        // Since custom-embroidery uses a string ID, we'll fetch reviews that match it
+        const response = await productReviewApiService.getProductReviews('custom-embroidery' as any)
+        
+        if (response.success && response.data) {
+          setReviews(response.data.reviews)
+          setReviewStats(response.data.stats)
+        }
+      } catch (error) {
+        console.error('Error fetching custom embroidery reviews:', error)
+        // Set empty state on error
+        setReviews([])
+        setReviewStats({
+          totalReviews: 0,
+          averageRating: '0',
+          ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+        })
+      } finally {
+        setReviewsLoading(false)
+      }
+    }
+
+    fetchCustomEmbroideryReviews()
+  }, [])
 
   return (
     <main>
@@ -65,6 +100,67 @@ export default function CustomizedEmbroidery() {
               setDesignPreview(preview)
             }}
           />
+        </div>
+      </section>
+
+      {/* Customer Reviews Section */}
+      <section className="py-16 bg-white">
+        <div className="container max-w-6xl">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center space-x-2 bg-accent/10 text-accent px-4 py-2 rounded-full text-sm font-medium mb-4">
+              <Star className="w-4 h-4 fill-current" />
+              <span>Customer Testimonials</span>
+            </div>
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              What Our Customers Say
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Real feedback from customers who have experienced our custom embroidery services
+            </p>
+          </div>
+
+          {reviewsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading reviews...</p>
+              </div>
+            </div>
+          ) : reviews.length > 0 ? (
+            <Reviews
+              reviews={reviews.map(review => ({
+                id: review.id.toString(),
+                customerName: review.first_name && review.last_name 
+                  ? `${review.first_name} ${review.last_name}` 
+                  : 'Anonymous',
+                rating: review.rating,
+                comment: review.comment,
+                title: review.title,
+                createdAt: new Date(review.created_at),
+                isVerified: review.is_verified,
+                helpfulVotes: review.helpful_votes || 0,
+                images: review.images ? JSON.parse(review.images) : []
+              }))}
+              averageRating={parseFloat(reviewStats?.averageRating || '0')}
+              totalReviews={reviewStats?.totalReviews || 0}
+            />
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                No Reviews Yet
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Be the first to share your experience with our custom embroidery service!
+              </p>
+              <Link to="/contact">
+                <Button>
+                  Get Started
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

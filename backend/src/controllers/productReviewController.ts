@@ -87,15 +87,6 @@ export const createReview = async (
       });
     }
 
-    // Skip custom embroidery products (they don't have numeric IDs)
-    if (typeof productId === 'string' && productId === 'custom-embroidery') {
-      return res.status(400).json({
-        success: false,
-        message: 'Custom embroidery items cannot be reviewed individually',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
     // Check if order exists and belongs to user
     logger.info('🔍 Checking order:', { orderId, userId });
     const [orderResult] = await sequelize.query(`
@@ -149,6 +140,7 @@ export const createReview = async (
     // Check if product exists in order (handle both string and number productId)
     logger.info('🔍 Checking if product is in order:', { 
       productId, 
+      productIdType: typeof productId,
       orderDataLength: orderData.length,
       orderProducts: orderData.map(i => ({ 
         productId: i.productId, 
@@ -158,10 +150,19 @@ export const createReview = async (
     });
     
     const productInOrder = orderData.some((item: any) => {
+      // Handle custom embroidery string ID
+      if (productId === 'custom-embroidery' && item.productId === 'custom-embroidery') {
+        logger.info('✅ Custom embroidery product found in order');
+        return true;
+      }
+      
+      // Handle numeric product IDs (regular products)
       const itemProductId = typeof item.productId === 'string' ? parseInt(item.productId) : item.productId;
-      const matches = itemProductId === productId || item.productId === String(productId);
+      const numericProductId = typeof productId === 'string' ? parseInt(productId) : productId;
+      
+      const matches = !isNaN(itemProductId) && !isNaN(numericProductId) && itemProductId === numericProductId;
       if (matches) {
-        logger.info('✅ Product found in order:', { itemProductId, productId });
+        logger.info('✅ Product found in order:', { itemProductId, numericProductId });
       }
       return matches;
     });

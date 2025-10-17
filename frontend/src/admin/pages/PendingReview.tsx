@@ -34,8 +34,10 @@ import { useAdminWebSocket } from '../../hooks/useWebSocket'
 import { products } from '../../data/products'
 import { productApiService } from '../../shared/productApiService'
 import { apiAuthService } from '../../shared/apiAuthService'
+import { useAlertModal } from '../../ecommerce/context/AlertModalContext'
 
 const PendingReview: React.FC = () => {
+  const { showSuccess, showError, showInfo } = useAlertModal()
   const [reviews, setReviews] = useState<OrderReview[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -269,13 +271,13 @@ const PendingReview: React.FC = () => {
     try {
       // Validate rejection reason if status is rejected
       if (status === 'rejected' && !notes.trim()) {
-        alert('Please provide a reason for rejection in the admin notes');
+        showError('Please provide a reason for rejection in the admin notes', 'Validation Error');
         return;
       }
 
       // Validate shipping info if status is shipped and no label has been created
       if (status === 'shipped' && !selectedReview?.tracking_number && (!tracking || !carrier)) {
-        alert('Please create a shipping label first or manually enter tracking number and carrier');
+        showError('Please create a shipping label first or manually enter tracking number and carrier', 'Missing Shipping Info');
         return;
       }
 
@@ -307,11 +309,11 @@ const PendingReview: React.FC = () => {
         setTrackingNumber('')
         setShippingCarrier('')
       } else {
-        alert('Failed to update review status')
+        showError('Failed to update review status')
       }
     } catch (error) {
       console.error('Error updating review status:', error)
-      alert('Failed to update review status')
+      showError('Failed to update review status')
     }
   }
 
@@ -402,11 +404,11 @@ const PendingReview: React.FC = () => {
         loadReviews() // Refresh the reviews
         setIsDetailModalOpen(false) // Close the modal after successful upload
       } else {
-        alert('Failed to upload picture replies. Please try again.')
+        showError('Failed to upload picture replies. Please try again.')
       }
     } catch (error) {
       console.error('Error uploading picture replies:', error)
-      alert('Failed to upload picture replies. Please try again.')
+      showError('Failed to upload picture replies. Please try again.')
     } finally {
       setUploadingPictures(false)
     }
@@ -416,6 +418,9 @@ const PendingReview: React.FC = () => {
   const handleCreateLabel = async (orderId: number, rateId?: string) => {
     try {
       setCreatingLabel(true)
+      
+      // Show info modal about label creation
+      showInfo('Creating shipping label... This may take a few moments. Please wait.', 'Processing')
       
       console.log('📦 Creating label for order:', orderId)
       
@@ -451,6 +456,9 @@ const PendingReview: React.FC = () => {
         // Refresh reviews to show updated tracking info
         await loadReviews()
         
+        // Show success message (replaces the info modal)
+        showSuccess(`Shipping label ${response.data.wasUpdate ? 'updated' : 'created'} successfully! Tracking: ${response.data.trackingNumber}`)
+        
         // Show success modal with label info
         setIsLabelModalOpen(true)
       } else {
@@ -458,7 +466,7 @@ const PendingReview: React.FC = () => {
       }
     } catch (error: any) {
       console.error('❌ Label creation error:', error)
-      alert(`Failed to create shipping label: ${error.message || 'Unknown error'}`)
+      showError(`Failed to create shipping label: ${error.message || 'Unknown error'}`)
     } finally {
       setCreatingLabel(false)
     }
@@ -468,7 +476,7 @@ const PendingReview: React.FC = () => {
   const handleDownloadLabel = (pdfUrl: string) => {
     if (!pdfUrl) {
       console.error('❌ No PDF URL provided - this may be a backend issue where the URL was not saved')
-      alert('PDF URL not available. This may be a backend issue. Please contact support or try creating a new label.')
+      showError('PDF URL not available. This may be a backend issue. Please contact support or try creating a new label.')
       return
     }
 
@@ -505,7 +513,7 @@ const PendingReview: React.FC = () => {
         console.log('✅ PDF download triggered successfully')
       } catch (error) {
         console.error('❌ Error downloading base64 PDF:', error)
-        alert('Failed to download PDF. Please try again.')
+        showError('Failed to download PDF. Please try again.')
       }
     } else {
       // Regular URL - open in new tab
@@ -3940,7 +3948,7 @@ const PendingReview: React.FC = () => {
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(labelData.trackingNumber)
-                        alert('Tracking number copied to clipboard!')
+                        showSuccess('Tracking number copied to clipboard!')
                       }}
                       className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center justify-center space-x-1 mx-auto"
                     >

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Search, Filter, Download, CheckCircle, XCircle, Clock, RotateCcw, Eye, User, Calendar, DollarSign, AlertCircle, RefreshCw, Package } from 'lucide-react'
 import { RefundApiService, RefundRequest, RefundStats } from '../../shared/refundApiService'
+import { useAlertModal } from '../../ecommerce/context/AlertModalContext'
 
 const RefundManagement: React.FC = () => {
+  const { showSuccess, showError, showWarning, showConfirm } = useAlertModal()
+  
   // State management
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [filteredRequests, setFilteredRequests] = useState<RefundRequest[]>([])
@@ -106,7 +109,12 @@ const RefundManagement: React.FC = () => {
    * Handle refund approval
    */
   const handleApprove = async (refundId: number) => {
-    if (!confirm('Are you sure you want to approve this refund? This will process the payment refund immediately.')) {
+    const confirmed = await showConfirm(
+      'Are you sure you want to approve this refund? This will process the payment refund immediately.',
+      'Confirm Refund Approval'
+    )
+    
+    if (!confirmed) {
       return
     }
 
@@ -115,7 +123,7 @@ const RefundManagement: React.FC = () => {
       const response = await RefundApiService.approveRefund(refundId, adminNotes, manualCaptureId || undefined)
       
       if (response.success) {
-        alert('Refund approved and processed successfully!')
+        showSuccess('Refund approved and processed successfully!')
         setShowDetailsModal(false)
         setAdminNotes('')
         setManualCaptureId('')
@@ -128,15 +136,19 @@ const RefundManagement: React.FC = () => {
         const errorMessage = response.message || 'Unknown error'
         if (errorMessage.includes('MANUAL_REFUND_REQUIRED')) {
           // Show detailed error message with option to enter capture ID
-          if (confirm(errorMessage + '\n\nWould you like to enter the PayPal Capture ID manually?')) {
+          const enterManually = await showConfirm(
+            errorMessage + '\n\nWould you like to enter the PayPal Capture ID manually?',
+            'Manual PayPal Capture Required'
+          )
+          if (enterManually) {
             setShowManualInput(true)
           }
         } else {
-          alert('Error approving refund: ' + errorMessage)
+          showError('Error approving refund: ' + errorMessage)
         }
       }
     } catch (err: any) {
-      alert('Error approving refund: ' + (err.message || 'Unknown error'))
+      showError('Error approving refund: ' + (err.message || 'Unknown error'))
     } finally {
       setProcessing(false)
     }
@@ -147,7 +159,7 @@ const RefundManagement: React.FC = () => {
    */
   const handleReject = async (refundId: number) => {
     if (!rejectionReason.trim()) {
-      alert('Please provide a rejection reason')
+      showWarning('Please provide a rejection reason', 'Rejection Reason Required')
       return
     }
 
@@ -156,7 +168,7 @@ const RefundManagement: React.FC = () => {
       const response = await RefundApiService.rejectRefund(refundId, rejectionReason, adminNotes)
       
       if (response.success) {
-        alert('Refund rejected successfully')
+        showSuccess('Refund rejected successfully')
         setShowDetailsModal(false)
         setShowRejectModal(false)
         setAdminNotes('')
@@ -166,7 +178,7 @@ const RefundManagement: React.FC = () => {
         await fetchStats()
       }
     } catch (err: any) {
-      alert('Error rejecting refund: ' + (err.message || 'Unknown error'))
+      showError('Error rejecting refund: ' + (err.message || 'Unknown error'))
     } finally {
       setProcessing(false)
     }
@@ -181,14 +193,14 @@ const RefundManagement: React.FC = () => {
       const response = await RefundApiService.reviewRefund(refundId, adminNotes)
       
       if (response.success) {
-        alert('Refund marked as under review')
+        showSuccess('Refund marked as under review')
         setShowDetailsModal(false)
         setAdminNotes('')
         await fetchRefunds()
         await fetchStats()
       }
     } catch (err: any) {
-      alert('Error updating refund: ' + (err.message || 'Unknown error'))
+      showError('Error updating refund: ' + (err.message || 'Unknown error'))
     } finally {
       setProcessing(false)
     }

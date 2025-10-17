@@ -622,10 +622,32 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
             preview: design.preview // Keep base64 preview
           }))
         }
-        localStorage.setItem(CUSTOMIZATION_STORAGE_KEY, JSON.stringify(serializableState))
-        console.log('💾 Customization data saved to localStorage')
-      } catch (error) {
-        console.warn('Failed to save customization data to localStorage:', error)
+        
+        const dataString = JSON.stringify(serializableState)
+        const dataSizeInMB = dataString.length / 1024 / 1024
+        
+        // Check if data is too large (limit to 2MB to leave room for auth data)
+        if (dataSizeInMB > 2) {
+          console.warn('⚠️ Customization data too large for localStorage:', dataSizeInMB.toFixed(2), 'MB')
+          console.warn('⚠️ Skipping localStorage save to prevent quota issues that could affect authentication')
+          return newState
+        }
+        
+        localStorage.setItem(CUSTOMIZATION_STORAGE_KEY, dataString)
+        console.log('💾 Customization data saved to localStorage (' + dataSizeInMB.toFixed(2) + ' MB)')
+      } catch (error: any) {
+        if (error.name === 'QuotaExceededError') {
+          console.error('❌ localStorage quota exceeded! This may affect authentication.')
+          console.error('❌ Clearing customization data to preserve auth state')
+          // Clear customization data to prevent auth issues
+          try {
+            localStorage.removeItem(CUSTOMIZATION_STORAGE_KEY)
+          } catch (e) {
+            console.error('Failed to clear customization data:', e)
+          }
+        } else {
+          console.warn('Failed to save customization data to localStorage:', error)
+        }
       }
       
       return newState

@@ -291,8 +291,8 @@ export const updateCartItem = async (req: AuthenticatedRequest, res: Response, n
       return;
     }
 
-    // Validate stock for regular products
-    if (typeof cartItem.productId === 'string' && !isNaN(Number(cartItem.productId))) {
+    // Validate stock for regular products (skip for custom embroidery which doesn't have inventory)
+    if (cartItem.productId !== 'custom-embroidery' && typeof cartItem.productId === 'string' && !isNaN(Number(cartItem.productId))) {
       const product = await Product.findByPk(Number(cartItem.productId));
       if (product && product.stock && quantity > product.stock) {
         res.status(400).json({

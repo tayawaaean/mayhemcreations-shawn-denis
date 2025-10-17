@@ -1068,10 +1068,18 @@ export default function Cart() {
                 <div className="border-t pt-4">
                   <h4 className="font-semibold text-gray-900 mb-3">Price Breakdown</h4>
                   <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Base Product Price:</span>
-                      <span className="font-medium">${formatPrice(selectedItem.product?.price || 0)}</span>
-                    </div>
+                    {/* For custom embroidery, show base embroidery price instead of product price */}
+                    {selectedItem.productId === 'custom-embroidery' && selectedItem.customization?.embroideryData ? (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Base Embroidery Price:</span>
+                        <span className="font-medium">${formatPrice(selectedItem.customization.embroideryData.materialCosts?.totalCost || 0)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Base Product Price:</span>
+                        <span className="font-medium">${formatPrice(selectedItem.product?.price || 0)}</span>
+                      </div>
+                    )}
                     {selectedItem.customization && (
                       <>
                         {/* Multiple Designs Pricing */}
@@ -1173,11 +1181,15 @@ export default function Cart() {
                             </div>
                           </>
                         ) : (
-                          /* Legacy Single Design Pricing */
+                          /* Legacy Single Design Pricing or Custom Embroidery */
                           <div className="flex justify-between">
                             <span className="text-gray-600">Customization Total:</span>
                             <span className="font-medium">
-                              +${formatPrice(calculateItemPrice(selectedItem) - Number(selectedItem.product?.price || 0))}
+                              +${formatPrice(
+                                selectedItem.productId === 'custom-embroidery' && selectedItem.customization?.embroideryData
+                                  ? selectedItem.customization.embroideryData.optionsPrice || 0
+                                  : calculateItemPrice(selectedItem) - Number(selectedItem.product?.price || 0)
+                              )}
                             </span>
                           </div>
                         )}

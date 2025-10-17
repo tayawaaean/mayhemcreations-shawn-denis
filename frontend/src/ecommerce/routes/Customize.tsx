@@ -55,6 +55,8 @@ export default function Customize() {
   const [error, setError] = useState<string | null>(null)
   const [showCartConfirmation, setShowCartConfirmation] = useState(false)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [isTransitioningToEmbroidery, setIsTransitioningToEmbroidery] = useState(false)
+  const [isCapturingDesign, setIsCapturingDesign] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
   
@@ -740,37 +742,54 @@ export default function Customize() {
   }
 
   const nextStep = async () => {
-    // When leaving step 3, capture and save a high-quality mockup once
-    if (currentStep === 3 && productRef.current) {
-      try {
-        // Show final view for clean capture
-        const wasInFinalView = showFinalView
-        if (!wasInFinalView) setShowFinalView(true)
-        
-        // Wait for DOM to update before capturing
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        const mockupBase64 = await captureElementAsBase64(productRef.current, { backgroundColor: '#ffffff' })
-        setCustomizationData({ mockup: mockupBase64 })
-        
-        // Restore previous view state
-        if (!wasInFinalView) setShowFinalView(false)
-        
-        // Wait for state to settle before moving to next step
-        await new Promise(resolve => setTimeout(resolve, 50))
-        
-        console.log('💾 Mockup captured and saved to localStorage')
-      } catch (e) {
-        console.error('Failed to capture mockup at step 3:', e)
-        // Even if mockup capture fails, ensure we restore the view state
-        setShowFinalView(false)
-      }
+    // Show loading modal when transitioning to step 4 (Embroidery Options)
+    if (currentStep === 3) {
+      setIsTransitioningToEmbroidery(true)
     }
 
-    // Move to next step after async operations complete
-    if (currentStep < steps.length) {
-      console.log(`📍 Moving from step ${currentStep} to step ${currentStep + 1}`)
-      setCurrentStep(currentStep + 1)
+    try {
+      // When leaving step 3, capture and save a high-quality mockup once
+      if (currentStep === 3 && productRef.current) {
+        try {
+          // Show final view for clean capture
+          const wasInFinalView = showFinalView
+          if (!wasInFinalView) setShowFinalView(true)
+          
+          // Wait for DOM to update before capturing
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          const mockupBase64 = await captureElementAsBase64(productRef.current, { backgroundColor: '#ffffff' })
+          setCustomizationData({ mockup: mockupBase64 })
+          
+          // Restore previous view state
+          if (!wasInFinalView) setShowFinalView(false)
+          
+          // Wait for state to settle before moving to next step
+          await new Promise(resolve => setTimeout(resolve, 50))
+          
+          console.log('💾 Mockup captured and saved to localStorage')
+        } catch (e) {
+          console.error('Failed to capture mockup at step 3:', e)
+          // Even if mockup capture fails, ensure we restore the view state
+          setShowFinalView(false)
+        }
+      }
+
+      // Move to next step after async operations complete
+      if (currentStep < steps.length) {
+        console.log(`📍 Moving from step ${currentStep} to step ${currentStep + 1}`)
+        setCurrentStep(currentStep + 1)
+        
+        // Add a small delay to allow the embroidery options component to load
+        if (currentStep === 3) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+    } finally {
+      // Hide loading modal after transition
+      if (currentStep === 3) {
+        setIsTransitioningToEmbroidery(false)
+      }
     }
   }
 
@@ -1019,6 +1038,9 @@ export default function Customize() {
     if (!productRef.current) return
 
     try {
+      // Show loading modal
+      setIsCapturingDesign(true)
+      
       // Show final view for clean capture (this hides all numbers, handles, and info)
       setShowFinalView(true)
       // Wait for UI to update
@@ -1031,8 +1053,11 @@ export default function Customize() {
       // Restore editing state
       setShowFinalView(false)
       
+      // Hide loading modal
+      setIsCapturingDesign(false)
+      
       // Show the captured image in a modal
-    setShowFinalDesignModal(true)
+      setShowFinalDesignModal(true)
       setFinalDesignImage(mockupBase64)
       
       console.log('✅ High-quality design preview captured:', {
@@ -1041,8 +1066,9 @@ export default function Customize() {
       })
     } catch (error) {
       console.error('❌ Error capturing design:', error)
-      // Make sure to restore editing state even on error
+      // Make sure to restore editing state and hide loading modal even on error
       setShowFinalView(false)
+      setIsCapturingDesign(false)
     }
   }
 
@@ -2145,6 +2171,50 @@ export default function Customize() {
                   Got it!
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Modal for Transitioning to Embroidery Options */}
+      {isTransitioningToEmbroidery && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="absolute inset-0 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-gray-200 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Loading Embroidery Options
+              </h3>
+              
+              <p className="text-gray-600">
+                Please wait while we prepare your customization options...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Modal for Capturing Design Preview */}
+      {isCapturingDesign && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className="absolute inset-0 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-gray-200 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Capturing Your Design
+              </h3>
+              
+              <p className="text-gray-600">
+                Please wait while we prepare your design preview...
+              </p>
             </div>
           </div>
         </div>

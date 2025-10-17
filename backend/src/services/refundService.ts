@@ -756,10 +756,27 @@ export class RefundService {
           continue;
         }
 
+        // Check if it's a custom embroidery item (skip inventory restoration)
+        if (item.productId === 'custom-embroidery') {
+          logger.info(`Skipping inventory restoration for custom embroidery item`);
+          continue;
+        }
+
         // Check if it's a custom item (skip inventory restoration)
         if (isNaN(parseInt(item.productId))) {
           logger.info(`Skipping inventory restoration for custom item: ${item.productId}`);
           continue;
+        }
+
+        // Check if item has embroidery customization (permanent made-to-order, cannot be restocked)
+        if (item.customization) {
+          const hasEmbroidery = item.customization.designs && Array.isArray(item.customization.designs) && item.customization.designs.length > 0;
+          const hasEmbroideryData = item.customization.embroideryData;
+          
+          if (hasEmbroidery || hasEmbroideryData) {
+            logger.info(`Skipping inventory restoration for embroidered item: ${item.productId} - made-to-order/permanent customization`);
+            continue;
+          }
         }
 
         // Restore product stock
