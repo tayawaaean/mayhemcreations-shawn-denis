@@ -75,9 +75,9 @@ export class EmailService {
    * Send customer notification for admin message
    */
   async sendCustomerNotification(profile: UserProfile, message: string): Promise<boolean> {
-    // Don't send emails to guest users
-    if (profile.isGuest || !profile.email) {
-      logger.info(`📧 Skipping email notification for ${profile.isGuest ? 'guest' : 'user without email'} ${profile.id}`);
+    // Don't send emails to users without email addresses
+    if (!profile.email) {
+      logger.info(`📧 Skipping email notification for user without email ${profile.id}`);
       return true;
     }
 
@@ -89,7 +89,7 @@ export class EmailService {
       customerEmail: profile.email,
       message,
       timestamp: new Date().toISOString(),
-      isGuest: false,
+      isGuest: profile.isGuest,
       adminName: process.env.ADMIN_NAME || 'Support Team',
       companyName: 'Mayhem Creations'
     });
@@ -103,7 +103,7 @@ export class EmailService {
         customerEmail: profile.email,
         message,
         timestamp: new Date().toISOString(),
-        isGuest: false,
+        isGuest: profile.isGuest,
         adminName: process.env.ADMIN_NAME || 'Support Team',
         companyName: 'Mayhem Creations'
       })
@@ -256,6 +256,281 @@ To view the full conversation, please visit: ${process.env.FRONTEND_URL || 'http
 
 This message was sent from the ${data.companyName} chat system.
 If you need immediate assistance, please contact us directly.
+    `.trim();
+  }
+
+  /**
+   * Send conversation summary email to customer
+   */
+  async sendConversationSummary(profile: UserProfile, messages: Array<{
+    text: string;
+    sender: 'user' | 'admin';
+    timestamp: Date;
+    type: string;
+  }>): Promise<boolean> {
+    if (!profile.email) {
+      logger.info(`📧 Skipping conversation summary for user without email ${profile.id}`);
+      return true;
+    }
+
+    const customerName = this.getCustomerDisplayName(profile);
+    
+    const subject = `Chat Conversation Summary - Mayhem Creations`;
+    const html = this.generateConversationSummaryHTML({
+      customerName,
+      customerEmail: profile.email,
+      messages,
+      isGuest: profile.isGuest,
+      companyName: 'Mayhem Creations'
+    });
+
+    return this.sendEmail({
+      to: profile.email,
+      subject,
+      html,
+      text: this.generateConversationSummaryText({
+        customerName,
+        customerEmail: profile.email,
+        messages,
+        isGuest: profile.isGuest,
+        companyName: 'Mayhem Creations'
+      })
+    });
+  }
+
+  /**
+   * Send unread messages notification to admin
+   */
+  async sendUnreadMessagesNotification(customerName: string, customerEmail: string | null, unreadCount: number, lastMessage: string, isGuest: boolean): Promise<boolean> {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      logger.error('❌ ADMIN_EMAIL not configured');
+      return false;
+    }
+
+    const subject = `Unread Messages from ${isGuest ? 'Guest' : 'Customer'} - ${customerName}`;
+    const html = this.generateUnreadMessagesHTML({
+      customerName,
+      customerEmail,
+      unreadCount,
+      lastMessage,
+      isGuest,
+      adminName: process.env.ADMIN_NAME || 'Admin',
+      companyName: 'Mayhem Creations'
+    });
+
+    return this.sendEmail({
+      to: adminEmail,
+      subject,
+      html,
+      text: this.generateUnreadMessagesText({
+        customerName,
+        customerEmail,
+        unreadCount,
+        lastMessage,
+        isGuest,
+        adminName: process.env.ADMIN_NAME || 'Admin',
+        companyName: 'Mayhem Creations'
+      })
+    });
+  }
+
+  /**
+   * Generate conversation summary HTML
+   */
+  private generateConversationSummaryHTML(data: {
+    customerName: string;
+    customerEmail: string;
+    messages: Array<{
+      text: string;
+      sender: 'user' | 'admin';
+      timestamp: Date;
+      type: string;
+    }>;
+    isGuest: boolean;
+    companyName: string;
+  }): string {
+    const messageList = data.messages.map(msg => `
+      <div class="message ${msg.sender === 'user' ? 'user-message' : 'admin-message'}">
+        <div class="message-header">
+          <strong>${msg.sender === 'user' ? 'You' : 'Support Team'}</strong>
+          <span class="timestamp">${new Date(msg.timestamp).toLocaleString()}</span>
+        </div>
+        <div class="message-content">${msg.text}</div>
+      </div>
+    `).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Chat Conversation Summary - ${data.companyName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+          .summary-box { background: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0; }
+          .message { margin: 15px 0; padding: 10px; border-radius: 8px; }
+          .user-message { background: #e8f5e8; border-left: 4px solid #4caf50; }
+          .admin-message { background: #f3e5f5; border-left: 4px solid #9c27b0; }
+          .message-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; color: #666; }
+          .message-content { font-size: 14px; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center; }
+          .cta-button { display: inline-block; background: #2196f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>Chat Conversation Summary</h2>
+          <p>Here's a summary of your recent conversation with our support team.</p>
+        </div>
+        
+        <div class="summary-box">
+          <h3>Recent Messages</h3>
+          <div class="messages">
+            ${messageList}
+          </div>
+        </div>
+        
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat" class="cta-button">Continue Conversation</a>
+        </div>
+        
+        <div class="footer">
+          <p>This conversation summary was sent from the ${data.companyName} chat system.</p>
+          <p>If you need immediate assistance, please contact us directly.</p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate conversation summary text
+   */
+  private generateConversationSummaryText(data: {
+    customerName: string;
+    customerEmail: string;
+    messages: Array<{
+      text: string;
+      sender: 'user' | 'admin';
+      timestamp: Date;
+      type: string;
+    }>;
+    isGuest: boolean;
+    companyName: string;
+  }): string {
+    const messageList = data.messages.map(msg => 
+      `${msg.sender === 'user' ? 'You' : 'Support Team'} (${new Date(msg.timestamp).toLocaleString()}):\n${msg.text}\n`
+    ).join('\n');
+
+    return `
+Chat Conversation Summary - ${data.companyName}
+
+Hi ${data.customerName},
+
+Here's a summary of your recent conversation with our support team:
+
+${messageList}
+
+To continue the conversation, please visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat
+
+This conversation summary was sent from the ${data.companyName} chat system.
+If you need immediate assistance, please contact us directly.
+    `.trim();
+  }
+
+  /**
+   * Generate unread messages HTML
+   */
+  private generateUnreadMessagesHTML(data: {
+    customerName: string;
+    customerEmail: string | null;
+    unreadCount: number;
+    lastMessage: string;
+    isGuest: boolean;
+    adminName: string;
+    companyName: string;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Unread Messages - ${data.companyName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #fff3cd; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+          .alert-box { background: #f8d7da; padding: 15px; border-left: 4px solid #dc3545; margin: 20px 0; }
+          .message-preview { background: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center; }
+          .cta-button { display: inline-block; background: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>⚠️ Unread Messages Alert</h2>
+          <p>Customer has unread messages and went offline</p>
+        </div>
+        
+        <div class="alert-box">
+          <h3>Customer Information</h3>
+          <p><strong>Name:</strong> ${data.customerName}</p>
+          <p><strong>Email:</strong> ${data.customerEmail || 'Not provided'}</p>
+          <p><strong>Type:</strong> ${data.isGuest ? 'Guest User' : 'Registered Customer'}</p>
+          <p><strong>Unread Count:</strong> ${data.unreadCount} message(s)</p>
+        </div>
+        
+        <div class="message-preview">
+          <h3>Last Message Preview</h3>
+          <p>${data.lastMessage}</p>
+        </div>
+        
+        <div style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages" class="cta-button">View Messages</a>
+        </div>
+        
+        <div class="footer">
+          <p>This alert was sent from the ${data.companyName} chat system.</p>
+          <p>Please check the admin panel to respond to unread messages.</p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate unread messages text
+   */
+  private generateUnreadMessagesText(data: {
+    customerName: string;
+    customerEmail: string | null;
+    unreadCount: number;
+    lastMessage: string;
+    isGuest: boolean;
+    adminName: string;
+    companyName: string;
+  }): string {
+    return `
+Unread Messages Alert - ${data.companyName}
+
+Customer has unread messages and went offline:
+
+Customer Information:
+- Name: ${data.customerName}
+- Email: ${data.customerEmail || 'Not provided'}
+- Type: ${data.isGuest ? 'Guest User' : 'Registered Customer'}
+- Unread Count: ${data.unreadCount} message(s)
+
+Last Message Preview:
+${data.lastMessage}
+
+To view and respond to messages, please visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages
+
+This alert was sent from the ${data.companyName} chat system.
+Please check the admin panel to respond to unread messages.
     `.trim();
   }
 }

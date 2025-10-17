@@ -9,11 +9,12 @@ export interface MessageAttributes {
   type?: 'text' | 'image' | 'file';
   attachment?: any | null;
   isGuest?: boolean; // Flag to indicate if message is from a guest user
+  email?: string | null; // Email address for guest users (NULL for registered users)
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export type MessageCreationAttributes = Optional<MessageAttributes, 'id' | 'createdAt' | 'updatedAt' | 'isGuest'>;
+export type MessageCreationAttributes = Optional<MessageAttributes, 'id' | 'createdAt' | 'updatedAt' | 'isGuest' | 'email'>;
 
 export class Message extends Model<MessageAttributes, MessageCreationAttributes> implements MessageAttributes {
   public id!: number;
@@ -23,6 +24,7 @@ export class Message extends Model<MessageAttributes, MessageCreationAttributes>
   public type?: 'text' | 'image' | 'file';
   public attachment?: any | null;
   public isGuest?: boolean; // Flag for guest users
+  public email?: string | null; // Email address for guest users
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -64,6 +66,12 @@ Message.init(
       defaultValue: false,
       field: 'is_guest',
       comment: 'True if message is from a guest user',
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'email',
+      comment: 'Email address for guest users (NULL for registered users)',
     },
   },
   {

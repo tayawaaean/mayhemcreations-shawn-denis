@@ -6,7 +6,7 @@ import Joi from 'joi';
 
 // Validation schema for webhook payload
 const webhookSchema = Joi.object({
-  event: Joi.string().valid('chat_message', 'chat_connected', 'chat_disconnected').required(),
+  event: Joi.string().valid('chat_message', 'chat_connected', 'chat_disconnected', 'conversation_summary', 'unread_messages').required(),
   data: Joi.object({
     messageId: Joi.string().optional(),
     text: Joi.string().allow(null).optional(),
@@ -16,7 +16,14 @@ const webhookSchema = Joi.object({
     attachment: Joi.any().optional(),
     name: Joi.string().allow(null).optional(),
     email: Joi.string().email().allow(null).optional(),
-    timestamp: Joi.string().isoDate().required()
+    timestamp: Joi.string().isoDate().required(),
+    // Additional fields for new events
+    customerEmail: Joi.string().email().optional(),
+    customerName: Joi.string().optional(),
+    isGuest: Joi.boolean().optional(),
+    messages: Joi.array().optional(),
+    unreadCount: Joi.number().optional(),
+    lastMessage: Joi.string().optional()
   }).required()
 });
 
@@ -64,6 +71,12 @@ export const handleChatWebhook = async (req: Request, res: Response): Promise<vo
         break;
       case 'chat_disconnected':
         await handleChatDisconnected(payload.data as any);
+        break;
+      case 'conversation_summary':
+        await handleConversationSummary(payload.data as any);
+        break;
+      case 'unread_messages':
+        await handleUnreadMessages(payload.data as any);
         break;
       default:
         logger.warn(`⚠️ Unknown event type: ${payload.event}`);
@@ -142,6 +155,52 @@ async function handleChatDisconnected(data: any): Promise<void> {
   
   // We could send a notification here if needed, but for now just log
   // This could be useful for admin notifications about customer leaving
+}
+
+/**
+ * Handle conversation summary event
+ */
+async function handleConversationSummary(data: any): Promise<void> {
+  const { customerId, customerEmail, customerName, isGuest, messages } = data;
+  
+  logger.info(`📧 Sending conversation summary for customer ${customerId}`);
+  
+  try {
+    const profile: UserProfile = {
+      id: customerId,
+      firstName: customerName?.split(' ')[0] || null,
+      lastName: customerName?.split(' ').slice(1).join(' ') || null,
+      email: customerEmail,
+      isGuest: isGuest || false
+    };
+
+    await getEmailService().sendConversationSummary(profile, messages);
+    logger.info(`✅ Conversation summary sent to ${customerEmail}`);
+  } catch (error) {
+    logger.error(`❌ Error sending conversation summary for ${customerId}:`, error);
+  }
+}
+
+/**
+ * Handle unread messages event
+ */
+async function handleUnreadMessages(data: any): Promise<void> {
+  const { customerId, customerName, customerEmail, isGuest, unreadCount, lastMessage } = data;
+  
+  logger.info(`📧 Sending unread messages notification for customer ${customerId}`);
+  
+  try {
+    await getEmailService().sendUnreadMessagesNotification(
+      customerName,
+      customerEmail,
+      unreadCount,
+      lastMessage,
+      isGuest || false
+    );
+    logger.info(`✅ Unread messages notification sent for ${customerName}`);
+  } catch (error) {
+    logger.error(`❌ Error sending unread messages notification for ${customerId}:`, error);
+  }
 }
 
 /**

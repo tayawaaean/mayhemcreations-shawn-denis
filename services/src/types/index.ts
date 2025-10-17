@@ -13,12 +13,24 @@ export interface ChatMessage {
 
 // Webhook payload from main backend
 export interface ChatWebhookPayload {
-  event: 'chat_message' | 'chat_connected' | 'chat_disconnected';
+  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages';
   data: ChatMessage | {
     customerId: string;
     name?: string | null;
     email?: string | null;
     timestamp: string;
+    // Additional fields for new events
+    customerEmail?: string;
+    customerName?: string;
+    isGuest?: boolean;
+    messages?: Array<{
+      text: string;
+      sender: 'user' | 'admin';
+      timestamp: Date;
+      type: string;
+    }>;
+    unreadCount?: number;
+    lastMessage?: string;
   };
 }
 

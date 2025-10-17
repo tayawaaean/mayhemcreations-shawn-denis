@@ -22,7 +22,7 @@ const sequelize = new Sequelize({
     indexes: [], // Disable automatic index creation to prevent duplicate key errors
     hooks: {
       beforeSync: () => {
-        console.log('🔧 Database sync disabled to prevent index issues');
+        console.log('🔧 Database sync enabled for email column addition');
         return Promise.resolve();
       }
     }
@@ -54,7 +54,7 @@ const syncDatabase = async (force: boolean = false): Promise<void> => {
     await sequelize.sync({ 
       force: false, // Never force recreate
       alter: true,  // Use alter to modify existing tables
-      logging: false // Disable logging to reduce noise
+      logging: console.log // Enable logging to see what's happening
     });
     console.log('✅ Database synchronized successfully.');
   } catch (error) {

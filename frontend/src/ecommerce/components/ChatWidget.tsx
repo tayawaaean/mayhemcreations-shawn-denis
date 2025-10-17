@@ -5,13 +5,31 @@ import { useAuth } from '../context/AuthContext'
 import Button from '../../components/Button'
 
 export default function ChatWidget() {
-  const { isOpen, setIsOpen, messages, sendMessage, setTyping, isAdminTyping, isConnected, isCustomerOnline, quickQuestions, unreadCount } = useRealTimeChat()
+  const { 
+    isOpen, 
+    setIsOpen, 
+    messages, 
+    sendMessage, 
+    setTyping, 
+    isAdminTyping, 
+    isConnected, 
+    isCustomerOnline, 
+    quickQuestions, 
+    unreadCount,
+    guestEmail,
+    setGuestEmail,
+    hasProvidedEmail,
+    setHasProvidedEmail
+  } = useRealTimeChat()
   const { isLoggedIn } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [inputText, setInputText] = useState('')
   const [isMinimized, setIsMinimized] = useState(false)
+  const [emailInput, setEmailInput] = useState('')
+  const [emailError, setEmailError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -26,6 +44,35 @@ export default function ChatWidget() {
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailError('')
+    
+    if (!emailInput.trim()) {
+      setEmailError('Please enter your email address')
+      return
+    }
+    
+    if (!validateEmail(emailInput.trim())) {
+      setEmailError('Please enter a valid email address')
+      return
+    }
+    
+    setGuestEmail(emailInput.trim())
+    setHasProvidedEmail(true)
+    setEmailInput('')
+    
+    // Focus on message input after email is provided
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 100)
+  }
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault()
@@ -129,25 +176,77 @@ export default function ChatWidget() {
             {/* Guest User Banner */}
             {!isLoggedIn && (
               <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-blue-200 p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <UserPlus className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-800 font-medium">Guest Mode</span>
+                {!hasProvidedEmail ? (
+                  <div>
+                    <div className="flex items-center space-x-2 mb-2">
+                      <UserPlus className="w-4 h-4 text-blue-600" />
+                      <span className="text-blue-800 font-medium">Guest Mode</span>
+                    </div>
+                    <p className="text-xs text-blue-700 mb-3">
+                      Please provide your email to receive notifications when we reply
+                    </p>
+                    <form onSubmit={handleEmailSubmit} className="space-y-2">
+                      <div>
+                        <input
+                          ref={emailInputRef}
+                          type="email"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          placeholder="Enter your email address"
+                          className="w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          required
+                        />
+                        {emailError && (
+                          <p className="text-xs text-red-600 mt-1">{emailError}</p>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="px-3 py-1 text-xs"
+                        >
+                          Continue
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsOpen(false);
+                            window.dispatchEvent(new CustomEvent('openAuthModal', { detail: { mode: 'login' } }));
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                        >
+                          Sign In Instead
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      // Trigger custom event to open navbar auth modal
-                      window.dispatchEvent(new CustomEvent('openAuthModal', { detail: { mode: 'login' } }));
-                    }}
-                    className="text-blue-600 hover:text-blue-800 font-medium underline text-xs"
-                  >
-                    Sign In
-                  </button>
-                </div>
-                <p className="text-xs text-blue-700 mt-1">
-                  Sign in to save your conversation history
-                </p>
+                ) : (
+                  <div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <UserPlus className="w-4 h-4 text-blue-600" />
+                        <span className="text-blue-800 font-medium">Guest Mode</span>
+                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                          {guestEmail}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setHasProvidedEmail(false);
+                          setGuestEmail(null);
+                          setEmailInput('');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 font-medium underline text-xs"
+                      >
+                        Change Email
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-700 mt-1">
+                      You'll receive email notifications when we reply
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -236,18 +335,36 @@ export default function ChatWidget() {
                   type="text"
                   value={inputText}
                   onChange={handleInputChange}
-                  placeholder="Type your message..."
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none"
+                  placeholder={
+                    !isLoggedIn && !hasProvidedEmail 
+                      ? "Please provide your email first..." 
+                      : "Type your message..."
+                  }
+                  disabled={!isLoggedIn && !hasProvidedEmail}
+                  className={`flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-accent outline-none ${
+                    !isLoggedIn && !hasProvidedEmail
+                      ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : 'border-gray-300'
+                  }`}
                 />
                 <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
-                <button type="button" onClick={handleAttachClick} className="p-2 rounded-lg border border-gray-300 hover:bg-gray-100">
+                <button 
+                  type="button" 
+                  onClick={handleAttachClick} 
+                  disabled={!isLoggedIn && !hasProvidedEmail}
+                  className={`p-2 rounded-lg border hover:bg-gray-100 ${
+                    !isLoggedIn && !hasProvidedEmail
+                      ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'border-gray-300'
+                  }`}
+                >
                   <Paperclip className="w-4 h-4" />
                 </button>
                 <Button
                   type="submit"
                   size="sm"
                   className="px-3 py-2"
-                  disabled={!inputText.trim()}
+                  disabled={!inputText.trim() || (!isLoggedIn && !hasProvidedEmail)}
                 >
                   <Send className="w-4 h-4" />
                 </Button>

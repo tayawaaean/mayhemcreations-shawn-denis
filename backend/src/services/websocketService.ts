@@ -8,6 +8,7 @@ import { emailWebhookService } from './emailWebhookService';
 export class WebSocketService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> Set of socketIds
+  private userOnlineStatus: Map<string, boolean> = new Map(); // userId -> isOnline
 
   constructor(server: HttpServer) {
     this.io = new SocketIOServer(server, {
@@ -90,6 +91,9 @@ export class WebSocketService {
         socket.join(`chat_${customerId}`);
         logger.info(`💬 Socket ${socket.id} joined chat room for customer ${customerId}`);
         
+        // Set user as online
+        this.setUserOnlineStatus(customerId, true);
+        
         // Check if this is a guest user
         const isGuest = String(customerId).startsWith('guest_');
 
@@ -156,9 +160,12 @@ export class WebSocketService {
       });
 
       // Handle chat room leaving
-      socket.on('leave_chat_room', (customerId: string) => {
+      socket.on('leave_chat_room', async (customerId: string) => {
         socket.leave(`chat_${customerId}`);
         logger.info(`💬 Socket ${socket.id} left chat room for customer ${customerId}`);
+        
+        // Set user as offline
+        this.setUserOnlineStatus(customerId, false);
         
         // Notify admins that customer is offline
         this.io.to('admin_room').emit('chat_disconnected', {
@@ -166,10 +173,8 @@ export class WebSocketService {
           timestamp: new Date().toISOString()
         });
 
-        // Send webhook to email service for chat disconnection
-        emailWebhookService.sendChatDisconnectedWebhook({
-          customerId
-        });
+        // Send conversation summary and check for unread messages
+        await this.handleUserDisconnection(customerId);
       });
 
       // Admin can request chat history for a customer without joining their room
@@ -238,7 +243,7 @@ export class WebSocketService {
       });
 
       // Handle chat messages (text or attachment)
-      socket.on('chat_message', async (data: { messageId: string; text?: string; customerId: string; timestamp: string; type?: 'text' | 'image' | 'file'; attachment?: any }) => {
+      socket.on('chat_message', async (data: { messageId: string; text?: string; customerId: string; timestamp: string; type?: 'text' | 'image' | 'file'; attachment?: any; email?: string }) => {
         logger.info(`💬 Chat message from ${socket.id} for customer ${data.customerId}: ${data.text}`);
 
         // Determine sender based on room membership
@@ -262,13 +267,13 @@ export class WebSocketService {
           }
         }
 
-        // For guest users, create a mock profile
+        // For guest users, create a mock profile with email if provided
         if (sender === 'user' && isGuest) {
           profile = {
             id: data.customerId,
             firstName: 'Guest',
             lastName: 'User',
-            email: null
+            email: data.email || null
           };
         }
 
@@ -281,8 +286,9 @@ export class WebSocketService {
             type: data.type ?? 'text',
             attachment: data.attachment ?? null,
             isGuest, // Flag to identify guest messages
+            email: isGuest ? data.email || null : null, // Store email for guest users
           } as any);
-          logger.info(`💾 Saved message ${created.id} for ${isGuest ? 'guest' : 'user'} ${data.customerId} (type=${data.type ?? 'text'})`);
+          logger.info(`💾 Saved message ${created.id} for ${isGuest ? 'guest' : 'user'} ${data.customerId} (type=${data.type ?? 'text'})${isGuest && data.email ? ` with email ${data.email}` : ''}`);
         } catch (e) {
           logger.warn(`Failed to persist chat message for ${data.customerId}: ${(e as any).message}`);
         }
@@ -296,21 +302,28 @@ export class WebSocketService {
           type: data.type ?? 'text',
           attachment: data.attachment ?? null,
           name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
-          email: profile?.email || null
+          email: profile?.email || data.email || null
         });
 
-        // Send webhook to email service for notifications
+        // Send webhook to email service for notifications (only when user is offline)
         if (data.text && data.text.trim().length > 0) {
-          emailWebhookService.sendChatMessageWebhook({
-            messageId: data.messageId,
-            text: data.text,
-            sender,
-            customerId: data.customerId,
-            type: data.type ?? 'text',
-            attachment: data.attachment ?? null,
-            name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
-            email: profile?.email || null
-          });
+          const isUserCurrentlyOnline = this.isUserOnline(data.customerId);
+          
+          if (!isUserCurrentlyOnline) {
+            logger.info(`📧 User ${data.customerId} is offline, sending email notification`);
+            emailWebhookService.sendChatMessageWebhook({
+              messageId: data.messageId,
+              text: data.text,
+              sender,
+              customerId: data.customerId,
+              type: data.type ?? 'text',
+              attachment: data.attachment ?? null,
+              name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
+              email: profile?.email || data.email || null
+            });
+          } else {
+            logger.info(`📧 User ${data.customerId} is online, skipping email notification`);
+          }
         }
       });
 
@@ -326,15 +339,18 @@ export class WebSocketService {
       });
 
       // Handle disconnection
-      socket.on('disconnect', () => {
+      socket.on('disconnect', async () => {
         logger.info(`🔌 Client disconnected: ${socket.id}`);
         
-        // Remove from connected users
+        // Find and handle disconnection for all users associated with this socket
         for (const [userId, socketIds] of this.connectedUsers.entries()) {
           if (socketIds.has(socket.id)) {
             socketIds.delete(socket.id);
             if (socketIds.size === 0) {
               this.connectedUsers.delete(userId);
+              // Set user as offline and handle disconnection
+              this.setUserOnlineStatus(userId, false);
+              await this.handleUserDisconnection(userId);
             }
             break;
           }
@@ -418,6 +434,91 @@ export class WebSocketService {
   // Get connected admins count
   public getConnectedAdminsCount(): number {
     return this.io.sockets.adapter.rooms.get('admin_room')?.size || 0;
+  }
+
+  // Check if user is online
+  public isUserOnline(userId: string): boolean {
+    return this.userOnlineStatus.get(userId) || false;
+  }
+
+  // Set user online status
+  private setUserOnlineStatus(userId: string, isOnline: boolean): void {
+    this.userOnlineStatus.set(userId, isOnline);
+    logger.info(`👤 User ${userId} is now ${isOnline ? 'online' : 'offline'}`);
+  }
+
+  // Handle user disconnection - send conversation summary and check for unread messages
+  private async handleUserDisconnection(customerId: string): Promise<void> {
+    try {
+      // Get recent conversation history
+      const messages = await Message.findAll({
+        where: { customerId: String(customerId) } as any,
+        order: [['createdAt', 'DESC']],
+        limit: 10, // Last 10 messages
+      });
+
+      if (messages.length === 0) {
+        logger.info(`📧 No messages found for customer ${customerId}, skipping conversation summary`);
+        return;
+      }
+
+      // Check if there are unread admin messages (admin messages that customer hasn't seen)
+      const unreadAdminMessages = messages.filter(msg => 
+        msg.sender === 'admin' && 
+        new Date(msg.createdAt).getTime() > (Date.now() - 5 * 60 * 1000) // Last 5 minutes
+      );
+
+      // Get user profile for email
+      const isGuest = String(customerId).startsWith('guest_');
+      let profile: any = null;
+      
+      if (!isGuest) {
+        try {
+          const [rows] = await sequelize.query(
+            'SELECT id, first_name as firstName, last_name as lastName, email FROM users WHERE id = ? LIMIT 1',
+            { replacements: [customerId] }
+          );
+          profile = (rows as any)[0] || null;
+        } catch (e) {
+          logger.warn(`Could not fetch user profile for ${customerId}: ${(e as any).message}`);
+        }
+      }
+
+      // Send conversation summary to customer if they have email
+      const guestEmail = isGuest ? messages.find(msg => (msg as any).email)?.email : null;
+      if (profile?.email || guestEmail) {
+        const customerEmail = profile?.email || guestEmail;
+        const customerName = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Customer' : 'Guest User';
+        
+        await emailWebhookService.sendConversationSummaryWebhook({
+          customerId,
+          customerEmail,
+          customerName,
+          isGuest,
+          messages: messages.slice(0, 5).map(msg => ({
+            text: msg.text || '',
+            sender: msg.sender,
+            timestamp: msg.createdAt,
+            type: (msg as any).type || 'text'
+          }))
+        });
+      }
+
+      // Send admin notification if there are unread messages
+      if (unreadAdminMessages.length > 0) {
+        await emailWebhookService.sendUnreadMessagesWebhook({
+          customerId,
+          customerName: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Customer' : 'Guest User',
+          customerEmail: profile?.email || guestEmail || null,
+          isGuest,
+          unreadCount: unreadAdminMessages.length,
+          lastMessage: unreadAdminMessages[0].text || 'No message content'
+        });
+      }
+
+    } catch (error) {
+      logger.error(`❌ Error handling user disconnection for ${customerId}:`, error);
+    }
   }
 
   // Emit chat message to specific customer

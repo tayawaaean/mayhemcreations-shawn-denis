@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 
 // Interface for webhook payload
 interface ChatWebhookPayload {
-  event: 'chat_message' | 'chat_connected' | 'chat_disconnected';
+  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages';
   data: {
     messageId?: string;
     text?: string | null;
@@ -14,6 +14,18 @@ interface ChatWebhookPayload {
     name?: string | null;
     email?: string | null;
     timestamp: string;
+    // Additional fields for new events
+    customerEmail?: string | null;
+    customerName?: string;
+    isGuest?: boolean;
+    messages?: Array<{
+      text: string;
+      sender: 'user' | 'admin';
+      timestamp: Date;
+      type: string;
+    }>;
+    unreadCount?: number;
+    lastMessage?: string;
   };
 }
 
@@ -98,6 +110,64 @@ export class EmailWebhookService {
       logger.info(`📧 Chat disconnected webhook sent for customer ${data.customerId}`);
     } catch (error) {
       logger.error('❌ Failed to send chat disconnected webhook:', error);
+    }
+  }
+
+  /**
+   * Send conversation summary webhook to email service
+   */
+  async sendConversationSummaryWebhook(data: {
+    customerId: string;
+    customerEmail: string;
+    customerName: string;
+    isGuest: boolean;
+    messages: Array<{
+      text: string;
+      sender: 'user' | 'admin';
+      timestamp: Date;
+      type: string;
+    }>;
+  }): Promise<void> {
+    try {
+      const payload: ChatWebhookPayload = {
+        event: 'conversation_summary' as const,
+        data: {
+          ...data,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      await this.sendWebhook(payload);
+      logger.info(`📧 Conversation summary webhook sent for customer ${data.customerId}`);
+    } catch (error) {
+      logger.error('❌ Failed to send conversation summary webhook:', error);
+    }
+  }
+
+  /**
+   * Send unread messages webhook to email service
+   */
+  async sendUnreadMessagesWebhook(data: {
+    customerId: string;
+    customerName: string;
+    customerEmail: string | null;
+    isGuest: boolean;
+    unreadCount: number;
+    lastMessage: string;
+  }): Promise<void> {
+    try {
+      const payload: ChatWebhookPayload = {
+        event: 'unread_messages' as const,
+        data: {
+          ...data,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      await this.sendWebhook(payload);
+      logger.info(`📧 Unread messages webhook sent for customer ${data.customerId}`);
+    } catch (error) {
+      logger.error('❌ Failed to send unread messages webhook:', error);
     }
   }
 

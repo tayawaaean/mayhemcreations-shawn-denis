@@ -27,6 +27,11 @@ interface RealTimeChatContextType {
   typingTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
   unreadCount: number;
   requestNotificationPermission: () => Promise<boolean>;
+  // Guest email management
+  guestEmail: string | null;
+  setGuestEmail: (email: string | null) => void;
+  hasProvidedEmail: boolean;
+  setHasProvidedEmail: (provided: boolean) => void;
 }
 
 const RealTimeChatContext = createContext<RealTimeChatContextType | undefined>(undefined);
@@ -50,6 +55,10 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [isCustomerOnline, setIsCustomerOnline] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Guest email state
+  const [guestEmail, setGuestEmail] = useState<string | null>(null);
+  const [hasProvidedEmail, setHasProvidedEmail] = useState(false);
+  
   const setIsOpen = (open: boolean) => {
     _setIsOpen(open);
     if (open) {
@@ -262,8 +271,12 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Add message to local state immediately
     setMessages(prev => [...prev, newMessage]);
 
-    // Send via WebSocket
-    webSocketService.sendChatMessage(messageId, text.trim(), customerId);
+    // Send via WebSocket with email for guest users
+    if (!isLoggedIn && guestEmail) {
+      webSocketService.sendChatMessageWithEmail(messageId, text.trim(), customerId, guestEmail);
+    } else {
+      webSocketService.sendChatMessage(messageId, text.trim(), customerId);
+    }
 
     // Send typing status
     webSocketService.sendTypingStatus(customerId, true);
@@ -375,7 +388,12 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     quickQuestions,
     typingTimeout,
     unreadCount,
-    requestNotificationPermission
+    requestNotificationPermission,
+    // Guest email management
+    guestEmail,
+    setGuestEmail,
+    hasProvidedEmail,
+    setHasProvidedEmail
   };
 
   return (

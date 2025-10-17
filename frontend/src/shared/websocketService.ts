@@ -215,6 +215,18 @@ class WebSocketService {
     }
   }
 
+  public sendChatMessageWithEmail(messageId: string, text: string, customerId: string, email: string): void {
+    if (typeof window !== 'undefined' && this.socket && this.isConnected) {
+      this.socket.emit('chat_message', {
+        messageId,
+        text,
+        customerId,
+        email, // Include email for guest users
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
   public sendChatAttachment(messageId: string, customerId: string, payload: { type: 'image' | 'file'; attachment: any; text?: string }): void {
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
       this.socket.emit('chat_message', {
