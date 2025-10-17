@@ -6,7 +6,7 @@ import Joi from 'joi';
 
 // Validation schema for webhook payload
 const webhookSchema = Joi.object({
-  event: Joi.string().valid('chat_message', 'chat_connected', 'chat_disconnected', 'conversation_summary', 'unread_messages').required(),
+  event: Joi.string().valid('chat_message', 'chat_connected', 'chat_disconnected', 'conversation_summary', 'unread_messages', 'new_customer').required(),
   data: Joi.object({
     messageId: Joi.string().optional(),
     text: Joi.string().allow(null).optional(),
@@ -77,6 +77,9 @@ export const handleChatWebhook = async (req: Request, res: Response): Promise<vo
         break;
       case 'unread_messages':
         await handleUnreadMessages(payload.data as any);
+        break;
+      case 'new_customer':
+        await handleNewCustomer(payload.data as any);
         break;
       default:
         logger.warn(`⚠️ Unknown event type: ${payload.event}`);
@@ -200,6 +203,26 @@ async function handleUnreadMessages(data: any): Promise<void> {
     logger.info(`✅ Unread messages notification sent for ${customerName}`);
   } catch (error) {
     logger.error(`❌ Error sending unread messages notification for ${customerId}:`, error);
+  }
+}
+
+/**
+ * Handle new customer event (when admin is offline)
+ */
+async function handleNewCustomer(data: any): Promise<void> {
+  const { customerId, customerName, customerEmail, isGuest } = data;
+  
+  logger.info(`📧 Sending new customer notification for ${customerId}`);
+  
+  try {
+    await getEmailService().sendNewCustomerNotification(
+      customerName,
+      customerEmail,
+      isGuest || false
+    );
+    logger.info(`✅ New customer notification sent for ${customerId}`);
+  } catch (error) {
+    logger.error(`❌ Error sending new customer notification for ${customerId}:`, error);
   }
 }
 

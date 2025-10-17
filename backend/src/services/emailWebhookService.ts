@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 
 // Interface for webhook payload
 interface ChatWebhookPayload {
-  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages';
+  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages' | 'new_customer';
   data: {
     messageId?: string;
     text?: string | null;
@@ -168,6 +168,32 @@ export class EmailWebhookService {
       logger.info(`📧 Unread messages webhook sent for customer ${data.customerId}`);
     } catch (error) {
       logger.error('❌ Failed to send unread messages webhook:', error);
+    }
+  }
+
+  /**
+   * Send new customer webhook to email service (when admin is offline)
+   */
+  async sendNewCustomerWebhook(data: {
+    customerId: string;
+    customerName: string;
+    customerEmail: string | null;
+    isGuest: boolean;
+    timestamp: string;
+  }): Promise<void> {
+    try {
+      const payload: ChatWebhookPayload = {
+        event: 'new_customer' as const,
+        data: {
+          ...data,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      await this.sendWebhook(payload);
+      logger.info(`📧 New customer webhook sent for customer ${data.customerId}`);
+    } catch (error) {
+      logger.error('❌ Failed to send new customer webhook:', error);
     }
   }
 

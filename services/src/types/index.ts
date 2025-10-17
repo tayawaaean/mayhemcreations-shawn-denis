@@ -13,7 +13,7 @@ export interface ChatMessage {
 
 // Webhook payload from main backend
 export interface ChatWebhookPayload {
-  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages';
+  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages' | 'new_customer';
   data: ChatMessage | {
     customerId: string;
     name?: string | null;

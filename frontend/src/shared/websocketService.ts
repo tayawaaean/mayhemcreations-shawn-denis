@@ -20,6 +20,7 @@ export interface WebSocketEvents {
   chat_connected: (data: { customerId: string; timestamp: string }) => void;
   chat_disconnected: (data: { customerId: string; timestamp: string }) => void;
   chat_history: (data: { customerId: string; messages: { id: number; text: string; sender: 'user' | 'admin'; timestamp: string }[] }) => void;
+  admin_status_changed: (data: { isOnline: boolean; timestamp: string }) => void; // New: Admin status events
   
   // Inventory events
   inventory_updated: (data: { productId: number; variantId?: number | null; stock?: number; totalProductStock?: number; price?: number; status?: string; timestamp: string }) => void;

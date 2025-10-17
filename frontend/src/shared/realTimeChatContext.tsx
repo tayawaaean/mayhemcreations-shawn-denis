@@ -23,6 +23,7 @@ interface RealTimeChatContextType {
   isAdminTyping: boolean;
   isConnected: boolean;
   isCustomerOnline: boolean;
+  isAdminOnline: boolean; // New: Admin online status
   quickQuestions: string[];
   typingTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
   unreadCount: number;
@@ -54,6 +55,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAdminTyping, setIsAdminTyping] = useState(false);
   const [isCustomerOnline, setIsCustomerOnline] = useState(false);
+  const [isAdminOnline, setIsAdminOnline] = useState(false); // New: Admin online status
   const [unreadCount, setUnreadCount] = useState(0);
   // Guest email state
   const [guestEmail, setGuestEmail] = useState<string | null>(null);
@@ -244,11 +246,18 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     });
 
+    // Listen for admin status changes
+    const unsubscribeAdminStatus = subscribe('admin_status_changed', (data) => {
+      console.log('👨‍💼 Admin status changed:', data);
+      setIsAdminOnline(data.isOnline);
+    });
+
     return () => {
       unsubscribeMessage();
       unsubscribeTyping();
       unsubscribeConnection();
       unsubscribeDisconnection();
+      unsubscribeAdminStatus();
       unsubscribeHistory();
     };
   }, [isConnected, customerId, subscribe]);
@@ -385,6 +394,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     isAdminTyping,
     isConnected,
     isCustomerOnline,
+    isAdminOnline, // New: Admin online status
     quickQuestions,
     typingTimeout,
     unreadCount,

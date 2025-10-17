@@ -14,6 +14,7 @@ export default function ChatWidget() {
     isAdminTyping, 
     isConnected, 
     isCustomerOnline, 
+    isAdminOnline, // New: Admin online status
     quickQuestions, 
     unreadCount,
     guestEmail,
@@ -148,9 +149,20 @@ export default function ChatWidget() {
             <div>
               <h3 className="font-semibold">Mayhem Creation</h3>
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-purple-400' : 'bg-red-400'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${
+                  isConnected && isAdminOnline 
+                    ? 'bg-green-400' 
+                    : isConnected 
+                      ? 'bg-yellow-400' 
+                      : 'bg-red-400'
+                }`}></div>
                 <span className="text-xs opacity-90">
-                  {isConnected ? 'Online' : 'Offline'}
+                  {isConnected && isAdminOnline 
+                    ? 'Support Online' 
+                    : isConnected 
+                      ? 'Connecting...' 
+                      : 'Offline'
+                  }
                 </span>
               </div>
             </div>

@@ -336,6 +336,39 @@ If you need immediate assistance, please contact us directly.
   }
 
   /**
+   * Send new customer notification to admin (when admin is offline)
+   */
+  async sendNewCustomerNotification(customerName: string, customerEmail: string | null, isGuest: boolean): Promise<boolean> {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (!adminEmail) {
+      logger.error('❌ ADMIN_EMAIL not configured');
+      return false;
+    }
+
+    const subject = `New Customer Chat - ${isGuest ? 'Guest' : 'Customer'} - ${customerName}`;
+    const html = this.generateNewCustomerHTML({
+      customerName,
+      customerEmail,
+      isGuest,
+      adminName: process.env.ADMIN_NAME || 'Admin',
+      companyName: 'Mayhem Creations'
+    });
+
+    return this.sendEmail({
+      to: adminEmail,
+      subject,
+      html,
+      text: this.generateNewCustomerText({
+        customerName,
+        customerEmail,
+        isGuest,
+        adminName: process.env.ADMIN_NAME || 'Admin',
+        companyName: 'Mayhem Creations'
+      })
+    });
+  }
+
+  /**
    * Generate conversation summary HTML
    */
   private generateConversationSummaryHTML(data: {
@@ -531,6 +564,98 @@ To view and respond to messages, please visit: ${process.env.FRONTEND_URL || 'ht
 
 This alert was sent from the ${data.companyName} chat system.
 Please check the admin panel to respond to unread messages.
+    `.trim();
+  }
+
+  /**
+   * Generate new customer HTML
+   */
+  private generateNewCustomerHTML(data: {
+    customerName: string;
+    customerEmail: string | null;
+    isGuest: boolean;
+    adminName: string;
+    companyName: string;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Customer Chat - ${data.companyName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .customer-info { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
+          .cta-button { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+          .footer { text-align: center; color: #666; font-size: 14px; margin-top: 30px; }
+          .status-badge { display: inline-block; background: ${data.isGuest ? '#ff9800' : '#4caf50'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>New Customer Chat Alert</h1>
+          <p>A ${data.isGuest ? 'guest user' : 'customer'} has started a chat and you're currently offline</p>
+        </div>
+        
+        <div class="content">
+          <div class="customer-info">
+            <h3>Customer Information</h3>
+            <p><strong>Name:</strong> ${data.customerName}</p>
+            <p><strong>Email:</strong> ${data.customerEmail || 'Not provided'}</p>
+            <p><strong>Type:</strong> <span class="status-badge">${data.isGuest ? 'Guest User' : 'Registered Customer'}</span></p>
+            <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+            <h4>⚠️ Action Required</h4>
+            <p>This customer is waiting for a response. Please log into the admin panel to start the conversation.</p>
+          </div>
+          
+          <div style="text-align: center;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages" class="cta-button">View Chat Messages</a>
+          </div>
+          
+          <div class="footer">
+            <p>This alert was sent from the ${data.companyName} chat system.</p>
+            <p>Please respond promptly to maintain good customer service.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate new customer text
+   */
+  private generateNewCustomerText(data: {
+    customerName: string;
+    customerEmail: string | null;
+    isGuest: boolean;
+    adminName: string;
+    companyName: string;
+  }): string {
+    return `
+New Customer Chat Alert - ${data.companyName}
+
+A ${data.isGuest ? 'guest user' : 'customer'} has started a chat and you're currently offline.
+
+Customer Information:
+- Name: ${data.customerName}
+- Email: ${data.customerEmail || 'Not provided'}
+- Type: ${data.isGuest ? 'Guest User' : 'Registered Customer'}
+- Time: ${new Date().toLocaleString()}
+
+Action Required:
+This customer is waiting for a response. Please log into the admin panel to start the conversation.
+
+Admin Panel: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages
+
+This alert was sent from the ${data.companyName} chat system.
+Please respond promptly to maintain good customer service.
     `.trim();
   }
 }

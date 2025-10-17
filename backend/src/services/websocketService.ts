@@ -9,6 +9,8 @@ export class WebSocketService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> Set of socketIds
   private userOnlineStatus: Map<string, boolean> = new Map(); // userId -> isOnline
+  private adminSockets: Set<string> = new Set(); // Set of admin socket IDs
+  private isAdminOnline: boolean = false; // Global admin online status
 
   constructor(server: HttpServer) {
     this.io = new SocketIOServer(server, {
@@ -45,7 +47,22 @@ export class WebSocketService {
       // Handle admin joining admin room
       socket.on('join_admin_room', async () => {
         socket.join('admin_room');
-        logger.info(`👨‍💼 Admin joined admin room: ${socket.id}`);
+        this.adminSockets.add(socket.id);
+        
+        // Update admin online status
+        const wasAdminOnline = this.isAdminOnline;
+        this.isAdminOnline = true;
+        
+        logger.info(`👨‍💼 Admin joined admin room: ${socket.id} (Total admins: ${this.adminSockets.size})`);
+
+        // Notify all customers that admin is now online (if this is the first admin)
+        if (!wasAdminOnline) {
+          this.io.emit('admin_status_changed', { 
+            isOnline: true, 
+            timestamp: new Date().toISOString() 
+          });
+          logger.info('📢 Notified all customers: Admin is now online');
+        }
 
         // Emit recent conversation threads to this admin
         try {
@@ -133,6 +150,18 @@ export class WebSocketService {
           name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
           email: profile?.email || null
         });
+
+        // Send email notification to admin if admin is offline and this is a new customer
+        if (!this.isAdminOnlineStatus()) {
+          logger.info(`📧 Admin is offline, sending new customer notification for ${customerId}`);
+          emailWebhookService.sendNewCustomerWebhook({
+            customerId,
+            customerName: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Guest User' : 'Guest User',
+            customerEmail: profile?.email || null,
+            isGuest,
+            timestamp: new Date().toISOString()
+          });
+        }
 
         // Send recent chat history directly to this socket (supports both user IDs and guest IDs)
         try {
@@ -305,12 +334,23 @@ export class WebSocketService {
           email: profile?.email || data.email || null
         });
 
-        // Send webhook to email service for notifications (only when user is offline)
+        // Send webhook to email service for notifications based on online status
         if (data.text && data.text.trim().length > 0) {
           const isUserCurrentlyOnline = this.isUserOnline(data.customerId);
+          const isAdminCurrentlyOnline = this.isAdminOnlineStatus();
           
-          if (!isUserCurrentlyOnline) {
-            logger.info(`📧 User ${data.customerId} is offline, sending email notification`);
+          // Send email notification if:
+          // 1. User is offline (for admin messages)
+          // 2. Admin is offline (for user messages)
+          const shouldSendEmail = (sender === 'admin' && !isUserCurrentlyOnline) || 
+                                 (sender === 'user' && !isAdminCurrentlyOnline);
+          
+          if (shouldSendEmail) {
+            const reason = sender === 'admin' 
+              ? `User ${data.customerId} is offline` 
+              : `Admin is offline`;
+            logger.info(`📧 ${reason}, sending email notification`);
+            
             emailWebhookService.sendChatMessageWebhook({
               messageId: data.messageId,
               text: data.text,
@@ -322,7 +362,10 @@ export class WebSocketService {
               email: profile?.email || data.email || null
             });
           } else {
-            logger.info(`📧 User ${data.customerId} is online, skipping email notification`);
+            const reason = sender === 'admin' 
+              ? `User ${data.customerId} is online` 
+              : `Admin is online`;
+            logger.info(`📧 ${reason}, skipping email notification`);
           }
         }
       });
@@ -341,6 +384,26 @@ export class WebSocketService {
       // Handle disconnection
       socket.on('disconnect', async () => {
         logger.info(`🔌 Client disconnected: ${socket.id}`);
+        
+        // Check if this was an admin socket
+        const wasAdminSocket = this.adminSockets.has(socket.id);
+        if (wasAdminSocket) {
+          this.adminSockets.delete(socket.id);
+          logger.info(`👨‍💼 Admin disconnected: ${socket.id} (Remaining admins: ${this.adminSockets.size})`);
+          
+          // Update admin online status
+          const wasAdminOnline = this.isAdminOnline;
+          this.isAdminOnline = this.adminSockets.size > 0;
+          
+          // Notify all customers if admin went offline
+          if (wasAdminOnline && !this.isAdminOnline) {
+            this.io.emit('admin_status_changed', { 
+              isOnline: false, 
+              timestamp: new Date().toISOString() 
+            });
+            logger.info('📢 Notified all customers: Admin is now offline');
+          }
+        }
         
         // Find and handle disconnection for all users associated with this socket
         for (const [userId, socketIds] of this.connectedUsers.entries()) {
@@ -439,6 +502,16 @@ export class WebSocketService {
   // Check if user is online
   public isUserOnline(userId: string): boolean {
     return this.userOnlineStatus.get(userId) || false;
+  }
+
+  // Check if admin is online
+  public isAdminOnlineStatus(): boolean {
+    return this.isAdminOnline;
+  }
+
+  // Get admin count
+  public getAdminCount(): number {
+    return this.adminSockets.size;
   }
 
   // Set user online status
