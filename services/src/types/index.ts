@@ -11,15 +11,86 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-// Webhook payload from main backend
+// Order item interface for email notifications
+export interface OrderItem {
+  id: string | number;
+  productId: number;
+  productName: string;
+  variantName?: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+  customization?: any;
+  imageUrl?: string;
+}
+
+// Address interface for shipping/billing addresses
+export interface Address {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+// Payment information interface
+export interface PaymentInfo {
+  paymentMethod: string;
+  paymentProvider: string;
+  transactionId?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  paidAmount: number;
+}
+
+// Shipping information interface
+export interface ShippingInfo {
+  carrier: string;
+  service: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  estimatedDeliveryDate?: string;
+  shippingCost: number;
+}
+
+// Refund information interface
+export interface RefundInfo {
+  refundId: string;
+  refundAmount: number;
+  refundReason?: string;
+  refundMethod: string;
+  refundDate: string;
+  itemsRefunded?: OrderItem[];
+}
+
+// Webhook payload from main backend - now includes all event types
 export interface ChatWebhookPayload {
-  event: 'chat_message' | 'chat_connected' | 'chat_disconnected' | 'conversation_summary' | 'unread_messages' | 'new_customer';
+  event: 
+    | 'chat_message' 
+    | 'chat_connected' 
+    | 'chat_disconnected' 
+    | 'conversation_summary' 
+    | 'unread_messages' 
+    | 'new_customer'
+    | 'order_confirmed'
+    | 'shipping_confirmed'
+    | 'delivered'
+    | 'refund_confirmed'
+    | 'payment_receipt'
+    | 'review_request'
+    | 'newsletter'
+    | 'account_update';
   data: ChatMessage | {
     customerId: string;
     name?: string | null;
     email?: string | null;
     timestamp: string;
-    // Additional fields for new events
+    // Additional fields for chat events
     customerEmail?: string;
     customerName?: string;
     isGuest?: boolean;
@@ -31,6 +102,32 @@ export interface ChatWebhookPayload {
     }>;
     unreadCount?: number;
     lastMessage?: string;
+    // Fields for order confirmation
+    orderId?: string | number;
+    orderNumber?: string;
+    orderItems?: OrderItem[];
+    orderTotal?: number;
+    subtotal?: number;
+    tax?: number;
+    shippingCost?: number;
+    shippingAddress?: Address;
+    billingAddress?: Address;
+    // Fields for shipping confirmation
+    shippingInfo?: ShippingInfo;
+    // Fields for payment receipt
+    paymentInfo?: PaymentInfo;
+    // Fields for refund
+    refundInfo?: RefundInfo;
+    // Fields for review request
+    reviewUrl?: string;
+    // Fields for newsletter
+    newsletterContent?: string;
+    newsletterTitle?: string;
+    unsubscribeUrl?: string;
+    // Fields for account update
+    updateType?: string;
+    updateDetails?: string;
+    actionRequired?: boolean;
   };
 }
 

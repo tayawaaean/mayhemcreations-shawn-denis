@@ -6,24 +6,58 @@ import Joi from 'joi';
 
 // Validation schema for webhook payload
 const webhookSchema = Joi.object({
-  event: Joi.string().valid('chat_message', 'chat_connected', 'chat_disconnected', 'conversation_summary', 'unread_messages', 'new_customer').required(),
+  event: Joi.string().valid(
+    'chat_message', 'chat_connected', 'chat_disconnected', 'conversation_summary', 'unread_messages', 'new_customer',
+    'order_confirmed', 'shipping_confirmed', 'delivered', 'refund_confirmed', 'payment_receipt', 'review_request',
+    'newsletter', 'account_update'
+  ).required(),
   data: Joi.object({
     messageId: Joi.string().optional(),
     text: Joi.string().allow(null).optional(),
     sender: Joi.string().valid('user', 'admin').optional(),
-    customerId: Joi.string().required(),
+    customerId: Joi.string().optional(),
     type: Joi.string().valid('text', 'image', 'file').optional(),
     attachment: Joi.any().optional(),
     name: Joi.string().allow(null).optional(),
     email: Joi.string().email().allow(null).optional(),
     timestamp: Joi.string().isoDate().required(),
-    // Additional fields for new events
-    customerEmail: Joi.string().email().optional(),
+    // Fields for chat events
+    customerEmail: Joi.string().email().allow(null).optional(),
     customerName: Joi.string().optional(),
     isGuest: Joi.boolean().optional(),
     messages: Joi.array().optional(),
     unreadCount: Joi.number().optional(),
-    lastMessage: Joi.string().optional()
+    lastMessage: Joi.string().optional(),
+    // Fields for order events
+    orderId: Joi.alternatives().try(Joi.string(), Joi.number()).optional(),
+    orderNumber: Joi.string().optional(),
+    orderItems: Joi.array().optional(),
+    orderTotal: Joi.number().optional(),
+    subtotal: Joi.number().optional(),
+    tax: Joi.number().optional(),
+    shippingCost: Joi.number().optional(),
+    shippingAddress: Joi.object().optional(),
+    billingAddress: Joi.object().optional(),
+    // Fields for shipping events
+    shippingInfo: Joi.object().optional(),
+    deliveryDate: Joi.string().optional(),
+    estimatedDeliveryDate: Joi.string().optional(),
+    // Fields for payment/refund events
+    paymentInfo: Joi.object().optional(),
+    refundInfo: Joi.object().optional(),
+    // Fields for review requests
+    reviewUrl: Joi.string().uri().optional(),
+    // Fields for newsletter
+    recipientEmail: Joi.string().email().optional(),
+    recipientName: Joi.string().optional(),
+    newsletterTitle: Joi.string().optional(),
+    newsletterContent: Joi.string().optional(),
+    unsubscribeUrl: Joi.string().uri().optional(),
+    // Fields for account updates
+    updateType: Joi.string().optional(),
+    updateDetails: Joi.string().optional(),
+    actionRequired: Joi.boolean().optional(),
+    actionUrl: Joi.string().uri().optional()
   }).required()
 });
 
@@ -80,6 +114,30 @@ export const handleChatWebhook = async (req: Request, res: Response): Promise<vo
         break;
       case 'new_customer':
         await handleNewCustomer(payload.data as any);
+        break;
+      case 'order_confirmed':
+        await handleOrderConfirmed(payload.data as any);
+        break;
+      case 'shipping_confirmed':
+        await handleShippingConfirmed(payload.data as any);
+        break;
+      case 'delivered':
+        await handleDelivered(payload.data as any);
+        break;
+      case 'refund_confirmed':
+        await handleRefundConfirmed(payload.data as any);
+        break;
+      case 'payment_receipt':
+        await handlePaymentReceipt(payload.data as any);
+        break;
+      case 'review_request':
+        await handleReviewRequest(payload.data as any);
+        break;
+      case 'newsletter':
+        await handleNewsletter(payload.data as any);
+        break;
+      case 'account_update':
+        await handleAccountUpdate(payload.data as any);
         break;
       default:
         logger.warn(`⚠️ Unknown event type: ${payload.event}`);
@@ -251,6 +309,187 @@ export const healthCheck = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
+
+/**
+ * Handle order confirmed event
+ * Sends order confirmation email to customer
+ */
+async function handleOrderConfirmed(data: any): Promise<void> {
+  logger.info(`📧 Sending order confirmation email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendOrderConfirmation({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      orderItems: data.orderItems || [],
+      subtotal: data.subtotal || 0,
+      tax: data.tax || 0,
+      shippingCost: data.shippingCost || 0,
+      orderTotal: data.orderTotal || 0,
+      shippingAddress: data.shippingAddress,
+      billingAddress: data.billingAddress,
+      estimatedDeliveryDate: data.estimatedDeliveryDate
+    });
+    logger.info(`✅ Order confirmation email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending order confirmation email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle shipping confirmed event
+ * Sends shipping confirmation email with tracking information
+ */
+async function handleShippingConfirmed(data: any): Promise<void> {
+  logger.info(`📧 Sending shipping confirmation email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendShippingConfirmation({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      shippingInfo: data.shippingInfo,
+      orderItems: data.orderItems || [],
+      shippingAddress: data.shippingAddress
+    });
+    logger.info(`✅ Shipping confirmation email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending shipping confirmation email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle delivered event
+ * Sends delivery notification and prompts for review
+ */
+async function handleDelivered(data: any): Promise<void> {
+  logger.info(`📧 Sending delivery notification email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendDeliveryNotification({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      deliveryDate: data.deliveryDate || new Date().toISOString(),
+      orderItems: data.orderItems || []
+    });
+    logger.info(`✅ Delivery notification email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending delivery notification email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle refund confirmed event
+ * Sends refund confirmation email to customer
+ */
+async function handleRefundConfirmed(data: any): Promise<void> {
+  logger.info(`📧 Sending refund confirmation email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendRefundConfirmation({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      refundInfo: data.refundInfo
+    });
+    logger.info(`✅ Refund confirmation email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending refund confirmation email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle payment receipt event
+ * Sends payment receipt email to customer
+ */
+async function handlePaymentReceipt(data: any): Promise<void> {
+  logger.info(`📧 Sending payment receipt email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendPaymentReceipt({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      paymentInfo: data.paymentInfo,
+      orderTotal: data.orderTotal || data.paymentInfo?.paidAmount || 0
+    });
+    logger.info(`✅ Payment receipt email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending payment receipt email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle review request event
+ * Sends review request email after successful delivery
+ */
+async function handleReviewRequest(data: any): Promise<void> {
+  logger.info(`📧 Sending review request email for order ${data.orderNumber}`);
+  
+  try {
+    await getEmailService().sendReviewRequest({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      orderNumber: data.orderNumber,
+      orderId: data.orderId,
+      orderItems: data.orderItems || [],
+      reviewUrl: data.reviewUrl
+    });
+    logger.info(`✅ Review request email sent for order ${data.orderNumber}`);
+  } catch (error) {
+    logger.error(`❌ Error sending review request email for order ${data.orderNumber}:`, error);
+  }
+}
+
+/**
+ * Handle newsletter event
+ * Sends marketing/newsletter email to subscriber
+ */
+async function handleNewsletter(data: any): Promise<void> {
+  logger.info(`📧 Sending newsletter: ${data.newsletterTitle}`);
+  
+  try {
+    await getEmailService().sendNewsletter({
+      recipientEmail: data.recipientEmail || data.customerEmail || data.email,
+      recipientName: data.recipientName || data.customerName || 'Valued Customer',
+      newsletterTitle: data.newsletterTitle,
+      newsletterContent: data.newsletterContent,
+      unsubscribeUrl: data.unsubscribeUrl
+    });
+    logger.info(`✅ Newsletter sent: ${data.newsletterTitle}`);
+  } catch (error) {
+    logger.error(`❌ Error sending newsletter:`, error);
+  }
+}
+
+/**
+ * Handle account update event
+ * Sends account update notification email
+ */
+async function handleAccountUpdate(data: any): Promise<void> {
+  logger.info(`📧 Sending account update notification: ${data.updateType}`);
+  
+  try {
+    await getEmailService().sendAccountUpdateNotification({
+      customerName: data.customerName,
+      customerEmail: data.customerEmail || data.email,
+      updateType: data.updateType,
+      updateDetails: data.updateDetails,
+      actionRequired: data.actionRequired || false,
+      actionUrl: data.actionUrl
+    });
+    logger.info(`✅ Account update notification sent: ${data.updateType}`);
+  } catch (error) {
+    logger.error(`❌ Error sending account update notification:`, error);
+  }
+}
 
 /**
  * Test email configuration
