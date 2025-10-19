@@ -44,8 +44,6 @@ interface User {
 interface LoginResponse {
   user: User
   sessionId: string
-  accessToken: string
-  refreshToken: string
 }
 
 class CustomerApiService {
@@ -173,14 +171,6 @@ class CustomerApiService {
     })
   }
 
-  /**
-   * Refresh access token
-   */
-  async refreshToken(): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
-    return this.request<{ accessToken: string; refreshToken: string }>('/auth/refresh', {
-      method: 'POST',
-    })
-  }
 
   /**
    * Test backend connectivity

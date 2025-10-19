@@ -23,8 +23,6 @@ export interface StoredUser {
 // Essential session data only
 export interface StoredSession {
   sessionId: string;
-  accessToken: string;
-  refreshToken: string;
   lastActivity: string;
 }
 
@@ -100,6 +98,12 @@ class MultiAccountStorageService {
       // Set as current account
       multiData.currentAccount = accountType;
 
+      console.log(`🔍 Storing ${accountType} account data:`, {
+        sessionId: authData.session.sessionId,
+        userId: authData.user.id,
+        email: authData.user.email
+      });
+
       this.setMultiAccountData(multiData);
       console.log(`✅ Stored ${accountType} account data`);
     } catch (error) {
@@ -143,6 +147,12 @@ class MultiAccountStorageService {
     try {
       const multiData = this.getMultiAccountData();
       multiData.currentAccount = accountType;
+      
+      console.log(`🔍 Setting current account to ${accountType}:`, {
+        currentData: multiData[accountType],
+        sessionId: multiData[accountType]?.session?.sessionId
+      });
+      
       this.setMultiAccountData(multiData);
       console.log(`✅ Set current account to ${accountType}`);
     } catch (error) {
@@ -236,25 +246,33 @@ class MultiAccountStorageService {
       const accountData = this.getAccountAuthData(accountType);
       if (!accountData) return true; // Already logged out
 
-      // Call backend logout
+      // Call backend logout (session-based auth uses cookies)
       const apiBaseUrl = this.getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accountData.session.accessToken}`,
         },
+        credentials: 'include', // Include cookies for session-based auth
       });
 
       // Remove the account from storage
       const multiData = this.getMultiAccountData();
-      delete multiData[accountType];
-
-      // If this was the current account, switch to another available account
+      
+      // If this was the current account, find another available account before deleting
       if (multiData.currentAccount === accountType) {
-        const availableAccounts = this.getAvailableAccounts();
-        multiData.currentAccount = availableAccounts.length > 0 ? availableAccounts[0] : null;
+        // Get available accounts before deleting the current one
+        const remainingAccounts = [];
+        if (multiData.customer && accountType !== 'customer') {
+          remainingAccounts.push('customer');
+        }
+        if (multiData.employee && accountType !== 'employee') {
+          remainingAccounts.push('employee');
+        }
+        multiData.currentAccount = remainingAccounts.length > 0 ? remainingAccounts[0] : null;
       }
+      
+      delete multiData[accountType];
 
       this.setMultiAccountData(multiData);
       console.log(`✅ Logged out from ${accountType} account`);
@@ -344,10 +362,20 @@ class MultiAccountStorageService {
       const oldData = localStorage.getItem(oldAuthKey);
       
       if (oldData) {
+        console.log('🔄 Found old auth data, migrating...');
         const parsed = JSON.parse(oldData);
         if (parsed.user && parsed.session) {
           // Determine account type based on role
           const accountType = parsed.user.role === 'customer' ? 'customer' : 'employee';
+          
+          // Check if we already have this account in multi-account storage
+          const existingData = this.getMultiAccountData();
+          if (existingData[accountType]) {
+            console.log(`⚠️ ${accountType} account already exists in multi-account storage, skipping migration`);
+            // Still remove old data to prevent conflicts
+            localStorage.removeItem(oldAuthKey);
+            return;
+          }
           
           // Store in new multi-account format
           this.storeAccountAuthData(accountType, {
@@ -359,6 +387,8 @@ class MultiAccountStorageService {
           localStorage.removeItem(oldAuthKey);
           console.log(`✅ Migrated old ${accountType} account to multi-account storage`);
         }
+      } else {
+        console.log('ℹ️ No old auth data found to migrate');
       }
     } catch (error) {
       console.error('Error migrating from old storage:', error);

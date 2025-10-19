@@ -3,7 +3,7 @@
 
 import express from 'express'
 import { labelController } from '../controllers/labelController'
-import { hybridAuthenticate, requireAdmin } from '../middlewares/auth'
+import { sessionAuthenticate, requireAdmin } from '../middlewares/auth'
 
 const router = express.Router()
 
@@ -13,7 +13,7 @@ const router = express.Router()
  * @access  Private (Admin only)
  * @body    { orderId: number, rateId?: string }
  */
-router.post('/create', hybridAuthenticate, requireAdmin, labelController.createLabel.bind(labelController))
+router.post('/create', sessionAuthenticate, requireAdmin, labelController.createLabel.bind(labelController))
 
 /**
  * @route   GET /api/v1/labels/order/:orderId
@@ -21,7 +21,7 @@ router.post('/create', hybridAuthenticate, requireAdmin, labelController.createL
  * @access  Private (Admin only)
  * @param   orderId - Order ID
  */
-router.get('/order/:orderId', hybridAuthenticate, requireAdmin, labelController.getLabelByOrderId.bind(labelController))
+router.get('/order/:orderId', sessionAuthenticate, requireAdmin, labelController.getLabelByOrderId.bind(labelController))
 
 /**
  * @route   GET /api/v1/labels/all
@@ -29,7 +29,7 @@ router.get('/order/:orderId', hybridAuthenticate, requireAdmin, labelController.
  * @access  Private (Admin only)
  * @query   limit, offset
  */
-router.get('/all', hybridAuthenticate, requireAdmin, labelController.getAllLabels.bind(labelController))
+router.get('/all', sessionAuthenticate, requireAdmin, labelController.getAllLabels.bind(labelController))
 
 /**
  * @route   GET /api/v1/labels/check/:orderId
@@ -37,7 +37,7 @@ router.get('/all', hybridAuthenticate, requireAdmin, labelController.getAllLabel
  * @access  Private (Admin only)
  * @param   orderId - Order ID
  */
-router.get('/check/:orderId', hybridAuthenticate, requireAdmin, labelController.checkExistingLabel.bind(labelController))
+router.get('/check/:orderId', sessionAuthenticate, requireAdmin, labelController.checkExistingLabel.bind(labelController))
 
 export default router
 

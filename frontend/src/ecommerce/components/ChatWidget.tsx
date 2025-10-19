@@ -22,6 +22,7 @@ export default function ChatWidget() {
     hasProvidedEmail,
     setHasProvidedEmail
   } = useRealTimeChat()
+
   const { isLoggedIn } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [inputText, setInputText] = useState('')
@@ -153,15 +154,15 @@ export default function ChatWidget() {
                   isConnected && isAdminOnline 
                     ? 'bg-green-400' 
                     : isConnected 
-                      ? 'bg-yellow-400' 
+                      ? 'bg-blue-400' 
                       : 'bg-red-400'
                 }`}></div>
                 <span className="text-xs opacity-90">
                   {isConnected && isAdminOnline 
-                    ? 'Support Online' 
+                    ? 'Chat Connected - Admin Online' 
                     : isConnected 
-                      ? 'Connecting...' 
-                      : 'Offline'
+                      ? 'Chat Connected - Messages via Email' 
+                      : 'Connecting...'
                   }
                 </span>
               </div>
@@ -341,6 +342,21 @@ export default function ChatWidget() {
 
             {/* Input */}
             <div className="p-4 border-t border-gray-200">
+              {/* Status message */}
+              {isConnected && !isAdminOnline && (
+                <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    💬 Chat is connected! Your messages will be sent via email and we'll respond as soon as possible.
+                  </p>
+                </div>
+              )}
+              {isConnected && isAdminOnline && (
+                <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-700">
+                    ✅ Admin is online! You can chat in real-time.
+                  </p>
+                </div>
+              )}
               <form onSubmit={handleSendMessage} className="flex space-x-2 items-center">
                 <input
                   ref={inputRef}

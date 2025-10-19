@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { UserController } from '../controllers/userController';
-import { hybridAuthenticate, requireRole } from '../middlewares/auth';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
@@ -110,34 +110,34 @@ const getUsersValidation = [
 
 // User routes - all require authentication and admin role
 router.get('/', 
-  hybridAuthenticate, 
+  sessionAuthenticate, 
   requireRole(['admin', 'manager']), 
   getUsersValidation, 
   UserController.getUsers
 );
 
 router.get('/stats', 
-  hybridAuthenticate, 
+  sessionAuthenticate, 
   requireRole(['admin', 'manager']), 
   UserController.getUserStats
 );
 
 router.get('/:id', 
-  hybridAuthenticate, 
+  sessionAuthenticate, 
   requireRole(['admin', 'manager']), 
   getUserValidation, 
   UserController.getUserById
 );
 
 router.put('/:id', 
-  hybridAuthenticate, 
+  sessionAuthenticate, 
   requireRole(['admin', 'manager']), 
   updateUserValidation, 
   UserController.updateUser
 );
 
 router.patch('/:id/status', 
-  hybridAuthenticate, 
+  sessionAuthenticate, 
   requireRole(['admin', 'manager']), 
   updateStatusValidation, 
   UserController.updateUserStatus

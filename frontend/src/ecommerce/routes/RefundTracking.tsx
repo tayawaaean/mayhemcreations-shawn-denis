@@ -34,7 +34,7 @@ const RefundTracking: React.FC = () => {
   // Fetch refunds on mount
   useEffect(() => {
     if (!user) {
-      navigate('/login')
+      navigate('/')
       return
     }
     fetchRefunds()

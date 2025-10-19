@@ -7,7 +7,7 @@ import {
   deleteEmbroideryOption,
   toggleEmbroideryOptionStatus
 } from '../controllers/embroideryOptionController';
-import { hybridAuthenticate, requireRole } from '../middlewares/auth';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
@@ -30,27 +30,27 @@ router.get('/:id', getEmbroideryOptionById);
  * @desc Create new embroidery option
  * @access Private (Admin/Seller only)
  */
-router.post('/', hybridAuthenticate, requireRole(['admin', 'seller']), createEmbroideryOption);
+router.post('/', sessionAuthenticate, requireRole(['admin', 'seller']), createEmbroideryOption);
 
 /**
  * @route PUT /api/v1/embroidery-options/:id
  * @desc Update embroidery option
  * @access Private (Admin/Seller only)
  */
-router.put('/:id', hybridAuthenticate, requireRole(['admin', 'seller']), updateEmbroideryOption);
+router.put('/:id', sessionAuthenticate, requireRole(['admin', 'seller']), updateEmbroideryOption);
 
 /**
  * @route DELETE /api/v1/embroidery-options/:id
  * @desc Delete embroidery option
  * @access Private (Admin/Seller only)
  */
-router.delete('/:id', hybridAuthenticate, requireRole(['admin', 'seller']), deleteEmbroideryOption);
+router.delete('/:id', sessionAuthenticate, requireRole(['admin', 'seller']), deleteEmbroideryOption);
 
 /**
  * @route PATCH /api/v1/embroidery-options/:id/toggle
  * @desc Toggle embroidery option active status
  * @access Private (Admin/Seller only)
  */
-router.patch('/:id/toggle', hybridAuthenticate, requireRole(['admin', 'seller']), toggleEmbroideryOptionStatus);
+router.patch('/:id/toggle', sessionAuthenticate, requireRole(['admin', 'seller']), toggleEmbroideryOptionStatus);
 
 export default router;

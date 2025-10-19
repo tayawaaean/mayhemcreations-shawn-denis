@@ -18,8 +18,6 @@ export interface OAuthUser {
 
 export interface OAuthSession {
   sessionId: string
-  accessToken: string
-  refreshToken: string
 }
 
 export interface OAuthResponse {
@@ -28,8 +26,6 @@ export interface OAuthResponse {
   data?: {
     user: OAuthUser
     sessionId: string
-    accessToken: string
-    refreshToken: string
   }
 }
 

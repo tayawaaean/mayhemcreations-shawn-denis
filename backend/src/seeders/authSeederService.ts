@@ -14,8 +14,6 @@ export interface SeederAuthContext {
   adminUser: User;
   adminRole: Role;
   sessionId: string;
-  accessToken: string;
-  refreshToken: string;
 }
 
 /**
@@ -102,8 +100,6 @@ export async function authenticateAsAdmin(): Promise<SeederAuthContext> {
       adminUser,
       adminRole,
       sessionId: sessionData.sessionId,
-      accessToken: sessionData.accessToken,
-      refreshToken: sessionData.refreshToken,
     };
 
   } catch (error) {
@@ -127,12 +123,9 @@ export function createAuthenticatedRequest(authContext: SeederAuthContext): any 
       loginTime: new Date(),
       lastActivity: new Date(),
       sessionId: authContext.sessionId,
-      accessToken: authContext.accessToken,
-      refreshToken: authContext.refreshToken,
     },
     headers: {
       'user-agent': 'SeederService/1.0',
-      'authorization': `Bearer ${authContext.accessToken}`,
     },
     ip: '127.0.0.1',
     user: {
@@ -143,8 +136,6 @@ export function createAuthenticatedRequest(authContext: SeederAuthContext): any 
       loginTime: new Date(),
       lastActivity: new Date(),
       sessionId: authContext.sessionId,
-      accessToken: authContext.accessToken,
-      refreshToken: authContext.refreshToken,
     },
   };
 }

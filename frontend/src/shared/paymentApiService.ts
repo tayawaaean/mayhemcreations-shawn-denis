@@ -80,16 +80,13 @@ class PaymentApiService {
     options: RequestInit = {}
   ): Promise<PaymentApiResponse<T>> {
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
           ...options.headers,
         },
-        credentials: 'include',
+        credentials: 'include', // Include cookies for session-based auth
       });
 
       const data = await response.json();

@@ -28,8 +28,6 @@ export interface OAuthLoginResult {
   data?: {
     user: any;
     sessionId: string;
-    accessToken: string;
-    refreshToken: string;
   };
 }
 
@@ -205,9 +203,7 @@ export class OAuthService {
             lastLoginAt: user.lastLoginAt,
             createdAt: user.createdAt
           },
-          sessionId: sessionResult.sessionId,
-          accessToken: sessionResult.accessToken,
-          refreshToken: sessionResult.refreshToken
+          sessionId: sessionResult.sessionId
         }
       };
 

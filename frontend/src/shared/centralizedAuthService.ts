@@ -174,54 +174,13 @@ class CentralizedAuthService {
   }
 
   /**
-   * Refresh access token using refresh token
+   * Refresh authentication (session-based - no token refresh needed)
    */
   private async refreshToken(): Promise<boolean> {
-    if (this.refreshPromise) {
-      return this.refreshPromise;
-    }
-
-    this.refreshPromise = this.performTokenRefresh();
-    const result = await this.refreshPromise;
-    this.refreshPromise = null;
-    return result;
-  }
-
-  /**
-   * Perform the actual token refresh
-   */
-  private async performTokenRefresh(): Promise<boolean> {
-    try {
-      console.log('🔄 Refreshing access token...');
-      // The backend expects session-based authentication, not refresh token in body
-      const response = await apiClient.post('/auth/refresh');
-
-      if (response.data.success && response.data.data?.accessToken) {
-        console.log('✅ Access token refreshed successfully');
-        // Update access token in current account
-        const currentAccount = MultiAccountStorageService.getCurrentAccountData();
-        if (currentAccount) {
-          MultiAccountStorageService.storeAccountAuthData(
-            currentAccount.user.accountType,
-            {
-              user: currentAccount.user,
-              session: {
-                ...currentAccount.session,
-                accessToken: response.data.data.accessToken,
-                lastActivity: new Date().toISOString()
-              }
-            }
-          );
-        }
-        return true;
-      } else {
-        console.log('❌ Token refresh failed:', response.data.message);
-        return false;
-      }
-    } catch (error) {
-      console.error('❌ Token refresh error:', error);
-      return false;
-    }
+    console.log('🔄 CentralizedAuthService: Session-based auth - no token refresh needed');
+    // For session-based auth, the session is automatically maintained by cookies
+    // No token refresh is needed
+    return true;
   }
 
   /**
@@ -305,8 +264,6 @@ class CentralizedAuthService {
           },
           session: {
             sessionId: response.data.data.sessionId,
-            accessToken: response.data.data.accessToken,
-            refreshToken: response.data.data.refreshToken,
             lastActivity: new Date().toISOString()
           }
         });

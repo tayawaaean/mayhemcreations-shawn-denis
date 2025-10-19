@@ -9,7 +9,6 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  refreshToken: () => Promise<boolean>;
   updateActivity: () => void;
 }
 
@@ -38,7 +37,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Check if token needs refresh
           if (AuthStorageService.needsRefresh()) {
-            await refreshToken();
+            // For session-based auth, just update activity
+            AuthStorageService.updateSessionActivity();
           }
         } else {
           // Clear invalid data
@@ -67,7 +67,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const checkTokenRefresh = async () => {
       if (AuthStorageService.needsRefresh()) {
-        await refreshToken();
+        // For session-based auth, just update activity
+        AuthStorageService.updateSessionActivity();
       }
     };
 
@@ -83,14 +84,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiService.login(email, password);
       
       if (response.success && response.data) {
-        const { user, sessionId, accessToken, refreshToken } = response.data;
+        const { user, sessionId } = response.data;
         
         const authData = {
           user,
           session: {
             sessionId,
-            accessToken,
-            refreshToken,
             loginTime: new Date().toISOString(),
             lastActivity: new Date().toISOString(),
           },
@@ -128,28 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const refreshToken = async (): Promise<boolean> => {
-    try {
-      const response = await apiService.refreshToken();
-      
-      if (response?.success && response.data?.accessToken) {
-        AuthStorageService.updateAccessToken(response.data.accessToken);
-        
-        // Update session state
-        const currentSession = AuthStorageService.getSession();
-        if (currentSession) {
-          setSession(currentSession);
-        }
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      return false;
-    }
-  };
+  // Note: refreshToken method removed - not needed for session-based auth
 
   const updateActivity = (): void => {
     AuthStorageService.updateActivity();
@@ -162,7 +140,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     login,
     logout,
-    refreshToken,
     updateActivity,
   };
 

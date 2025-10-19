@@ -4,7 +4,7 @@
  */
 
 import express from 'express';
-import { hybridAuthenticate, requireRole } from '../middlewares/auth';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 import {
   createReview,
   getProductReviews,
@@ -22,14 +22,14 @@ const router = express.Router();
  * @desc    Create a new product review
  * @access  Private (Customer only)
  */
-router.post('/', hybridAuthenticate, createReview);
+router.post('/', sessionAuthenticate, createReview);
 
 /**
  * @route   GET /api/v1/reviews/my-reviews
  * @desc    Get all reviews by the current user
  * @access  Private (Customer only)
  */
-router.get('/my-reviews', hybridAuthenticate, getMyReviews);
+router.get('/my-reviews', sessionAuthenticate, getMyReviews);
 
 /**
  * @route   GET /api/v1/reviews/product/:productId
@@ -43,21 +43,21 @@ router.get('/product/:productId', getProductReviews);
  * @desc    Get all reviews (with filtering)
  * @access  Private (Admin only)
  */
-router.get('/admin/all', hybridAuthenticate, requireRole(['admin']), getAllReviews);
+router.get('/admin/all', sessionAuthenticate, requireRole(['admin']), getAllReviews);
 
 /**
  * @route   PATCH /api/v1/reviews/admin/:id/status
  * @desc    Update review status (approve/reject)
  * @access  Private (Admin only)
  */
-router.patch('/admin/:id/status', hybridAuthenticate, requireRole(['admin']), updateReviewStatus);
+router.patch('/admin/:id/status', sessionAuthenticate, requireRole(['admin']), updateReviewStatus);
 
 /**
  * @route   DELETE /api/v1/reviews/admin/:id
  * @desc    Delete a review
  * @access  Private (Admin only)
  */
-router.delete('/admin/:id', hybridAuthenticate, requireRole(['admin']), deleteReview);
+router.delete('/admin/:id', sessionAuthenticate, requireRole(['admin']), deleteReview);
 
 /**
  * @route   POST /api/v1/reviews/:id/helpful

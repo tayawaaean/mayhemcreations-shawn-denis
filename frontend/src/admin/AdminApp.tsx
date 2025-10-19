@@ -29,6 +29,7 @@ import ShippingManagement from './pages/ShippingManagement'
 import RefundManagement from './pages/RefundManagement'
 import SystemLogs from './pages/SystemLogs'
 import Profile from './pages/Profile'
+import AdminNotFound from './pages/NotFound'
 
 const AdminApp: React.FC = () => {
   return (
@@ -63,6 +64,7 @@ const AdminApp: React.FC = () => {
                         <Route path="refund-management" element={<RefundManagement />} />
                         <Route path="system-logs" element={<SystemLogs />} />
                         <Route path="profile" element={<Profile />} />
+                        <Route path="*" element={<AdminNotFound />} />
                       </Route>
                     </Routes>
                   </ProtectedRoute>

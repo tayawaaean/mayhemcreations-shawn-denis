@@ -145,41 +145,41 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         })
 
         if (response.success && response.data) {
+          const { userData, sessionId } = extractUserData(response);
+          
           // Check if email is verified
-          if (response.data.user.isEmailVerified) {
+          if (userData.isEmailVerified) {
             // Only authenticate if email is verified
             MultiAccountStorageService.storeAccountAuthData('customer', {
               user: {
-                id: response.data.user.id,
-                email: response.data.user.email,
-                role: response.data.user.role,
-                firstName: response.data.user.firstName,
-                lastName: response.data.user.lastName,
-                isEmailVerified: response.data.user.isEmailVerified,
+                id: userData.id,
+                email: userData.email,
+                role: userData.role,
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                isEmailVerified: userData.isEmailVerified,
                 lastLoginAt: new Date().toISOString(),
-                createdAt: response.data.user.createdAt || new Date().toISOString(),
-                avatar: response.data.user.avatar,
+                createdAt: userData.createdAt || new Date().toISOString(),
+                avatar: userData.avatar,
                 accountType: 'customer'
               },
               session: {
-                sessionId: response.data.sessionId,
-                accessToken: response.data.accessToken,
-                refreshToken: response.data.refreshToken,
+                sessionId: sessionId,
                 lastActivity: new Date().toISOString()
               }
             })
 
             // Convert to User format for context
-            const userData: User = {
-              id: response.data.user.id,
-              firstName: response.data.user.firstName,
-              lastName: response.data.user.lastName,
-              email: response.data.user.email,
-              role: response.data.user.role,
-              isEmailVerified: response.data.user.isEmailVerified,
+            const userDataForContext: User = {
+              id: userData.id,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              email: userData.email,
+              role: userData.role,
+              isEmailVerified: userData.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
               createdAt: new Date().toISOString(),
-              avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+              avatar: `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3b82f6&color=ffffff`
             }
 
             // Log successful registration
@@ -189,7 +189,7 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
               lastName: formData.lastName
             }, { userId: userData.id.toString(), userEmail: userData.email, userRole: 'customer' })
 
-            onSuccess(userData)
+            onSuccess(userDataForContext)
             onClose()
           } else {
             // Email not verified - show message and keep modal open
@@ -220,45 +220,66 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         const response = await customerApiService.login(formData.email, formData.password, 'customer')
 
         if (response.success && response.data) {
+          const { userData, sessionId } = extractUserData(response);
+          
+          console.log('🔐 Customer login successful, storing auth data...', {
+            sessionId: sessionId,
+            userId: userData.id,
+            email: userData.email,
+            role: userData.role,
+            fullResponse: response.data
+          });
+
           // Store auth data using multi-account storage
+          // Note: For session-based auth, we only need sessionId
+          // The actual authentication is handled by cookies
           MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
-              id: response.data.user.id,
-              email: response.data.user.email,
-              role: response.data.user.role,
-              firstName: response.data.user.firstName,
-              lastName: response.data.user.lastName,
-              isEmailVerified: response.data.user.isEmailVerified,
+              id: userData.id,
+              email: userData.email,
+              role: userData.role,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              isEmailVerified: userData.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
-              createdAt: response.data.user.createdAt || new Date().toISOString(),
-              avatar: response.data.user.avatar,
+              createdAt: userData.createdAt || new Date().toISOString(),
+              avatar: userData.avatar,
               accountType: 'customer'
             },
             session: {
-              sessionId: response.data.sessionId,
-              accessToken: response.data.accessToken,
-              refreshToken: response.data.refreshToken,
+              sessionId: sessionId,
               lastActivity: new Date().toISOString()
             }
           })
 
+          // Explicitly set as current account to ensure proper token management
+          MultiAccountStorageService.setCurrentAccount('customer')
+
+          // Verify the data was stored correctly
+          const storedData = MultiAccountStorageService.getCurrentAccountData();
+          console.log('🔍 Verification - stored customer data:', {
+            hasStoredData: !!storedData,
+            sessionId: storedData?.session?.sessionId,
+            accountType: storedData?.user?.accountType
+          });
+
           // Convert to User format for context
-          const userData: User = {
-            id: response.data.user.id,
-            firstName: response.data.user.firstName,
-            lastName: response.data.user.lastName,
-            email: response.data.user.email,
-            role: response.data.user.role,
-            isEmailVerified: response.data.user.isEmailVerified,
+          const userDataForContext: User = {
+            id: userData.id,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            email: userData.email,
+            role: userData.role,
+            isEmailVerified: userData.isEmailVerified,
             lastLoginAt: new Date().toISOString(),
             createdAt: new Date().toISOString(),
-            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+            avatar: `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3b82f6&color=ffffff`
           }
 
           // Log successful login
           loggingService.logLoginAttempt(formData.email, true, 'customer')
 
-          onSuccess(userData)
+          onSuccess(userDataForContext)
           onClose()
         } else {
           // Handle specific error types
@@ -321,8 +342,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           },
           session: {
             sessionId: result.data.sessionId,
-            accessToken: result.data.accessToken,
-            refreshToken: result.data.refreshToken,
             lastActivity: new Date().toISOString()
           }
         })
@@ -379,6 +398,21 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
     }
   }
 
+  // Helper function to extract user data from response
+  const extractUserData = (response: any) => {
+    // customerApiService.request() already extracts response.data, so we access directly
+    const userData = response.data?.user;
+    const sessionId = response.data?.sessionId;
+    
+    if (!userData || !sessionId) {
+      console.error('❌ Invalid response structure:', response);
+      console.error('❌ Expected response.data.user and response.data.sessionId');
+      throw new Error('Invalid response structure from server');
+    }
+    
+    return { userData, sessionId };
+  };
+
   const handleDemoLogin = async (customer: typeof demoCustomers[0]) => {
     setIsLoading(true)
     setError('')
@@ -389,48 +423,50 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
       const response = await customerApiService.login(customer.email, customer.password, 'customer')
 
       if (response.success) {
+        console.log('🔍 Demo login response structure:', response);
+        console.log('🔍 Response.data structure:', response.data);
+        console.log('🔍 User data:', response.data?.user);
+        console.log('🔍 Session ID:', response.data?.sessionId);
         // Store auth data using multi-account storage
         if (response.data) {
+          const { userData, sessionId } = extractUserData(response);
+          
           MultiAccountStorageService.storeAccountAuthData('customer', {
             user: {
-              id: response.data.user.id,
-              email: response.data.user.email,
-              role: response.data.user.role,
-              firstName: response.data.user.firstName,
-              lastName: response.data.user.lastName,
-              isEmailVerified: response.data.user.isEmailVerified,
+              id: userData.id,
+              email: userData.email,
+              role: userData.role,
+              firstName: userData.firstName,
+              lastName: userData.lastName,
+              isEmailVerified: userData.isEmailVerified,
               lastLoginAt: new Date().toISOString(),
-              createdAt: response.data.user.createdAt || new Date().toISOString(),
-              avatar: response.data.user.avatar,
+              createdAt: userData.createdAt || new Date().toISOString(),
+              avatar: userData.avatar,
               accountType: 'customer'
             },
             session: {
-              sessionId: response.data.sessionId,
-              accessToken: response.data.accessToken,
-              refreshToken: response.data.refreshToken,
+              sessionId: sessionId,
               lastActivity: new Date().toISOString()
             }
           })
-        }
 
-        // Convert to User format for context
-        if (response.data) {
-          const userData: User = {
-            id: response.data.user.id,
-            firstName: response.data.user.firstName,
-            lastName: response.data.user.lastName,
-            email: response.data.user.email,
-            role: response.data.user.role,
-            isEmailVerified: response.data.user.isEmailVerified,
+          // Convert to User format for context
+          const userDataForContext: User = {
+            id: userData.id,
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            email: userData.email,
+            role: userData.role,
+            isEmailVerified: userData.isEmailVerified,
             lastLoginAt: new Date().toISOString(),
             createdAt: new Date().toISOString(),
-            avatar: `https://ui-avatars.com/api/?name=${response.data.user.firstName}+${response.data.user.lastName}&background=3b82f6&color=ffffff`
+            avatar: `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3b82f6&color=ffffff`
           }
 
           // Log successful login
           loggingService.logLoginAttempt(customer.email, true, 'customer')
 
-          onSuccess(userData)
+          onSuccess(userDataForContext)
         }
         onClose()
       } else {

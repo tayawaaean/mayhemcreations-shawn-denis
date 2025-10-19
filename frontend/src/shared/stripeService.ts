@@ -313,18 +313,14 @@ export interface CheckoutSessionResult {
  */
 export const createPaymentIntent = async (data: CreatePaymentIntentData): Promise<PaymentIntentResult> => {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+    // Session-based auth - no token needed
 
     const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-intent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
+      credentials: 'include', // Include cookies for session-based auth
       body: JSON.stringify(data),
     });
 
@@ -346,18 +342,14 @@ export const createPaymentIntent = async (data: CreatePaymentIntentData): Promis
  */
 export const createCheckoutSession = async (data: CreateCheckoutSessionData): Promise<CheckoutSessionResult> => {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+    // Session-based auth - no token needed
 
     const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
+      credentials: 'include', // Include cookies for session-based auth
       body: JSON.stringify(data),
     });
 
@@ -379,17 +371,11 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
  */
 export const getPaymentIntentStatus = async (paymentIntentId: string): Promise<PaymentIntentResult> => {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+    // Session-based auth - no token needed
 
     const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/intent/${paymentIntentId}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      credentials: 'include', // Include cookies for session-based auth
     });
 
     if (!response.ok) {
@@ -410,17 +396,11 @@ export const getPaymentIntentStatus = async (paymentIntentId: string): Promise<P
  */
 export const getCheckoutSessionStatus = async (sessionId: string): Promise<CheckoutSessionResult> => {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+    // Session-based auth - no token needed
 
     const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/session/${sessionId}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      credentials: 'include', // Include cookies for session-based auth
     });
 
     if (!response.ok) {
@@ -441,18 +421,14 @@ export const getCheckoutSessionStatus = async (sessionId: string): Promise<Check
  */
 export const createOrRetrieveCustomer = async (email: string, name?: string) => {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
+    // Session-based auth - no token needed
 
     const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/customer`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
+      credentials: 'include', // Include cookies for session-based auth
       body: JSON.stringify({ email, name }),
     });
 

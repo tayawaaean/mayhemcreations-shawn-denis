@@ -10,7 +10,7 @@ import {
   getPayPalOrderStatus,
   handlePayPalWebhook
 } from '../controllers/paypalController';
-import { hybridAuthenticate } from '../middlewares/auth';
+import { sessionAuthenticate } from '../middlewares/auth';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ const router = Router();
 router.post('/webhook', handlePayPalWebhook);
 
 // All other PayPal routes require authentication (supports session or bearer)
-router.use(hybridAuthenticate);
+router.use(sessionAuthenticate);
 
 /**
  * @route POST /api/v1/payments/paypal/create-order

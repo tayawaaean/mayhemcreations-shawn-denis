@@ -22,8 +22,6 @@ export interface StoredUser {
 // Essential session data only
 export interface StoredSession {
   sessionId: string;
-  accessToken: string;
-  refreshToken: string;
   lastActivity: string;
 }
 
@@ -65,8 +63,6 @@ class AuthStorageService {
         },
         session: {
           sessionId: authData.session.sessionId,
-          accessToken: authData.session.accessToken,
-          refreshToken: authData.session.refreshToken,
           lastActivity: authData.session.lastActivity
         }
       };
@@ -156,12 +152,11 @@ class AuthStorageService {
   }
 
   /**
-   * Update access token
+   * Update session activity (for session-based auth)
    */
-  static updateAccessToken(accessToken: string): void {
+  static updateSessionActivity(): void {
     const authData = this.getAuthData();
     if (authData) {
-      authData.session.accessToken = accessToken;
       authData.session.lastActivity = new Date().toISOString();
       this.storeAuthData(authData);
     }
@@ -238,14 +233,14 @@ class AuthStorageService {
         return true;
       }
 
-      // Call backend logout endpoint to revoke session
+      // Call backend logout endpoint to revoke session (session-based auth uses cookies)
       const apiBaseUrl = this.getApiBaseUrl();
       const response = await fetch(`${apiBaseUrl}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.accessToken}`,
         },
+        credentials: 'include', // Include cookies for session-based auth
       });
 
       // Clear local storage regardless of backend response
@@ -261,47 +256,31 @@ class AuthStorageService {
   }
 
   /**
-   * Get authorization header for API requests
+   * Get authorization header for API requests (session-based auth)
    */
   static getAuthHeader(): string | null {
-    const session = this.getSession();
-    return session ? `Bearer ${session.accessToken}` : null;
+    // For session-based auth, we don't need Bearer tokens
+    // Authentication is handled by cookies
+    return null;
   }
 
   /**
-   * Check if session needs refresh (access token expires in 5 minutes)
+   * Check if session needs refresh (for session-based auth)
    */
   static needsRefresh(): boolean {
     const session = this.getSession();
     if (!session) return false;
 
     try {
-      // Check if token is a JWT (has 3 parts separated by dots)
-      const tokenParts = session.accessToken.split('.');
-      if (tokenParts.length !== 3) {
-        // Not a JWT, assume it needs refresh based on lastActivity
-        const lastActivity = new Date(session.lastActivity).getTime();
-        const now = Date.now();
-        const fiveMinutes = 5 * 60 * 1000;
-        
-        return (now - lastActivity) > fiveMinutes;
-      }
-
-      // Decode JWT to check expiration
-      const payload = JSON.parse(atob(tokenParts[1]));
-      const exp = payload.exp * 1000; // Convert to milliseconds
-      const now = Date.now();
-      const fiveMinutes = 5 * 60 * 1000;
-
-      return (exp - now) < fiveMinutes;
-    } catch (error) {
-      console.error('Error checking token expiration:', error);
-      // Fallback to time-based check using lastActivity
+      // For session-based auth, check based on lastActivity
       const lastActivity = new Date(session.lastActivity).getTime();
       const now = Date.now();
       const fiveMinutes = 5 * 60 * 1000;
       
       return (now - lastActivity) > fiveMinutes;
+    } catch (error) {
+      console.error('Error checking session activity:', error);
+      return false;
     }
   }
 

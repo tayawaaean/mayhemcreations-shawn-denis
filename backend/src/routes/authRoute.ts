@@ -8,7 +8,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { AuthController } from '../controllers/authController';
-import { authenticate, validateSession, hybridAuthenticate } from '../middlewares/auth';
+import { authenticate, validateSession, sessionAuthenticate } from '../middlewares/auth';
 import { authRateLimit } from '../config/security';
 
 const router = Router();
@@ -61,14 +61,15 @@ router.post('/register', registerValidation, AuthController.register);
 router.post('/login', authRateLimit, loginValidation, AuthController.login);
 router.post('/resend-verification', AuthController.resendVerificationEmail);
 router.post('/verify-email', AuthController.verifyEmail);
-router.post('/logout', hybridAuthenticate, AuthController.logout);
-router.get('/profile', hybridAuthenticate, validateSession, AuthController.getProfile);
-router.post('/refresh', hybridAuthenticate, validateSession, AuthController.refreshSession);
+router.post('/logout', sessionAuthenticate, AuthController.logout);
+router.post('/logout-all-sessions/:userId', sessionAuthenticate, validateSession, AuthController.logoutAllSessions);
+router.get('/profile', sessionAuthenticate, validateSession, AuthController.getProfile);
+router.post('/refresh', sessionAuthenticate, validateSession, AuthController.refreshSession);
 
 // OAuth routes
 router.post('/google', authRateLimit, AuthController.googleLogin);
-router.get('/oauth/providers', hybridAuthenticate, validateSession, AuthController.getOAuthProviders);
-router.post('/oauth/unlink', hybridAuthenticate, validateSession, AuthController.unlinkOAuthProvider);
+router.get('/oauth/providers', sessionAuthenticate, validateSession, AuthController.getOAuthProviders);
+router.post('/oauth/unlink', sessionAuthenticate, validateSession, AuthController.unlinkOAuthProvider);
 
 /**
  * @swagger

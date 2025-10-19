@@ -1,10 +1,43 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { webSocketService, WebSocketEvents } from '../shared/websocketService';
 import { useAuth } from '../ecommerce/context/AuthContext';
 
 export const useWebSocket = () => {
   const { user, isLoggedIn } = useAuth();
   const callbacksRef = useRef<Map<string, Function[]>>(new Map());
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Track connection status
+  useEffect(() => {
+    const handleConnect = () => {
+      console.log('🔌 WebSocket connected in hook');
+      setIsConnected(true);
+    };
+
+    const handleDisconnect = () => {
+      console.log('🔌 WebSocket disconnected in hook');
+      setIsConnected(false);
+    };
+
+    const handleConnectError = () => {
+      console.log('🔌 WebSocket connection error in hook');
+      setIsConnected(false);
+    };
+
+    // Subscribe to connection events
+    webSocketService.on('connect', handleConnect);
+    webSocketService.on('disconnect', handleDisconnect);
+    webSocketService.on('connect_error', handleConnectError);
+
+    // Check initial connection status
+    setIsConnected(webSocketService.getConnectionStatus());
+
+    return () => {
+      webSocketService.off('connect', handleConnect);
+      webSocketService.off('disconnect', handleDisconnect);
+      webSocketService.off('connect_error', handleConnectError);
+    };
+  }, []);
 
   // Join appropriate rooms when user changes
   useEffect(() => {
@@ -59,7 +92,7 @@ export const useWebSocket = () => {
 
   return {
     subscribe,
-    isConnected: webSocketService.getConnectionStatus(),
+    isConnected,
     reconnect: webSocketService.reconnect,
     disconnect: webSocketService.disconnect
   };

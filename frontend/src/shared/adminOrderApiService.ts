@@ -44,7 +44,9 @@ class AdminOrderApiService {
       if (authData) {
         try {
           const parsed = JSON.parse(authData);
-          token = parsed.session?.accessToken;
+          // For session-based auth, we don't need access tokens
+          // Authentication is handled by cookies
+          token = null;
         } catch (error) {
           console.error('Error parsing auth data:', error);
         }
@@ -52,9 +54,9 @@ class AdminOrderApiService {
       
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
+        credentials: 'include', // Include cookies for session-based auth
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
           ...options.headers,
         },
       });

@@ -12,8 +12,6 @@ interface SessionData {
   loginTime: Date;
   lastActivity: Date;
   sessionId: string;
-  accessToken: string;
-  refreshToken: string;
 }
 
 export class SessionService {
@@ -31,12 +29,6 @@ export class SessionService {
     return (req.session as any)?.user || null;
   }
 
-  /**
-   * Generate secure random token
-   */
-  private static generateToken(length: number = 32): string {
-    return crypto.randomBytes(length).toString('hex');
-  }
 
   /**
    * Generate session ID
@@ -46,7 +38,7 @@ export class SessionService {
   }
 
   /**
-   * Create new session with database tokens
+   * Create new session
    */
   static async createSession(
     req: Request, 
@@ -57,10 +49,8 @@ export class SessionService {
   ): Promise<SessionData> {
     try {
       const sessionId = this.generateSessionId();
-      const accessToken = this.generateToken(32);
-      const refreshToken = this.generateToken(48);
 
-      // Calculate expiration time (7 days for refresh token)
+      // Calculate expiration time (7 days)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -75,8 +65,6 @@ export class SessionService {
       const dbSession = await Session.create({
         sessionId,
         userId: user.id,
-        accessToken,
-        refreshToken,
         userAgent,
         ipAddress,
         expiresAt,
@@ -97,8 +85,6 @@ export class SessionService {
         loginTime: new Date(),
         lastActivity: new Date(),
         sessionId,
-        accessToken,
-        refreshToken,
       };
 
       // Store in express-session
@@ -151,14 +137,17 @@ export class SessionService {
         return null;
       }
 
-      // Verify access token matches
-      if (dbSession.accessToken !== sessionData.accessToken) {
-        logger.warn('Access token mismatch', {
+      // Check if session was revoked (isActive: false)
+      if (!dbSession.isActive) {
+        logger.warn('Session was revoked', {
           sessionId: sessionData.sessionId,
           userId: sessionData.userId,
         });
+        // Set a special flag to indicate session was revoked
+        (req as any).sessionRevoked = true;
         return null;
       }
+
 
       // Update last activity
       await dbSession.updateActivity();
@@ -181,118 +170,6 @@ export class SessionService {
     }
   }
 
-  /**
-   * Refresh access token
-   */
-  static async refreshAccessToken(req: Request): Promise<string | null> {
-    try {
-      let sessionData = this.getSession(req);
-      
-      // If no session data from cookies, try to get from Bearer token
-      if (!sessionData) {
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          const token = authHeader.substring(7);
-          
-          // Find session by access token
-          const dbSession = await Session.findOne({
-            where: { 
-              accessToken: token,
-              isActive: true 
-            },
-            include: [
-              {
-                model: User,
-                as: 'user',
-                include: [{ model: Role, as: 'role' }],
-              },
-            ],
-          });
-
-          if (!dbSession || !dbSession.isActiveSession()) {
-            return null;
-          }
-
-          // Generate new access token
-          const newAccessToken = this.generateToken(32);
-
-          // Update database session
-          await dbSession.update({
-            accessToken: newAccessToken,
-            lastActivity: new Date(),
-          });
-
-          logger.info('Access token refreshed via Bearer token', {
-            sessionId: dbSession.sessionId,
-            userId: dbSession.userId,
-          });
-
-          return newAccessToken;
-        }
-        
-        return null;
-      }
-
-      // Original session-based logic
-      const dbSession = await Session.findOne({
-        where: {
-          sessionId: sessionData.sessionId,
-          isActive: true,
-        },
-        include: [
-          {
-            model: User,
-            as: 'user',
-            include: [{ model: Role, as: 'role' }],
-          },
-        ],
-      });
-
-      if (!dbSession || !dbSession.isActiveSession()) {
-        return null;
-      }
-
-      // Verify refresh token matches
-      if (dbSession.refreshToken !== sessionData.refreshToken) {
-        logger.warn('Refresh token mismatch', {
-          sessionId: sessionData.sessionId,
-          userId: sessionData.userId,
-        });
-        return null;
-      }
-
-      // Generate new access token
-      const newAccessToken = this.generateToken(32);
-
-      // Update database session
-      await dbSession.update({
-        accessToken: newAccessToken,
-        lastActivity: new Date(),
-      });
-
-      // Update session data
-      const updatedSessionData: SessionData = {
-        ...sessionData,
-        accessToken: newAccessToken,
-        lastActivity: new Date(),
-        permissions: (dbSession as any).user.role.permissions,
-      };
-
-      if (req.session) {
-        (req.session as any).user = updatedSessionData;
-      }
-
-      logger.info('Access token refreshed', {
-        userId: sessionData.userId,
-        sessionId: sessionData.sessionId,
-      });
-
-      return newAccessToken;
-    } catch (error) {
-      logger.error('Error refreshing access token:', error);
-      return null;
-    }
-  }
 
   /**
    * Revoke session (logout)
@@ -484,13 +361,11 @@ export class SessionService {
     userId: number,
     req: any,
     userAgent?: string
-  ): Promise<{ sessionId: string; accessToken: string; refreshToken: string } | null> {
+  ): Promise<{ sessionId: string } | null> {
     try {
       const sessionId = this.generateSessionId();
-      const accessToken = this.generateToken(32);
-      const refreshToken = this.generateToken(48);
 
-      // Calculate expiration time (7 days for refresh token)
+      // Calculate expiration time (7 days)
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -498,8 +373,6 @@ export class SessionService {
       const dbSession = await Session.create({
         sessionId,
         userId,
-        accessToken,
-        refreshToken,
         userAgent: userAgent || 'SeederService/1.0',
         ipAddress: req.ip || '127.0.0.1',
         expiresAt,
@@ -513,8 +386,6 @@ export class SessionService {
 
       return {
         sessionId: dbSession.sessionId,
-        accessToken: dbSession.accessToken,
-        refreshToken: dbSession.refreshToken,
       };
     } catch (error) {
       logger.error('Error creating seeder session:', error);

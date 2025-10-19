@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { hybridAuthenticate, requireRole } from '../middlewares/auth';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 import {
   getCart,
   addToCart,
@@ -21,42 +21,42 @@ const router = Router();
  * @desc Get user's cart items
  * @access Private (Customer only)
  */
-router.get('/', hybridAuthenticate, requireRole(['customer']), getCart);
+router.get('/', sessionAuthenticate, requireRole(['customer']), getCart);
 
 /**
  * @route POST /api/v1/cart
  * @desc Add item to cart
  * @access Private (Customer only)
  */
-router.post('/', hybridAuthenticate, requireRole(['customer']), addToCart);
+router.post('/', sessionAuthenticate, requireRole(['customer']), addToCart);
 
 /**
  * @route PUT /api/v1/cart/:itemId
  * @desc Update cart item quantity
  * @access Private (Customer only)
  */
-router.put('/:itemId', hybridAuthenticate, requireRole(['customer']), updateCartItem);
+router.put('/:itemId', sessionAuthenticate, requireRole(['customer']), updateCartItem);
 
 /**
  * @route DELETE /api/v1/cart/:itemId
  * @desc Remove item from cart
  * @access Private (Customer only)
  */
-router.delete('/:itemId', hybridAuthenticate, requireRole(['customer']), removeFromCart);
+router.delete('/:itemId', sessionAuthenticate, requireRole(['customer']), removeFromCart);
 
 /**
  * @route DELETE /api/v1/cart
  * @desc Clear user's cart
  * @access Private (Customer only)
  */
-router.delete('/', hybridAuthenticate, requireRole(['customer']), clearCart);
+router.delete('/', sessionAuthenticate, requireRole(['customer']), clearCart);
 
 /**
  * @route POST /api/v1/cart/sync
  * @desc Sync cart from localStorage to database
  * @access Private (Customer only)
  */
-router.post('/sync', hybridAuthenticate, requireRole(['customer']), syncCart);
+router.post('/sync', sessionAuthenticate, requireRole(['customer']), syncCart);
 
 
 export default router;

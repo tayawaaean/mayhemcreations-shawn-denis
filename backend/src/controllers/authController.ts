@@ -235,9 +235,7 @@ export class AuthController {
             lastLoginAt: userWithRole.lastLoginAt,
             createdAt: userWithRole.createdAt
           },
-          sessionId: sessionResult.sessionId,
-          accessToken: sessionResult.accessToken,
-          refreshToken: sessionResult.refreshToken
+          sessionId: sessionResult.sessionId
         },
       });
     } catch (error) {
@@ -460,6 +458,9 @@ export class AuthController {
       // Reset failed login attempts on successful login
       await user.resetLoginAttempts();
 
+      // Update user last login
+      await user.update({ lastLoginAt: new Date() });
+
       // Create session with database tokens
       const sessionData = await SessionService.createSession(
         req, 
@@ -469,6 +470,22 @@ export class AuthController {
         req.ip
       );
 
+      // Debug: Log the session data
+      console.log('🔍 Session data created:', {
+        sessionId: sessionData.sessionId,
+        userId: sessionData.userId,
+        email: sessionData.email,
+        role: sessionData.role
+      });
+
+      // Debug: Log the session data to see if tokens are present
+      logger.info(`Session data created:`, {
+        sessionId: sessionData.sessionId,
+        userId: sessionData.userId,
+        email: sessionData.email,
+        role: sessionData.role
+      });
+
       // Log successful login
       logger.info(`User logged in: ${email}`, {
         userId: user.id,
@@ -477,7 +494,7 @@ export class AuthController {
         sessionId: sessionData.sessionId,
       });
 
-      res.json({
+      const responseData = {
         success: true,
         message: 'Login successful',
         data: {
@@ -494,10 +511,20 @@ export class AuthController {
             createdAt: user.createdAt,
           },
           sessionId: sessionData.sessionId,
-          accessToken: sessionData.accessToken,
-          refreshToken: sessionData.refreshToken,
+          // Note: Tokens are not needed for session-based auth
+          // The session cookie handles authentication automatically
         },
+      };
+
+      // Debug: Log the response data to see what's being sent
+      logger.info(`Login response data:`, {
+        sessionId: responseData.data.sessionId,
+        userId: responseData.data.user.id,
+        email: responseData.data.user.email,
+        role: responseData.data.user.role
       });
+
+      res.json(responseData);
     } catch (error) {
       logger.error('Login error:', error);
       next(error);
@@ -584,27 +611,6 @@ export class AuthController {
           });
           success = false;
         }
-      } else {
-        // Try to revoke by access token if available
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          const token = authHeader.substring(7);
-          try {
-            const session = await Session.findOne({ where: { accessToken: token } });
-            if (session) {
-              await session.revoke(); // Use the existing revoke() method
-              sessionId = session.sessionId; // sessionId is a string
-              userId = session.userId;
-              logger.info(`Session revoked by token: ${sessionId}`);
-            }
-          } catch (revokeError) {
-            logger.error('Failed to revoke session by token during logout', {
-              token: token.substring(0, 10) + '...',
-              error: revokeError
-            });
-            success = false;
-          }
-        }
       }
 
       // Log logout
@@ -622,6 +628,107 @@ export class AuthController {
       });
     } catch (error) {
       logger.error('Logout error:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/v1/auth/logout-all-sessions/{userId}:
+   *   post:
+   *     tags: [Authentication]
+   *     summary: Logout all sessions for a specific user
+   *     description: Invalidates all active sessions for the specified user. Requires admin privileges.
+   *     security:
+   *       - sessionAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: userId
+   *         required: true
+   *         schema:
+   *           type: integer
+   *         description: The ID of the user whose sessions should be invalidated
+   *     responses:
+   *       200:
+   *         description: All sessions invalidated successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 message:
+   *                   type: string
+   *                 invalidatedSessions:
+   *                   type: integer
+   *                 timestamp:
+   *                   type: string
+   *       401:
+   *         description: Not authenticated
+   *       403:
+   *         description: Insufficient permissions
+   *       404:
+   *         description: User not found
+   *       500:
+   *         description: Server error
+   */
+  static async logoutAllSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const targetUserId = parseInt(userId);
+
+      if (isNaN(targetUserId)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid user ID',
+        });
+        return;
+      }
+
+      // Check if user exists
+      const user = await User.findByPk(targetUserId, {
+        include: [{ model: Role, as: 'role' }]
+      });
+
+      if (!user) {
+        res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+        return;
+      }
+
+      // Get all active sessions for this user
+      const activeSessions = await Session.findAll({
+        where: {
+          userId: targetUserId,
+          isActive: true
+        }
+      });
+
+      // Revoke all sessions
+      let invalidatedCount = 0;
+      for (const session of activeSessions) {
+        try {
+          await session.revoke();
+          invalidatedCount++;
+          logger.info(`Session revoked for user ${targetUserId}: ${session.sessionId}`);
+        } catch (error) {
+          logger.error(`Failed to revoke session ${session.sessionId} for user ${targetUserId}:`, error);
+        }
+      }
+
+      logger.info(`Invalidated ${invalidatedCount} sessions for user ${targetUserId} (${user.email})`);
+
+      res.json({
+        success: true,
+        message: `Successfully invalidated ${invalidatedCount} sessions for user ${user.email}`,
+        invalidatedSessions: invalidatedCount,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Logout all sessions error:', error);
       next(error);
     }
   }
@@ -801,17 +908,7 @@ export class AuthController {
         return;
       }
 
-      const newAccessToken = await SessionService.refreshAccessToken(req);
-      
-      if (!newAccessToken) {
-        res.status(401).json({
-          success: false,
-          message: 'Failed to refresh token',
-        });
-        return;
-      }
-
-      // Update activity if we have session data
+      // For session-based auth, just update activity - no token refresh needed
       if (SessionService.isAuthenticated(req)) {
         SessionService.updateActivity(req);
       }
@@ -820,7 +917,7 @@ export class AuthController {
         success: true,
         message: 'Session refreshed successfully',
         data: {
-          accessToken: newAccessToken,
+          // No tokens needed for session-based auth
         },
       });
     } catch (error) {

@@ -27,10 +27,9 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
   }
 };
 
-// Hybrid authentication middleware - supports both session-based and token-based auth
-export const hybridAuthenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+// Session-based authentication middleware for all user types
+export const sessionAuthenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // First try session-based authentication
     if (SessionService.isAuthenticated(req)) {
       const sessionData = SessionService.getSession(req);
       if (sessionData) {
@@ -52,106 +51,36 @@ export const hybridAuthenticate = async (req: Request, res: Response, next: Next
       return;
     }
 
-    // If no session, try token-based authentication
-    const authHeader = req.headers.authorization;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-      logger.info('🔐 HybridAuth: Attempting Bearer token authentication', { 
-        tokenPrefix: token.substring(0, 10) + '...',
-        url: req.url 
+    // Check if session was revoked
+    if ((req as any).sessionRevoked) {
+      logger.warn('🔐 SessionAuth: Session was revoked', {
+        hasSession: !!req.session,
+        url: req.url,
+        method: req.method
       });
-      
-      try {
-        // Find session by access token
-        const session = await Session.findOne({
-          where: { accessToken: token },
-          include: [
-            { model: User, as: 'user', include: [{ model: Role, as: 'role' }] }
-          ]
-        }) as any; // Type assertion for association
 
-        logger.info('🔐 HybridAuth: Session lookup result', { 
-          found: !!session,
-          hasUser: !!(session && session.user),
-          sessionId: session?.sessionId,
-          userId: session?.user?.id,
-          userRole: session?.user?.role?.name,
-          tokenPrefix: token.substring(0, 20) + '...'
-        });
-
-        if (session && session.user) {
-          // Check if session is expired
-          const now = new Date();
-          if (session.expiresAt && session.expiresAt < now) {
-            res.status(401).json({
-              success: false,
-              message: 'Token expired',
-              code: 'TOKEN_EXPIRED',
-            });
-            return;
-          }
-
-          // Attach user info to request for compatibility
-          (req as any).user = {
-            id: session.user.id, // Use 'id' for compatibility with existing code
-            userId: session.user.id, // Keep both for backward compatibility
-            email: session.user.email,
-            role: session.user.role?.name || 'customer',
-            permissions: session.user.role?.permissions || [],
-            loginTime: session.createdAt,
-            lastActivity: session.updatedAt,
-            sessionId: session.sessionId, // Use sessionId string, not id number
-            accessToken: session.accessToken,
-            refreshToken: session.refreshToken,
-          };
-
-          // Set session data for SessionService compatibility
-          if (req.session) {
-            (req.session as any).user = {
-              userId: session.user.id,
-              email: session.user.email,
-              role: session.user.role?.name || 'customer', // Ensure role is set correctly
-              permissions: session.user.role?.permissions || [],
-              sessionId: session.sessionId,
-              accessToken: session.accessToken,
-              refreshToken: session.refreshToken,
-              loginTime: session.createdAt,
-              lastActivity: now,
-            };
-          }
-
-          logger.info('🔐 HybridAuth: User authenticated successfully', {
-            userId: session.user.id,
-            email: session.user.email,
-            role: session.user.role?.name,
-            roleId: session.user.role?.id,
-            permissions: session.user.role?.permissions?.length || 0,
-            sessionRoleSet: (req.session as any)?.user?.role
-          });
-
-          // Update session activity
-          await session.update({ 
-            lastActivity: now,
-            updatedAt: now 
-          });
-
-          next();
-          return;
-        }
-      } catch (tokenError) {
-        logger.warn('Token validation error:', tokenError);
-      }
+      res.status(401).json({
+        success: false,
+        message: 'Your session has been revoked. Please log in again.',
+        code: 'SESSION_REVOKED',
+      });
+      return;
     }
 
-    // If neither session nor token authentication worked
+    // No valid session found
+    logger.warn('🔐 SessionAuth: No valid session found', {
+      hasSession: !!req.session,
+      url: req.url,
+      method: req.method
+    });
+
     res.status(401).json({
       success: false,
       message: 'Authentication required',
       code: 'AUTH_REQUIRED',
     });
   } catch (error) {
-    logger.error('Hybrid authentication middleware error:', error);
+    logger.error('Session authentication middleware error:', error);
     res.status(500).json({
       success: false,
       message: 'Authentication error',

@@ -19,6 +19,7 @@ import FAQs from './pages/FAQs'
 import Analytics from './pages/Analytics'
 import PaymentManagement from './pages/PaymentManagement'
 import SellerRefundManagement from './pages/SellerRefundManagement'
+import AdminNotFound from './pages/NotFound'
 
 const SellerApp: React.FC = () => {
   return (
@@ -43,6 +44,7 @@ const SellerApp: React.FC = () => {
                     <Route path="analytics" element={<Analytics />} />
                     <Route path="payment-management" element={<PaymentManagement />} />
                     <Route path="refund-management" element={<SellerRefundManagement />} />
+                    <Route path="*" element={<AdminNotFound />} />
                   </Route>
                 </Routes>
               </ProtectedRoute>

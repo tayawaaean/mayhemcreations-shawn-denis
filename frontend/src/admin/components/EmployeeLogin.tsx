@@ -121,7 +121,7 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
       const response = await apiService.login(formData.email, formData.password, 'employee')
       
       if (response.success && response.data) {
-        const { user: apiUser, sessionId, accessToken, refreshToken } = response.data
+        const { user: apiUser, sessionId } = response.data
         
         // Create employee user object
         const employeeUser: EmployeeUser = {
@@ -148,11 +148,12 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
           },
           session: {
             sessionId,
-            accessToken,
-            refreshToken,
             lastActivity: new Date().toISOString()
           }
         })
+
+        // Explicitly set as current account to ensure proper token management
+        MultiAccountStorageService.setCurrentAccount('employee')
 
         // Log successful login attempt
         const logRole = employeeUser.role === 'admin' ? 'admin' : 'seller'

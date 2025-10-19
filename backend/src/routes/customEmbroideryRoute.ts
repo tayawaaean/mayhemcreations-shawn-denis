@@ -1,25 +1,25 @@
 import { Router } from 'express'
 import { CustomEmbroideryController } from '../controllers/customEmbroideryController'
-import { hybridAuthenticate } from '../middlewares/auth'
+import { sessionAuthenticate } from '../middlewares/auth'
 
 const router = Router()
 
 // Create a new custom embroidery order
-router.post('/', hybridAuthenticate, CustomEmbroideryController.createOrder)
+router.post('/', sessionAuthenticate, CustomEmbroideryController.createOrder)
 
 // Get user's custom embroidery orders
-router.get('/my-orders', hybridAuthenticate, CustomEmbroideryController.getUserOrders)
+router.get('/my-orders', sessionAuthenticate, CustomEmbroideryController.getUserOrders)
 
 // Get all orders (admin only - you can add admin middleware later)
-router.get('/', hybridAuthenticate, CustomEmbroideryController.getAllOrders)
+router.get('/', sessionAuthenticate, CustomEmbroideryController.getAllOrders)
 
 // Get a specific order by ID
-router.get('/:id', hybridAuthenticate, CustomEmbroideryController.getOrderById)
+router.get('/:id', sessionAuthenticate, CustomEmbroideryController.getOrderById)
 
 // Update order status (admin only)
-router.patch('/:id/status', hybridAuthenticate, CustomEmbroideryController.updateOrderStatus)
+router.patch('/:id/status', sessionAuthenticate, CustomEmbroideryController.updateOrderStatus)
 
 // Delete an order
-router.delete('/:id', hybridAuthenticate, CustomEmbroideryController.deleteOrder)
+router.delete('/:id', sessionAuthenticate, CustomEmbroideryController.deleteOrder)
 
 export default router

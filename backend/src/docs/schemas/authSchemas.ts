@@ -134,10 +134,10 @@
  *             data:
  *               type: object
  *               properties:
- *                 refreshToken:
+ *                 message:
  *                   type: string
- *                   example: refresh_token_1234567890abcdef
- *                   description: New refresh token
+ *                   example: Session refreshed successfully
+ *                   description: Success message
  * 
  *     LogoutResponse:
  *       allOf:

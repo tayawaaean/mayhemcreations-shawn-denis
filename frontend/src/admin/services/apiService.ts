@@ -79,7 +79,8 @@ class ApiService {
    */
   private getAuthHeaders(): HeadersInit {
     const currentAccount = MultiAccountStorageService.getCurrentAccountData();
-    const authHeader = currentAccount?.session?.accessToken ? `Bearer ${currentAccount.session.accessToken}` : null;
+    // For session-based auth, we don't need Bearer tokens
+    const authHeader = null;
     return {
       ...this.defaultHeaders,
       ...(authHeader && { Authorization: authHeader }),
@@ -160,35 +161,13 @@ class ApiService {
     return this.request('/auth/profile');
   }
 
-  async refreshToken(): Promise<ApiResponse<{ accessToken: string }> | null> {
-    try {
-      const response = await this.request('/auth/refresh', {
-        method: 'POST',
-      });
-
-      if (response.success && response.data?.accessToken) {
-        const currentAccount = MultiAccountStorageService.getCurrentAccountData();
-        if (currentAccount) {
-          MultiAccountStorageService.storeAccountAuthData(
-            currentAccount.user.accountType,
-            {
-              user: currentAccount.user,
-              session: {
-                ...currentAccount.session,
-                accessToken: response.data.accessToken,
-                lastActivity: new Date().toISOString()
-              }
-            }
-          );
-        }
-      }
-
-      return response;
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      return null;
-    }
+  async logoutAllSessions(userId: number): Promise<ApiResponse<{ invalidatedSessions: number }>> {
+    return this.request(`/auth/logout-all-sessions/${userId}`, {
+      method: 'POST',
+    });
   }
+
+  // Note: refreshToken method removed - not needed for session-based auth
 
   // User management methods
   async getUsers(params: {

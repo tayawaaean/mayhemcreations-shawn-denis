@@ -11,12 +11,12 @@ import {
   getPaymentLogsByCustomer,
   getPaymentLogById
 } from '../controllers/paymentLogController';
-import { hybridAuthenticate, requireRole } from '../middlewares/auth';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 
 const router = Router();
 
 // All routes require admin or manager role
-router.use(hybridAuthenticate);
+router.use(sessionAuthenticate);
 router.use(requireRole(['admin', 'manager']));
 
 // Get all payment logs with filters and pagination

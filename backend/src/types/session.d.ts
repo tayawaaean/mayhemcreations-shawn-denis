@@ -9,9 +9,7 @@ declare module 'express-session' {
       permissions: string[];
       loginTime: Date;
       lastActivity: Date;
-      refreshToken?: string;
     };
-    refreshToken?: string;
   }
 }
 

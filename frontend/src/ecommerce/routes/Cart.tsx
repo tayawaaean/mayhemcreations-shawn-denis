@@ -12,7 +12,7 @@ import { MaterialPricingService } from '../../shared/materialPricingService'
 export default function Cart() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { items, update, remove, clear } = useCart()
+  const { items, update, remove, clear, refreshCart } = useCart()
   const { showError, showWarning } = useAlertModal()
   const [selectedItem, setSelectedItem] = useState<typeof enriched[0] | null>(null)
   const [showFinalProductModal, setShowFinalProductModal] = useState(false)
@@ -23,12 +23,13 @@ export default function Cart() {
   // Import useAuth to check login status
   const { isLoggedIn, user } = useAuth()
 
-  // Force re-render when cart page is visited to show latest items
+  // Refresh cart from database when cart page is visited
   useEffect(() => {
-    console.log('🛒 Cart page loaded, triggering refresh...')
+    console.log('🛒 Cart page loaded, refreshing cart from database...')
+    refreshCart()
     // Force component re-render to pick up latest cart state
     setKey(prev => prev + 1)
-  }, [location.pathname])
+  }, [location.pathname, refreshCart])
   
   // Debug logging
   console.log('🛒 Cart component - Raw items:', items)

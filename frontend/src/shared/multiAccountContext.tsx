@@ -114,6 +114,9 @@ export const MultiAccountProvider: React.FC<MultiAccountProviderProps> = ({ chil
 
   const login = (userData: User, accountType: 'customer' | 'employee') => {
     try {
+      // Get existing account data to preserve sessionId
+      const existingData = MultiAccountStorageService.getAccountAuthData(accountType);
+      
       // Store the account data
       const authData: AccountAuthData = {
         user: {
@@ -129,12 +132,16 @@ export const MultiAccountProvider: React.FC<MultiAccountProviderProps> = ({ chil
           accountType
         },
         session: {
-          sessionId: '', // Will be set by the login components
-          accessToken: '', // Will be set by the login components
-          refreshToken: '', // Will be set by the login components
+          sessionId: existingData?.session?.sessionId || '', // Preserve existing sessionId
           lastActivity: new Date().toISOString()
         }
       };
+
+      console.log('🔍 MultiAccountContext login:', {
+        accountType,
+        sessionId: authData.session.sessionId,
+        hasExistingSessionId: !!existingData?.session?.sessionId
+      });
 
       MultiAccountStorageService.storeAccountAuthData(accountType, authData);
       

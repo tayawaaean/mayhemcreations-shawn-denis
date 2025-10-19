@@ -11,12 +11,13 @@ import {
   DollarSign,
   User,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { CustomerDetailModal, EditCustomerModal } from '../components/modals/CustomerModals'
 import { useUsers } from '../hooks/useUsers'
-import { User as ApiUser } from '../services/apiService'
+import { User as ApiUser, apiService } from '../services/apiService'
 
 const Customers: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -101,6 +102,25 @@ const Customers: React.FC = () => {
 
   const handleStatusToggle = async (customer: ApiUser) => {
     await updateUserStatus(customer.id, !customer.isActive)
+  }
+
+  const handleLogoutAllSessions = async (userId: number, userEmail: string) => {
+    if (window.confirm(`Are you sure you want to logout all sessions for ${userEmail}? This will invalidate all their active sessions and force them to re-login.`)) {
+      try {
+        const response = await apiService.logoutAllSessions(userId)
+        
+        if (response.success) {
+          alert(`Successfully invalidated ${response.data?.invalidatedSessions || 0} sessions for ${userEmail}`)
+          console.log('✅ Logout all sessions successful:', response)
+        } else {
+          alert(`Failed to logout sessions: ${response.message}`)
+          console.error('❌ Logout all sessions failed:', response)
+        }
+      } catch (error) {
+        console.error('Logout all sessions error:', error)
+        alert('Failed to logout sessions. Please try again.')
+      }
+    }
   }
 
   return (
@@ -405,6 +425,13 @@ const Customers: React.FC = () => {
                           title={customer.isActive ? 'Deactivate User' : 'Activate User'}
                         >
                           {customer.isActive ? '⏸️' : '▶️'}
+                        </button>
+                        <button
+                          onClick={() => handleLogoutAllSessions(customer.id, customer.email)}
+                          className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Logout all sessions for this customer"
+                        >
+                          <LogOut className="h-4 w-4" />
                         </button>
                       </div>
                     </td>

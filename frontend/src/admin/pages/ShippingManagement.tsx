@@ -57,9 +57,7 @@ const ShippingManagement: React.FC = () => {
       
       const response = await fetch('/api/v1/shipping/shipengine/test', {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        credentials: 'include', // Include cookies for session-based auth
       })
       
       const data = await response.json()

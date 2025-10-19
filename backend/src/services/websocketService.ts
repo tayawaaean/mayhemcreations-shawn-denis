@@ -31,6 +31,13 @@ export class WebSocketService {
     this.io.on('connection', (socket: Socket) => {
       logger.info(`🔌 Client connected: ${socket.id}`);
 
+      // Send current admin status to the newly connected client
+      socket.emit('admin_status_changed', { 
+        isOnline: this.isAdminOnline, 
+        timestamp: new Date().toISOString() 
+      });
+      logger.info(`📢 Sent initial admin status to new client: ${this.isAdminOnline ? 'online' : 'offline'}`);
+
       // Handle user authentication and room joining
       socket.on('join_user_room', (userId: string) => {
         socket.join(`user_${userId}`);

@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react'
 import { useUsers } from '../hooks/useUsers'
-import { Search, Filter, Eye, Edit, Users, Shield, Plus } from 'lucide-react'
+import { Search, Filter, Eye, Edit, Users, Shield, Plus, LogOut } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { UserDetailModal, EditUserModal, AddUserModal } from '../components/modals/UserModals'
-import { User as ApiUser } from '../services/apiService'
+import { User as ApiUser, apiService } from '../services/apiService'
 import { formatDateOnly } from '../../utils/dateFormatter'
+import { useNavigate } from 'react-router-dom'
 
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate()
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'manager' | 'designer' | 'support' | 'moderator'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive' | 'all'>('all')
@@ -75,6 +77,25 @@ const UsersPage: React.FC = () => {
       ...data
     }
     dispatch({ type: 'ADD_USER', payload: newUser })
+  }
+
+  const handleLogoutAllSessions = async (userId: number, userEmail: string) => {
+    if (window.confirm(`Are you sure you want to logout all sessions for ${userEmail}? This will invalidate all their active sessions and force them to re-login.`)) {
+      try {
+        const response = await apiService.logoutAllSessions(userId)
+        
+        if (response.success) {
+          alert(`Successfully invalidated ${response.data?.invalidatedSessions || 0} sessions for ${userEmail}`)
+          console.log('✅ Logout all sessions successful:', response)
+        } else {
+          alert(`Failed to logout sessions: ${response.message}`)
+          console.error('❌ Logout all sessions failed:', response)
+        }
+      } catch (error) {
+        console.error('Logout all sessions error:', error)
+        alert('Failed to logout sessions. Please try again.')
+      }
+    }
   }
 
   return (
@@ -240,6 +261,13 @@ const UsersPage: React.FC = () => {
                       </button>
                       <button className="text-gray-600 hover:text-gray-900" onClick={() => handleEditUser(user)}>
                         <Edit className="h-4 w-4" />
+                      </button>
+                      <button 
+                        className="text-red-600 hover:text-red-900" 
+                        onClick={() => handleLogoutAllSessions(user.id, user.email)}
+                        title="Logout all sessions for this user"
+                      >
+                        <LogOut className="h-4 w-4" />
                       </button>
                     </div>
                   </td>

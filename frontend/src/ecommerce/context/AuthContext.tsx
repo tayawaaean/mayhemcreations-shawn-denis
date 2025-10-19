@@ -94,16 +94,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Only update if customer account changes (actual login/logout)
   useEffect(() => {
-    // Only react to currentUser changes if it's a customer account
-    if (currentUser && currentUser.accountType === 'customer') {
-      console.log('🔐 Ecommerce AuthContext: Customer account updated', currentUser);
-      setUser(currentUser as User)
-    } else if (!currentUser) {
-      // Clear user state when currentUser becomes null (logout)
+    // Check if we have a customer account authenticated
+    const customerData = MultiAccountStorageService.getAccountAuthData('customer');
+    const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
+    
+    console.log('🔐 Ecommerce AuthContext: Checking customer auth state', {
+      hasCustomerData: !!customerData,
+      isCustomerAuthenticated,
+      currentUser: currentUser?.accountType,
+      isAuthenticated
+    });
+    
+    if (customerData && isCustomerAuthenticated) {
+      // Convert customer account data to User format
+      const customerUser: User = {
+        id: customerData.user.id,
+        email: customerData.user.email,
+        firstName: customerData.user.firstName || '',
+        lastName: customerData.user.lastName || '',
+        role: customerData.user.role,
+        isEmailVerified: customerData.user.isEmailVerified || false,
+        lastLoginAt: customerData.user.lastLoginAt || new Date().toISOString(),
+        createdAt: customerData.user.createdAt || new Date().toISOString(),
+        avatar: customerData.user.avatar
+      }
+      console.log('✅ Ecommerce AuthContext: Setting customer user from multi-account', {
+        userId: customerUser.id,
+        email: customerUser.email
+      });
+      setUser(customerUser)
+    } else {
+      // Clear user state when no customer account is authenticated
       console.log('🔐 Ecommerce AuthContext: Customer account cleared');
       setUser(null)
     }
-  }, [currentUser])
+  }, [currentUser, isAuthenticated, currentAccountType])
 
   const login = (userData: User) => {
     // Convert to multi-account user format

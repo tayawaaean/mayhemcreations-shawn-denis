@@ -31,6 +31,7 @@ import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentCancel from './pages/PaymentCancel'
 import OrderTracking from './components/OrderTracking'
 import StripeTestSuite from './components/StripeTestSuite'
+import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
@@ -147,6 +148,9 @@ export default function App() {
                     <Route path="/payment/success" element={<PaymentSuccess />} />
                     <Route path="/payment/cancel" element={<PaymentCancel />} />
                     <Route path="/stripe-test" element={<StripeTestSuite />} />
+                    
+                    {/* 404 - Catch all route */}
+                    <Route path="*" element={<NotFound />} />
             </Routes>
               </CustomizationProvider>
             </RealTimeChatProvider>

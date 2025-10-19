@@ -12,7 +12,7 @@ import {
   createOrRetrieveCustomer
 } from '../controllers/paymentController';
 import { handleStripeWebhook } from '../controllers/webhookController';
-import { hybridAuthenticate } from '../middlewares/auth';
+import { sessionAuthenticate } from '../middlewares/auth';
 import { webhookBodyParser } from '../middlewares/webhookMiddleware';
 
 const router = Router();
@@ -21,7 +21,7 @@ const router = Router();
 router.post('/webhook', webhookBodyParser, handleStripeWebhook);
 
 // All other payment routes require authentication (supports session or bearer)
-router.use(hybridAuthenticate);
+router.use(sessionAuthenticate);
 
 /**
  * @route POST /api/v1/payments/create-intent

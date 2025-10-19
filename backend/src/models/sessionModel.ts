@@ -5,8 +5,6 @@ export interface SessionAttributes {
   id: number;
   sessionId: string;
   userId: number;
-  accessToken: string;
-  refreshToken: string;
   userAgent?: string;
   ipAddress?: string;
   isActive: boolean;
@@ -22,8 +20,6 @@ export class Session extends Model<SessionAttributes, SessionCreationAttributes>
   public id!: number;
   public sessionId!: string;
   public userId!: number;
-  public accessToken!: string;
-  public refreshToken!: string;
   public userAgent?: string;
   public ipAddress?: string;
   public isActive!: boolean;
@@ -52,10 +48,7 @@ export class Session extends Model<SessionAttributes, SessionCreationAttributes>
   }
 
   public toJSON(): SessionAttributes {
-    const values = Object.assign({}, this.get());
-    // Remove sensitive data from JSON output
-    const { accessToken, refreshToken, ...safeValues } = values;
-    return safeValues as SessionAttributes;
+    return Object.assign({}, this.get());
   }
 }
 
@@ -84,18 +77,6 @@ Session.init(
       onUpdate: 'NO ACTION', // Changed from CASCADE to prevent session deletion on user updates
       onDelete: 'CASCADE',   // Keep CASCADE for delete - sessions should be removed if user is deleted
       comment: 'Reference to user',
-    },
-    accessToken: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: 'access_token', // Map to snake_case column name
-      comment: 'JWT access token',
-    },
-    refreshToken: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: 'refresh_token', // Map to snake_case column name
-      comment: 'JWT refresh token',
     },
     userAgent: {
       type: DataTypes.TEXT,

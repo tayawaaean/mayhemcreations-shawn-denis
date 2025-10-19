@@ -17,6 +17,7 @@ type CartContextType = {
   syncWithDatabase: () => Promise<void>
   cleanupInvalidItems: () => void
   clearLocalStorageIfNeeded: () => void
+  refreshCart: () => Promise<void>
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -666,6 +667,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }
 
+  // Method to refresh cart from database (can be called from components)
+  const refreshCart = useCallback(async () => {
+    if (isLoggedIn && user && user.id) {
+      console.log('🔄 Refreshing cart from database...')
+      await loadCartFromDatabase()
+    }
+  }, [isLoggedIn, user?.id, loadCartFromDatabase])
+
   return <CartContext.Provider value={{ 
     items, 
     add, 
@@ -676,7 +685,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading, 
     syncWithDatabase,
     cleanupInvalidItems,
-    clearLocalStorageIfNeeded
+    clearLocalStorageIfNeeded,
+    refreshCart
   }}>{children}</CartContext.Provider>
 }
 

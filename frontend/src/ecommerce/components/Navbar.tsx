@@ -308,7 +308,7 @@ const MobileCategorySection: React.FC<{ onClose: () => void }> = ({ onClose }) =
 }
 
 export default function Navbar() {
-  const { items } = useCart()
+  const { items, refreshCart } = useCart()
   const { user, isLoggedIn, login, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false)
@@ -527,7 +527,14 @@ export default function Navbar() {
             </div>
 
             {/* Cart */}
-            <Link to="/cart" className="relative p-2 text-gray-700 hover:text-accent transition-colors">
+            <Link 
+              to="/cart" 
+              className="relative p-2 text-gray-700 hover:text-accent transition-colors"
+              onClick={() => {
+                console.log('🛒 Cart icon clicked, refreshing cart...')
+                refreshCart()
+              }}
+            >
               <ShoppingCart className="w-5 h-5" />
               {count > 0 && (
                 <span className="absolute -top-1 -right-1 bg-accent text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium text-xs">
