@@ -6,6 +6,7 @@ import { loggingService } from '../shared/loggingService'
 import MultiAccountStorageService from '../shared/multiAccountStorage'
 import { customerApiService } from '../shared/customerApiService'
 import { envConfig } from '../shared/envConfig'
+import { useToast } from '../shared/toastContext'
 
 interface User {
   id: number
@@ -76,6 +77,7 @@ const getDemoCustomers = () => {
 const demoCustomers = getDemoCustomers()
 
 export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSuccess }: AuthModalProps) {
+  const { showToast } = useToast()
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -199,6 +201,16 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             // Don't close modal or authenticate user
           }
         } else {
+          // Toast for specific conflicts or validation
+          if (response.message?.toLowerCase().includes('already exists') ||
+              response.message?.toLowerCase().includes('already registered') ||
+              response.message?.toLowerCase().includes('conflict')) {
+            showToast({
+              type: 'error',
+              title: 'Email already registered',
+              message: 'Try signing in or use Forgot password to recover your account.'
+            })
+          }
           // Handle validation errors
           if (response.errors && Array.isArray(response.errors)) {
             const fieldErrors: Record<string, string> = {}
@@ -283,12 +295,24 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           onClose()
         } else {
           // Handle specific error types
-          if (response.requiresEmailVerification) {
+          if ((response as any)?.requiresEmailVerification) {
             setRequiresEmailVerification(true)
             setError('Please verify your email address before logging in. Check your inbox for the verification email.')
+            showToast({
+              type: 'warning',
+              title: 'Verify your email',
+              message: 'We just sent another verification email. Check your inbox or spam folder.'
+            })
           } else {
             setRequiresEmailVerification(false)
             setError(response.message || 'Login failed')
+            if (response.message?.toLowerCase().includes('invalid email or password')) {
+              showToast({
+                type: 'error',
+                title: 'Login failed',
+                message: 'Invalid email or password. Please try again.'
+              })
+            }
           }
         }
       }
@@ -763,23 +787,23 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
                     <>
                       <div className="flex justify-between">
                         <span className="font-medium">Robert Wilson:</span>
-                        <span>{demoAccounts.customer1}</span>
+                        <span>{demoAccounts.customer}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Maria Garcia:</span>
-                        <span>{demoAccounts.customer2}</span>
+                        <span>{demoAccounts.customer}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">James Anderson:</span>
-                        <span>{demoAccounts.customer3}</span>
+                        <span>{demoAccounts.customer}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Sophie Taylor:</span>
-                        <span>{demoAccounts.customer4}</span>
+                        <span>{demoAccounts.customer}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-medium">Kevin Martinez:</span>
-                        <span>{demoAccounts.customer5}</span>
+                        <span>{demoAccounts.customer}</span>
                       </div>
                     </>
                   )

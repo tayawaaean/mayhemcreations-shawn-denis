@@ -1,4 +1,5 @@
 import React from 'react'
+import { ToastProvider } from './shared/toastContext'
 import { Routes, Route } from 'react-router-dom'
 import EcommerceLayout from './ecommerce/components/EcommerceLayout'
 import { RealTimeChatProvider } from './shared/realTimeChatContext'
@@ -42,6 +43,7 @@ export default function App() {
           <CartProvider>
             <RealTimeChatProvider>
               <CustomizationProvider>
+                <ToastProvider>
               <Routes>
             {/* Employee Login Route */}
             <Route path="/employee-login" element={<EmployeeApp />} />
@@ -160,6 +162,7 @@ export default function App() {
                     {/* 404 - Catch all route */}
                     <Route path="*" element={<NotFound />} />
             </Routes>
+                </ToastProvider>
               </CustomizationProvider>
             </RealTimeChatProvider>
           </CartProvider>
