@@ -42,6 +42,10 @@ const updateUserValidation = [
     .optional()
     .isISO8601()
     .withMessage('Please provide a valid date of birth'),
+  body('password')
+    .optional()
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long'),
   body('isEmailVerified')
     .optional()
     .isBoolean()
@@ -131,7 +135,6 @@ router.get('/:id',
 
 router.put('/:id', 
   sessionAuthenticate, 
-  requireRole(['admin', 'manager']), 
   updateUserValidation, 
   UserController.updateUser
 );

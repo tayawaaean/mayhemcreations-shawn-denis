@@ -91,10 +91,10 @@ const Products: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading products...</p>
+          <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-sm sm:text-base text-gray-600">Loading products...</p>
         </div>
       </div>
     )
@@ -102,13 +102,13 @@ const Products: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">Error loading products: {error}</p>
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-sm sm:text-base text-red-600 mb-4 break-words">Error loading products: {error}</p>
           <button 
             onClick={() => window.location.reload()} 
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base"
           >
             Retry
           </button>
@@ -118,29 +118,29 @@ const Products: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
       {/* Page header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-          <p className="mt-2 text-gray-600">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Products</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
             Manage your product catalog. Create and edit products here, then use the Inventory section to manage stock and variants.
           </p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-xs sm:text-sm text-gray-500">
             {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
           <button
             onClick={() => setIsHelpOpen(true)}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm flex-1 sm:flex-none"
           >
             <span className="hidden sm:inline">How to use</span>
             <span className="sm:hidden">?</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 flex items-center font-medium text-sm sm:text-base"
+            className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 flex items-center justify-center font-medium text-sm sm:text-base flex-1 sm:flex-none"
           >
             <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
             <span className="hidden sm:inline">Add Product</span>
@@ -150,10 +150,10 @@ const Products: React.FC = () => {
       </div>
 
       {/* Filters and search */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+      <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="sm:col-span-2 md:col-span-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -161,17 +161,17 @@ const Products: React.FC = () => {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Categories</option>
               {categories.map(category => (
@@ -181,11 +181,11 @@ const Products: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -194,8 +194,8 @@ const Products: React.FC = () => {
             </select>
           </div>
 
-          <div className="flex items-end">
-            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center">
+          <div className="flex items-end sm:col-span-2 md:col-span-1">
+            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center text-sm">
               <Filter className="h-4 w-4 mr-2" />
               More Filters
             </button>
@@ -231,88 +231,58 @@ const Products: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <img
-                        src={product.image}
-                        alt={product.alt}
-                        className="h-12 w-12 rounded-lg object-cover"
-                      />
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{product.title}</div>
-                        <div className="text-sm text-gray-500">{product.subcategory?.name || 'N/A'}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.sku}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {product.category?.name || 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>
-                      <span className="font-medium">${product.price}</span>
-                      {product.salePrice && (
-                        <span className="text-green-600 ml-2">${product.salePrice}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      product.status === 'active' ? 'bg-green-100 text-green-800' :
-                      product.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {product.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <button 
-                        onClick={() => handleEditProduct(product)}
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Edit Product"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+              {paginatedProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 text-sm">No products found</p>
+                    <p className="text-gray-500 text-xs mt-1">Try adjusting your search or filters</p>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Mobile Card Layout */}
-          <div className="lg:hidden">
-            {paginatedProducts.map((product) => (
-              <div key={product.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
-                <div className="flex items-start space-x-3">
-                  <img
-                    src={product.image}
-                    alt={product.alt}
-                    className="h-16 w-16 rounded-lg object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">{product.title}</h3>
-                        <p className="text-sm text-gray-500 truncate">{product.subcategory?.name || 'N/A'}</p>
-                        <p className="text-xs text-gray-400 mt-1">SKU: {product.sku}</p>
+              ) : (
+                paginatedProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <img
+                          src={product.image}
+                          alt={product.alt}
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                          <div className="text-sm text-gray-500">{product.subcategory?.name || 'N/A'}</div>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2 ml-2">
-                        <button
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {product.sku}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {product.category?.name || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div>
+                        <span className="font-medium">${product.price}</span>
+                        {product.salePrice && (
+                          <span className="text-green-600 ml-2">${product.salePrice}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        product.status === 'active' ? 'bg-green-100 text-green-800' :
+                        product.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {product.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button 
                           onClick={() => handleEditProduct(product)}
-                          className="text-indigo-600 hover:text-indigo-900"
+                          className="text-gray-600 hover:text-gray-900"
                           title="Edit Product"
                         >
                           <Edit className="h-4 w-4" />
@@ -325,40 +295,88 @@ const Products: React.FC = () => {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
-                    </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
 
-                    <div className="mt-3 grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500">Category</p>
-                        <p className="text-sm text-gray-900">{product.category?.name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Price</p>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-900">${product.price}</span>
-                          {product.salePrice && (
-                            <span className="text-sm text-green-600">${product.salePrice}</span>
-                          )}
+          {/* Mobile Card Layout */}
+          <div className="lg:hidden">
+            {paginatedProducts.length === 0 ? (
+              <div className="p-8 text-center">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 text-sm">No products found</p>
+                <p className="text-gray-500 text-xs mt-1">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              paginatedProducts.map((product) => (
+                <div key={product.id} className="bg-white border-b border-gray-200 p-3 sm:p-4 last:border-b-0">
+                  <div className="flex items-start space-x-3">
+                    <img
+                      src={product.image}
+                      alt={product.alt}
+                      className="h-14 w-14 sm:h-16 sm:w-16 rounded-lg object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <h3 className="text-sm font-medium text-gray-900 break-words line-clamp-2">{product.title}</h3>
+                          <p className="text-xs sm:text-sm text-gray-500 truncate">{product.subcategory?.name || 'N/A'}</p>
+                          <p className="text-xs text-gray-400 mt-1 break-all">SKU: {product.sku}</p>
+                        </div>
+                        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="p-1.5 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50 rounded"
+                            title="Edit Product"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product)}
+                            className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
+                            title="Delete Product"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Status</p>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          product.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : product.status === 'inactive'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {product.status}
-                        </span>
-                      </div>
-                    </div>
 
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500">Category</p>
+                          <p className="text-sm text-gray-900 truncate">{product.category?.name || 'N/A'}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500">Price</p>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-900">${product.price}</span>
+                            {product.salePrice && (
+                              <span className="text-xs sm:text-sm text-green-600">${product.salePrice}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <p className="text-xs text-gray-500 mb-1">Status</p>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            product.status === 'active'
+                              ? 'bg-green-100 text-green-800'
+                              : product.status === 'inactive'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {product.status}
+                          </span>
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -377,26 +395,29 @@ const Products: React.FC = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="bg-white rounded-xl border border-gray-200 px-3 py-3 sm:px-4 sm:py-3 flex items-center justify-between">
           <div className="flex-1 flex justify-between sm:hidden">
             <button 
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
             <button 
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-xs sm:text-sm text-gray-700">
                 Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalItems)}</span> of{' '}
                 <span className="font-medium">{totalItems}</span> results
               </p>
@@ -406,7 +427,7 @@ const Products: React.FC = () => {
                 <button 
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
@@ -414,7 +435,7 @@ const Products: React.FC = () => {
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                    className={`relative inline-flex items-center px-3 sm:px-4 py-2 border text-xs sm:text-sm font-medium ${
                       page === currentPage
                         ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                         : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
@@ -426,7 +447,7 @@ const Products: React.FC = () => {
                 <button 
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
                 </button>

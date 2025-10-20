@@ -544,20 +544,39 @@ export class UserController {
         isEmailVerified,
         isPhoneVerified,
         isActive,
-        roleId
+        roleId,
+        password
       } = req.body;
 
+      // Check if user is updating their own profile or is admin
+      const requestingUser = (req as any).user;
+      const isOwnProfile = requestingUser && requestingUser.id === userId;
+      const isAdmin = requestingUser && ['admin', 'manager'].includes(requestingUser.role?.name);
+
+      // Prepare update data
+      const updateData: any = {};
+
+      // Fields that any user can update for their own profile
+      if (firstName !== undefined) updateData.firstName = firstName;
+      if (lastName !== undefined) updateData.lastName = lastName;
+      if (phone !== undefined) updateData.phone = phone;
+      if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+
+      // Password can only be updated by the user themselves
+      if (password && isOwnProfile) {
+        updateData.password = password;
+      }
+
+      // Admin-only fields
+      if (isAdmin) {
+        if (isEmailVerified !== undefined) updateData.isEmailVerified = isEmailVerified;
+        if (isPhoneVerified !== undefined) updateData.isPhoneVerified = isPhoneVerified;
+        if (isActive !== undefined) updateData.isActive = isActive;
+        if (roleId !== undefined) updateData.roleId = roleId;
+      }
+
       // Update user
-      await user.update({
-        firstName: firstName || user.firstName,
-        lastName: lastName || user.lastName,
-        phone: phone !== undefined ? phone : user.phone,
-        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : user.dateOfBirth,
-        isEmailVerified: isEmailVerified !== undefined ? isEmailVerified : user.isEmailVerified,
-        isPhoneVerified: isPhoneVerified !== undefined ? isPhoneVerified : user.isPhoneVerified,
-        isActive: isActive !== undefined ? isActive : user.isActive,
-        roleId: roleId || user.roleId
-      });
+      await user.update(updateData);
 
       // Fetch updated user with role
       const updatedUser = await User.findByPk(userId, {
@@ -567,7 +586,8 @@ export class UserController {
 
       logger.info(`User updated: ${user.email}`, {
         userId: user.id,
-        updatedBy: (req as any).user?.id
+        updatedBy: requestingUser?.id,
+        isOwnProfile
       });
 
       res.json({

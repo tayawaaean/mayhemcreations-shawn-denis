@@ -11,6 +11,7 @@ import { Payment } from '../models/paymentModel';
 import { RefundService } from '../services/refundService';
 import { logger } from '../utils/logger';
 import { Op } from 'sequelize';
+import { EmailNotificationService } from '../services/emailNotificationService';
 
 // Extend Request type to include user
 interface AuthenticatedRequest extends Request {
@@ -503,6 +504,51 @@ export const approveRefund = async (
 
     logger.info(`Refund ${id} approved by admin ${adminUserId}${manualCaptureId ? ' with manual capture ID' : ''}`);
 
+    // Send refund confirmation email
+    try {
+      const refund = await RefundRequest.findByPk(id, {
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['email', 'firstName', 'lastName']
+          },
+          {
+            model: OrderReview,
+            as: 'order',
+            attributes: ['orderNumber', 'id']
+          }
+        ]
+      });
+
+      if (refund && refund.user) {
+        const customerName = `${refund.user.firstName || ''} ${refund.user.lastName || ''}`.trim() || 'Customer';
+        const customerEmail = refund.user.email;
+
+        await EmailNotificationService.sendRefundConfirmation({
+          customerName,
+          customerEmail,
+          orderNumber: refund.order?.orderNumber || `ORD-${refund.orderId}`,
+          orderId: refund.orderId,
+          refundInfo: {
+            refundId: `REF-${refund.id}`,
+            refundAmount: parseFloat(refund.refundAmount as any),
+            refundReason: refund.reason,
+            refundMethod: refund.refundMethod || 'Original Payment Method',
+            refundDate: refund.updatedAt.toISOString()
+          }
+        });
+
+        logger.info('Refund confirmation email sent', {
+          refundId: id,
+          customerEmail
+        });
+      }
+    } catch (emailError) {
+      logger.error('Error sending refund confirmation email:', emailError);
+      // Don't fail the request if email fails
+    }
+
     res.status(200).json({
       success: true,
       message: result.message,
@@ -555,6 +601,47 @@ export const rejectRefund = async (
     }
 
     logger.info(`Refund ${id} rejected`);
+
+    // Send refund rejection email
+    try {
+      const refund = await RefundRequest.findByPk(id, {
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: ['email', 'firstName', 'lastName']
+          },
+          {
+            model: OrderReview,
+            as: 'order',
+            attributes: ['orderNumber', 'id']
+          }
+        ]
+      });
+
+      if (refund && refund.user) {
+        const customerName = `${refund.user.firstName || ''} ${refund.user.lastName || ''}`.trim() || 'Customer';
+        const customerEmail = refund.user.email;
+
+        await EmailNotificationService.sendRefundRejection({
+          customerName,
+          customerEmail,
+          orderNumber: refund.order?.orderNumber || `ORD-${refund.orderId}`,
+          orderId: refund.orderId,
+          rejectionReason,
+          refundAmount: parseFloat(refund.refundAmount as any),
+          requestedReason: refund.reason
+        });
+
+        logger.info('Refund rejection email sent', {
+          refundId: id,
+          customerEmail
+        });
+      }
+    } catch (emailError) {
+      logger.error('Error sending refund rejection email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(200).json({
       success: true,

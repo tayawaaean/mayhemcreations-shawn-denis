@@ -1384,65 +1384,67 @@ const PendingReview: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-        <span className="ml-2 text-gray-600">Loading reviews...</span>
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="flex flex-col items-center space-y-2">
+          <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-gray-400" />
+          <span className="text-sm sm:text-base text-gray-600">Loading reviews...</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
       {/* Page header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="flex items-center space-x-4">
-            <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Orders</h1>
             {/* WebSocket connection status */}
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-600">
+              <span className="text-xs sm:text-sm text-gray-600">
                 {isConnected ? 'Live Updates' : 'Offline'}
               </span>
             </div>
           </div>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
             Review and approve customized orders before checkout
           </p>
         </div>
         <button
           onClick={loadReviews}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full sm:w-auto flex items-center justify-center px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
         >
-          <RefreshCw className="h-4 w-4 mr-2" />
+          <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
           Refresh
         </button>
       </div>
 
       {/* Stats cards - Now Clickable for Quick Filtering */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
         <button
           onClick={() => {
             setSelectedStatus('pending');
             window.scrollTo({ top: 400, behavior: 'smooth' });
           }}
-          className="bg-white p-6 rounded-lg shadow-sm border-2 border-yellow-200 hover:border-yellow-400 hover:shadow-md transition-all text-left group"
+          className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border-2 border-yellow-200 hover:border-yellow-400 hover:shadow-md transition-all text-left group"
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors">
-                <Clock className="h-6 w-6 text-yellow-600" />
+            <div className="flex items-center min-w-0">
+              <div className="p-1.5 sm:p-2 bg-yellow-100 rounded-lg group-hover:bg-yellow-200 transition-colors flex-shrink-0">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-yellow-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">For Review</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">For Review</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                   {reviews.filter(r => r.status === 'pending' || r.status === 'picture-reply-pending').length}
                 </p>
               </div>
             </div>
-            <AlertCircle className="h-5 w-5 text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
           </div>
-          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+          <p className="mt-2 text-xs text-gray-500 hidden sm:block">Click to view these orders</p>
         </button>
         
         <button
@@ -1450,23 +1452,23 @@ const PendingReview: React.FC = () => {
             setSelectedStatus('pending-payment');
             window.scrollTo({ top: 400, behavior: 'smooth' });
           }}
-          className="bg-white p-6 rounded-lg shadow-sm border-2 border-orange-200 hover:border-orange-400 hover:shadow-md transition-all text-left group"
+          className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border-2 border-orange-200 hover:border-orange-400 hover:shadow-md transition-all text-left group"
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors">
-                <DollarSign className="h-6 w-6 text-orange-600" />
+            <div className="flex items-center min-w-0">
+              <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg group-hover:bg-orange-200 transition-colors flex-shrink-0">
+                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-orange-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Awaiting Payment</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Awaiting Payment</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                   {reviews.filter(r => r.status === 'pending-payment' || r.status === 'ready-for-checkout').length}
                 </p>
               </div>
             </div>
-            <Eye className="h-5 w-5 text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
           </div>
-          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+          <p className="mt-2 text-xs text-gray-500 hidden sm:block">Click to view these orders</p>
         </button>
         
         <button
@@ -1474,23 +1476,23 @@ const PendingReview: React.FC = () => {
             setSelectedStatus('in-production');
             window.scrollTo({ top: 400, behavior: 'smooth' });
           }}
-          className="bg-white p-6 rounded-lg shadow-sm border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all text-left group"
+          className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all text-left group"
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                <Package className="h-6 w-6 text-purple-600" />
+            <div className="flex items-center min-w-0">
+              <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors flex-shrink-0">
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">In Production</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">In Production</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                   {reviews.filter(r => r.status === 'approved-processing' || r.status === 'in-production').length}
                 </p>
               </div>
             </div>
-            <Eye className="h-5 w-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
           </div>
-          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+          <p className="mt-2 text-xs text-gray-500 hidden sm:block">Click to view these orders</p>
         </button>
         
         <button
@@ -1498,46 +1500,46 @@ const PendingReview: React.FC = () => {
             setSelectedStatus('shipped');
             window.scrollTo({ top: 400, behavior: 'smooth' });
           }}
-          className="bg-white p-6 rounded-lg shadow-sm border-2 border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left group"
+          className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border-2 border-green-200 hover:border-green-400 hover:shadow-md transition-all text-left group"
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="flex items-center min-w-0">
+              <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors flex-shrink-0">
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Shipped & Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Shipped & Delivered</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                   {reviews.filter(r => r.status === 'shipped' || r.status === 'delivered').length}
                 </p>
               </div>
             </div>
-            <Eye className="h-5 w-5 text-green-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2" />
           </div>
-          <p className="mt-2 text-xs text-gray-500">Click to view these orders</p>
+          <p className="mt-2 text-xs text-gray-500 hidden sm:block">Click to view these orders</p>
         </button>
       </div>
 
       {/* Filters and search */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col gap-3 sm:gap-4">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-3 w-3 sm:h-4 sm:w-4" />
               <input
                 type="text"
                 placeholder="Search by order ID, customer name, or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
               />
             </div>
           </div>
-          <div className="sm:w-48">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
             >
               {statusOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -1545,12 +1547,10 @@ const PendingReview: React.FC = () => {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="sm:w-48">
             <select
               value={selectedPictureReplyStatus}
               onChange={(e) => setSelectedPictureReplyStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
             >
               {pictureReplyStatusOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -1568,36 +1568,36 @@ const PendingReview: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left">
                   <input
                     type="checkbox"
                     checked={selectedReviews.length === filteredReviews.length && filteredReviews.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3 w-3 sm:h-4 sm:w-4"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Order ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Order
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Items
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Total
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Picture Reply
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   Submitted
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <th className="px-3 sm:px-4 md:px-6 py-2 sm:py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
                   Actions
                 </th>
               </tr>

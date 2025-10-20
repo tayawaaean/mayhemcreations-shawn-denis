@@ -197,103 +197,103 @@ const ShippingManagement: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Shipping Management</h1>
-          <p className="text-sm text-gray-600 mt-1">
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Shipping Management</h1>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
             Test shipping rates and manage shipping configuration
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             onClick={testConnection}
             disabled={loading}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-xs sm:text-sm"
           >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Test API
+            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Test API</span>
           </button>
           <button
             onClick={testCarriers}
             disabled={loading}
-            className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-xs sm:text-sm"
           >
-            <TruckIcon className="w-4 h-4 mr-2" />
-            Test Carriers
+            <TruckIcon className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Test Carriers</span>
           </button>
           <button
             onClick={loadConfiguration}
             disabled={loading}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-xs sm:text-sm"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+            <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Configuration Status */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
         {/* ShipEngine Status */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">ShipEngine Status</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">ShipEngine Status</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mt-1 sm:mt-2 truncate">
                 {configStatus?.configured ? 'Configured' : 'Not Configured'}
               </p>
             </div>
             {configStatus?.configured ? (
-              <CheckCircle className="w-10 h-10 text-green-500" />
+              <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-500 flex-shrink-0 ml-2" />
             ) : (
-              <AlertCircle className="w-10 h-10 text-red-500" />
+              <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-red-500 flex-shrink-0 ml-2" />
             )}
           </div>
         </div>
 
         {/* Origin Address */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Origin Address</p>
-              <p className="text-lg font-semibold text-gray-900 mt-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Origin Address</p>
+              <p className="text-base sm:text-lg font-semibold text-gray-900 mt-1 sm:mt-2 truncate">
                 {configStatus?.origin?.city}, {configStatus?.origin?.state}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-xs sm:text-sm text-gray-600 truncate">
                 {configStatus?.origin?.postalCode}
               </p>
             </div>
-            <MapPin className="w-10 h-10 text-blue-500" />
+            <MapPin className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500 flex-shrink-0 ml-2" />
           </div>
         </div>
 
         {/* Available Carriers */}
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="bg-white rounded-lg shadow p-3 sm:p-4 md:p-6">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Available Carriers</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Available Carriers</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 mt-1 sm:mt-2">
                 {carriers.length}
               </p>
             </div>
-            <TruckIcon className="w-10 h-10 text-purple-500" />
+            <TruckIcon className="w-8 h-8 sm:w-10 sm:h-10 text-purple-500 flex-shrink-0 ml-2" />
           </div>
         </div>
       </div>
 
       {/* Rate Calculator */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Test Rate Calculator</h2>
-          <p className="text-sm text-gray-600 mt-1">
+        <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-gray-200">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">Test Rate Calculator</h2>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
             Enter shipping details to get real-time rate quotes
           </p>
         </div>
 
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="p-3 sm:p-4 md:p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Shipping Address Form */}
             <div className="space-y-4">
               <h3 className="font-medium text-gray-900">Destination Address</h3>

@@ -4,7 +4,9 @@
  */
 
 import Stripe from 'stripe';
+import axios from 'axios';
 import { RefundRequest } from '../models/refundRequestModel';
+import { RefundRequestHistory } from '../models/refundRequestHistoryModel';
 import { OrderReview } from '../models/orderReviewModel';
 import { Payment } from '../models/paymentModel';
 import { User } from '../models/userModel';
@@ -13,6 +15,7 @@ import Variant from '../models/variantModel';
 import { sequelize } from '../config/database';
 import { logger } from '../utils/logger';
 import { logPaymentTransaction } from './paymentLogService';
+import { getWebSocketService } from './websocketService';
 
 // Initialize Stripe with API key from environment
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -36,6 +39,140 @@ const paypalEnvironment = process.env.PAYPAL_MODE === 'live'
 const paypalClient = new paypal.core.PayPalHttpClient(paypalEnvironment);
 
 export class RefundService {
+  /**
+   * Log refund request history for audit and abuse prevention
+   */
+  private static async logRefundHistory(data: {
+    refundRequestId: number;
+    userId: number;
+    orderId: number;
+    orderNumber: string;
+    action: 'created' | 'approved' | 'rejected' | 'cancelled' | 'modified' | 'under_review';
+    previousStatus?: string;
+    newStatus: string;
+    adminId?: number;
+    adminEmail?: string;
+    adminNotes?: string;
+    rejectionReason?: string;
+    refundAmount: number;
+    refundType: 'full' | 'partial';
+    reason: string;
+    description?: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    try {
+      await RefundRequestHistory.create({
+        refundRequestId: data.refundRequestId,
+        userId: data.userId,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        action: data.action,
+        previousStatus: data.previousStatus,
+        newStatus: data.newStatus,
+        adminId: data.adminId,
+        adminEmail: data.adminEmail,
+        adminNotes: data.adminNotes,
+        rejectionReason: data.rejectionReason,
+        refundAmount: data.refundAmount,
+        refundType: data.refundType,
+        reason: data.reason,
+        description: data.description,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent
+      });
+      logger.info(`Logged refund history: ${data.action} for refund ${data.refundRequestId}`);
+    } catch (error: any) {
+      logger.error('Failed to log refund history:', error.message);
+      // Don't throw - logging failure shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Get refund history for a specific refund request
+   */
+  static async getRefundHistory(refundRequestId: number): Promise<RefundRequestHistory[]> {
+    try {
+      const history = await RefundRequestHistory.findAll({
+        where: { refundRequestId },
+        order: [['createdAt', 'DESC']]
+      });
+      return history;
+    } catch (error: any) {
+      logger.error('Error fetching refund history:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get refund rejection count for a user
+   * Used for abuse detection
+   */
+  static async getUserRejectionCount(userId: number): Promise<{
+    totalAttempts: number;
+    rejectionCount: number;
+    rejectionRate: number;
+  }> {
+    try {
+      const [results] = await sequelize.query(`
+        SELECT 
+          COUNT(*) as totalAttempts,
+          SUM(CASE WHEN action = 'rejected' THEN 1 ELSE 0 END) as rejectionCount,
+          ROUND(
+            (SUM(CASE WHEN action = 'rejected' THEN 1 ELSE 0 END) * 100.0) / 
+            NULLIF(COUNT(*), 0),
+            2
+          ) as rejectionRate
+        FROM refund_request_history
+        WHERE user_id = ? AND action IN ('created', 'rejected', 'approved')
+      `, {
+        replacements: [userId],
+        type: 'SELECT'
+      });
+
+      const result = results as any;
+      return {
+        totalAttempts: parseInt(result.totalAttempts) || 0,
+        rejectionCount: parseInt(result.rejectionCount) || 0,
+        rejectionRate: parseFloat(result.rejectionRate) || 0
+      };
+    } catch (error: any) {
+      logger.error('Error calculating user rejection count:', error.message);
+      return { totalAttempts: 0, rejectionCount: 0, rejectionRate: 0 };
+    }
+  }
+
+  /**
+   * Check if user has suspicious refund pattern (potential abuse)
+   */
+  static async checkForRefundAbuse(userId: number): Promise<{
+    isSuspicious: boolean;
+    reason?: string;
+    stats: any;
+  }> {
+    const stats = await this.getUserRejectionCount(userId);
+
+    // Flag as suspicious if:
+    // 1. User has 3+ rejections
+    // 2. OR rejection rate is above 50% with at least 2 rejections
+    const isSuspicious = 
+      stats.rejectionCount >= 3 || 
+      (stats.rejectionRate >= 50 && stats.rejectionCount >= 2);
+
+    let reason: string | undefined;
+    if (stats.rejectionCount >= 3) {
+      reason = `User has ${stats.rejectionCount} rejected refund requests`;
+    } else if (stats.rejectionRate >= 50 && stats.rejectionCount >= 2) {
+      reason = `User has ${stats.rejectionRate}% rejection rate with ${stats.rejectionCount} rejections`;
+    }
+
+    return {
+      isSuspicious,
+      reason,
+      stats
+    };
+  }
+
   /**
    * Create a new refund request from customer
    * Validates eligibility and creates the request in pending status
@@ -367,11 +504,30 @@ export class RefundService {
         return { success: false, message: `Refund cannot be rejected in ${refund.status} status` };
       }
 
+      const previousStatus = refund.status;
+      
       await refund.update({
         status: 'rejected',
         rejectionReason,
         adminNotes: adminNotes || refund.adminNotes,
         reviewedAt: new Date()
+      });
+
+      // Log rejection in refund history
+      await this.logRefundHistory({
+        refundRequestId: refund.id,
+        userId: refund.userId,
+        orderId: refund.orderId,
+        orderNumber: refund.orderNumber,
+        action: 'rejected',
+        previousStatus,
+        newStatus: 'rejected',
+        rejectionReason,
+        adminNotes: adminNotes || undefined,
+        refundAmount: Number(refund.refundAmount),
+        refundType: refund.refundType,
+        reason: refund.reason,
+        description: refund.description || undefined
       });
 
       // Log rejected refund in payment logs
@@ -404,6 +560,44 @@ export class RefundService {
           replacements: ['none', refund.orderId]
         }
       );
+
+      // Send email notification to customer about refund rejection
+      try {
+        const emailServiceUrl = process.env.EMAIL_SERVICE_URL || 'http://localhost:3002';
+        await axios.post(`${emailServiceUrl}/api/notifications/refund-rejected`, {
+          customerName: refund.customerName,
+          customerEmail: refund.customerEmail,
+          orderNumber: refund.orderNumber,
+          orderId: refund.orderId,
+          rejectionReason: rejectionReason,
+          refundAmount: Number(refund.refundAmount),
+          requestedReason: this.getReasonLabel(refund.reason)
+        });
+        logger.info(`Refund rejection email sent to ${refund.customerEmail}`);
+      } catch (emailError: any) {
+        logger.error('Failed to send refund rejection email:', emailError.message);
+        // Don't fail the refund rejection if email fails
+      }
+
+      // Send WebSocket notification to customer in real-time
+      try {
+        const webSocketService = getWebSocketService();
+        if (webSocketService) {
+          webSocketService.emitToUserRoom(refund.userId, 'refund_rejected', {
+            refundId: refund.id,
+            orderId: refund.orderId,
+            orderNumber: refund.orderNumber,
+            refundAmount: Number(refund.refundAmount),
+            rejectionReason: rejectionReason,
+            requestedReason: this.getReasonLabel(refund.reason),
+            timestamp: new Date().toISOString()
+          });
+          logger.info(`WebSocket notification sent to user ${refund.userId} for refund rejection`);
+        }
+      } catch (wsError: any) {
+        logger.error('Failed to send WebSocket refund rejection notification:', wsError.message);
+        // Don't fail the refund rejection if WebSocket fails
+      }
 
       logger.info(`Refund rejected: ${refund.id}`);
 

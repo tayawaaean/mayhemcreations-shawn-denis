@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { sequelize } from '../config/database';
 import { logger } from '../utils/logger';
 import { getWebSocketService } from '../services/websocketService';
+import { EmailNotificationService } from '../services/emailNotificationService';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -719,6 +720,80 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
           logger.error('Error emitting delivered order notification:', notificationError);
         }
       }
+
+      // Send shipping confirmation email when order is shipped
+      if (status === 'shipped') {
+        try {
+          // Get order details for email
+          const [orderResult] = await sequelize.query(`
+            SELECT o.*, u.email, u.first_name, u.last_name
+            FROM order_reviews o
+            JOIN users u ON o.user_id = u.id
+            WHERE o.id = ?
+          `, {
+            replacements: [id]
+          });
+
+          if (Array.isArray(orderResult) && orderResult.length > 0) {
+            const order = orderResult[0] as any;
+            const customerName = `${order.first_name || ''} ${order.last_name || ''}`.trim() || 'Customer';
+            const customerEmail = order.email;
+
+            // Get order items
+            const orderData = typeof order.order_data === 'string' ? JSON.parse(order.order_data) : order.order_data;
+            const orderItems = orderData?.items || [];
+
+            // Parse shipping address
+            const shippingAddress = typeof order.shipping_address === 'string' 
+              ? JSON.parse(order.shipping_address) 
+              : order.shipping_address || {};
+
+            // Send shipping confirmation email
+            await EmailNotificationService.sendShippingConfirmation({
+              customerName,
+              customerEmail,
+              orderNumber: order.order_number || `ORD-${order.id}`,
+              orderId: order.id,
+              shippingInfo: {
+                carrier: shippingCarrier || order.shipping_carrier || 'Standard Shipping',
+                service: 'Standard',
+                trackingNumber: trackingNumber || order.tracking_number,
+                trackingUrl: (trackingNumber || order.tracking_number) 
+                  ? `https://www.fedex.com/fedextrack/?trknbr=${trackingNumber || order.tracking_number}` 
+                  : undefined
+              },
+              orderItems: orderItems.map((item: any) => ({
+                id: item.id || item.cartItemId,
+                productId: item.productId,
+                productName: item.productName,
+                variantName: item.variantName,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                imageUrl: item.imageUrl
+              })),
+              shippingAddress: {
+                firstName: shippingAddress.firstName || '',
+                lastName: shippingAddress.lastName || '',
+                addressLine1: shippingAddress.street || shippingAddress.addressLine1 || '',
+                city: shippingAddress.city || '',
+                state: shippingAddress.state || '',
+                postalCode: shippingAddress.zipCode || shippingAddress.postalCode || '',
+                country: shippingAddress.country || 'US',
+                phone: shippingAddress.phone || ''
+              }
+            });
+
+            logger.info('Shipping confirmation email sent', {
+              orderId: id,
+              customerEmail
+            });
+          }
+        } catch (emailError) {
+          logger.error('Error sending shipping confirmation email:', emailError);
+          // Don't fail the request if email fails
+        }
+      }
     }
 
     logger.info(`Order review ${id} status updated to ${status}`, {
@@ -1005,11 +1080,22 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
     `);
     const totalOrders = (totalOrdersResult[0] as any).total_orders || 0;
 
-    // Get total sales from delivered orders
+    // Get total sales from delivered orders, excluding refunded orders
+    // For partially refunded orders, subtract the refunded amount from total
     const [totalSalesResult] = await sequelize.query(`
-      SELECT COALESCE(SUM(total), 0) as total_sales
+      SELECT COALESCE(
+        SUM(
+          CASE 
+            WHEN payment_status = 'refunded' THEN 0
+            WHEN payment_status = 'partially_refunded' THEN total - COALESCE(refunded_amount, 0)
+            ELSE total
+          END
+        ), 
+        0
+      ) as total_sales
       FROM order_reviews
       WHERE status = 'delivered'
+        AND payment_status NOT IN ('pending', 'failed', 'cancelled')
     `);
     const totalSales = parseFloat((totalSalesResult[0] as any).total_sales) || 0;
 
@@ -1041,13 +1127,23 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
       LIMIT 10
     `);
 
-    // Get revenue chart data (last 7 days)
+    // Get revenue chart data (last 7 days), excluding refunded orders
     const [revenueChartResult] = await sequelize.query(`
       SELECT 
         DATE(updated_at) as date,
-        COALESCE(SUM(total), 0) as revenue
+        COALESCE(
+          SUM(
+            CASE 
+              WHEN payment_status = 'refunded' THEN 0
+              WHEN payment_status = 'partially_refunded' THEN total - COALESCE(refunded_amount, 0)
+              ELSE total
+            END
+          ), 
+          0
+        ) as revenue
       FROM order_reviews
       WHERE status = 'delivered'
+        AND payment_status NOT IN ('pending', 'failed', 'cancelled')
         AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
       GROUP BY DATE(updated_at)
       ORDER BY date ASC
@@ -1071,6 +1167,159 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch order statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Customer confirm order delivery (marks order as delivered)
+ * @route POST /api/v1/orders/review-orders/:id/confirm-delivery
+ * @access Private (Customer only)
+ */
+export const confirmOrderDelivery = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check if order exists and belongs to user
+    const [orderResult] = await sequelize.query(`
+      SELECT * FROM order_reviews 
+      WHERE id = ? AND user_id = ?
+    `, {
+      replacements: [id, userId]
+    });
+
+    if (!orderResult || orderResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const order = orderResult[0] as any;
+
+    // Only allow confirming delivery if order is shipped
+    if (order.status !== 'shipped') {
+      return res.status(400).json({
+        success: false,
+        message: 'Order must be in shipped status to confirm delivery',
+        currentStatus: order.status,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Update order status to delivered
+    const deliveredAt = new Date();
+    await sequelize.query(`
+      UPDATE order_reviews 
+      SET status = 'delivered', 
+          delivered_at = ?
+      WHERE id = ?
+    `, {
+      replacements: [deliveredAt, id]
+    });
+
+    logger.info(`Order ${id} marked as delivered by customer ${userId}`);
+
+    // Send delivery notification and review request emails
+    try {
+      // Get user details
+      const [userResult] = await sequelize.query(`
+        SELECT email, first_name, last_name FROM users WHERE id = ?
+      `, {
+        replacements: [userId]
+      });
+
+      if (Array.isArray(userResult) && userResult.length > 0) {
+        const user = userResult[0] as any;
+        const customerName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer';
+        const customerEmail = user.email;
+
+        // Get order items for email
+        const orderData = typeof order.order_data === 'string' ? JSON.parse(order.order_data) : order.order_data;
+        const orderItems = orderData?.items || [];
+
+        // Send delivery notification email
+        await EmailNotificationService.sendDeliveryNotification({
+          customerName,
+          customerEmail,
+          orderNumber: order.order_number || `ORD-${order.id}`,
+          orderId: order.id,
+          deliveryDate: deliveredAt.toISOString(),
+          orderItems: orderItems.map((item: any) => ({
+            id: item.id || item.cartItemId,
+            productId: item.productId,
+            productName: item.productName,
+            variantName: item.variantName,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
+            imageUrl: item.imageUrl
+          }))
+        });
+
+        // Send review request email (24 hours after delivery)
+        setTimeout(async () => {
+          try {
+            await EmailNotificationService.sendReviewRequest({
+              customerName,
+              customerEmail,
+              orderNumber: order.order_number || `ORD-${order.id}`,
+              orderId: order.id,
+              orderItems: orderItems.map((item: any) => ({
+                id: item.id || item.cartItemId,
+                productId: item.productId,
+                productName: item.productName,
+                variantName: item.variantName,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                imageUrl: item.imageUrl
+              }))
+            });
+            logger.info(`Review request email sent for order ${id}`);
+          } catch (reviewEmailError) {
+            logger.error('Error sending review request email:', reviewEmailError);
+          }
+        }, 24 * 60 * 60 * 1000); // 24 hours delay
+
+        logger.info('Delivery notification email sent', {
+          orderId: id,
+          customerEmail
+        });
+      }
+    } catch (emailError) {
+      logger.error('Error sending delivery notification email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: parseInt(id),
+        status: 'delivered',
+        deliveredAt: deliveredAt.toISOString()
+      },
+      message: 'Order confirmed as delivered successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error('Error confirming order delivery:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to confirm order delivery',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString(),
     });

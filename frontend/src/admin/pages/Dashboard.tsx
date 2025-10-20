@@ -67,43 +67,43 @@ const Dashboard: React.FC = () => {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600">
             Welcome back! Here's what's happening with your store today.
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Last updated</p>
-          <p className="text-sm font-medium text-gray-900">{new Date().toLocaleTimeString()}</p>
+        <div className="text-left sm:text-right flex-shrink-0">
+          <p className="text-xs sm:text-sm text-gray-500">Last updated</p>
+          <p className="text-xs sm:text-sm font-medium text-gray-900">{new Date().toLocaleTimeString()}</p>
         </div>
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.name} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-200 group">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`p-3 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+          <div key={stat.name} className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 hover:shadow-lg transition-all duration-200 group">
+            <div className="flex items-start sm:items-center justify-between gap-2">
+              <div className="flex items-start sm:items-center flex-1 min-w-0">
+                <div className={`p-2 sm:p-3 rounded-lg bg-gray-50 group-hover:bg-gray-100 transition-colors duration-200 flex-shrink-0`}>
+                  <stat.icon className={`h-5 w-5 sm:h-6 sm:w-6 ${stat.color}`} />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                <div className="ml-3 sm:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">{stat.name}</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-0.5 sm:mt-1 truncate">{stat.value}</p>
                 </div>
               </div>
               {stat.change !== 0 && (
-                <div className={`flex items-center text-sm font-semibold ${
+                <div className={`flex items-center text-xs sm:text-sm font-semibold flex-shrink-0 ${
                   stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
                 }`}>
                   {stat.changeType === 'increase' ? (
-                    <TrendingUp className="h-4 w-4 mr-1" />
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   ) : (
-                    <TrendingDown className="h-4 w-4 mr-1" />
+                    <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                   )}
                   {Math.abs(stat.change)}%
                 </div>
@@ -114,23 +114,23 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Charts and tables */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:gap-8">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 xl:gap-8">
         {/* Revenue Chart */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Revenue Overview</h3>
-            <div className="flex items-center text-sm text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Revenue Overview</h3>
+            <div className="flex items-center text-xs sm:text-sm text-gray-500">
               <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
               Last 7 days
             </div>
           </div>
-          <div className="h-64 flex items-end space-x-2">
+          <div className="h-48 sm:h-64 flex items-end space-x-1 sm:space-x-2">
             {analytics.revenueChart && analytics.revenueChart.length > 0 ? (
               analytics.revenueChart.map((item, index) => {
                 const maxRevenue = Math.max(...analytics.revenueChart.map(i => i.revenue));
                 const height = maxRevenue > 0 ? (item.revenue / maxRevenue) * 200 : 4;
                 return (
-                  <div key={index} className="flex-1 flex flex-col items-center">
+                  <div key={index} className="flex-1 flex flex-col items-center min-w-0">
                     <div className="relative w-full">
                       <div
                         className="w-full bg-blue-500 rounded-t transition-all duration-300 hover:bg-blue-600 cursor-pointer"
@@ -138,37 +138,37 @@ const Dashboard: React.FC = () => {
                         title={`$${item.revenue.toFixed(2)}`}
                       ></div>
                     </div>
-                    <span className="text-xs text-gray-500 mt-2">
+                    <span className="text-xs text-gray-500 mt-2 truncate w-full text-center">
                       {formatDateShort(item.date).replace(/,.*/, '')}
                     </span>
                   </div>
                 );
               })
             ) : (
-              <div className="flex items-center justify-center w-full h-full text-gray-500">
-                <p>No revenue data available for the last 7 days</p>
+              <div className="flex items-center justify-center w-full h-full text-gray-500 text-center px-4">
+                <p className="text-sm">No revenue data available for the last 7 days</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Recent Paid Orders</h3>
-            <button className="text-sm text-gray-500 hover:text-gray-700 font-medium">View all</button>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Recent Paid Orders</h3>
+            <button className="text-xs sm:text-sm text-gray-500 hover:text-gray-700 font-medium">View all</button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {analytics.recentOrders && analytics.recentOrders.length > 0 ? (
               analytics.recentOrders.slice(0, 5).map((order) => (
-                <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{order.orderNumber}</p>
-                    <p className="text-sm text-gray-500">{order.customer.name}</p>
+                <div key={order.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 py-2 border-b border-gray-100 last:border-b-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{order.orderNumber}</p>
+                    <p className="text-xs sm:text-sm text-gray-500 truncate">{order.customer.name}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">${order.total.toFixed(2)}</p>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  <div className="flex items-center justify-between sm:justify-end sm:text-right gap-2 sm:flex-col sm:items-end">
+                    <p className="text-sm font-medium text-gray-900 whitespace-nowrap">${order.total.toFixed(2)}</p>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
                       order.status.includes('delivered') ? 'bg-green-100 text-green-800' :
                       order.status.includes('shipped') ? 'bg-indigo-100 text-indigo-800' :
                       order.status.includes('production') ? 'bg-purple-100 text-purple-800' :
@@ -182,7 +182,7 @@ const Dashboard: React.FC = () => {
               ))
             ) : (
               <div className="text-center py-8 text-gray-500">
-                <p>No paid orders yet</p>
+                <p className="text-sm">No paid orders yet</p>
               </div>
             )}
           </div>
@@ -190,44 +190,46 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Low Stock Alert */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-50 rounded-lg mr-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+            <div className="p-2 bg-yellow-50 rounded-lg mr-2 sm:mr-3 flex-shrink-0">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Low Stock Alert</h3>
-            <span className="ml-2 text-sm text-gray-500">({analytics.lowStockProducts.length} variants)</span>
+            <div className="flex flex-col sm:flex-row sm:items-center min-w-0">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Low Stock Alert</h3>
+              <span className="text-xs sm:text-sm text-gray-500 sm:ml-2">({analytics.lowStockProducts.length} variants)</span>
+            </div>
           </div>
         </div>
         {analytics.lowStockProducts.length > 0 ? (
           <>
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {paginatedLowStockProducts.map((product) => (
-                <div key={product.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                  <div className="flex items-center">
+                <div key={product.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 py-2 border-b border-gray-100 last:border-b-0">
+                  <div className="flex items-start sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
                     <img 
                       src={product.primaryImage} 
                       alt={product.title}
-                      className="h-10 w-10 rounded-lg object-cover"
+                      className="h-10 w-10 sm:h-10 sm:w-10 rounded-lg object-cover flex-shrink-0"
                     />
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">{product.title}</p>
-                      <div className="flex items-center space-x-2 text-xs text-gray-500">
-                        <span>SKU: {product.sku}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{product.title}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
+                        <span className="truncate">SKU: {product.sku}</span>
                         {product.variants && product.variants.length > 0 && (
                           <>
-                            <span>•</span>
-                            <span>{product.variants[0].color}</span>
-                            <span>•</span>
-                            <span>{product.variants[0].size}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="truncate">{product.variants[0].color}</span>
+                            <span className="hidden sm:inline">•</span>
+                            <span className="truncate">{product.variants[0].size}</span>
                           </>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-red-600 font-medium">
+                  <div className="text-left sm:text-right flex-shrink-0">
+                    <p className="text-xs sm:text-sm text-red-600 font-medium whitespace-nowrap">
                       {product.variants && product.variants.length > 0 
                         ? `${product.variants[0].stock} units left`
                         : 'No stock data'
@@ -240,25 +242,25 @@ const Dashboard: React.FC = () => {
             
             {/* Pagination Controls */}
             {totalLowStockPages > 1 && (
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-500">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-200">
+                <div className="text-xs sm:text-sm text-gray-500 text-center sm:text-left">
                   Showing {startIndex + 1}-{Math.min(endIndex, analytics.lowStockProducts.length)} of {analytics.lowStockProducts.length} variants
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-center space-x-1 sm:space-x-2">
                   <button
                     onClick={() => handleLowStockPageChange(lowStockPage - 1)}
                     disabled={lowStockPage === 1}
-                    className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-1.5 sm:p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                   </button>
                   
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-0.5 sm:space-x-1">
                     {Array.from({ length: totalLowStockPages }, (_, i) => i + 1).map((page) => (
                       <button
                         key={page}
                         onClick={() => handleLowStockPageChange(page)}
-                        className={`px-3 py-1 text-sm rounded-lg ${
+                        className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-lg ${
                           page === lowStockPage
                             ? 'bg-blue-600 text-white'
                             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
@@ -272,9 +274,9 @@ const Dashboard: React.FC = () => {
                   <button
                     onClick={() => handleLowStockPageChange(lowStockPage + 1)}
                     disabled={lowStockPage === totalLowStockPages}
-                    className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-1.5 sm:p-2 rounded-lg border border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
                   </button>
                 </div>
               </div>
@@ -282,8 +284,8 @@ const Dashboard: React.FC = () => {
           </>
         ) : (
           <div className="text-center py-8">
-            <p className="text-gray-500">No low stock variants found</p>
-            <p className="text-sm text-gray-400 mt-1">All variants have sufficient stock (threshold: ≤10 units)</p>
+            <p className="text-sm sm:text-base text-gray-500">No low stock variants found</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1">All variants have sufficient stock (threshold: ≤10 units)</p>
           </div>
         )}
       </div>

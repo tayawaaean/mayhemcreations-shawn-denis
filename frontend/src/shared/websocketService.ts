@@ -12,6 +12,9 @@ export interface WebSocketEvents {
   confirmation_submitted: (data: { orderId: number; confirmationData: any; timestamp: string }) => void;
   order_status_updated: (data: { orderId: number; statusData: any; timestamp: string }) => void;
   
+  // Refund events
+  refund_rejected: (data: { refundId: number; orderId: number; orderNumber: string; refundAmount: number; rejectionReason: string; requestedReason: string; timestamp: string }) => void;
+  
   // Chat events
   chat_message_received: (data: { messageId: string; text?: string | null; sender: 'user' | 'admin'; customerId: string; timestamp: string; isTyping?: boolean; type?: 'text' | 'image' | 'file'; attachment?: any }) => void;
   chat_message_sent: (data: { messageId: string; text: string; sender: 'user' | 'admin'; customerId: string; timestamp: string }) => void;

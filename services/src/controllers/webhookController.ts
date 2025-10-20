@@ -492,6 +492,51 @@ async function handleAccountUpdate(data: any): Promise<void> {
 }
 
 /**
+ * Handle refund rejection notification
+ * Sends refund rejection email to customer
+ */
+export const handleRefundRejection = async (req: Request, res: Response): Promise<void> => {
+  try {
+    logger.info(`📧 Sending refund rejection email for order ${req.body.orderNumber}`);
+    
+    const { customerName, customerEmail, orderNumber, orderId, rejectionReason, refundAmount, requestedReason } = req.body;
+    
+    // Validate required fields
+    if (!customerEmail || !orderNumber || !rejectionReason) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: customerEmail, orderNumber, and rejectionReason are required'
+      });
+      return;
+    }
+    
+    await getEmailService().sendRefundRejection({
+      customerName: customerName || 'Valued Customer',
+      customerEmail,
+      orderNumber,
+      orderId,
+      rejectionReason,
+      refundAmount: refundAmount || 0,
+      requestedReason: requestedReason || 'Refund requested'
+    });
+    
+    logger.info(`✅ Refund rejection email sent for order ${orderNumber}`);
+    
+    res.json({
+      success: true,
+      message: 'Refund rejection email sent successfully'
+    });
+  } catch (error) {
+    logger.error(`❌ Error sending refund rejection email:`, error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send refund rejection email',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+};
+
+/**
  * Test email configuration
  */
 async function testEmailConfiguration(): Promise<boolean> {

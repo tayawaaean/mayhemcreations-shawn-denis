@@ -38,6 +38,65 @@ const MobileNavItem: React.FC<{ to: string; children: React.ReactNode; onClick?:
   </NavLink>
 )
 
+const AccountDropdown: React.FC<{ onClose: () => void; userName?: string }> = ({ onClose, userName }) => {
+  const accountItems = [
+    {
+      name: 'My Profile',
+      href: '/profile',
+      description: 'Manage your account settings',
+      icon: <User className="w-4 h-4" />
+    },
+    {
+      name: 'My Orders',
+      href: '/my-orders',
+      description: 'View and track your orders',
+      icon: <Package className="w-4 h-4" />
+    },
+    {
+      name: 'My Reviews',
+      href: '/my-reviews',
+      description: 'View your product reviews',
+      icon: <Star className="w-4 h-4" />
+    },
+    {
+      name: 'Refund Tracking',
+      href: '/my-refunds',
+      description: 'Track your refund requests',
+      icon: <RotateCcw className="w-4 h-4" />
+    }
+  ]
+
+  return (
+    <>
+      {/* User Greeting */}
+      {userName && (
+        <div className="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-accent/5 to-accent/10">
+          <p className="text-xs text-gray-500">Signed in as</p>
+          <p className="text-sm font-semibold text-gray-900">Hi, {userName}! 👋</p>
+        </div>
+      )}
+      
+      {/* Account Menu Items */}
+      {accountItems.map((item) => (
+        <Link
+          key={item.name}
+          to={item.href}
+          onClick={onClose}
+          className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="text-gray-500">{item.icon}</div>
+            <div>
+              <div className="font-medium text-gray-900">{item.name}</div>
+              <div className="text-xs text-gray-500">{item.description}</div>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </>
+  )
+}
+
 const SupportDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const supportItems = [
     {
@@ -313,12 +372,14 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [productsDropdownOpen, setProductsDropdownOpen] = useState(false)
   const [supportDropdownOpen, setSupportDropdownOpen] = useState(false)
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false)
   const [dropdownTimeout, setDropdownTimeout] = useState<number | null>(null)
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     products: false,
-    support: false
+    support: false,
+    account: false
   })
   const count = items.reduce((s, i) => s + i.quantity, 0)
   
@@ -359,6 +420,21 @@ export default function Navbar() {
   const handleSupportMouseLeave = () => {
     const timeout = setTimeout(() => {
       setSupportDropdownOpen(false)
+    }, 150) // Small delay to prevent flickering
+    setDropdownTimeout(timeout)
+  }
+
+  const handleAccountMouseEnter = () => {
+    if (dropdownTimeout) {
+      clearTimeout(dropdownTimeout)
+      setDropdownTimeout(null)
+    }
+    setAccountDropdownOpen(true)
+  }
+
+  const handleAccountMouseLeave = () => {
+    const timeout = setTimeout(() => {
+      setAccountDropdownOpen(false)
     }, 150) // Small delay to prevent flickering
     setDropdownTimeout(timeout)
   }
@@ -429,7 +505,7 @@ export default function Navbar() {
             </div>
 
             {isLoggedIn && (
-              <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+              <NavItem to="/studio">Studio</NavItem>
             )}
 
             {/* Support Dropdown */}
@@ -451,25 +527,91 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+
+            {/* Account Dropdown - Only visible when logged in */}
             {isLoggedIn && (
-              <NavItem to="/my-orders">Orders</NavItem>
+              <div
+                className="relative group"
+                onMouseEnter={handleAccountMouseEnter}
+                onMouseLeave={handleAccountMouseLeave}
+              >
+                <button
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Account</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {accountDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
+                    <AccountDropdown onClose={() => setAccountDropdownOpen(false)} userName={user?.firstName} />
+                    <div className="border-t border-gray-100">
+                      <button
+                        onClick={() => {
+                          logout()
+                          setAccountDropdownOpen(false)
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
+                      >
+                        <LogIn className="w-4 h-4 rotate-180" />
+                        <div>
+                          <div className="font-medium">Logout</div>
+                          <div className="text-xs text-gray-500">Sign out of your account</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </nav>
 
           {/* Desktop Navigation - Medium screens */}
-          <nav className="hidden md:flex lg:hidden items-center space-x-4">
+          <nav className="hidden md:flex lg:hidden items-center space-x-2">
             <NavItem to="/">Home</NavItem>
             <NavItem to="/products">Products</NavItem>
             {isLoggedIn && (
-              <NavItem to="/customized-embroidery">Customized Embroidery</NavItem>
+              <NavItem to="/studio">Studio</NavItem>
             )}
             <NavItem to="/about">Support</NavItem>
+            
+            {/* Account Dropdown - Medium screens */}
             {isLoggedIn && (
-              <>
-                <NavItem to="/my-orders">Orders</NavItem>
-                <NavItem to="/my-refunds">Refunds</NavItem>
-                <NavItem to="/my-reviews">Reviews</NavItem>
-              </>
+              <div
+                className="relative group"
+                onMouseEnter={handleAccountMouseEnter}
+                onMouseLeave={handleAccountMouseLeave}
+              >
+                <button
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-accent transition-colors duration-200"
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Account</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${accountDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {accountDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
+                    <AccountDropdown onClose={() => setAccountDropdownOpen(false)} userName={user?.firstName} />
+                    <div className="border-t border-gray-100">
+                      <button
+                        onClick={() => {
+                          logout()
+                          setAccountDropdownOpen(false)
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
+                      >
+                        <LogIn className="w-4 h-4 rotate-180" />
+                        <div>
+                          <div className="font-medium">Logout</div>
+                          <div className="text-xs text-gray-500">Sign out of your account</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </nav>
 
@@ -487,20 +629,9 @@ export default function Navbar() {
 
           {/* Cart & Auth & Mobile Menu */}
           <div className="flex items-center space-x-4">
-            {/* Auth Buttons - Desktop */}
+            {/* Auth Buttons - Desktop (Only shown when NOT logged in) */}
             <div className="hidden md:flex items-center space-x-2">
-              {isLoggedIn ? (
-                <div className="flex items-center space-x-2">
-                  <User className="w-4 h-4 text-gray-700" />
-                  <span className="text-sm text-gray-700 hidden lg:inline">Hi, {user?.firstName}!</span>
-                  <button
-                    onClick={logout}
-                    className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100"
-                  >
-                    Logout
-                  </button>
-                </div>
-              ) : (
+              {!isLoggedIn && (
                 <>
                   <button
                     onClick={() => {
@@ -602,12 +733,12 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* Customized Embroidery */}
+                {/* Studio */}
                 {isLoggedIn && (
-                  <MobileNavItem to="/customized-embroidery" onClick={() => setMobileMenuOpen(false)}>
+                  <MobileNavItem to="/studio" onClick={() => setMobileMenuOpen(false)}>
                     <div className="flex items-center space-x-3">
                       <Sparkles className="w-5 h-5 text-gray-600" />
-                      <span>Customized Embroidery</span>
+                      <span>Studio</span>
                     </div>
                   </MobileNavItem>
                 )}
@@ -655,28 +786,53 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* Orders (if logged in) */}
+                {/* Account Section (if logged in) */}
                 {isLoggedIn && (
-                  <>
-                    <MobileNavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => toggleSection('account')}
+                      className="flex items-center justify-between w-full px-4 py-3 text-left text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
+                    >
                       <div className="flex items-center space-x-3">
-                        <Package className="w-5 h-5 text-gray-600" />
-                        <span>My Orders</span>
+                        <User className="w-5 h-5 text-gray-600" />
+                        <span>Account</span>
                       </div>
-                    </MobileNavItem>
-                    <MobileNavItem to="/my-refunds" onClick={() => setMobileMenuOpen(false)}>
-                      <div className="flex items-center space-x-3">
-                        <RotateCcw className="w-5 h-5 text-gray-600" />
-                        <span>My Refunds</span>
+                      {expandedSections.account ? (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                      )}
+                    </button>
+
+                    {expandedSections.account && (
+                      <div className="ml-6 space-y-1 pl-4">
+                        <MobileNavItem to="/profile" onClick={() => setMobileMenuOpen(false)}>
+                          <div className="flex items-center space-x-3">
+                            <User className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">My Profile</span>
+                          </div>
+                        </MobileNavItem>
+                        <MobileNavItem to="/my-orders" onClick={() => setMobileMenuOpen(false)}>
+                          <div className="flex items-center space-x-3">
+                            <Package className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">My Orders</span>
+                          </div>
+                        </MobileNavItem>
+                        <MobileNavItem to="/my-reviews" onClick={() => setMobileMenuOpen(false)}>
+                          <div className="flex items-center space-x-3">
+                            <Star className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">My Reviews</span>
+                          </div>
+                        </MobileNavItem>
+                        <MobileNavItem to="/my-refunds" onClick={() => setMobileMenuOpen(false)}>
+                          <div className="flex items-center space-x-3">
+                            <RotateCcw className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm">Refund Tracking</span>
+                          </div>
+                        </MobileNavItem>
                       </div>
-                    </MobileNavItem>
-                    <MobileNavItem to="/my-reviews" onClick={() => setMobileMenuOpen(false)}>
-                      <div className="flex items-center space-x-3">
-                        <Star className="w-5 h-5 text-gray-600" />
-                        <span>My Reviews</span>
-                      </div>
-                    </MobileNavItem>
-                  </>
+                    )}
+                  </div>
                 )}
 
                 {/* Mobile Auth */}

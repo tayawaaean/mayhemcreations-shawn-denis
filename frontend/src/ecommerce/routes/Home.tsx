@@ -94,7 +94,7 @@ export default function Home() {
             </div>
           </div>
           <div className="text-center">
-            <Link to="/customized-embroidery">
+            <Link to="/studio">
               <Button variant="outline" size="lg" className="group">
                 Explore All Services
                 <ArrowRight className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
@@ -144,7 +144,7 @@ export default function Home() {
             We're here to bring your vision to life.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/customized-embroidery">
+            <Link to="/studio">
               <Button variant="secondary" size="lg" className="group">
                 Custom Embroidery Services
                 <ArrowRight className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />

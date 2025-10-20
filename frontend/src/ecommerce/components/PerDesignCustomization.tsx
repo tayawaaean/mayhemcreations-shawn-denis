@@ -189,11 +189,11 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <div className="flex items-center space-x-2">
-                    <span className="w-6 h-6 bg-accent text-white rounded-full flex items-center justify-center text-xs">
+                  <div className="flex items-center space-x-2 min-w-0 flex-1">
+                    <span className="w-6 h-6 bg-accent text-white rounded-full flex items-center justify-center text-xs flex-shrink-0">
                       {index + 1}
                     </span>
-                    <span className="truncate max-w-[100px]">{design.name}</span>
+                    <span className="truncate" title={design.name}>{design.name}</span>
                   </div>
                 </button>
               ))}
@@ -203,16 +203,16 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
             {activeDesign && (
               <div className="space-y-6">
                 {/* Design Info */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-4">
+                <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
+                  <div className="flex items-start sm:items-center flex-col sm:flex-row gap-3 sm:gap-4 sm:space-x-0">
                     <img
                       src={activeDesign.preview}
                       alt={activeDesign.name}
-                      className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                      className="w-16 h-16 sm:w-16 sm:h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                     />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{activeDesign.name}</h4>
-                      <p className="text-sm text-gray-600">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 truncate" title={activeDesign.name}>{activeDesign.name}</h4>
+                      <p className="text-xs sm:text-sm text-gray-600">
                         {activeDesign.dimensions.width}" × {activeDesign.dimensions.height}" @ {Math.round(activeDesign.scale * 100)}%
                       </p>
                     </div>
@@ -227,27 +227,33 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
 
                 {/* Copy Options */}
                 {customizationData.designs.length > 1 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h5 className="font-medium text-blue-900 mb-2">Copy Options from Another Design</h5>
-                    <div className="flex items-center space-x-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                    <h5 className="font-medium text-blue-900 mb-2 text-sm sm:text-base">Copy Options from Another Design</h5>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                       <select
                         value={copyFromDesignId || ''}
                         onChange={(e) => setCopyFromDesignId(e.target.value || null)}
-                        className="px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 text-sm sm:text-base border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Select design to copy from</option>
                         {customizationData.designs
                           .filter(d => d.id !== activeDesignId)
-                          .map((design, index) => (
-                            <option key={design.id} value={design.id}>
-                              Design {index + 1}: {design.name}
-                            </option>
-                          ))}
+                          .map((design, index) => {
+                            // Truncate long names for display in dropdown
+                            const displayName = design.name.length > 30 
+                              ? `${design.name.substring(0, 30)}...` 
+                              : design.name
+                            return (
+                              <option key={design.id} value={design.id}>
+                                Design {index + 1}: {displayName}
+                              </option>
+                            )
+                          })}
                       </select>
                       <button
                         onClick={handleCopyOptions}
                         disabled={!copyFromDesignId}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                        className="px-4 py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center sm:justify-start"
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
@@ -318,8 +324,8 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
                       
                       if (missing.length > 0) {
                         return (
-                          <li key={design.id}>
-                            <strong>Design {index + 1} ({design.name}):</strong> Missing {missing.join(', ')}
+                          <li key={design.id} className="break-words">
+                            <strong>Design {index + 1} (<span className="inline-block max-w-[200px] truncate align-bottom" title={design.name}>{design.name}</span>):</strong> Missing {missing.join(', ')}
                           </li>
                         )
                       }

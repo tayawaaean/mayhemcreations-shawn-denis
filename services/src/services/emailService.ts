@@ -1330,6 +1330,153 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
   }
 
   /**
+   * Send refund rejection email
+   * Triggered when a refund request is rejected by admin
+   */
+  async sendRefundRejection(data: {
+    customerName: string;
+    customerEmail: string;
+    orderNumber: string;
+    orderId: string | number;
+    rejectionReason: string;
+    refundAmount: number;
+    requestedReason: string;
+  }): Promise<boolean> {
+    const subject = `Refund Request Update for Order #${data.orderNumber} - Mayhem Creations`;
+    const html = this.generateRefundRejectionHTML(data);
+    const text = this.generateRefundRejectionText(data);
+
+    return this.sendEmail({
+      to: data.customerEmail,
+      subject,
+      html,
+      text
+    });
+  }
+
+  /**
+   * Generate refund rejection HTML
+   */
+  private generateRefundRejectionHTML(data: {
+    customerName: string;
+    orderNumber: string;
+    orderId: string | number;
+    rejectionReason: string;
+    refundAmount: number;
+    requestedReason: string;
+  }): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Refund Request Update - Mayhem Creations</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+          .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%); color: white; padding: 40px 30px; text-align: center; }
+          .content { padding: 30px; }
+          .rejection-box { background: #ffebee; border-left: 4px solid #f44336; padding: 20px; margin: 20px 0; border-radius: 6px; }
+          .info-box { background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 15px 0; }
+          .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 6px; }
+          .cta-button { display: inline-block; background: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 15px 0; }
+          .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📋 Refund Request Update</h1>
+            <p style="margin: 10px 0 0 0;">Order #${data.orderNumber}</p>
+          </div>
+          
+          <div class="content">
+            <p>Hi ${data.customerName},</p>
+            <p>Thank you for contacting us regarding your refund request for Order #${data.orderNumber}.</p>
+            
+            <div class="rejection-box">
+              <h3 style="margin: 0 0 15px 0; color: #d32f2f;">❌ Refund Request Not Approved</h3>
+              <p style="margin: 5px 0;"><strong>Requested Amount:</strong> $${data.refundAmount.toFixed(2)}</p>
+              <p style="margin: 5px 0;"><strong>Your Reason:</strong> ${data.requestedReason}</p>
+              <hr style="border: none; border-top: 1px solid #ffcdd2; margin: 15px 0;">
+              <p style="margin: 5px 0;"><strong>Admin Response:</strong></p>
+              <p style="margin: 10px 0; padding: 10px; background: white; border-radius: 4px;">${data.rejectionReason}</p>
+            </div>
+            
+            <div class="warning-box">
+              <p style="margin: 0;"><strong>💡 What can I do next?</strong></p>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Review the admin response above to understand why your request was not approved</li>
+                <li>If you have additional information or evidence, you can submit a new refund request</li>
+                <li>Contact our support team if you have questions or need clarification</li>
+              </ul>
+            </div>
+            
+            <div class="info-box">
+              <p style="margin: 0;"><strong>📞 Need Help?</strong></p>
+              <p style="margin: 5px 0 0 0;">Our customer support team is here to assist you. Reply to this email or contact us directly.</p>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders" class="cta-button">View My Orders</a>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p><strong>Questions or concerns?</strong></p>
+            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate refund rejection text version
+   */
+  private generateRefundRejectionText(data: {
+    customerName: string;
+    orderNumber: string;
+    orderId: string | number;
+    rejectionReason: string;
+    refundAmount: number;
+    requestedReason: string;
+  }): string {
+    return `
+Refund Request Update - Mayhem Creations
+
+Hi ${data.customerName},
+
+Thank you for contacting us regarding your refund request for Order #${data.orderNumber}.
+
+REFUND REQUEST NOT APPROVED
+
+Requested Amount: $${data.refundAmount.toFixed(2)}
+Your Reason: ${data.requestedReason}
+
+ADMIN RESPONSE:
+${data.rejectionReason}
+
+WHAT CAN I DO NEXT?
+- Review the admin response above to understand why your request was not approved
+- If you have additional information or evidence, you can submit a new refund request
+- Contact our support team if you have questions or need clarification
+
+NEED HELP?
+Our customer support team is here to assist you. Reply to this email or contact us directly.
+
+View your orders: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders
+
+Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+
+© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+    `.trim();
+  }
+
+  /**
    * Send payment receipt email
    * Triggered after successful payment
    */

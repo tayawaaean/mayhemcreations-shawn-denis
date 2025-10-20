@@ -877,20 +877,25 @@ export default function Payment() {
                     onClick={() => setPaymentMethod('stripe')}
                     className={`w-full p-4 rounded-lg border-2 transition-all ${
                       paymentMethod === 'stripe'
-                        ? 'border-accent bg-accent/5'
+                        ? 'border-[#635BFF] bg-[#635BFF]/5'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <CreditCard className={`w-6 h-6 ${paymentMethod === 'stripe' ? 'text-accent' : 'text-gray-600'}`} />
+                        {/* Stripe Logo */}
+                        <div className="w-12 h-8 flex items-center justify-center">
+                          <svg viewBox="0 0 60 25" className="w-full h-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v3.32a8.33 8.33 0 0 1-4.56 1.1c-4.01 0-6.83-2.5-6.83-7.48 0-4.19 2.39-7.52 6.3-7.52 3.92 0 5.96 3.28 5.96 7.5 0 .4-.04 1.26-.06 1.48zm-5.92-5.62c-1.03 0-2.17.73-2.17 2.58h4.25c0-1.85-1.07-2.58-2.08-2.58zM40.95 20.3c-1.44 0-2.32-.6-2.9-1.04l-.02 4.63-4.12.87V5.57h3.76l.08 1.02a4.7 4.7 0 0 1 3.23-1.29c2.9 0 5.62 2.6 5.62 7.4 0 5.23-2.7 7.6-5.65 7.6zM40 8.95c-.95 0-1.54.34-1.97.81l.02 6.12c.4.44.98.78 1.95.78 1.52 0 2.54-1.65 2.54-3.87 0-2.15-1.04-3.84-2.54-3.84zM28.24 5.57h4.13v14.44h-4.13V5.57zm0-4.7L32.37 0v3.36l-4.13.88V.88zm-4.32 9.35v9.79H19.8V5.57h3.7l.12 1.22c1-1.77 3.07-1.41 3.62-1.22v3.79c-.52-.17-2.29-.43-3.32.86zm-8.55 4.72c0 2.43 2.6 1.68 3.12 1.46v3.36c-.55.3-1.54.54-2.89.54a4.15 4.15 0 0 1-4.27-4.24l.01-13.17 4.02-.86v3.54h3.14V9.1h-3.13v5.85zm-4.91.7c0 2.97-2.31 4.66-5.73 4.66a11.2 11.2 0 0 1-4.46-.93v-3.93c1.38.75 3.1 1.31 4.46 1.31.92 0 1.53-.24 1.53-1C6.26 13.77 0 14.51 0 9.95 0 7.04 2.28 5.3 5.62 5.3c1.36 0 2.72.2 4.09.75v3.88a9.23 9.23 0 0 0-4.1-1.06c-.86 0-1.44.25-1.44.9 0 1.85 6.29.97 6.29 5.88z" fill="#635BFF"/>
+                          </svg>
+                        </div>
                         <div className="text-left">
                           <p className="font-medium text-gray-900">Credit / Debit Card</p>
                           <p className="text-sm text-gray-600">Secure checkout powered by Stripe</p>
                         </div>
                       </div>
                       {paymentMethod === 'stripe' && (
-                        <CheckCircle className="w-6 h-6 text-accent" />
+                        <CheckCircle className="w-6 h-6 text-[#635BFF]" />
                       )}
                     </div>
                   </button>
@@ -900,20 +905,27 @@ export default function Payment() {
                     onClick={() => setPaymentMethod('paypal')}
                     className={`w-full p-4 rounded-lg border-2 transition-all ${
                       paymentMethod === 'paypal'
-                        ? 'border-accent bg-accent/5'
+                        ? 'border-[#0070BA] bg-[#0070BA]/5'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <Smartphone className={`w-6 h-6 ${paymentMethod === 'paypal' ? 'text-accent' : 'text-gray-600'}`} />
+                        {/* PayPal Logo */}
+                        <div className="w-16 h-10 flex items-center justify-center">
+                          <img 
+                            src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_111x69.jpg" 
+                            alt="PayPal Logo" 
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                         <div className="text-left">
                           <p className="font-medium text-gray-900">PayPal</p>
                           <p className="text-sm text-gray-600">Fast and secure PayPal checkout</p>
                         </div>
                       </div>
                       {paymentMethod === 'paypal' && (
-                        <CheckCircle className="w-6 h-6 text-accent" />
+                        <CheckCircle className="w-6 h-6 text-[#0070BA]" />
                       )}
                     </div>
                   </button>
@@ -921,12 +933,12 @@ export default function Payment() {
 
                 {/* Payment Info Notice */}
                 {paymentMethod === 'stripe' && (
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-4 p-4 bg-[#635BFF]/5 border border-[#635BFF]/20 rounded-lg">
                     <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <Shield className="w-5 h-5 text-[#635BFF] mt-0.5 mr-3 flex-shrink-0" />
                       <div>
-                        <p className="text-sm text-blue-900 font-medium">Secure Stripe Checkout</p>
-                        <p className="text-xs text-blue-700 mt-1">
+                        <p className="text-sm text-gray-900 font-medium">Secure Stripe Checkout</p>
+                        <p className="text-xs text-gray-600 mt-1">
                           You'll be redirected to Stripe's secure payment page to enter your card details.
                         </p>
                       </div>
@@ -935,12 +947,12 @@ export default function Payment() {
                 )}
 
                 {paymentMethod === 'paypal' && (
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="mt-4 p-4 bg-[#0070BA]/5 border border-[#0070BA]/20 rounded-lg">
                     <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                      <Shield className="w-5 h-5 text-[#0070BA] mt-0.5 mr-3 flex-shrink-0" />
                       <div>
-                        <p className="text-sm text-blue-900 font-medium">PayPal Checkout</p>
-                        <p className="text-xs text-blue-700 mt-1">
+                        <p className="text-sm text-gray-900 font-medium">PayPal Checkout</p>
+                        <p className="text-xs text-gray-600 mt-1">
                           You'll be redirected to PayPal to complete your payment securely.
                         </p>
                       </div>
@@ -963,45 +975,45 @@ export default function Payment() {
 
             {/* Step 2: Review & Pay */}
             {currentStep === 2 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                  <CheckCircle className="w-5 h-5 mr-2 text-accent" />
+              <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-accent flex-shrink-0" />
                   Review Your Order
                 </h2>
 
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Shipping Address */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <MapPin className="w-5 h-5 mr-2 text-accent" />
+                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                    <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-3 flex items-center">
+                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-accent flex-shrink-0" />
                       Shipping Address
                     </h3>
-                    <div className="text-sm text-gray-700 space-y-1">
-                      <p className="font-medium">
+                    <div className="text-xs sm:text-sm text-gray-700 space-y-1">
+                      <p className="font-medium break-words">
                         {orderData.shippingAddress.firstName} {orderData.shippingAddress.lastName}
                       </p>
-                      <p>{orderData.shippingAddress.address}</p>
+                      <p className="break-words">{orderData.shippingAddress.address}</p>
                       {orderData.shippingAddress.apartment && (
-                        <p>{orderData.shippingAddress.apartment}</p>
+                        <p className="break-words">{orderData.shippingAddress.apartment}</p>
                       )}
-                      <p>
+                      <p className="break-words">
                         {orderData.shippingAddress.city}, {orderData.shippingAddress.state} {orderData.shippingAddress.zipCode}
                       </p>
-                      <p>{orderData.shippingAddress.country}</p>
-                      <p className="pt-2">Email: {orderData.shippingAddress.email}</p>
-                      <p>Phone: {orderData.shippingAddress.phone}</p>
+                      <p className="break-words">{orderData.shippingAddress.country}</p>
+                      <p className="pt-2 break-words">Email: {orderData.shippingAddress.email}</p>
+                      <p className="break-words">Phone: {orderData.shippingAddress.phone}</p>
                     </div>
                   </div>
 
                   {/* Shipping Method */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <Truck className="w-5 h-5 mr-2 text-accent" />
+                  <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                    <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-3 flex items-center">
+                      <Truck className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-accent flex-shrink-0" />
                       Shipping Method
                     </h3>
-                    <div className="text-sm text-gray-700">
-                      <p className="font-medium">{orderData.shippingMethod.serviceName}</p>
-                      <p className="text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-700">
+                      <p className="font-medium break-words">{orderData.shippingMethod.serviceName}</p>
+                      <p className="text-gray-600 break-words">
                         {orderData.shippingMethod.carrier}
                         {orderData.shippingMethod.estimatedDeliveryDays && (
                           <span> • {orderData.shippingMethod.estimatedDeliveryDays} business days</span>
@@ -1012,11 +1024,11 @@ export default function Payment() {
 
                   {/* Order Items */}
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <Package className="w-5 h-5 mr-2 text-accent" />
+                    <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-3 flex items-center">
+                      <Package className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-accent flex-shrink-0" />
                       Order Items ({orderData.items.length})
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {orderData.items.map((item: any, index: number) => {
                         // Handle custom embroidery items specially
                         const isCustomEmbroidery = item.productId === 'custom-embroidery'
@@ -1025,8 +1037,8 @@ export default function Payment() {
                         // Only show error for non-custom-embroidery items that can't be found
                         if (!product && !isCustomEmbroidery) {
                           return (
-                            <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                              <p className="text-red-800 text-sm">Product not found: {item.productId}</p>
+                            <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-2 sm:p-3">
+                              <p className="text-red-800 text-xs sm:text-sm">Product not found: {item.productId}</p>
                             </div>
                           )
                         }
@@ -1042,39 +1054,39 @@ export default function Payment() {
                                            (product ? product.image : '/demo-images/embroidery-placeholder.jpg')
 
                         return (
-                          <div key={index} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-start space-x-4">
+                          <div key={index} className="border border-gray-200 rounded-lg p-3 sm:p-4">
+                            <div className="flex items-start gap-3 sm:gap-4">
                               <img
                                 src={displayImage}
                                 alt={displayTitle}
-                                className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                                className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                               />
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{displayTitle}</h4>
-                                <p className="text-sm text-gray-600 mt-1">Qty: {item.quantity}</p>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm sm:text-base font-medium text-gray-900 truncate" title={displayTitle}>{displayTitle}</h4>
+                                <p className="text-xs sm:text-sm text-gray-600 mt-1">Qty: {item.quantity}</p>
                                 {isCustomEmbroidery && item.customization?.embroideryData && (
-                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Custom Embroidery
+                                  <div className="mt-1.5 sm:mt-2 inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 text-[10px] sm:text-xs font-medium rounded-full">
+                                    <CheckCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                                    <span className="truncate">Custom Embroidery</span>
                                     {item.customization.embroideryData.dimensions && (
-                                      <span className="ml-1">
+                                      <span className="ml-1 whitespace-nowrap">
                                         • {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
                                       </span>
                                     )}
                                   </div>
                                 )}
                                 {item.customization && !isCustomEmbroidery && (
-                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
-                                    <CheckCircle className="w-3 h-3 mr-1" />
-                                    Customized
+                                  <div className="mt-1.5 sm:mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-[10px] sm:text-xs font-medium rounded-full">
+                                    <CheckCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                                    <span className="truncate">Customized</span>
                                     {item.customization.designs && (
-                                      <span className="ml-1">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
+                                      <span className="ml-1 whitespace-nowrap">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
                                     )}
                                   </div>
                                 )}
                               </div>
-                              <div className="text-right">
-                                <p className="font-bold text-accent">${(itemPrice * item.quantity).toFixed(2)}</p>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-sm sm:text-base font-bold text-accent whitespace-nowrap">${(itemPrice * item.quantity).toFixed(2)}</p>
                               </div>
                             </div>
                           </div>
@@ -1084,33 +1096,55 @@ export default function Payment() {
                   </div>
 
                   {/* Payment Method Selected */}
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-                      <DollarSign className="w-5 h-5 mr-2 text-accent" />
+                  <div className={`p-3 sm:p-4 rounded-lg border-2 ${
+                    paymentMethod === 'stripe' 
+                      ? 'bg-[#635BFF]/5 border-[#635BFF]/20' 
+                      : 'bg-[#0070BA]/5 border-[#0070BA]/20'
+                  }`}>
+                    <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-2 sm:mb-3 flex items-center">
+                      <DollarSign className={`w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0 ${
+                        paymentMethod === 'stripe' ? 'text-[#635BFF]' : 'text-[#0070BA]'
+                      }`} />
                       Payment Method
                     </h3>
-                    <div className="text-sm text-gray-700">
+                    <div className="text-xs sm:text-sm text-gray-700">
                       {paymentMethod === 'stripe' ? (
-                        <div>
-                          <p className="font-medium">Credit / Debit Card via Stripe</p>
-                          <p className="text-gray-600">Secure payment processing</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-8 flex items-center justify-center flex-shrink-0">
+                            <svg viewBox="0 0 60 25" className="w-full h-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M59.64 14.28h-8.06c.19 1.93 1.6 2.55 3.2 2.55 1.64 0 2.96-.37 4.05-.95v3.32a8.33 8.33 0 0 1-4.56 1.1c-4.01 0-6.83-2.5-6.83-7.48 0-4.19 2.39-7.52 6.3-7.52 3.92 0 5.96 3.28 5.96 7.5 0 .4-.04 1.26-.06 1.48zm-5.92-5.62c-1.03 0-2.17.73-2.17 2.58h4.25c0-1.85-1.07-2.58-2.08-2.58zM40.95 20.3c-1.44 0-2.32-.6-2.9-1.04l-.02 4.63-4.12.87V5.57h3.76l.08 1.02a4.7 4.7 0 0 1 3.23-1.29c2.9 0 5.62 2.6 5.62 7.4 0 5.23-2.7 7.6-5.65 7.6zM40 8.95c-.95 0-1.54.34-1.97.81l.02 6.12c.4.44.98.78 1.95.78 1.52 0 2.54-1.65 2.54-3.87 0-2.15-1.04-3.84-2.54-3.84zM28.24 5.57h4.13v14.44h-4.13V5.57zm0-4.7L32.37 0v3.36l-4.13.88V.88zm-4.32 9.35v9.79H19.8V5.57h3.7l.12 1.22c1-1.77 3.07-1.41 3.62-1.22v3.79c-.52-.17-2.29-.43-3.32.86zm-8.55 4.72c0 2.43 2.6 1.68 3.12 1.46v3.36c-.55.3-1.54.54-2.89.54a4.15 4.15 0 0 1-4.27-4.24l.01-13.17 4.02-.86v3.54h3.14V9.1h-3.13v5.85zm-4.91.7c0 2.97-2.31 4.66-5.73 4.66a11.2 11.2 0 0 1-4.46-.93v-3.93c1.38.75 3.1 1.31 4.46 1.31.92 0 1.53-.24 1.53-1C6.26 13.77 0 14.51 0 9.95 0 7.04 2.28 5.3 5.62 5.3c1.36 0 2.72.2 4.09.75v3.88a9.23 9.23 0 0 0-4.1-1.06c-.86 0-1.44.25-1.44.9 0 1.85 6.29.97 6.29 5.88z" fill="#635BFF"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium">Credit / Debit Card via Stripe</p>
+                            <p className="text-gray-600">Secure payment processing</p>
+                          </div>
                         </div>
                       ) : (
-                        <div>
-                          <p className="font-medium">PayPal</p>
-                          <p className="text-gray-600">Fast and secure PayPal checkout</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-14 h-9 flex items-center justify-center flex-shrink-0">
+                            <img 
+                              src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_111x69.jpg" 
+                              alt="PayPal Logo" 
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-medium">PayPal</p>
+                            <p className="text-gray-600">Fast and secure PayPal checkout</p>
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Security Notice */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-                      <div>
-                        <h4 className="font-medium text-blue-900">Secure Payment</h4>
-                        <p className="text-sm text-blue-700 mt-1">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <h4 className="text-sm sm:text-base font-medium text-blue-900">Secure Payment</h4>
+                        <p className="text-xs sm:text-sm text-blue-700 mt-1">
                           Your payment information is encrypted and secure. We never store your complete card details.
                         </p>
                       </div>
@@ -1119,8 +1153,8 @@ export default function Payment() {
                 </div>
 
                 {/* Navigation */}
-                <div className="flex justify-between mt-6">
-                  <Button variant="outline" onClick={handlePrev}>
+                <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-0 mt-4 sm:mt-6">
+                  <Button variant="outline" onClick={handlePrev} className="w-full sm:w-auto">
                     Previous
                   </Button>
                   <Button
@@ -1128,9 +1162,10 @@ export default function Payment() {
                     disabled={!canProceed() || isProcessing}
                     isLoading={isProcessing}
                     variant="add-to-cart"
+                    className="w-full sm:w-auto"
                   >
-                    {isProcessing ? 'Processing...' : `Pay $${getCorrectOrderTotal(orderData).toFixed(2)}`}
-                    <Lock className="w-4 h-4 ml-2" />
+                    <span className="truncate">{isProcessing ? 'Processing...' : `Pay $${getCorrectOrderTotal(orderData).toFixed(2)}`}</span>
+                    <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-2 flex-shrink-0" />
                   </Button>
                 </div>
               </div>

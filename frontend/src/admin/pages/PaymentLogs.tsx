@@ -168,42 +168,42 @@ const PaymentLogs: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Payment Logs</h1>
-          <p className="mt-2 text-gray-600">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Payment Logs</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
             Monitor and track all payment transactions across different providers
           </p>
         </div>
-        <div className="flex space-x-3">
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-            <Download className="w-4 h-4 mr-2" />
-            Export
+        <div className="flex space-x-2 sm:space-x-3 w-full sm:w-auto">
+          <button className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export</span>
           </button>
-          <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
+          <button className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent rounded-md shadow-sm text-xs sm:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Loading and Error States */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="flex items-center space-x-2">
-            <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-            <span className="text-gray-600">Loading payment data...</span>
+        <div className="flex items-center justify-center min-h-[50vh] px-4">
+          <div className="flex flex-col items-center space-y-2">
+            <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-blue-600" />
+            <span className="text-sm sm:text-base text-gray-600">Loading payment data...</span>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
-            <span className="text-red-800">{error}</span>
+            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mr-2 flex-shrink-0" />
+            <span className="text-sm sm:text-base text-red-800 break-words">{error}</span>
           </div>
         </div>
       )}
@@ -211,81 +211,81 @@ const PaymentLogs: React.FC = () => {
       {!loading && !error && (
         <>
           {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-green-50">
-              <DollarSign className="h-6 w-6 text-green-600" />
+            <div className="p-2 sm:p-3 rounded-lg bg-green-50 flex-shrink-0">
+              <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">${stats?.netAmount?.toLocaleString() || '0'}</p>
+            <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Revenue</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">${stats?.netAmount?.toLocaleString() || '0'}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-blue-50">
-              <CreditCard className="h-6 w-6 text-blue-600" />
+            <div className="p-2 sm:p-3 rounded-lg bg-blue-50 flex-shrink-0">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-blue-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Transactions</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalPayments || 0}</p>
+            <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Transactions</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">{stats?.totalPayments || 0}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-green-50">
-              <CheckCircle className="h-6 w-6 text-green-600" />
+            <div className="p-2 sm:p-3 rounded-lg bg-green-50 flex-shrink-0">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Success Rate</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                 {stats?.totalPayments ? Math.round((stats.byStatus.completed?.count || 0) / stats.totalPayments * 100) : 0}%
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-purple-50">
-              <RefreshCw className="h-6 w-6 text-purple-600" />
+            <div className="p-2 sm:p-3 rounded-lg bg-purple-50 flex-shrink-0">
+              <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Refunded Amount</p>
-              <p className="text-2xl font-bold text-gray-900">${stats?.byStatus.refunded?.amount?.toLocaleString() || '0'}</p>
+            <div className="ml-2 sm:ml-3 md:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">Refunded Amount</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">${stats?.byStatus.refunded?.amount?.toLocaleString() || '0'}</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+      <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-6">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 sm:w-4 sm:h-4" />
               <input
                 type="text"
-                placeholder="Search transactions..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-8 sm:pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Provider</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Provider</label>
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value as PaymentProvider | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="all">All Providers</option>
               <option value="stripe">Stripe</option>
@@ -296,11 +296,11 @@ const PaymentLogs: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Status</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as PaymentStatus | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="all">All Status</option>
               <option value="completed">Completed</option>
@@ -313,11 +313,11 @@ const PaymentLogs: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Method</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">Method</label>
             <select
               value={selectedMethod}
               onChange={(e) => setSelectedMethod(e.target.value as PaymentMethod | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="all">All Methods</option>
               <option value="card">Card</option>
@@ -327,22 +327,22 @@ const PaymentLogs: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">From Date</label>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">To Date</label>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             />
           </div>
         </div>

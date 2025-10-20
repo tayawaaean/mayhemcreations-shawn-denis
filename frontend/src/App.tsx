@@ -14,7 +14,7 @@ import Home from './ecommerce/routes/Home'
 import Products from './ecommerce/routes/Products'
 import ProductPage from './ecommerce/routes/ProductPage'
 import Customize from './ecommerce/routes/Customize'
-import CustomizedEmbroidery from './ecommerce/routes/CustomizedEmbroidery'
+import Studio from './ecommerce/routes/Studio'
 import ProtectedRoute from './ecommerce/components/ProtectedRoute'
 import About from './ecommerce/routes/About'
 import FAQ from './ecommerce/routes/FAQ'
@@ -25,6 +25,7 @@ import OrderCheckout from './ecommerce/routes/OrderCheckout'
 import MyOrders from './ecommerce/routes/MyOrders'
 import RefundTracking from './ecommerce/routes/RefundTracking'
 import MyReviews from './ecommerce/routes/MyReviews'
+import Profile from './ecommerce/routes/Profile'
 import Payment from './ecommerce/routes/Payment'
 import VerifyEmail from './pages/VerifyEmail'
 import PaymentSuccess from './pages/PaymentSuccess'
@@ -72,10 +73,10 @@ export default function App() {
                 <Customize />
               </EcommerceLayout>
             } />
-            <Route path="/customized-embroidery" element={
+            <Route path="/studio" element={
               <ProtectedRoute fallbackPath="/">
                 <EcommerceLayout>
-                  <CustomizedEmbroidery />
+                  <Studio />
                 </EcommerceLayout>
               </ProtectedRoute>
             } />
@@ -132,6 +133,13 @@ export default function App() {
               <ProtectedRoute fallbackPath="/">
                 <EcommerceLayout>
                   <MyReviews />
+                </EcommerceLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute fallbackPath="/">
+                <EcommerceLayout>
+                  <Profile />
                 </EcommerceLayout>
               </ProtectedRoute>
             } />

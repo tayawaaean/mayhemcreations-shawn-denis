@@ -8,6 +8,7 @@ import { verifyWebhookSignature } from '../services/stripeService';
 import { logger } from '../utils/logger';
 import { StripeWebhookEventType } from '../types/stripeWebhookEvents';
 import { isSupportedEventType, getEventCategory, isCriticalEvent } from '../utils/webhookEventValidator';
+import { EmailNotificationService } from '../services/emailNotificationService';
 
 /**
  * Handle Stripe Webhook Events
@@ -352,6 +353,96 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
           orderNumber,
           paymentIntentId: paymentIntent.id,
         });
+
+        // Send payment receipt and order confirmation emails
+        try {
+          // Get user details for emails
+          const [userResult] = await sequelize.query(`
+            SELECT email, first_name, last_name FROM users WHERE id = ?
+          `, {
+            replacements: [userId]
+          });
+
+          if (Array.isArray(userResult) && userResult.length > 0) {
+            const user = userResult[0] as any;
+            const customerName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer';
+            const customerEmail = user.email;
+
+            // Get order items for email
+            const [orderDataResult] = await sequelize.query(`
+              SELECT order_data FROM order_reviews WHERE id = ?
+            `, {
+              replacements: [order.id]
+            });
+
+            let orderItems = [];
+            if (Array.isArray(orderDataResult) && orderDataResult.length > 0) {
+              const orderData = (orderDataResult[0] as any).order_data;
+              if (typeof orderData === 'string') {
+                orderItems = JSON.parse(orderData).items || [];
+              } else {
+                orderItems = orderData?.items || [];
+              }
+            }
+
+            // Send payment receipt email
+            await EmailNotificationService.sendPaymentReceipt({
+              customerName,
+              customerEmail,
+              orderNumber,
+              orderId: order.id,
+              paymentInfo: {
+                paymentMethod: 'Credit Card',
+                paymentProvider: 'Stripe',
+                transactionId: paymentIntent.id,
+                cardLast4: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.last4,
+                cardBrand: paymentIntent.charges?.data?.[0]?.payment_method_details?.card?.brand,
+                paidAmount: paymentIntent.amount / 100
+              },
+              orderTotal: paymentIntent.amount / 100
+            });
+
+            // Send order confirmation email
+            await EmailNotificationService.sendOrderConfirmation({
+              customerName,
+              customerEmail,
+              orderNumber,
+              orderId: order.id,
+              orderItems: orderItems.map((item: any) => ({
+                id: item.id || item.cartItemId,
+                productId: item.productId,
+                productName: item.productName,
+                variantName: item.variantName,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                imageUrl: item.imageUrl
+              })),
+              subtotal: subtotal || order.subtotal,
+              tax: tax || order.tax,
+              shippingCost: shipping || order.shipping,
+              orderTotal: total || order.total,
+              shippingAddress: {
+                firstName: shippingDetails.firstName,
+                lastName: shippingDetails.lastName,
+                addressLine1: shippingDetails.street,
+                city: shippingDetails.city,
+                state: shippingDetails.state,
+                postalCode: shippingDetails.zipCode,
+                country: shippingDetails.country,
+                phone: shippingDetails.phone
+              }
+            });
+
+            logger.info('Payment receipt and order confirmation emails sent', {
+              orderId: order.id,
+              customerEmail
+            });
+          }
+        } catch (emailError) {
+          logger.error('Error sending payment/order confirmation emails:', emailError);
+          // Don't fail the webhook if email fails
+        }
       } catch (orderError) {
         logger.error('Error updating order review with payment details:', orderError);
         // Don't fail the webhook if update fails
@@ -693,6 +784,94 @@ const handleCheckoutSessionCompleted = async (session: any) => {
           orderNumber,
           sessionId: session.id,
         });
+
+        // Send payment receipt and order confirmation emails
+        try {
+          // Get user details for emails
+          const [userResult] = await sequelize.query(`
+            SELECT email, first_name, last_name FROM users WHERE id = ?
+          `, {
+            replacements: [userId]
+          });
+
+          if (Array.isArray(userResult) && userResult.length > 0) {
+            const user = userResult[0] as any;
+            const customerName = session.customer_details?.name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer';
+            const customerEmail = session.customer_details?.email || user.email;
+
+            // Get order items for email
+            const [orderDataResult] = await sequelize.query(`
+              SELECT order_data FROM order_reviews WHERE id = ?
+            `, {
+              replacements: [order.id]
+            });
+
+            let orderItems = [];
+            if (Array.isArray(orderDataResult) && orderDataResult.length > 0) {
+              const orderData = (orderDataResult[0] as any).order_data;
+              if (typeof orderData === 'string') {
+                orderItems = JSON.parse(orderData).items || [];
+              } else {
+                orderItems = orderData?.items || [];
+              }
+            }
+
+            // Send payment receipt email
+            await EmailNotificationService.sendPaymentReceipt({
+              customerName,
+              customerEmail,
+              orderNumber,
+              orderId: order.id,
+              paymentInfo: {
+                paymentMethod: 'Credit Card',
+                paymentProvider: 'Stripe',
+                transactionId: session.payment_intent || session.id,
+                paidAmount: session.amount_total / 100
+              },
+              orderTotal: session.amount_total / 100
+            });
+
+            // Send order confirmation email
+            await EmailNotificationService.sendOrderConfirmation({
+              customerName,
+              customerEmail,
+              orderNumber,
+              orderId: order.id,
+              orderItems: orderItems.map((item: any) => ({
+                id: item.id || item.cartItemId,
+                productId: item.productId,
+                productName: item.productName,
+                variantName: item.variantName,
+                quantity: item.quantity,
+                price: item.price,
+                subtotal: item.subtotal,
+                imageUrl: item.imageUrl
+              })),
+              subtotal: subtotal || order.subtotal,
+              tax: tax || order.tax,
+              shippingCost: shipping || order.shipping,
+              orderTotal: total || order.total,
+              shippingAddress: {
+                firstName: shippingDetails.firstName,
+                lastName: shippingDetails.lastName,
+                addressLine1: shippingDetails.street,
+                city: shippingDetails.city,
+                state: shippingDetails.state,
+                postalCode: shippingDetails.zipCode,
+                country: shippingDetails.country,
+                phone: shippingDetails.phone
+              }
+            });
+
+            logger.info('Payment receipt and order confirmation emails sent (checkout session)', {
+              orderId: order.id,
+              customerEmail
+            });
+          }
+        } catch (emailError) {
+          logger.error('Error sending payment/order confirmation emails (checkout session):', emailError);
+          // Don't fail the webhook if email fails
+        }
       } catch (orderError) {
         logger.error('Error updating order review with payment details:', orderError);
         // Don't fail the webhook if update fails

@@ -18,11 +18,11 @@ const Profile: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-          <p className="mt-2 text-gray-600">Update your account information</p>
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Profile</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">Update your account information</p>
         </div>
       </div>
 

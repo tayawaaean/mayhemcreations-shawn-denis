@@ -254,27 +254,27 @@ const Categories: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-            <p className="mt-1 text-sm text-gray-500">
+      <div className="space-y-4 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Categories</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500 break-words">
               Organize your products with categories and subcategories
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm flex-1 sm:flex-none"
             >
               <span className="hidden sm:inline">How to use</span>
               <span className="sm:hidden">?</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
+              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center justify-center text-sm sm:text-base flex-1 sm:flex-none"
             >
               <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               <span className="hidden sm:inline">Add Category</span>
@@ -285,41 +285,43 @@ const Categories: React.FC = () => {
       </div>
 
       {/* Search and Filter Controls */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Search categories..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
+      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                />
+              </div>
             </div>
-          </div>
-          
-          {/* Status Filter */}
-          <div className="sm:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            
+            {/* Status Filter */}
+            <div className="w-full sm:w-48">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
 
           {/* Stats Display */}
           {stats && (
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
-              <span>Total: {stats.total}</span>
-              <span>Active: {stats.active}</span>
-              <span>Inactive: {stats.inactive}</span>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600 pt-2 border-t border-gray-200">
+              <span>Total: <span className="font-medium">{stats.total}</span></span>
+              <span>Active: <span className="font-medium text-green-600">{stats.active}</span></span>
+              <span>Inactive: <span className="font-medium text-gray-500">{stats.inactive}</span></span>
             </div>
           )}
         </div>
@@ -327,18 +329,18 @@ const Categories: React.FC = () => {
 
       {/* Loading and Error States */}
       {loading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2 text-gray-600">Loading categories...</p>
+        <div className="text-center py-6 sm:py-8">
+          <div className="inline-block animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-gray-900"></div>
+          <p className="mt-2 text-sm sm:text-base text-gray-600">Loading categories...</p>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-700">Error: {error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+          <p className="text-sm sm:text-base text-red-700 break-words">Error: {error}</p>
           <button
             onClick={() => fetchCategories()}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            className="mt-2 text-xs sm:text-sm text-red-600 hover:text-red-800 underline"
           >
             Try again
           </button>
@@ -347,15 +349,15 @@ const Categories: React.FC = () => {
 
       {/* Bulk actions */}
       {selectedCategories.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <span className="text-xs sm:text-sm text-blue-700 font-medium">
               {selectedCategories.length} categor{selectedCategories.length > 1 ? 'ies' : 'y'} selected
             </span>
-            <div className="flex space-x-2">
-              <button className="text-sm text-blue-700 hover:text-blue-800">Bulk Edit</button>
-              <button className="text-sm text-blue-700 hover:text-blue-800">Change Status</button>
-              <button className="text-sm text-red-700 hover:text-red-800">Delete</button>
+            <div className="flex flex-wrap gap-2">
+              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Bulk Edit</button>
+              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Change Status</button>
+              <button className="text-xs sm:text-sm text-red-700 hover:text-red-800 px-2 py-1 hover:bg-red-100 rounded">Delete</button>
             </div>
           </div>
         </div>
@@ -402,89 +404,103 @@ const Categories: React.FC = () => {
 
           {/* Mobile Card Layout */}
           <div className="lg:hidden">
-            {paginatedCategories.map(category => (
-              <div key={category.id} className="bg-white border-b border-gray-200 p-4 last:border-b-0">
-                <div className="flex items-start space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(category.id)}
-                    onChange={() => handleSelectCategory(category.id)}
-                    className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">{category.name}</h3>
-                        <p className="text-sm text-gray-500 truncate">{category.slug}</p>
-                        <p className="text-xs text-gray-400 mt-1">Order: {category.sortOrder}</p>
+            {paginatedCategories.length === 0 ? (
+              <div className="p-8 text-center">
+                <Filter className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 text-sm">No categories found</p>
+                <p className="text-gray-500 text-xs mt-1">Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              paginatedCategories.map(category => (
+                <div key={category.id} className="bg-white border-b border-gray-200 p-3 sm:p-4 last:border-b-0">
+                  <div className="flex items-start space-x-2 sm:space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(category.id)}
+                      onChange={() => handleSelectCategory(category.id)}
+                      className="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-gray-900 break-words line-clamp-2">{category.name}</h3>
+                          <p className="text-xs sm:text-sm text-gray-500 truncate">{category.slug}</p>
+                          <p className="text-xs text-gray-400 mt-1">Order: {category.sortOrder}</p>
+                        </div>
+                        <div className="flex items-center space-x-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleToggleStatus(category.id)}
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              category.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {category.status === 'active' ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                          </button>
+                          <button
+                            onClick={() => handleEditCategory(category)}
+                            className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCategory(category)
+                              setIsDeleteModalOpen(true)
+                            }}
+                            className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2 ml-2">
-                        <button
-                          onClick={() => handleToggleStatus(category.id)}
-                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"
-                        >
-                          Active
-                        </button>
-                        <button
-                          onClick={() => handleEditCategory(category)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteCategory(category.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+
+                      <div className="mt-3">
+                        <p className="text-xs text-gray-500">Description</p>
+                        <p className="text-sm text-gray-900 line-clamp-2 break-words">{category.description || 'No description'}</p>
                       </div>
-                    </div>
 
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-500">Description</p>
-                      <p className="text-sm text-gray-900 line-clamp-2">{category.description}</p>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
+                      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                         {category.parentId && (
-                          <span className="text-xs text-gray-500">Sub-category</span>
+                          <span>Sub-category</span>
                         )}
-                        <span className="text-xs text-gray-500">
+                        <span>
                           {new Date(category.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="bg-white rounded-xl border border-gray-200 px-3 py-3 sm:px-4 sm:py-3 flex items-center justify-between">
           <div className="flex-1 flex justify-between sm:hidden">
             <button 
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
+            <span className="text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
             <button 
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
             </button>
           </div>
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-gray-700">
+              <p className="text-xs sm:text-sm text-gray-700">
                 Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalItems)}</span> of{' '}
                 <span className="font-medium">{totalItems}</span> results
               </p>
@@ -494,7 +510,7 @@ const Categories: React.FC = () => {
                 <button 
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
@@ -502,7 +518,7 @@ const Categories: React.FC = () => {
                   <button
                     key={page}
                     onClick={() => handlePageChange(page)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                    className={`relative inline-flex items-center px-3 sm:px-4 py-2 border text-xs sm:text-sm font-medium ${
                       page === currentPage
                         ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                         : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
@@ -514,7 +530,7 @@ const Categories: React.FC = () => {
                 <button 
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-xs sm:text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
                 </button>

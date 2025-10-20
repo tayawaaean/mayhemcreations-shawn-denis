@@ -220,10 +220,10 @@ const Embroidery: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading embroidery options...</span>
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="flex flex-col items-center space-y-2 text-center">
+          <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin" />
+          <span className="text-sm sm:text-base">Loading embroidery options...</span>
         </div>
       </div>
     )
@@ -231,12 +231,12 @@ const Embroidery: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{error}</p>
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="text-center max-w-md">
+          <p className="text-sm sm:text-base text-red-600 mb-4 break-words">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base"
           >
             Retry
           </button>
@@ -246,27 +246,27 @@ const Embroidery: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Embroidery Options</h1>
-            <p className="mt-1 text-sm text-gray-500">
+      <div className="space-y-4 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Embroidery Options</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500 break-words">
               Manage embroidery styles, materials, and pricing options
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm flex-1 sm:flex-none"
             >
               <span className="hidden sm:inline">How to use</span>
               <span className="sm:hidden">?</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
+              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center justify-center text-sm sm:text-base flex-1 sm:flex-none"
             >
               <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               <span className="hidden sm:inline">Add Option</span>

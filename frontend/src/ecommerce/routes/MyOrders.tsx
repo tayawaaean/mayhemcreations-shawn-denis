@@ -75,9 +75,10 @@ interface Order {
   deliveredAt?: string
   orderReceived?: boolean
   orderReceivedAt?: string
-  refundStatus?: 'none' | 'requested' | 'partial' | 'full'
+  refundStatus?: 'none' | 'requested' | 'partial' | 'full' | 'rejected'
   refundedAmount?: number
   refundRequestedAt?: string
+  refundRejectionReason?: string
   originalOrderData?: any[] // Store original order data for matching
 }
 
@@ -934,11 +935,29 @@ export default function MyOrders() {
       if (stored) {
         const receivedArray = JSON.parse(stored)
         setReceivedOrders(new Set(receivedArray))
-        console.log('📦 Loaded received orders:', receivedArray.length)
+        console.log('📦 Loaded received orders from localStorage:', receivedArray.length)
       }
     } catch (error) {
       console.error('Error loading received orders:', error)
     }
+  }
+
+  // Sync received orders with backend status - backend is source of truth
+  const syncReceivedOrdersWithBackend = (orders: Order[]) => {
+    const backendReceivedIds = new Set<number>()
+    
+    // Only orders with status 'delivered' should be marked as received
+    orders.forEach(order => {
+      if (order.status === 'delivered' && order.deliveredAt) {
+        backendReceivedIds.add(order.id)
+      }
+    })
+    
+    // Update state and localStorage to match backend
+    setReceivedOrders(backendReceivedIds)
+    localStorage.setItem('receivedOrders', JSON.stringify(Array.from(backendReceivedIds)))
+    
+    console.log('✅ Synced received orders with backend:', Array.from(backendReceivedIds))
   }
 
   // Load backend products
@@ -979,7 +998,7 @@ export default function MyOrders() {
   // Load orders on component mount
   useEffect(() => {
     if (isLoggedIn) {
-      loadReceivedOrders()
+      // No need to load from localStorage - we sync with backend after loading orders
       loadOrders()
       loadBackendProducts()
       // REMOVED: loadUserReviews() - using loadExistingReviews() instead (called from loadOrders)
@@ -1038,13 +1057,31 @@ export default function MyOrders() {
       ));
     });
 
+    // Listen for refund rejection
+    const unsubscribeRefundRejected = subscribe('refund_rejected', (data) => {
+      console.log('🔌 Real-time refund rejection:', data);
+      // Update the order with rejection data
+      setOrders(prev => prev.map(order => 
+        order.id === data.orderId 
+          ? { 
+              ...order, 
+              refundStatus: 'rejected',
+              refundRejectionReason: data.rejectionReason
+            }
+          : order
+      ));
+      // Show alert to user
+      showError(`Refund Request Declined\n\nYour refund request for Order #${data.orderNumber} has been declined.\n\nReason: ${data.rejectionReason}\n\nYou can submit a new refund request if you have additional information.`);
+    });
+
     // Cleanup subscriptions
     return () => {
       unsubscribePictureReply();
       unsubscribeStatusUpdate();
       unsubscribeConfirmation();
+      unsubscribeRefundRejected();
     };
-  }, [isConnected, isLoggedIn, subscribe]);
+  }, [isConnected, isLoggedIn, subscribe, showError]);
 
   const loadOrders = async () => {
     try {
@@ -1057,6 +1094,9 @@ export default function MyOrders() {
         const convertedOrders = response.data.map((orderReview: OrderReview) => convertOrderReviewToOrder(orderReview, backendProducts))
         console.log('✅ Orders loaded:', convertedOrders)
         setOrders(convertedOrders)
+        
+        // Sync received orders with backend status (backend is source of truth)
+        syncReceivedOrdersWithBackend(convertedOrders)
         
         // Load existing reviews after orders are set
         if (convertedOrders.length > 0) {
@@ -1341,11 +1381,12 @@ export default function MyOrders() {
 
   // Handler for opening refund modal
   const handleRequestRefund = (order: Order) => {
-    // Check if refund already requested
+    // Check if refund already requested (but allow resubmission if rejected)
     if (order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full') {
       showInfo('A refund has already been requested or processed for this order.')
       return
     }
+    // Note: 'rejected' status allows resubmission, so we don't block it
     
     // Calculate correct totals for refund modal
     const correctTotal = calculateCorrectOrderTotal(order)
@@ -1369,9 +1410,15 @@ export default function MyOrders() {
 
   // Handler for successful refund submission
   const handleRefundSuccess = () => {
-    // Don't close modal here - let the modal handle its own success state display
-    // Just refresh orders to show updated refund status
+    // Refresh orders to show updated refund status
     loadOrders()
+    
+    // The modal will show its own success screen and auto-close after 5 seconds
+    // The success screen displays detailed info, so we let it show fully
+    // We'll also show an alert that persists after the modal closes
+    setTimeout(() => {
+      showSuccess('Refund request submitted successfully! Track your refund status in "My Orders".')
+    }, 5500) // Show alert right after modal auto-closes
   }
 
   // Load existing reviews to track which items have been reviewed
@@ -1424,27 +1471,42 @@ export default function MyOrders() {
   }
 
   // Handler for confirming order received
-  const handleOrderReceived = (orderId: number) => {
-    // Add to received orders set
-    setReceivedOrders(prev => {
-      const newSet = new Set(prev)
-      newSet.add(orderId)
-      return newSet
-    })
-    
-    // Store in localStorage for persistence
-    const stored = localStorage.getItem('receivedOrders') || '[]'
-    const receivedArray = JSON.parse(stored)
-    if (!receivedArray.includes(orderId)) {
-      receivedArray.push(orderId)
-      localStorage.setItem('receivedOrders', JSON.stringify(receivedArray))
+  const handleOrderReceived = async (orderId: number) => {
+    try {
+      // Call API to mark order as delivered
+      const response = await orderReviewApiService.confirmOrderReceived(orderId)
+      
+      if (response.success) {
+        // Add to received orders set
+        setReceivedOrders(prev => {
+          const newSet = new Set(prev)
+          newSet.add(orderId)
+          return newSet
+        })
+        
+        // Store in localStorage for persistence
+        const stored = localStorage.getItem('receivedOrders') || '[]'
+        const receivedArray = JSON.parse(stored)
+        if (!receivedArray.includes(orderId)) {
+          receivedArray.push(orderId)
+          localStorage.setItem('receivedOrders', JSON.stringify(receivedArray))
+        }
+        
+        // Show success message
+        showSuccess('Order confirmed as received! Status updated to Delivered. You can now leave reviews for your items.')
+        
+        // Reload orders to show updated status
+        setTimeout(() => {
+          loadOrders()
+          loadExistingReviews()
+        }, 500)
+      } else {
+        showError(response.message || 'Failed to confirm order delivery')
+      }
+    } catch (error: any) {
+      console.error('Error confirming order received:', error)
+      showError(error.message || 'Failed to confirm order delivery')
     }
-    
-    // Show success message
-    showSuccess('Order confirmed as received! You can now leave reviews for your items.')
-    
-    // Load reviews after confirming receipt
-    setTimeout(() => loadExistingReviews(), 500)
   }
 
   // Check if order has been confirmed as received
@@ -1723,10 +1785,10 @@ export default function MyOrders() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
-          <Package className="mx-auto h-12 w-12 text-gray-400" />
-          <h2 className="mt-2 text-2xl font-bold text-gray-900">Please log in to view your orders</h2>
+          <Package className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
+          <h2 className="mt-2 text-xl sm:text-2xl font-bold text-gray-900">Please log in to view your orders</h2>
           <p className="mt-1 text-sm text-gray-500">
             You need to be logged in to access your order history.
           </p>
@@ -1752,11 +1814,11 @@ export default function MyOrders() {
 
   if (loading) {
     return (
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your orders...</p>
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-accent mx-auto mb-4"></div>
+            <p className="text-sm sm:text-base text-gray-600">Loading your orders...</p>
           </div>
         </div>
       </main>
@@ -1764,22 +1826,22 @@ export default function MyOrders() {
   }
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
+    <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
       {/* Payment Success Notification */}
       {paymentSuccessNotification.show && (
-        <div className="mb-6 bg-green-50 border-l-4 border-green-500 rounded-lg p-6 shadow-lg animate-fade-in">
+        <div className="mb-4 sm:mb-6 bg-green-50 border-l-4 border-green-500 rounded-lg p-4 sm:p-6 shadow-lg animate-fade-in">
           <div className="flex items-start">
             <div className="flex-shrink-0">
-              <CheckCircle className="h-8 w-8 text-green-500" />
+              <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-500" />
             </div>
-            <div className="ml-4 flex-1">
-              <h3 className="text-xl font-bold text-green-900 mb-2">
-                Payment Successful! 🎉
+            <div className="ml-3 sm:ml-4 flex-1">
+              <h3 className="text-lg sm:text-xl font-bold text-green-900 mb-2">
+                Payment Successful!
               </h3>
-              <p className="text-green-800 mb-2">
+              <p className="text-sm sm:text-base text-green-800 mb-2">
                 Your payment has been processed successfully. Your order is now being prepared.
               </p>
-              <div className="text-sm text-green-700 space-y-1">
+              <div className="text-xs sm:text-sm text-green-700 space-y-1">
                 <p>
                   <strong>Payment Method:</strong> {' '}
                   {paymentSuccessNotification.paymentMethod === 'paypal' ? 'PayPal' : 
@@ -1798,68 +1860,68 @@ export default function MyOrders() {
               </div>
               <button
                 onClick={() => setPaymentSuccessNotification({ show: false })}
-                className="mt-3 inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                className="mt-3 inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
               >
                 Got it, thanks!
               </button>
             </div>
             <button
               onClick={() => setPaymentSuccessNotification({ show: false })}
-              className="ml-4 text-green-500 hover:text-green-700 transition-colors"
+              className="ml-2 sm:ml-4 text-green-500 hover:text-green-700 transition-colors"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>
       )}
 
-      <div className="mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-100 shadow-sm">
+      <div className="mb-4 sm:mb-8 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-blue-100 shadow-sm">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center space-x-4 mb-2">
-              <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">My Orders</h1>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">My Orders</h1>
               {/* WebSocket connection status */}
-              <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full ${
+              <div className={`flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full self-start ${
                 isConnected ? 'bg-green-100 border border-green-300' : 'bg-red-100 border border-red-300'
               }`}>
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                <span className={`text-xs font-bold ${isConnected ? 'text-green-700' : 'text-red-700'}`}>
-                  {isConnected ? 'Live Updates Active' : 'Offline Mode'}
+                <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                <span className={`text-[10px] sm:text-xs font-bold ${isConnected ? 'text-green-700' : 'text-red-700'}`}>
+                  {isConnected ? 'Live Updates' : 'Offline'}
                 </span>
               </div>
             </div>
-            <p className="text-gray-700 font-medium">Track and manage all your orders in one place</p>
+            <p className="text-xs sm:text-sm md:text-base text-gray-700 font-medium">Track and manage all your orders in one place</p>
           </div>
-          <Package className="w-16 h-16 text-blue-400 opacity-50" />
+          <Package className="hidden sm:block w-12 h-12 md:w-16 md:h-16 text-blue-400 opacity-50 flex-shrink-0 ml-4" />
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="mb-8 bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-        <div className="space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
-          <div className="flex-1 max-w-lg">
-            <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Search Orders</label>
+      <div className="mb-4 sm:mb-8 bg-white rounded-lg sm:rounded-xl p-3 sm:p-5 shadow-sm border border-gray-200">
+        <div className="space-y-3 sm:space-y-4 md:space-y-0 md:flex md:items-end md:gap-4">
+          <div className="flex-1 max-w-full md:max-w-lg">
+            <label className="block text-[10px] sm:text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 sm:mb-2">Search Orders</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-5 sm:h-5" />
               <input
                 type="text"
                 placeholder="Search by order number or product..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2 sm:py-3 text-sm sm:text-base border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
               />
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Status Filter</label>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="flex-1 sm:flex-none sm:min-w-[180px]">
+              <label className="block text-[10px] sm:text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 sm:mb-2">Status Filter</label>
               <div className="relative">
-                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Filter className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="pl-10 pr-8 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
+                  className="w-full pl-8 sm:pl-10 pr-7 sm:pr-8 py-2 sm:py-3 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
                 >
                   <option value="all">All Orders</option>
                   <option value="pending-review">Being Reviewed</option>
@@ -1878,12 +1940,12 @@ export default function MyOrders() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">Sort By</label>
+            <div className="flex-1 sm:flex-none sm:min-w-[150px]">
+              <label className="block text-[10px] sm:text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 sm:mb-2">Sort By</label>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest')}
-                className="px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold bg-white appearance-none cursor-pointer"
               >
                 <option value="newest">⬇️ Newest First</option>
                 <option value="oldest">⬆️ Oldest First</option>
@@ -1894,12 +1956,12 @@ export default function MyOrders() {
       </div>
 
       {/* Orders List */}
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-lg font-medium text-gray-900">No orders found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="text-center py-8 sm:py-12">
+            <Package className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-400" />
+            <h3 className="mt-2 text-base sm:text-lg font-medium text-gray-900">No orders found</h3>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500">
               {searchTerm || statusFilter !== 'all' 
                 ? 'Try adjusting your search or filter criteria.'
                 : "You haven't placed any orders yet."
@@ -1908,47 +1970,49 @@ export default function MyOrders() {
           </div>
         ) : (
           filteredOrders.map((order) => (
-            <div key={order.id} className={`rounded-xl hover:shadow-lg transition-all duration-300 overflow-hidden ${getCardStyling(order)}`}>
+            <div key={order.id} className={`rounded-lg sm:rounded-xl hover:shadow-lg transition-all duration-300 overflow-hidden ${getCardStyling(order)}`}>
               {/* Order Header */}
-              <div className="px-6 py-5 border-b border-gray-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-                  {/* Left Section - Order Info */}
-                  <div className="flex items-start space-x-4">
+              <div className="px-3 sm:px-6 py-4 sm:py-5 border-b border-gray-200">
+                <div className="flex flex-col space-y-4">
+                  {/* Top Row - Status and Order Info */}
+                  <div className="flex items-start gap-3 sm:gap-4">
                     {/* Status Badge */}
-                    <div className="flex flex-col items-center space-y-2.5">
-                      <div className={`flex items-center justify-center w-14 h-14 rounded-full border-2 shadow-sm ${getIconBackgroundColor(order.status)}`}>
+                    <div className="flex flex-col items-center gap-2 sm:gap-2.5 flex-shrink-0">
+                      <div className={`flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 shadow-sm ${getIconBackgroundColor(order.status)}`}>
                         {getStatusIcon(order.status)}
                       </div>
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wide ${getStatusColor(order.status)}`}>
+                      <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide text-center ${getStatusColor(order.status)}`}>
                         {getStatusText(order.status)}
                       </span>
                       {order.refundStatus && order.refundStatus !== 'none' && (
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 ${
+                        <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-bold flex items-center gap-1 ${
                           order.refundStatus === 'requested' ? 'bg-red-100 text-red-800 border border-red-300' :
+                          order.refundStatus === 'rejected' ? 'bg-red-100 text-red-800 border border-red-300' :
                           order.refundStatus === 'partial' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
                           'bg-emerald-100 text-emerald-800 border border-emerald-300'
                         }`}>
-                          <RotateCcw className="w-3 h-3" />
+                          <RotateCcw className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                           {order.refundStatus === 'requested' ? 'Refund Pending' :
+                           order.refundStatus === 'rejected' ? 'Refund Declined' :
                            order.refundStatus === 'partial' ? 'Partial Refund' :
                            'Full Refund'}
                         </span>
                       )}
                     </div>
                     
-                    {/* Order Details */}
+                    {/* Order Details - Takes remaining space */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">
+                      <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1.5 sm:mb-2 tracking-tight break-words">
                         Order #{order.orderNumber}
                       </h3>
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-5 text-sm">
-                        <div className="flex items-center space-x-2 text-gray-600">
-                          <Calendar className="w-4 h-4 text-gray-400" />
+                      <div className="flex flex-col gap-1 sm:gap-0 sm:flex-row sm:items-center sm:flex-wrap sm:gap-x-5 text-xs sm:text-sm">
+                        <div className="flex items-center gap-1.5 sm:gap-2 text-gray-600">
+                          <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                           <span className="font-medium">Placed {formatDateWithoutTimezone(order.orderDate)}</span>
                         </div>
                         {order.reviewedAt && (
-                          <div className="flex items-center space-x-2 text-emerald-700">
-                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                          <div className="flex items-center gap-1.5 sm:gap-2 text-emerald-700">
+                            <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500 flex-shrink-0" />
                             <span className="font-medium">Reviewed {formatDateWithoutTimezone(order.reviewedAt)}</span>
                           </div>
                         )}
@@ -1956,56 +2020,59 @@ export default function MyOrders() {
                     </div>
                   </div>
 
-                  {/* Right Section - Total & Actions */}
-                  <div className="flex flex-col sm:items-end space-y-3">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-500 mb-1">Order Total</p>
-                      <p className="text-3xl font-bold text-gray-900 tracking-tight">${calculateCorrectOrderTotal(order).toFixed(2)}</p>
-                      <p className="text-sm text-gray-600 mt-1">
+                  {/* Bottom Row - Total & Actions */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pl-0 sm:pl-0">
+                    <div className="text-left sm:text-right">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500 mb-0.5 sm:mb-1">Order Total</p>
+                      <p className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">${calculateCorrectOrderTotal(order).toFixed(2)}</p>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
                         <span className="font-semibold">{order.items.length}</span> item{order.items.length !== 1 ? 's' : ''}
                       </p>
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 w-full sm:w-auto">
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => handleViewDetails(order)}
-                        className="w-full sm:w-auto bg-white hover:bg-gray-50 border-gray-300 text-gray-700 font-semibold shadow-sm"
+                        className="w-full sm:w-auto bg-white hover:bg-gray-50 border-gray-300 text-gray-700 text-xs sm:text-sm font-semibold shadow-sm"
                       >
-                        <Eye className="w-4 h-4 mr-2" />
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                         View Details
                       </Button>
                       
-                      {/* Order Received button - show only for delivered orders not yet confirmed and no refund */}
-                      {order.status === 'delivered' && 
+                      {/* Order Received button - show only for shipped orders not yet confirmed and no refund */}
+                      {order.status === 'shipped' && 
                        !isOrderReceived(order.id) && 
                        (!order.refundStatus || order.refundStatus === 'none') && (
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleOrderReceived(order.id)}
-                          className="w-full sm:w-auto bg-green-50 text-green-700 border-green-500 hover:bg-green-100 font-bold shadow-sm"
+                          className="w-full sm:w-auto bg-green-50 text-green-700 border-green-500 hover:bg-green-100 text-xs sm:text-sm font-bold shadow-sm"
                         >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Confirm Received
+                          <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                          Order Received
                         </Button>
                       )}
                       
-                      {/* Refund button - show only for delivered orders that haven't been marked as received */}
-                      {order.status === 'delivered' && !isOrderReceived(order.id) && (
+                      {/* Refund button - show only for shipped/delivered orders that haven't been confirmed as received yet */}
+                      {(order.status === 'shipped' || order.status === 'delivered') && !isOrderReceived(order.id) && (
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleRequestRefund(order)}
                           disabled={order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full'}
-                          className={`w-full sm:w-auto font-bold shadow-sm ${
+                          className={`w-full sm:w-auto text-xs sm:text-sm font-bold shadow-sm ${
                             order.refundStatus === 'requested' || order.refundStatus === 'partial' || order.refundStatus === 'full'
                               ? 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
+                              : order.refundStatus === 'rejected'
+                              ? 'bg-orange-50 text-orange-700 border-orange-500 hover:bg-orange-100'
                               : 'bg-blue-50 text-blue-700 border-blue-500 hover:bg-blue-100'
                           }`}
                         >
-                          <RotateCcw className="w-4 h-4 mr-2" />
-                          {order.refundStatus === 'requested' ? 'Refund Pending' : 
+                          <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                          {order.refundStatus === 'requested' ? 'Refund Pending' :
+                           order.refundStatus === 'rejected' ? 'Submit New Refund' : 
                            order.refundStatus === 'partial' || order.refundStatus === 'full' ? 'Refund Processed' : 
                            'Request Refund'}
                         </Button>
@@ -2016,12 +2083,12 @@ export default function MyOrders() {
               </div>
 
               {/* Order Progress Bar */}
-              <div className="px-6 py-3 bg-white border-b border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Order Progress</span>
-                  <span className="text-xs font-bold text-gray-900">{getOrderProgress(order.status)}%</span>
+              <div className="px-3 sm:px-6 py-2.5 sm:py-3 bg-white border-b border-gray-100">
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-600 uppercase tracking-wider">Order Progress</span>
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-900">{getOrderProgress(order.status)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2 overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(order.status)}`}
                     style={{ width: `${getOrderProgress(order.status)}%` }}
@@ -2031,32 +2098,59 @@ export default function MyOrders() {
                 </div>
               </div>
 
+              {/* Refund Rejection Notice */}
+              {order.refundStatus === 'rejected' && order.refundRejectionReason && (
+                <div className="mx-3 sm:mx-6 my-3 sm:my-4 p-3 sm:p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg shadow-sm">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs sm:text-sm font-bold text-red-900 mb-1">Refund Request Declined</h4>
+                      <p className="text-xs sm:text-sm text-red-800 mb-2">
+                        Your refund request was reviewed and declined by our team. You can submit a new refund request with additional information if needed.
+                      </p>
+                      <div className="bg-white p-2 sm:p-3 rounded border border-red-200">
+                        <p className="text-[10px] sm:text-xs font-semibold text-red-900 mb-1">Admin Response:</p>
+                        <p className="text-xs sm:text-sm text-gray-800 break-words">{order.refundRejectionReason}</p>
+                      </div>
+                      <div className="mt-2 sm:mt-3 flex items-center gap-2">
+                        <button
+                          onClick={() => handleRequestRefund(order)}
+                          className="text-[10px] sm:text-xs font-semibold text-blue-700 hover:text-blue-900 underline"
+                        >
+                          Submit New Refund Request
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Order Items Preview */}
-              <div className="px-6 py-4 bg-gradient-to-b from-white to-gray-50">
-                <h4 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">Order Items</h4>
-                <div className="space-y-3">
+              <div className="px-3 sm:px-6 py-3 sm:py-4 bg-gradient-to-b from-white to-gray-50">
+                <h4 className="text-xs sm:text-sm font-bold text-gray-700 mb-2 sm:mb-3 uppercase tracking-wide">Order Items</h4>
+                <div className="space-y-2 sm:space-y-3">
                   {order.items.slice(0, 2).map((item) => (
-                    <div key={item.id} className="flex items-center space-x-4 p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-                      <div className="relative flex space-x-2">
+                    <div key={item.id} className="flex items-center gap-2 sm:gap-4 p-2 sm:p-4 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="relative flex gap-1 sm:gap-2 flex-shrink-0">
                         {/* Final Product Image (with design overlays) */}
                         <div className="relative">
                           <img
                             src={item.customization?.mockup || item.productImage}
                             alt={`Final ${item.productName}`}
-                            className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                            className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
                             }}
                           />
-                          <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                          <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-[9px] sm:text-xs px-0.5 sm:px-1 rounded text-center min-w-[18px] sm:min-w-[20px]">
                             Final
                           </div>
                         </div>
                         
                         {/* Uploaded Design Image(s) */}
                         {item.customization && (
-                          <div className="flex space-x-1">
+                          <div className="flex gap-0.5 sm:gap-1">
                             {/* Show multiple designs if available */}
                             {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
                               (item.customization as any).designs.slice(0, 2).map((design: any, index: number) => {
@@ -2089,11 +2183,11 @@ export default function MyOrders() {
                                   <div key={design.id || index} className="relative">
                                     {isBlobUrl ? (
                                       // Show placeholder for blob URLs (temporary images)
-                                      <div className="w-16 h-16 bg-gray-100 rounded-lg border-2 border-white shadow-sm flex flex-col items-center justify-center">
-                                        <span className="text-xs text-gray-500 text-center px-1">
+                                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-lg border-2 border-white shadow-sm flex flex-col items-center justify-center">
+                                        <span className="text-[9px] sm:text-xs text-gray-500 text-center px-1">
                                           {design.name}
                                         </span>
-                                        <span className="text-xs text-red-500 mt-1">
+                                        <span className="text-[9px] sm:text-xs text-red-500 mt-1">
                                           Lost
                                         </span>
                                       </div>
@@ -2102,7 +2196,7 @@ export default function MyOrders() {
                                       <img
                                         src={imageSrc}
                                         alt={`Design ${index + 1}`}
-                                        className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                        className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm"
                                         onError={(e) => {
                                           console.error('❌ Order preview image failed to load:', {
                                             designName: design.name,
@@ -2117,12 +2211,12 @@ export default function MyOrders() {
                                         }}
                                       />
                                     )}
-                                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[9px] sm:text-xs px-0.5 sm:px-1 rounded text-center min-w-[18px] sm:min-w-[20px]">
                                       D{index + 1}
                                     </div>
                                     {(item.customization as any).designs.length > 2 && index === 1 && (
                                       <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
-                                        <span className="text-white text-xs font-bold">
+                                        <span className="text-white text-[9px] sm:text-xs font-bold">
                                           +{(item.customization as any).designs.length - 2}
                                         </span>
                                       </div>
@@ -2135,13 +2229,13 @@ export default function MyOrders() {
                                 <img
                                   src={item.customization.design.preview}
                                   alt="Design"
-                                  className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                  className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
                                   }}
                                 />
-                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[9px] sm:text-xs px-0.5 sm:px-1 rounded text-center min-w-[18px] sm:min-w-[20px]">
                                   Design
                                 </div>
                               </div>
@@ -2150,13 +2244,13 @@ export default function MyOrders() {
                                 <img
                                   src={item.customization.embroideryData.designImage}
                                   alt="Design"
-                                  className="w-16 h-16 object-cover rounded-lg border-2 border-white shadow-sm"
+                                  className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.src = 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image';
                                   }}
                                 />
-                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-xs px-1 rounded text-center min-w-[20px]">
+                                <div className="absolute -bottom-1 -right-1 bg-green-500 text-white text-[9px] sm:text-xs px-0.5 sm:px-1 rounded text-center min-w-[18px] sm:min-w-[20px]">
                                   Design
                                 </div>
                               </div>
@@ -2164,46 +2258,46 @@ export default function MyOrders() {
                           </div>
                         )}
                         
-                        <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                        <div className="absolute -top-1.5 sm:-top-2 -right-1.5 sm:-right-2 bg-accent text-white text-[10px] sm:text-xs font-bold rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
                           {item.quantity}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-base font-bold text-gray-900 truncate mb-1">{item.productName}</h4>
-                        <p className="text-sm text-gray-600 font-medium mb-2">
+                        <h4 className="text-sm sm:text-base font-bold text-gray-900 truncate mb-0.5 sm:mb-1">{item.productName}</h4>
+                        <p className="text-xs sm:text-sm text-gray-600 font-medium mb-1 sm:mb-2">
                           ${getPricingBreakdown(item, backendProducts).totalPrice.toFixed(2)} <span className="text-gray-400">×</span> {item.quantity}
                         </p>
                         
                         {/* Simplified Customization Display */}
                         {item.customization && (
-                          <div className="flex flex-wrap gap-1.5">
+                          <div className="flex flex-wrap gap-1 sm:gap-1.5">
                             {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
-                                🎨 {(item.customization as any).designs.length} Design{(item.customization as any).designs.length !== 1 ? 's' : ''}
+                              <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                {(item.customization as any).designs.length} Design{(item.customization as any).designs.length !== 1 ? 's' : ''}
                               </span>
                             ) : item.customization.design ? (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
-                                🎨 Custom Design
+                              <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                Custom Design
                               </span>
                             ) : null}
                             
                             {item.customization.placement && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                📍 {item.customization.placement.replace('-', ' ')}
+                              <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                {item.customization.placement.replace('-', ' ')}
                               </span>
                             )}
                             
                             {item.customization.size && (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                📏 {item.customization.size}
+                              <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                {item.customization.size}
                               </span>
                             )}
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-medium text-gray-500 mb-1">Item Total</p>
-                        <p className="text-lg font-bold text-gray-900">
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[10px] sm:text-xs font-medium text-gray-500 mb-0.5 sm:mb-1">Item Total</p>
+                        <p className="text-base sm:text-lg font-bold text-gray-900">
                           ${(getPricingBreakdown(item, backendProducts).totalPrice * (item.quantity || 1)).toFixed(2)}
                         </p>
                       </div>
@@ -2212,10 +2306,10 @@ export default function MyOrders() {
                   
                   {/* Show more items indicator */}
                   {order.items.length > 2 && (
-                    <div className="text-center py-3">
-                      <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full border border-gray-300">
-                        <Package className="w-4 h-4 text-gray-600 mr-2" />
-                        <span className="text-sm text-gray-700 font-bold">
+                    <div className="text-center py-2 sm:py-3">
+                      <div className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full border border-gray-300">
+                        <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600 mr-1.5 sm:mr-2" />
+                        <span className="text-xs sm:text-sm text-gray-700 font-bold">
                           +{order.items.length - 2} more item{order.items.length - 2 !== 1 ? 's' : ''}
                         </span>
                       </div>
@@ -2396,7 +2490,7 @@ export default function MyOrders() {
                           ? 'text-red-800' 
                           : 'text-blue-800'
                       }`}>
-                        {order.status === 'rejected-needs-upload' ? '⚠️ Rejection Reason' : 'Admin Message'}
+                        {order.status === 'rejected-needs-upload' ? 'Rejection Reason' : 'Admin Message'}
                       </p>
                       <p className={`text-sm ${
                         order.status === 'rejected-needs-upload' 
@@ -2441,34 +2535,34 @@ export default function MyOrders() {
               )}
 
               {order.status === 'shipped' && (
-                <div className="px-6 py-4 bg-purple-50 border-t border-purple-100">
-                  <div className="flex items-start space-x-3">
-                    <Package className="w-6 h-6 text-purple-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-purple-800 mb-2">Shipped</p>
-                      <p className="text-sm text-purple-700 mb-3">
+                <div className="px-3 sm:px-6 py-3 sm:py-4 bg-purple-50 border-t border-purple-100">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <Package className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-purple-800 mb-1.5 sm:mb-2">Shipped</p>
+                      <p className="text-xs sm:text-sm text-purple-700 mb-2 sm:mb-3">
                         Your order is on its way! Track your package using the information below.
                       </p>
                       {order.trackingNumber ? (
-                        <div className="bg-white rounded-lg p-3 border border-purple-200 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-gray-600">Courier:</span>
-                            <span className="text-sm font-semibold text-gray-900">{order.shippingCarrier || 'N/A'}</span>
+                        <div className="bg-white rounded-lg p-2 sm:p-3 border border-purple-200 space-y-1.5 sm:space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Courier:</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{order.shippingCarrier || 'N/A'}</span>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-gray-600">Tracking Number:</span>
-                            <span className="text-sm font-mono font-semibold text-purple-700">{order.trackingNumber}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Tracking Number:</span>
+                            <span className="text-xs sm:text-sm font-mono font-semibold text-purple-700 truncate">{order.trackingNumber}</span>
                           </div>
                           {order.shippedAt && (
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                              <span className="text-xs font-medium text-gray-600">Shipped On:</span>
-                              <span className="text-xs text-gray-700">{formatDateWithoutTimezone(order.shippedAt)}</span>
+                            <div className="flex items-center justify-between gap-2 pt-1.5 sm:pt-2 border-t border-gray-200">
+                              <span className="text-[10px] sm:text-xs font-medium text-gray-600">Shipped On:</span>
+                              <span className="text-[10px] sm:text-xs text-gray-700">{formatDateWithoutTimezone(order.shippedAt)}</span>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="bg-white rounded-lg p-3 border border-purple-200">
-                          <p className="text-sm text-gray-600 italic">Tracking information will be available soon.</p>
+                        <div className="bg-white rounded-lg p-2 sm:p-3 border border-purple-200">
+                          <p className="text-xs sm:text-sm text-gray-600 italic">Tracking information will be available soon.</p>
                         </div>
                       )}
                     </div>
@@ -2477,34 +2571,34 @@ export default function MyOrders() {
               )}
 
               {order.status === 'delivered' && (
-                <div className="px-6 py-4 bg-green-50 border-t border-green-100">
-                  <div className="flex items-start space-x-3">
-                    <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-green-800 mb-2">Delivered</p>
-                      <p className="text-sm text-green-700 mb-3">
+                <div className="px-3 sm:px-6 py-3 sm:py-4 bg-green-50 border-t border-green-100">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-green-800 mb-1.5 sm:mb-2">Delivered</p>
+                      <p className="text-xs sm:text-sm text-green-700 mb-2 sm:mb-3">
                         Your order has been delivered successfully! Thank you for your purchase.
                       </p>
                       {order.trackingNumber ? (
-                        <div className="bg-white rounded-lg p-3 border border-green-200 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-gray-600">Courier:</span>
-                            <span className="text-sm font-semibold text-gray-900">{order.shippingCarrier || 'N/A'}</span>
+                        <div className="bg-white rounded-lg p-2 sm:p-3 border border-green-200 space-y-1.5 sm:space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Courier:</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{order.shippingCarrier || 'N/A'}</span>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-gray-600">Tracking Number:</span>
-                            <span className="text-sm font-mono font-semibold text-green-700">{order.trackingNumber}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] sm:text-xs font-medium text-gray-600">Tracking Number:</span>
+                            <span className="text-xs sm:text-sm font-mono font-semibold text-green-700 truncate">{order.trackingNumber}</span>
                           </div>
                           {order.deliveredAt && (
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                              <span className="text-xs font-medium text-gray-600">Delivered On:</span>
-                              <span className="text-xs text-gray-700">{formatDateWithoutTimezone(order.deliveredAt)}</span>
+                            <div className="flex items-center justify-between gap-2 pt-1.5 sm:pt-2 border-t border-gray-200">
+                              <span className="text-[10px] sm:text-xs font-medium text-gray-600">Delivered On:</span>
+                              <span className="text-[10px] sm:text-xs text-gray-700">{formatDateWithoutTimezone(order.deliveredAt)}</span>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="bg-white rounded-lg p-3 border border-green-200">
-                          <p className="text-sm text-gray-600 italic">Tracking information not available.</p>
+                        <div className="bg-white rounded-lg p-2 sm:p-3 border border-green-200">
+                          <p className="text-xs sm:text-sm text-gray-600 italic">Tracking information not available.</p>
                         </div>
                       )}
                     </div>
@@ -2518,48 +2612,48 @@ export default function MyOrders() {
 
       {/* Order Details Modal */}
       {showOrderDetails && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Order Details</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Order Details</h2>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* Order Info */}
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Order Number</p>
-                      <p className="text-lg font-semibold text-gray-900">{selectedOrder.orderNumber}</p>
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Order Number</p>
+                      <p className="text-base sm:text-lg font-semibold text-gray-900 break-words">{selectedOrder.orderNumber}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Submitted Date</p>
-                      <p className="text-lg font-semibold text-gray-900">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Submitted Date</p>
+                      <p className="text-base sm:text-lg font-semibold text-gray-900">
                         {formatDateWithoutTimezone(selectedOrder.orderDate)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Status</p>
-                      <div className="flex items-center space-x-2">
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Status</p>
+                      <div className="flex items-center gap-2">
                         {getStatusIcon(selectedOrder.status)}
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
+                        <span className={`px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium ${getStatusColor(selectedOrder.status)}`}>
                           {getStatusText(selectedOrder.status)}
                         </span>
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Total</p>
-                      <p className="text-lg font-semibold text-gray-900">${calculateCorrectOrderTotal(selectedOrder, backendProducts).toFixed(2)}</p>
+                      <p className="text-xs sm:text-sm font-medium text-gray-500">Total</p>
+                      <p className="text-base sm:text-lg font-semibold text-gray-900">${calculateCorrectOrderTotal(selectedOrder, backendProducts).toFixed(2)}</p>
                       
                       {/* Order Total Breakdown */}
-                      <div className="mt-2 text-xs text-gray-600 space-y-1">
+                      <div className="mt-2 text-[10px] sm:text-xs text-gray-600 space-y-1">
                         <div className="flex justify-between">
                           <span>Items Subtotal:</span>
                           <span>${selectedOrder.items.reduce((total, item) => {
@@ -2584,27 +2678,27 @@ export default function MyOrders() {
                     </div>
                     {selectedOrder.reviewedAt && (
                     <div>
-                        <p className="text-sm font-medium text-gray-500">Reviewed Date</p>
-                        <p className="text-lg font-semibold text-gray-900">
+                        <p className="text-xs sm:text-sm font-medium text-gray-500">Reviewed Date</p>
+                        <p className="text-base sm:text-lg font-semibold text-gray-900">
                           {formatDateWithoutTimezone(selectedOrder.reviewedAt)}
                         </p>
                       </div>
                     )}
                     {selectedOrder.adminNotes && (
-                      <div className="col-span-2">
-                        <p className={`text-sm font-medium ${
+                      <div className="sm:col-span-2">
+                        <p className={`text-xs sm:text-sm font-medium ${
                           selectedOrder.status === 'rejected-needs-upload' 
                             ? 'text-red-600' 
                             : 'text-gray-500'
                         }`}>
-                          {selectedOrder.status === 'rejected-needs-upload' ? '⚠️ Rejection Reason' : 'Admin Notes'}
+                          {selectedOrder.status === 'rejected-needs-upload' ? 'Rejection Reason' : 'Admin Notes'}
                         </p>
-                        <div className={`mt-1 p-3 border rounded ${
+                        <div className={`mt-1 p-2 sm:p-3 border rounded ${
                           selectedOrder.status === 'rejected-needs-upload' 
                             ? 'bg-red-50 border-red-200' 
                             : 'bg-blue-50 border-blue-200'
                         }`}>
-                          <p className={`text-sm ${
+                          <p className={`text-xs sm:text-sm break-words ${
                             selectedOrder.status === 'rejected-needs-upload' 
                               ? 'text-red-800 font-medium' 
                               : 'text-blue-800'
@@ -2617,12 +2711,12 @@ export default function MyOrders() {
 
                 {/* Status Message */}
                 {selectedOrder && selectedOrder.status === 'pending-payment' && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <CreditCard className="h-6 w-6 text-orange-600" />
-                      <div>
-                        <h3 className="text-lg font-medium text-orange-800">Payment Required</h3>
-                        <p className="text-sm text-orange-700 mt-1">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-medium text-orange-800">Payment Required</h3>
+                        <p className="text-xs sm:text-sm text-orange-700 mt-1">
                           Your design has been approved! Please proceed to checkout to complete your payment and begin processing.
                         </p>
                       </div>
@@ -2631,12 +2725,12 @@ export default function MyOrders() {
                 )}
 
                 {selectedOrder && selectedOrder.status === 'approved-processing' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                      <div>
-                        <h3 className="text-lg font-medium text-green-800">Design Approved!</h3>
-                        <p className="text-sm text-green-700 mt-1">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-medium text-green-800">Design Approved!</h3>
+                        <p className="text-xs sm:text-sm text-green-700 mt-1">
                           Your design has been approved and is being processed. You can now proceed to checkout to complete your order.
                         </p>
                       </div>
@@ -2646,36 +2740,36 @@ export default function MyOrders() {
 
                 {/* Tracking Information - Shipped Status */}
                 {selectedOrder && selectedOrder.status === 'shipped' && (
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-3">
-                      <Package className="h-6 w-6 text-purple-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium text-purple-800 mb-2">Order Shipped!</h3>
-                        <p className="text-sm text-purple-700 mb-3">
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <Package className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-medium text-purple-800 mb-1.5 sm:mb-2">Order Shipped!</h3>
+                        <p className="text-xs sm:text-sm text-purple-700 mb-2 sm:mb-3">
                           Your order is on its way! Track your package using the information below.
                         </p>
                         {selectedOrder.trackingNumber ? (
-                          <div className="bg-white rounded-lg p-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                               <div>
-                                <p className="text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
-                                <p className="text-base font-semibold text-gray-900">{selectedOrder.shippingCarrier || 'N/A'}</p>
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
+                                <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">{selectedOrder.shippingCarrier || 'N/A'}</p>
                               </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
-                                <p className="text-base font-mono font-semibold text-purple-700">{selectedOrder.trackingNumber}</p>
+                              <div className="min-w-0">
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
+                                <p className="text-sm sm:text-base font-mono font-semibold text-purple-700 break-all">{selectedOrder.trackingNumber}</p>
                               </div>
                             </div>
                             {selectedOrder.shippedAt && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <p className="text-xs font-medium text-gray-600 mb-1">Shipped Date</p>
-                                <p className="text-sm text-gray-900">{new Date(selectedOrder.shippedAt).toLocaleString()}</p>
+                              <div className="pt-2 sm:pt-3 border-t border-gray-200">
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Shipped Date</p>
+                                <p className="text-xs sm:text-sm text-gray-900 break-words">{new Date(selectedOrder.shippedAt).toLocaleString()}</p>
                               </div>
                             )}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-lg p-4">
-                            <p className="text-sm text-gray-600 italic">Tracking information will be available soon.</p>
+                          <div className="bg-white rounded-lg p-3 sm:p-4">
+                            <p className="text-xs sm:text-sm text-gray-600 italic">Tracking information will be available soon.</p>
                           </div>
                         )}
                       </div>
@@ -2685,36 +2779,36 @@ export default function MyOrders() {
 
                 {/* Tracking Information - Delivered Status */}
                 {selectedOrder && selectedOrder.status === 'delivered' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex items-start space-x-3">
-                      <CheckCircle className="h-6 w-6 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium text-green-800 mb-2">Order Delivered!</h3>
-                        <p className="text-sm text-green-700 mb-3">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <CheckCircle className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-medium text-green-800 mb-1.5 sm:mb-2">Order Delivered!</h3>
+                        <p className="text-xs sm:text-sm text-green-700 mb-2 sm:mb-3">
                           Your order has been delivered successfully. Thank you for your purchase!
                         </p>
                         {selectedOrder.trackingNumber ? (
-                          <div className="bg-white rounded-lg p-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                               <div>
-                                <p className="text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
-                                <p className="text-base font-semibold text-gray-900">{selectedOrder.shippingCarrier || 'N/A'}</p>
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Shipping Courier</p>
+                                <p className="text-sm sm:text-base font-semibold text-gray-900 break-words">{selectedOrder.shippingCarrier || 'N/A'}</p>
                               </div>
-                              <div>
-                                <p className="text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
-                                <p className="text-base font-mono font-semibold text-green-700">{selectedOrder.trackingNumber}</p>
+                              <div className="min-w-0">
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Tracking Number</p>
+                                <p className="text-sm sm:text-base font-mono font-semibold text-green-700 break-all">{selectedOrder.trackingNumber}</p>
                               </div>
                             </div>
                             {selectedOrder.deliveredAt && (
-                              <div className="pt-3 border-t border-gray-200">
-                                <p className="text-xs font-medium text-gray-600 mb-1">Delivered Date</p>
-                                <p className="text-sm text-gray-900">{new Date(selectedOrder.deliveredAt).toLocaleString()}</p>
+                              <div className="pt-2 sm:pt-3 border-t border-gray-200">
+                                <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Delivered Date</p>
+                                <p className="text-xs sm:text-sm text-gray-900 break-words">{new Date(selectedOrder.deliveredAt).toLocaleString()}</p>
                               </div>
                             )}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-lg p-4">
-                            <p className="text-sm text-gray-600 italic">Tracking information not available.</p>
+                          <div className="bg-white rounded-lg p-3 sm:p-4">
+                            <p className="text-xs sm:text-sm text-gray-600 italic">Tracking information not available.</p>
                           </div>
                         )}
                       </div>
@@ -2724,8 +2818,8 @@ export default function MyOrders() {
 
                 {/* Order Items */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Order Items</h3>
-                  <div className="space-y-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Order Items</h3>
+                  <div className="space-y-3 sm:space-y-4">
                     {selectedOrder.items.map((item) => (
                       <div key={item.id} className="p-4 border border-gray-200 rounded-lg">
                         <div className="flex items-start space-x-4">
@@ -3147,8 +3241,8 @@ export default function MyOrders() {
                                               <div className="bg-white bg-opacity-50 rounded-lg p-2">
                                                 <p className="text-sm">
                                                   {selectedOrder.status === 'pending-payment' 
-                                                    ? '🎉 Design approved! Please complete payment to start production.'
-                                                    : '✨ Design approved and in progress. We\'ll notify you when it\'s ready!'
+                                                    ? 'Design approved! Please complete payment to start production.'
+                                                    : 'Design approved and in progress. We\'ll notify you when it\'s ready!'
                                                   }
                                                 </p>
                                               </div>

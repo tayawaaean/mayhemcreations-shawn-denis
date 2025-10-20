@@ -1407,9 +1407,9 @@ export default function Checkout() {
                         const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product?.title || 'Unknown Product'
                         
                     return (
-                      <div key={index} className="border-2 border-gray-300 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50 shadow-md">
+                      <div key={index} className="border-2 border-gray-300 rounded-lg p-3 sm:p-4 bg-gradient-to-br from-white to-gray-50 shadow-md">
                         {/* Product Header with Image */}
-                        <div className="flex items-start space-x-3 sm:space-x-4 mb-3">
+                        <div className="flex items-start gap-2 sm:gap-3 mb-3">
                           {/* Product/Design Image */}
                           <div className="flex-shrink-0">
                             {(() => {
@@ -1420,9 +1420,9 @@ export default function Checkout() {
                                     <img
                                       src={item.customization.mockup}
                                       alt="Final Product"
-                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                      className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg border-2 border-accent"
                                     />
-                                    <div className="absolute -top-2 -right-2 bg-accent text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                    <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-accent text-white text-xs font-bold rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
                                       ✓
                                     </div>
                                   </div>
@@ -1437,10 +1437,10 @@ export default function Checkout() {
                                     <img
                                       src={firstDesign.preview || product?.image}
                                       alt={firstDesign.name || 'Design 1'}
-                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                      className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg border-2 border-accent"
                                     />
                                     {item.customization.designs.length > 1 && (
-                                      <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                                      <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
                                         +{item.customization.designs.length - 1}
                                       </div>
                                     )}
@@ -1456,7 +1456,7 @@ export default function Checkout() {
                                     <img
                                       src={embroideryData.designImage}
                                       alt="Uploaded Design"
-                                      className="w-24 h-24 object-cover rounded-lg border-2 border-accent"
+                                      className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg border-2 border-accent"
                                     />
                                   );
                                 }
@@ -1467,7 +1467,7 @@ export default function Checkout() {
                               <img
                                 src={product?.image}
                                 alt={displayTitle}
-                                  className="w-24 h-24 object-cover rounded-lg border-2 border-gray-300"
+                                  className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 object-cover rounded-lg border-2 border-gray-300"
                               />
                               );
                             })()}
@@ -1475,25 +1475,25 @@ export default function Checkout() {
                           
                           {/* Product Title and Quantity */}
                               <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-gray-900 text-lg mb-1">
+                            <h3 className="font-bold text-gray-900 text-sm sm:text-base md:text-lg mb-1 truncate" title={displayTitle}>
                               {displayTitle}
                             </h3>
                             {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
-                              <p className="text-sm text-purple-600 font-medium mb-1">
+                              <p className="text-xs sm:text-sm text-purple-600 font-medium mb-1">
                                 {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
                               </p>
                             )}
-                            <p className="text-sm text-gray-600 mb-2">
+                            <p className="text-xs sm:text-sm text-gray-600 mb-2">
                               Quantity: <span className="font-medium">{item.quantity}</span>
                             </p>
                             
                             {/* Customization Badge */}
                             {item.customization && (
-                              <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full">
-                                <CheckCircle className="w-3 h-3 mr-1" />
-                                Customized Product
+                              <div className="mt-2 inline-flex items-center px-2 py-1 bg-accent/10 text-accent text-xs font-medium rounded-full flex-wrap">
+                                <CheckCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                                <span className="whitespace-nowrap">Customized Product</span>
                                 {item.customization.designs && item.customization.designs.length > 0 && (
-                                  <span className="ml-1">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
+                                  <span className="ml-1 whitespace-nowrap">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
                                 )}
                               </div>
                             )}
@@ -1502,14 +1502,16 @@ export default function Checkout() {
                             {item.customization?.designs && item.customization.designs.length > 0 && (
                                   <div className="mt-2 space-y-1">
                                 {item.customization.designs.map((design: any, designIndex: number) => (
-                                  <div key={designIndex} className="flex items-center text-xs text-gray-600">
-                                    <span className="inline-block w-2 h-2 bg-accent rounded-full mr-2"></span>
-                                    <span className="font-medium">{design.name || `Design ${designIndex + 1}`}</span>
-                                    {design.dimensions && (
-                                      <span className="ml-2 text-gray-400">
-                                        ({design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}")
-                                      </span>
-                                    )}
+                                  <div key={designIndex} className="flex items-start text-xs text-gray-600">
+                                    <span className="inline-block w-2 h-2 bg-accent rounded-full mr-2 mt-1 flex-shrink-0"></span>
+                                    <div className="flex-1 min-w-0">
+                                      <span className="font-medium break-words">{design.name || `Design ${designIndex + 1}`}</span>
+                                      {design.dimensions && (
+                                        <span className="ml-1 sm:ml-2 text-gray-400 whitespace-nowrap">
+                                          ({design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}")
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                                   </div>
@@ -1517,9 +1519,9 @@ export default function Checkout() {
                               </div>
                               
                               {/* Item Total Display */}
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-xs sm:text-sm text-gray-600">Item Total</p>
-                                <p className="font-bold text-lg sm:text-xl text-accent">
+                              <div className="text-right flex-shrink-0 ml-2">
+                                <p className="text-xs text-gray-600 whitespace-nowrap">Item Total</p>
+                                <p className="font-bold text-base sm:text-lg md:text-xl text-accent whitespace-nowrap">
                                   ${(calculateItemPrice(item) * item.quantity).toFixed(2)}
                                 </p>
                               </div>
@@ -1527,8 +1529,8 @@ export default function Checkout() {
                         
                         {/* Color and Size Info */}
                         {item.customization && (item.customization.color || item.customization.size) && (
-                          <div className="border-t border-gray-200 pt-3 mt-3">
-                            <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
+                          <div className="border-t border-gray-200 pt-2 sm:pt-3 mt-2 sm:mt-3">
+                            <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
                               {item.customization.color && (
                                 <div>
                                   <span className="text-gray-600">Color: </span>
@@ -1546,8 +1548,8 @@ export default function Checkout() {
                         )}
                         
                         {/* Pricing Breakdown */}
-                        <div className="border-t border-gray-200 pt-4 mt-3 space-y-2 text-sm">
-                          <div className="font-medium text-gray-900 mb-3 text-base">Detailed Price Breakdown</div>
+                        <div className="border-t border-gray-200 pt-3 sm:pt-4 mt-2 sm:mt-3 space-y-2 text-xs sm:text-sm">
+                          <div className="font-medium text-gray-900 mb-2 sm:mb-3 text-sm sm:text-base">Detailed Price Breakdown</div>
                           {/* For custom embroidery, show base embroidery price instead of product price */}
                           {item.productId === 'custom-embroidery' && item.customization?.embroideryData ? (
                             <div className="flex justify-between">
@@ -1566,15 +1568,15 @@ export default function Checkout() {
                             <>
                               {/* All Design Previews Gallery */}
                               {item.customization.designs.length > 1 && (
-                                <div className="mb-3 pb-3 border-b border-gray-200">
+                                <div className="mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-gray-200">
                                   <p className="text-xs font-medium text-gray-700 mb-2">All Designs:</p>
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                     {item.customization.designs.map((design: any, designIndex: number) => (
                                       <div key={designIndex} className="relative group">
                                         <img
                                           src={design.preview}
                                           alt={design.name || `Design ${designIndex + 1}`}
-                                          className="w-16 h-16 object-cover rounded border-2 border-gray-300 group-hover:border-accent transition-colors"
+                                          className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 object-cover rounded border-2 border-gray-300 group-hover:border-accent transition-colors"
                                         />
                                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity rounded flex items-center justify-center">
                                           <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100">
@@ -1588,7 +1590,7 @@ export default function Checkout() {
                               )}
                               
                               {/* Individual Design Pricing */}
-                              <div className="space-y-3 mt-3">
+                              <div className="space-y-2 sm:space-y-3 mt-2 sm:mt-3">
                                 {item.customization.designs.map((design: any, designIndex: number) => {
                                   // Calculate material cost
                                   let materialCost = 0;
@@ -1620,28 +1622,28 @@ export default function Checkout() {
                                   const designTotal = materialCost + stylesCost
                                   
                                   return (
-                                    <div key={designIndex} className="pl-3 border-l-2 border-accent/30 bg-white rounded-lg p-3 space-y-2">
+                                    <div key={designIndex} className="pl-2 sm:pl-3 border-l-2 border-accent/30 bg-white rounded-lg p-2 sm:p-3 space-y-1.5 sm:space-y-2">
                                       {/* Design Header */}
-                                      <div className="text-gray-700 font-semibold text-sm mb-2">
-                                        Design {designIndex + 1}: {design.name}
+                                      <div className="text-gray-700 font-semibold text-xs sm:text-sm mb-1 sm:mb-2 break-words">
+                                        Design {designIndex + 1}: <span className="truncate inline-block max-w-[150px] sm:max-w-none align-bottom" title={design.name}>{design.name}</span>
                                       </div>
                                     
                                       {/* Material Cost */}
                                       <div className="flex justify-between text-gray-600 text-xs">
                                         <span>Material Cost:</span>
-                                        <span>${materialCost.toFixed(2)}</span>
+                                        <span className="whitespace-nowrap ml-2">${materialCost.toFixed(2)}</span>
                                       </div>
                                       
                                       {/* Style Options Cost */}
                                       <div className="flex justify-between text-gray-600 text-xs">
                                         <span>Style Options:</span>
-                                        <span>${stylesCost.toFixed(2)}</span>
+                                        <span className="whitespace-nowrap ml-2">${stylesCost.toFixed(2)}</span>
                                       </div>
                                       
                                       {/* Design Total */}
-                                      <div className="flex justify-between font-medium text-xs pt-2 border-t border-gray-200">
+                                      <div className="flex justify-between font-medium text-xs pt-1.5 sm:pt-2 border-t border-gray-200">
                                         <span>Design Total:</span>
-                                        <span className="text-accent">${designTotal.toFixed(2)}</span>
+                                        <span className="text-accent whitespace-nowrap ml-2">${designTotal.toFixed(2)}</span>
                                       </div>
                                     </div>
                                 );
@@ -1651,9 +1653,9 @@ export default function Checkout() {
                           )}
                           
                           {/* Unit Price */}
-                          <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-sm mt-2">
+                          <div className="border-t border-gray-200 pt-2 flex justify-between font-semibold text-xs sm:text-sm mt-2">
                             <span>Unit Price:</span>
-                            <span className="text-accent">${calculateItemPrice(item).toFixed(2)}</span>
+                            <span className="text-accent whitespace-nowrap ml-2">${calculateItemPrice(item).toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -1664,37 +1666,37 @@ export default function Checkout() {
                   </div>
                   
                   {/* Final Totals */}
-                  <div className="border-t-2 border-gray-300 pt-4 space-y-2">
-                    <div className="flex justify-between text-base">
+                  <div className="border-t-2 border-gray-300 pt-3 sm:pt-4 space-y-2">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span className="text-gray-600">Subtotal:</span>
-                      <span className="font-medium">${calculateSubtotal().toFixed(2)}</span>
+                      <span className="font-medium whitespace-nowrap ml-2">${calculateSubtotal().toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-base">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span className="text-gray-600">Shipping:</span>
-                      <span className="font-medium">${(selectedShippingRate?.totalCost || 0).toFixed(2)}</span>
+                      <span className="font-medium whitespace-nowrap ml-2">${(selectedShippingRate?.totalCost || 0).toFixed(2)}</span>
                     </div>
                     {selectedShippingRate && (
-                      <div className="text-sm text-gray-500 ml-4">
+                      <div className="text-xs sm:text-sm text-gray-500 ml-3 sm:ml-4 break-words">
                         {selectedShippingRate.serviceName} • {selectedShippingRate.carrier}
                       </div>
                     )}
-                    <div className="flex justify-between text-base">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span className="text-gray-600">Tax (8%):</span>
-                      <span className="font-medium">${calculateTax().toFixed(2)}</span>
+                      <span className="font-medium whitespace-nowrap ml-2">${calculateTax().toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-xl font-bold pt-2 border-t">
+                    <div className="flex justify-between text-lg sm:text-xl font-bold pt-2 border-t">
                       <span className="text-gray-900">Order Total:</span>
-                      <span className="text-accent">${calculateTotal().toFixed(2)}</span>
+                      <span className="text-accent whitespace-nowrap ml-2">${calculateTotal().toFixed(2)}</span>
                     </div>
                   </div>
                   
                   {/* Important Notice */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-start">
-                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
-                      <div>
-                        <h4 className="font-medium text-blue-900">Ready to Submit?</h4>
-                        <p className="text-sm text-blue-700 mt-1">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                    <div className="flex items-start gap-2 sm:gap-3">
+                      <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-blue-900 text-sm sm:text-base">Ready to Submit?</h4>
+                        <p className="text-xs sm:text-sm text-blue-700 mt-1">
                           By clicking "Submit for Review", your order will be sent to our team for approval. Once approved, you'll receive a notification and can proceed to payment.
                         </p>
                     </div>
@@ -1703,12 +1705,12 @@ export default function Checkout() {
                   
                   {/* Error Display */}
                   {paymentError && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                      <div className="flex items-start">
-                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
-                        <div>
-                          <h4 className="font-medium text-red-900">Submission Error</h4>
-                          <p className="text-sm text-red-700 mt-1">{paymentError}</p>
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start gap-2 sm:gap-3">
+                        <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-red-900 text-sm sm:text-base">Submission Error</h4>
+                          <p className="text-xs sm:text-sm text-red-700 mt-1 break-words">{paymentError}</p>
                         </div>
                       </div>
                     </div>

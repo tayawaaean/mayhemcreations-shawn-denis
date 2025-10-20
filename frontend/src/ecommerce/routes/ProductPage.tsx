@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Heart, Share2, Star, ShoppingCart, ArrowRight } from 'lucide-react'
+import { ArrowLeft, Share2, Star, ShoppingCart, ArrowRight } from 'lucide-react'
 import Button from '../../components/Button'
 import ProductSlideshow from '../components/ProductSlideshow'
 import { productApiService, Product } from '../../shared/productApiService'
@@ -144,20 +144,20 @@ export default function ProductPage() {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Header */}
             <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
                 {product.title}
               </h1>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-base sm:text-lg text-gray-600 mb-3 sm:mb-4">
                 {product.category?.name} {product.subcategory?.name && `• ${product.subcategory.name}`}
               </p>
               
               {/* Price and Stock */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <span className="text-3xl font-bold text-gray-900">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+                <div>
+                  <span className="text-2xl sm:text-3xl font-bold text-gray-900">
                     ${typeof product.price === 'string' ? parseFloat(product.price).toFixed(2) : product.price.toFixed(2)}
                   </span>
                 </div>
@@ -165,14 +165,14 @@ export default function ProductPage() {
                 {/* Stock Status */}
                 {totalStock !== undefined && (
                   <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${
+                    <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${
                       totalStock === 0 
                         ? 'bg-red-500' 
                         : totalStock <= 5 
                           ? 'bg-yellow-500' 
                           : 'bg-green-500'
                     }`}></div>
-                    <span className={`text-sm font-medium ${
+                    <span className={`text-xs sm:text-sm font-medium ${
                       totalStock === 0 
                         ? 'text-red-600' 
                         : totalStock <= 5 
@@ -228,16 +228,16 @@ export default function ProductPage() {
 
             {/* Description */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Description</h3>
+              <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
                 {product.description}
               </p>
             </div>
 
             {/* Features */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Features</h3>
-              <ul className="space-y-2 text-gray-600">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Features</h3>
+              <ul className="space-y-2 text-sm sm:text-base text-gray-600">
                 <li className="flex items-center">
                   <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   High-quality embroidery
@@ -258,12 +258,12 @@ export default function ProductPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-4">
-              <div className="flex space-x-4">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <Button
                   variant={totalStock === 0 ? "outline" : "add-to-cart"}
                   size="lg"
-                  className="flex-1"
+                  className="flex-1 w-full"
                   disabled={totalStock === 0}
                   onClick={() => totalStock !== 0 && navigate(`/customize/${product.id}`)}
                 >
@@ -273,16 +273,10 @@ export default function ProductPage() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="px-4"
+                  className="px-6 sm:px-4 w-full sm:w-auto"
                 >
-                  <Heart className="w-5 h-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="px-4"
-                >
-                  <Share2 className="w-5 h-5" />
+                  <Share2 className="w-5 h-5 sm:mr-0 mr-2" />
+                  <span className="sm:hidden">Share</span>
                 </Button>
               </div>
 
@@ -299,8 +293,8 @@ export default function ProductPage() {
             </div>
 
             {/* Additional Info */}
-            <div className="border-t pt-6">
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+            <div className="border-t pt-4 sm:pt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
                 <div>
                   <span className="font-medium">SKU:</span> {product.sku}
                 </div>
@@ -313,8 +307,8 @@ export default function ProductPage() {
         </div>
 
         {/* Reviews Section */}
-        <div id="reviews-section" className="container mx-auto px-4 py-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Customer Reviews</h2>
+        <div id="reviews-section" className="mt-8 sm:mt-12 pt-8 sm:pt-12 border-t border-gray-200">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Customer Reviews</h2>
           
           {reviewsLoading ? (
             <div className="text-center py-8">
@@ -324,12 +318,12 @@ export default function ProductPage() {
             <>
               {/* Review Stats */}
               {reviewStats && reviewStats.totalReviews > 0 && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div>
                       <div className="flex items-center mb-2">
-                        <span className="text-5xl font-bold text-gray-900">{reviewStats.averageRating}</span>
-                        <div className="ml-4">
+                        <span className="text-4xl sm:text-5xl font-bold text-gray-900">{reviewStats.averageRating}</span>
+                        <div className="ml-3 sm:ml-4">
                           {renderStars(Math.round(parseFloat(reviewStats.averageRating)))}
                           <p className="text-sm text-gray-600 mt-1">
                             Based on {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? 'review' : 'reviews'}
@@ -363,16 +357,16 @@ export default function ProductPage() {
               )}
 
               {/* Individual Reviews */}
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {reviews.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 rounded-lg">
-                    <Star className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-1">No reviews yet</h3>
-                    <p className="text-gray-600">Be the first to review this product!</p>
+                  <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-lg">
+                    <Star className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-2 sm:mb-3" />
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1">No reviews yet</h3>
+                    <p className="text-sm sm:text-base text-gray-600">Be the first to review this product!</p>
                   </div>
                 ) : (
                   reviews.map((review) => (
-                    <div key={review.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                    <div key={review.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           {renderStars(review.rating)}
@@ -401,13 +395,13 @@ export default function ProductPage() {
                           const images = JSON.parse(review.images);
                           if (Array.isArray(images) && images.length > 0) {
                             return (
-                              <div className="grid grid-cols-4 gap-2 mb-4">
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                                 {images.map((image: string, imgIndex: number) => (
                                   <img
                                     key={imgIndex}
                                     src={image}
                                     alt={`Review ${imgIndex + 1}`}
-                                    className="w-full h-32 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="w-full h-24 sm:h-32 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
                                   />
                                 ))}
                               </div>

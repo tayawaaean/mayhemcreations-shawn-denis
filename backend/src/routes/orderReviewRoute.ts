@@ -12,6 +12,7 @@ import {
   updateReviewStatus,
   uploadPictureReply,
   confirmPictureReplies,
+  confirmOrderDelivery,
   getOrderStats,
 } from '../controllers/orderReviewController';
 
@@ -59,6 +60,13 @@ router.post('/admin/review-orders/:id/picture-reply', sessionAuthenticate, requi
  * @access Private (Customer only)
  */
 router.post('/review-orders/:id/confirm-pictures', sessionAuthenticate, requireRole(['customer']), confirmPictureReplies);
+
+/**
+ * @route POST /api/v1/orders/review-orders/:id/confirm-delivery
+ * @desc Customer confirm order received (marks as delivered)
+ * @access Private (Customer only)
+ */
+router.post('/review-orders/:id/confirm-delivery', sessionAuthenticate, requireRole(['customer']), confirmOrderDelivery);
 
 /**
  * @route GET /api/v1/orders/admin/stats

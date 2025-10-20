@@ -99,21 +99,21 @@ const UsersPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="mt-2 text-gray-600">View and manage admins, sellers, and customers</p>
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">View and manage admins, sellers, and customers</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <button onClick={() => setIsHelpOpen(true)} className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button onClick={() => setIsHelpOpen(true)} className="flex-1 sm:flex-none border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm">
             <span className="hidden sm:inline">How to use</span>
             <span className="sm:hidden">?</span>
           </button>
           {roleFilter !== 'customers' && (
             <button
               onClick={() => setIsUserAddOpen(true)}
-              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 font-medium text-sm sm:text-base"
+              className="flex-1 sm:flex-none bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors duration-200 font-medium text-sm sm:text-base"
             >
               Add User
             </button>
@@ -123,27 +123,27 @@ const UsersPage: React.FC = () => {
 
       {/* Role/Search Filters */}
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder={`Search ${roleFilter}...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                className="pl-8 sm:pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Role</label>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'manager' | 'designer' | 'support' | 'moderator')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
             >
               <option value="all">All Staff</option>
               <option value="admin">Administrators</option>
@@ -154,11 +154,11 @@ const UsersPage: React.FC = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as 'active' | 'inactive' | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -166,15 +166,15 @@ const UsersPage: React.FC = () => {
             </select>
           </div>
           <div className="flex items-end">
-            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center">
-              <Filter className="h-4 w-4 mr-2" />
+            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center text-sm sm:text-base">
+              <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               More Filters
             </button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table - Desktop */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
@@ -277,51 +277,170 @@ const UsersPage: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Card Layout */}
+        <div className="lg:hidden">
+          {loading ? (
+            <div className="px-4 py-12 text-center text-gray-500">
+              <div className="flex flex-col items-center space-y-2">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="text-sm">Loading users...</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="px-4 py-12 text-center text-red-500">
+              <p className="text-sm break-words">Error loading users: {error}</p>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="px-4 py-12 text-center text-gray-500">
+              <Users className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+              <p className="text-sm">No users found</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {filteredUsers.map(user => (
+                <div key={user.id} className="p-4 hover:bg-gray-50 transition-colors">
+                  {/* User Header */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div className="h-12 w-12 bg-gray-300 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-gray-600 font-medium text-sm">
+                          {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {user.email}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Status Badge */}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full flex-shrink-0 ml-2 ${
+                      user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+
+                  {/* User Details Grid */}
+                  <div className="space-y-2 mb-3">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Role:</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-semibold capitalize">
+                        <Shield className="w-3 h-3 mr-1" /> {user.role.displayName}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Verification:</span>
+                      <div className="flex gap-1">
+                        <span className={`inline-flex px-2 py-1 rounded-full font-semibold ${
+                          user.isEmailVerified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.isEmailVerified ? '✓ Email' : '✗ Email'}
+                        </span>
+                        <span className={`inline-flex px-2 py-1 rounded-full font-semibold ${
+                          user.isPhoneVerified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {user.isPhoneVerified ? '✓ Phone' : '✗ Phone'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500">Last Login:</span>
+                      <span className="text-gray-900 font-medium">
+                        {user.lastLoginAt ? formatDateOnly(user.lastLoginAt) : 'Never'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleViewUser(user)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
+                    >
+                      <Eye className="h-3 w-3" />
+                      View
+                    </button>
+                    <button 
+                      onClick={() => handleEditUser(user)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors text-xs font-medium"
+                    >
+                      <Edit className="h-3 w-3" />
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => handleLogoutAllSessions(user.id, user.email)}
+                      className="flex items-center justify-center px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                      title="Logout all sessions"
+                    >
+                      <LogOut className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         
         {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                {pagination.total} results
+          <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0">
+              <div className="text-xs sm:text-sm text-gray-700 order-2 sm:order-1">
+                <span className="hidden sm:inline">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
+                  {pagination.total} results
+                </span>
+                <span className="sm:hidden">
+                  Page {pagination.page} of {pagination.totalPages}
+                </span>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap justify-center gap-1 sm:gap-2 order-1 sm:order-2">
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Previous
+                  <span className="hidden sm:inline">Previous</span>
+                  <span className="sm:hidden">Prev</span>
                 </button>
-                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
-                  .filter(page => 
-                    page === 1 || 
-                    page === pagination.totalPages || 
-                    Math.abs(page - currentPage) <= 2
-                  )
-                  .map((page, index, array) => (
-                    <React.Fragment key={page}>
-                      {index > 0 && array[index - 1] !== page - 1 && (
-                        <span className="px-3 py-1 text-sm text-gray-500">...</span>
-                      )}
-                      <button
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1 text-sm border rounded-md ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white border-blue-500'
-                            : 'border-gray-300 hover:bg-gray-100'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    </React.Fragment>
-                  ))}
+                <div className="hidden sm:flex gap-2">
+                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                    .filter(page => 
+                      page === 1 || 
+                      page === pagination.totalPages || 
+                      Math.abs(page - currentPage) <= 2
+                    )
+                    .map((page, index, array) => (
+                      <React.Fragment key={page}>
+                        {index > 0 && array[index - 1] !== page - 1 && (
+                          <span className="px-3 py-1 text-sm text-gray-500">...</span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1 text-sm border rounded-md ${
+                            currentPage === page
+                              ? 'bg-blue-500 text-white border-blue-500'
+                              : 'border-gray-300 hover:bg-gray-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                </div>
                 <button
                   onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
                   disabled={currentPage === pagination.totalPages}
-                  className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
                 </button>

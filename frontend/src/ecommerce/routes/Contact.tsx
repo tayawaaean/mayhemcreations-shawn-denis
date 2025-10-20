@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users, Facebook, Instagram } from 'lucide-react'
+import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users, Facebook, Instagram, AlertCircle } from 'lucide-react'
 import Button from '../../components/Button'
+import { apiClient } from '../../shared/axiosConfig'
+import axios from 'axios'
 
 // Custom SVG Icons for social media platforms
 const EtsyIcon = ({ className }: { className?: string }) => (
@@ -27,6 +29,7 @@ export default function Contact() {
   })
   const [sent, setSent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -38,13 +41,38 @@ export default function Contact() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError(null)
     
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    console.log('Form submitted:', formData)
-    setSent(true)
-    setIsSubmitting(false)
+    try {
+      // Send contact form data to backend API
+      const response = await apiClient.post('/contact', {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        company: formData.company || undefined,
+        projectType: formData.projectType,
+        quantity: formData.quantity || undefined,
+        message: formData.message
+      })
+
+      if (response.data.success) {
+        // Successfully submitted
+        setSent(true)
+      } else {
+        // Unexpected response format
+        setError('Failed to submit contact form. Please try again.')
+      }
+    } catch (err: any) {
+      // Handle API errors
+      console.error('Contact form submission error:', err)
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.message || 'Failed to submit contact form. Please try again.')
+      } else {
+        setError('An unexpected error occurred. Please try again later.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const contactInfo = [
@@ -98,7 +126,19 @@ export default function Contact() {
                 <Button
                   variant="primary"
                   size="lg"
-                  onClick={() => setSent(false)}
+                  onClick={() => {
+                    setSent(false)
+                    setError(null)
+                    setFormData({
+                      name: '',
+                      email: '',
+                      phone: '',
+                      company: '',
+                      projectType: '',
+                      quantity: '',
+                      message: ''
+                    })
+                  }}
                 >
                   Send Another Message
                 </Button>
@@ -152,6 +192,16 @@ export default function Contact() {
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-sm font-semibold text-red-800 mb-1">Submission Failed</h4>
+                        <p className="text-sm text-red-700">{error}</p>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">

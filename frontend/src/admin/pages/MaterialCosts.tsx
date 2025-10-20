@@ -196,22 +196,22 @@ export default function MaterialCosts() {
   }
 
   return (
-    <div className="py-8">
-      <div className="container">
+    <div className="py-4 sm:py-6 md:py-8">
+      <div className="container px-3 sm:px-4">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">
                 Material Costs
               </h1>
-              <p className="text-lg text-gray-600">
+              <p className="text-sm sm:text-base lg:text-lg text-gray-600 break-words">
                 Manage material costs for embroidery pricing calculations
               </p>
             </div>
             <Button
               onClick={() => setShowForm(true)}
-              className="group"
+              className="group w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" />
               Add Material Cost
@@ -221,26 +221,26 @@ export default function MaterialCosts() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-              <p className="text-sm text-red-700">{error}</p>
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-400 mr-2 sm:mr-3 flex-shrink-0" />
+              <p className="text-xs sm:text-sm text-red-700 break-words">{error}</p>
             </div>
           </div>
         )}
 
         {/* Real-time Pricing Calculator */}
-        <div className="mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center mb-6">
-              <Calculator className="w-6 h-6 text-accent mr-3" />
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Real-time Pricing Calculator</h3>
-                <p className="text-sm text-gray-600">Test material cost calculations with different dimensions</p>
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 md:p-6">
+            <div className="flex items-start sm:items-center mb-4 sm:mb-6">
+              <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-accent mr-2 sm:mr-3 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Real-time Pricing Calculator</h3>
+                <p className="text-xs sm:text-sm text-gray-600 break-words">Test material cost calculations with different dimensions</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <Ruler className="w-4 h-4 inline mr-2" />

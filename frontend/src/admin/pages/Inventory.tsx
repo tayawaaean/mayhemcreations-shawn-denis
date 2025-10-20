@@ -333,27 +333,27 @@ const Inventory: React.FC = () => {
   const totalUnits = variantData?.variants?.reduce((sum, variant) => sum + variant.stock, 0) || 0
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
-          <p className="mt-1 text-sm text-gray-500">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventory</h1>
+          <p className="mt-1 text-xs sm:text-sm text-gray-500 break-words">
             Manage stock levels and track inventory for product variants
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
           <button
             onClick={loadInventoryData}
             disabled={loading}
-            className="text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
+            className="text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50 p-2"
             title="Refresh inventory data"
           >
-            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 sm:h-5 sm:w-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => setIsHelpOpen(true)}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm flex-1 sm:flex-none"
           >
             <span className="hidden sm:inline">How to use</span>
             <span className="sm:hidden">?</span>

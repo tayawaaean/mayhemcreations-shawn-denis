@@ -140,81 +140,84 @@ const Reviews: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+      <div className="flex items-center justify-center min-h-[50vh] px-4">
+        <div className="flex flex-col items-center space-y-2">
+          <Loader className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 animate-spin" />
+          <span className="text-sm sm:text-base text-gray-600">Loading reviews...</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
       <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reviews</h1>
-          <p className="mt-2 text-gray-600">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Reviews</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
             Manage customer reviews and ratings for your products.
           </p>
         </div>
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:gap-5 sm:grid-cols-3 lg:grid-cols-5">
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Total Reviews</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.total}</dd>
+          <div className="px-3 py-4 sm:px-4 sm:py-5 md:p-6">
+            <dt className="text-xs sm:text-sm font-medium text-gray-500 truncate">Total Reviews</dt>
+            <dd className="mt-1 text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">{stats.total}</dd>
           </div>
         </div>
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-gray-500 truncate">Average Rating</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.averageRating} ★</dd>
+          <div className="px-3 py-4 sm:px-4 sm:py-5 md:p-6">
+            <dt className="text-xs sm:text-sm font-medium text-gray-500 truncate">Avg Rating</dt>
+            <dd className="mt-1 text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">{stats.averageRating} ★</dd>
           </div>
         </div>
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-yellow-600 truncate">Pending</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.pending}</dd>
+          <div className="px-3 py-4 sm:px-4 sm:py-5 md:p-6">
+            <dt className="text-xs sm:text-sm font-medium text-yellow-600 truncate">Pending</dt>
+            <dd className="mt-1 text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">{stats.pending}</dd>
           </div>
         </div>
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-green-600 truncate">Approved</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.approved}</dd>
+          <div className="px-3 py-4 sm:px-4 sm:py-5 md:p-6">
+            <dt className="text-xs sm:text-sm font-medium text-green-600 truncate">Approved</dt>
+            <dd className="mt-1 text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">{stats.approved}</dd>
           </div>
         </div>
         <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <dt className="text-sm font-medium text-red-600 truncate">Rejected</dt>
-            <dd className="mt-1 text-3xl font-semibold text-gray-900">{stats.rejected}</dd>
+          <div className="px-3 py-4 sm:px-4 sm:py-5 md:p-6">
+            <dt className="text-xs sm:text-sm font-medium text-red-600 truncate">Rejected</dt>
+            <dd className="mt-1 text-xl sm:text-2xl md:text-3xl font-semibold text-gray-900">{stats.rejected}</dd>
           </div>
         </div>
       </div>
 
       {/* Filters and search */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white shadow rounded-lg p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search reviews..."
-                className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="pl-9 sm:pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm sm:text-base py-2"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm sm:text-base py-2"
             >
               <option value="all">All Status</option>
               <option value="pending">Pending</option>
@@ -224,11 +227,11 @@ const Reviews: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Rating</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Rating</label>
             <select
               value={ratingFilter}
               onChange={(e) => setRatingFilter(e.target.value as any)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm sm:text-base py-2"
             >
               <option value="all">All Ratings</option>
               <option value="5">5 Stars</option>
@@ -240,11 +243,11 @@ const Reviews: React.FC = () => {
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Sort By</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm sm:text-base py-2"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>

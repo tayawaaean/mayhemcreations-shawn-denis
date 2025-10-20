@@ -163,27 +163,27 @@ const FAQs: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
-      <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">FAQs</h1>
-            <p className="mt-1 text-sm text-gray-500">
+      <div className="space-y-4 sm:space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">FAQs</h1>
+            <p className="mt-1 text-xs sm:text-sm text-gray-500 break-words">
               Manage frequently asked questions and their order
             </p>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              className="flex-1 sm:flex-none border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
             >
               <span className="hidden sm:inline">How to use</span>
               <span className="sm:hidden">?</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center text-sm sm:text-base"
+              className="flex-1 sm:flex-none bg-gray-900 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl hover:bg-gray-800 flex items-center justify-center text-sm sm:text-base"
             >
               <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
               <span className="hidden sm:inline">Add FAQ</span>
@@ -194,28 +194,28 @@ const FAQs: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+      <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+          <div className="sm:col-span-2 md:col-span-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search FAQs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                className="pl-8 sm:pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               <option value="all">All Categories</option>
               {categories.map(category => (

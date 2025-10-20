@@ -124,27 +124,27 @@ const Customers: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8">
       {/* Page header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-          <p className="mt-2 text-gray-600">
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Customers</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
             Manage customer information and order history
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={refetch}
             disabled={loading}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            className="flex-1 sm:flex-none border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
             onClick={() => setIsHelpOpen(true)}
-            className="border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            className="flex-1 sm:flex-none border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-sm"
           >
             <span className="hidden sm:inline">How to use</span>
             <span className="sm:hidden">?</span>
@@ -153,65 +153,65 @@ const Customers: React.FC = () => {
       </div>
 
       {/* Customer Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <User className="h-6 w-6 text-blue-600" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
               </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">Total Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {stats?.totalUsers || 0}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="h-6 w-6 text-green-600" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
               </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">Active Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {stats?.activeUsers || 0}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-purple-600" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
               </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">Verified Users</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">Verified Users</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {stats?.verifiedUsers || 0}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
+              <div className="h-10 w-10 sm:h-12 sm:w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
               </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">New This Month</p>
-              <p className="text-2xl font-bold text-gray-900">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">New This Month</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {stats?.newUsersThisMonth || 0}
               </p>
             </div>
@@ -220,28 +220,28 @@ const Customers: React.FC = () => {
       </div>
 
       {/* Filters and search */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search customers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                className="pl-8 sm:pl-10 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
               />
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value as 'active' | 'inactive' | 'all')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -250,8 +250,8 @@ const Customers: React.FC = () => {
           </div>
 
           <div className="flex items-end">
-            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center">
-              <Filter className="h-4 w-4 mr-2" />
+            <button className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 flex items-center justify-center text-sm sm:text-base">
+              <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               More Filters
             </button>
           </div>
@@ -260,14 +260,14 @@ const Customers: React.FC = () => {
 
       {/* Bulk actions */}
       {selectedCustomers.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-blue-700">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+            <span className="text-xs sm:text-sm text-blue-700">
               {selectedCustomers.length} customer{selectedCustomers.length > 1 ? 's' : ''} selected
             </span>
             <div className="flex space-x-2">
-              <button className="text-sm text-blue-700 hover:text-blue-800">Send Email</button>
-              <button className="text-sm text-blue-700 hover:text-blue-800">Export</button>
+              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Send Email</button>
+              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Export</button>
             </div>
           </div>
         </div>

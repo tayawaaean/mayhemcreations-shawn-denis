@@ -139,64 +139,64 @@ const SystemLogs: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">System Logs</h1>
-          <p className="text-gray-600">Monitor system activity and user actions</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">System Logs</h1>
+          <p className="text-sm sm:text-base text-gray-600 break-words">Monitor system activity and user actions</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           <button
             onClick={loadLogs}
             disabled={isLoading}
-            className="flex items-center px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 sm:mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
             onClick={exportLogs}
-            className="flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Export
+            <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export</span>
           </button>
           <button
             onClick={clearLogs}
-            className="flex items-center px-3 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700"
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Clear
+            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Clear</span>
           </button>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {/* Search */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 sm:w-4 sm:h-4" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search logs..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-8 sm:pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
               />
             </div>
           </div>
 
           {/* Category Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               {categories.map(category => (
                 <option key={category} value={category}>
@@ -208,11 +208,11 @@ const SystemLogs: React.FC = () => {
 
           {/* Level Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Level</label>
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               {levels.map(level => (
                 <option key={level} value={level}>
@@ -224,11 +224,11 @@ const SystemLogs: React.FC = () => {
 
           {/* User Role Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">User Role</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">User Role</label>
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
               {userRoles.map(role => (
                 <option key={role} value={role}>

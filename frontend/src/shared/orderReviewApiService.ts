@@ -133,6 +133,13 @@ class OrderReviewApiService {
     // Backend also returns status (e.g., 'pending-payment') after confirmation
     return apiAuthService.post<{ id: number; confirmations: CustomerConfirmation[]; status?: string; confirmedAt: string }>(`/orders/review-orders/${orderId}/confirm-pictures`, { confirmations }, true);
   }
+
+  /**
+   * Customer confirm order received (marks as delivered)
+   */
+  async confirmOrderReceived(orderId: number) {
+    return apiAuthService.post<{ id: number; status: string; deliveredAt: string }>(`/orders/review-orders/${orderId}/confirm-delivery`, {}, true);
+  }
 }
 
 export const orderReviewApiService = new OrderReviewApiService();

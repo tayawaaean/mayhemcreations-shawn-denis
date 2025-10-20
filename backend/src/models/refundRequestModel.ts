@@ -114,6 +114,11 @@ export class RefundRequest
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 
+  // Associations (populated when included in queries)
+  public user?: any;
+  public order?: any;
+  public payment?: any;
+
   /**
    * Helper method to get images as array
    * Handles JSON parsing safely

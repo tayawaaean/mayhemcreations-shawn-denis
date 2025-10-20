@@ -5,13 +5,13 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
-import { handleChatWebhook, healthCheck } from './controllers/webhookController';
+import { handleChatWebhook, healthCheck, handleRefundRejection } from './controllers/webhookController';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5002;
+const PORT = process.env.PORT || 3002;
 
 // Security middleware
 app.use(helmet());
@@ -39,6 +39,9 @@ app.get('/health', healthCheck);
 
 // Webhook endpoint for chat events
 app.post('/webhook/chat', handleChatWebhook);
+
+// Notification endpoints
+app.post('/api/notifications/refund-rejected', handleRefundRejection);
 
 // 404 handler
 app.use(notFoundHandler);

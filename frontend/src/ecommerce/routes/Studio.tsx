@@ -6,10 +6,15 @@ import DesignUpload from '../components/DesignUpload'
 import Reviews from '../components/Reviews'
 import { productReviewApiService, ProductReview, ReviewStats } from '../../shared/productReviewApiService'
 
-export default function CustomizedEmbroidery() {
+export default function Studio() {
+  // State for uploaded design and preview
   const [uploadedDesign, setUploadedDesign] = useState<File | null>(null)
   const [designPreview, setDesignPreview] = useState<string | null>(null)
+  
+  // State for price quote calculation
   const [quotePrice, setQuotePrice] = useState<{total: number, base: number, options: number} | null>(null)
+  
+  // State for customer reviews
   const [reviews, setReviews] = useState<ProductReview[]>([])
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null)
   const [reviewsLoading, setReviewsLoading] = useState(true)
@@ -55,7 +60,7 @@ export default function CustomizedEmbroidery() {
               <span>Custom Embroidery Services</span>
             </div>
             <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6">
-              Customized Embroidery
+              Studio
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
               Transform your ideas into stunning embroidered designs. From custom logos to personal monograms, 
@@ -193,3 +198,4 @@ export default function CustomizedEmbroidery() {
     </main>
   )
 }
+

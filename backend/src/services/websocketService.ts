@@ -741,6 +741,14 @@ export class WebSocketService {
     this.io.to('admin_room').emit(eventName, data);
     logger.info(`📡 Emitted ${eventName} to admin room`);
   }
+
+  /**
+   * Generic method to emit events to a specific user room
+   */
+  public emitToUserRoom(userId: number | string, eventName: string, data: any): void {
+    this.io.to(`user_${userId}`).emit(eventName, data);
+    logger.info(`📡 Emitted ${eventName} to user ${userId} room`);
+  }
 }
 
 // Export singleton instance

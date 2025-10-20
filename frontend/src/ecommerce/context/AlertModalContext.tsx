@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
 import Modal from '../../components/Modal'
 
 // Type for modal configuration
@@ -22,7 +22,7 @@ interface AlertModalContextType {
   showError: (message: string, title?: string) => void
   showWarning: (message: string, title?: string) => void
   showInfo: (message: string, title?: string) => void
-  showConfirm: (message: string, onConfirm: () => void, title?: string) => void
+  showConfirm: (message: string, title?: string) => Promise<boolean>
 }
 
 // Create the context with undefined default value
@@ -41,6 +41,9 @@ export const AlertModalProvider: React.FC<AlertModalProviderProps> = ({ children
     message: '',
     type: 'info'
   })
+  
+  // Ref to store the Promise resolver for confirm dialogs
+  const confirmResolverRef = useRef<((value: boolean) => void) | null>(null)
 
   // Generic function to show any type of alert
   const showAlert = useCallback((options: AlertModalOptions) => {
@@ -88,21 +91,39 @@ export const AlertModalProvider: React.FC<AlertModalProviderProps> = ({ children
     })
   }, [showAlert])
 
-  // Convenience function to show confirmation dialog
-  const showConfirm = useCallback((message: string, onConfirm: () => void, title?: string) => {
-    showAlert({
-      message,
-      title,
-      type: 'confirm',
-      confirmText: 'Confirm',
-      cancelText: 'Cancel',
-      onConfirm,
-      showCancel: true
+  // Convenience function to show confirmation dialog (Promise-based)
+  const showConfirm = useCallback((message: string, title?: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      // Store the resolver in the ref
+      confirmResolverRef.current = resolve
+      
+      // Show the confirmation dialog
+      showAlert({
+        message,
+        title,
+        type: 'confirm',
+        confirmText: 'Confirm',
+        cancelText: 'Cancel',
+        onConfirm: () => {
+          // Resolve with true when user confirms
+          if (confirmResolverRef.current) {
+            confirmResolverRef.current(true)
+            confirmResolverRef.current = null
+          }
+        },
+        showCancel: true
+      })
     })
   }, [showAlert])
 
   // Function to close the modal
   const handleClose = useCallback(() => {
+    // If there's a pending confirmation, resolve with false (user cancelled)
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(false)
+      confirmResolverRef.current = null
+    }
+    
     setIsOpen(false)
   }, [])
 
