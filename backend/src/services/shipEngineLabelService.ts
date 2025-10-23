@@ -37,8 +37,6 @@ export class ShipEngineLabelService {
       console.error('❌ ShipEngine API key not found!')
       console.error('Please set SHIPENGINE_API_KEY or SHIPSTATION_API_KEY in your .env file')
       console.error('Get your API key from: https://www.shipengine.com/')
-    } else {
-      console.log('✅ ShipEngine API key loaded:', this.apiKey.substring(0, 20) + '...')
     }
   }
 
@@ -48,8 +46,6 @@ export class ShipEngineLabelService {
    */
   async createLabelFromRate(rateId: string, orderId: number): Promise<LabelResponse> {
     try {
-      console.log(`📦 Creating label from rate ${rateId} for order ${orderId}`)
-      
       // Fetch order details for metadata
       const [order] = await sequelize.query(
         'SELECT * FROM order_reviews WHERE id = ?',
@@ -90,11 +86,6 @@ export class ShipEngineLabelService {
 
       const label = response.data
 
-      console.log(`✅ Label created successfully: ${label.label_id}`)
-      console.log(`📍 Tracking number: ${label.tracking_number}`)
-      console.log('🔍 Full ShipEngine response structure:', JSON.stringify(label, null, 2))
-      console.log('🔍 Label download structure:', JSON.stringify(label.label_download, null, 2))
-      
       // Handle different possible label download structures from ShipEngine
       let pdfUrl = null
       let pngUrl = null
@@ -109,9 +100,7 @@ export class ShipEngineLabelService {
         // Try different possible field names for PNG
         pngUrl = label.label_download.png || null
         
-        console.log('🔍 Extracted URLs:', { pdfUrl, pngUrl })
       } else {
-        console.warn('⚠️ No label_download object in response!')
       }
 
       return {
@@ -135,7 +124,6 @@ export class ShipEngineLabelService {
    */
   async createLabelFromShipment(orderId: number): Promise<LabelResponse> {
     try {
-      console.log(`📦 Creating label from shipment for order ${orderId}`)
       
       // Fetch order with shipping details
       const [order] = await sequelize.query(
@@ -161,13 +149,6 @@ export class ShipEngineLabelService {
         throw new Error('Invalid order data format')
       }
 
-      console.log('📋 Order data structure:', {
-        hasItems: !!orderData?.items,
-        hasShippingAddress: !!orderData?.shippingAddress,
-        hasOrderShippingAddress: !!order.shipping_address,
-        keys: Object.keys(orderData || {}),
-        isArray: Array.isArray(orderData)
-      })
 
       // Get items - could be in orderData.items or directly as an array
       let items
@@ -209,26 +190,7 @@ export class ShipEngineLabelService {
         }
       }
 
-      console.log('📦 Extracted data:', {
-        itemsCount: items?.length || 0,
-        hasShippingAddress: !!shippingAddress,
-        addressFields: shippingAddress ? Object.keys(shippingAddress) : [],
-        hasShippingMethod: !!shippingMethod,
-        shippingMethod: shippingMethod
-      })
-
       // Debug: Log the actual shipping address data
-      if (shippingAddress) {
-        console.log('📍 Shipping Address Details:', {
-          name: shippingAddress.name || `${shippingAddress.firstName} ${shippingAddress.lastName}`,
-          address: shippingAddress.address || shippingAddress.street,
-          city: shippingAddress.city,
-          state: shippingAddress.state,
-          zipCode: shippingAddress.zipCode,
-          country: shippingAddress.country,
-          phone: shippingAddress.phone
-        })
-      }
 
       if (!shippingAddress) {
         console.error('Shipping address missing. Order:', {
@@ -315,22 +277,17 @@ export class ShipEngineLabelService {
       // Add carrier and service from order's shipping method if available
       if (shippingMethod?.carrierId) {
         shipmentConfig.carrier_id = shippingMethod.carrierId
-        console.log(`📮 Using carrier from order: ${shippingMethod.carrierId}`)
       } else if (process.env.SHIPENGINE_CARRIER_ID) {
         shipmentConfig.carrier_id = process.env.SHIPENGINE_CARRIER_ID
-        console.log(`📮 Using carrier from env: ${process.env.SHIPENGINE_CARRIER_ID}`)
       }
 
       // Add service code from order's shipping method
       if (shippingMethod?.serviceCode) {
         shipmentConfig.service_code = shippingMethod.serviceCode
-        console.log(`📮 Using service code from order: ${shippingMethod.serviceCode}`)
       } else if (shippingMethod?.service_code) {
         shipmentConfig.service_code = shippingMethod.service_code
-        console.log(`📮 Using service_code from order: ${shippingMethod.service_code}`)
       } else if (orderData?.selectedShipping?.service_code) {
         shipmentConfig.service_code = orderData.selectedShipping.service_code
-        console.log(`📮 Using service code from order data: ${orderData.selectedShipping.service_code}`)
       }
 
       // If we have neither carrier_id nor service_code, we can't create a label
@@ -338,15 +295,7 @@ export class ShipEngineLabelService {
         throw new Error('Missing carrier or service information. Please ensure the order has valid shipping details from checkout.')
       }
 
-      console.log('🚚 Final shipment config:', {
-        carrier_id: shipmentConfig.carrier_id,
-        service_code: shipmentConfig.service_code,
-        from: `${shipmentConfig.ship_from.city_locality}, ${shipmentConfig.ship_from.state_province}`,
-        to: `${shipmentConfig.ship_to.city_locality}, ${shipmentConfig.ship_to.state_province}`
-      })
-
       // Debug: Log the exact ship_to address being sent to ShipEngine
-      console.log('📮 ShipEngine ship_to address:', JSON.stringify(shipmentConfig.ship_to, null, 2))
 
       // Create label directly with shipment details
       const response = await axios.post(
@@ -369,17 +318,6 @@ export class ShipEngineLabelService {
 
       const label = response.data
 
-      console.log(`✅ Label created successfully: ${label.label_id}`)
-      console.log(`📍 Tracking number: ${label.tracking_number}`)
-      console.log(`🏷️ Label response data:`, {
-        label_id: label.label_id,
-        carrier_id: label.carrier_id,
-        carrier_code: label.carrier_code,
-        service_code: label.service_code,
-        shipment_cost: label.shipment_cost?.amount
-      })
-      console.log('🔍 Full label object keys:', Object.keys(label))
-      console.log('🔍 Label download structure:', JSON.stringify(label.label_download, null, 2))
       
       // Handle different possible label download structures from ShipEngine
       let pdfUrl = null
@@ -395,9 +333,7 @@ export class ShipEngineLabelService {
         // Try different possible field names for PNG
         pngUrl = label.label_download.png || null
         
-        console.log('🔍 Extracted URLs:', { pdfUrl, pngUrl })
       } else {
-        console.warn('⚠️ No label_download object in response!')
       }
 
       return {
@@ -466,7 +402,6 @@ export class ShipEngineLabelService {
   private calculateOrderWeight(items: any[]): number {
     // Handle undefined or empty items
     if (!items || !Array.isArray(items) || items.length === 0) {
-      console.warn('⚠️ No items provided for weight calculation, using minimum weight')
       return 4 // Minimum weight: 4 oz
     }
 
@@ -493,14 +428,7 @@ export class ShipEngineLabelService {
       const carrierCode = labelData.carrierCode || null
       const serviceCode = labelData.serviceCode || null
 
-      console.log('💾 Saving label to database:', {
-        orderId,
-        trackingNumber,
-        carrierCode,
-        serviceCode,
-        hasLabelUrl: !!labelUrl,
-        labelUrlValue: labelUrl
-      })
+      // Save label information to database
 
       // Save label information WITHOUT changing order status
       // Admin will manually mark as 'shipped' when package is actually handed to carrier
@@ -524,7 +452,6 @@ export class ShipEngineLabelService {
         }
       )
 
-      console.log(`✅ Label info saved to database for order ${orderId}`)
     } catch (error) {
       console.error('❌ Error saving label to database:', error)
       throw error

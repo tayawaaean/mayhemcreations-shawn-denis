@@ -196,7 +196,7 @@ export const getShipEngineRates = async (
     
     if (carrierIds.length === 0) {
       try {
-        console.log('\n>>> Fetching carriers from ShipEngine...');
+        logger.debug('Fetching carriers from ShipEngine');
         const carriersResponse = await axios.get(`${SHIPENGINE_API_URL}/carriers`, {
           headers: {
             'API-Key': SHIPENGINE_API_KEY,
@@ -206,16 +206,6 @@ export const getShipEngineRates = async (
         const carriers = carriersResponse.data.carriers || [];
         carrierIds = carriers.map((carrier: any) => carrier.carrier_id).filter((id: string) => id);
         
-        console.log('>>> Carriers Retrieved:');
-        console.log(JSON.stringify(carriers.map((c: any) => ({
-          carrier_id: c.carrier_id,
-          friendly_name: c.friendly_name,
-          carrier_code: c.carrier_code,
-          primary: c.primary,
-        })), null, 2));
-        console.log('>>> Extracted Carrier IDs:', carrierIds);
-        console.log('');
-        
         logger.info('Retrieved carrier IDs from ShipEngine', {
           carrierCount: carrierIds.length,
           carriers: carriers.map((c: any) => c.friendly_name || c.carrier_code),
@@ -223,15 +213,10 @@ export const getShipEngineRates = async (
         
         // If no carriers found via API, try using the test carrier ID
         if (carrierIds.length === 0) {
-          console.log(`>>> No carriers in response, using test carrier: ${testCarrierId}\n`);
           logger.warn(`No carriers returned from API, using test carrier ID: ${testCarrierId}`);
           carrierIds = [testCarrierId];
         }
       } catch (carrierError: any) {
-        console.log('>>> ERROR fetching carriers:');
-        console.log(JSON.stringify(carrierError.response?.data, null, 2));
-        console.log(`>>> Using test carrier ID: ${testCarrierId}\n`);
-        
         logger.error('Failed to fetch carriers:', carrierError.response?.data || carrierError.message);
         logger.warn(`Falling back to test carrier ID: ${testCarrierId}`);
         carrierIds = [testCarrierId];
@@ -254,14 +239,6 @@ export const getShipEngineRates = async (
       },
     };
 
-    // Log the FULL request for debugging
-    console.log('\n========== SHIPENGINE API REQUEST ==========');
-    console.log('URL:', `${SHIPENGINE_API_URL}/rates`);
-    console.log('API Key:', SHIPENGINE_API_KEY ? `${SHIPENGINE_API_KEY.substring(0, 12)}...` : 'NOT SET');
-    console.log('Request Body (RAW JSON):');
-    console.log(JSON.stringify(rateRequest, null, 2));
-    console.log('============================================\n');
-    
     logger.info('ShipEngine API Request:', {
       url: `${SHIPENGINE_API_URL}/rates`,
       hasApiKey: !!SHIPENGINE_API_KEY,
@@ -288,16 +265,7 @@ export const getShipEngineRates = async (
 
     const rateResponse = response.data.rate_response;
 
-    console.log('\n========== SHIPENGINE API RESPONSE ==========');
-    console.log('Status:', response.status);
-    console.log('Response Data (RAW JSON):');
-    console.log(JSON.stringify(response.data, null, 2));
-    console.log('=============================================\n');
-
     if (!rateResponse || !rateResponse.rates || rateResponse.rates.length === 0) {
-      console.log('>>> WARNING: No rates in response');
-      console.log('>>> Errors:', rateResponse?.errors);
-      
       logger.warn('No shipping rates returned from ShipEngine', {
         errors: rateResponse?.errors,
       });
@@ -309,9 +277,6 @@ export const getShipEngineRates = async (
 
     // Check for errors but only fail if we have NO rates at all
     if (rateResponse.errors && rateResponse.errors.length > 0) {
-      console.log('>>> WARNING: ShipEngine returned errors for some carriers:');
-      console.log(JSON.stringify(rateResponse.errors, null, 2));
-      
       logger.warn('ShipEngine rate errors (some carriers failed):', {
         errorCount: rateResponse.errors.length,
         failedCarriers: rateResponse.errors.map((e: any) => e.carrier_name || e.carrier_code),
@@ -320,7 +285,6 @@ export const getShipEngineRates = async (
       
       // Only return error if we have NO successful rates
       if (!rateResponse.rates || rateResponse.rates.length === 0) {
-        console.log('>>> CRITICAL: No rates available from any carrier');
         logger.error('All carriers failed to return rates');
         return {
           success: false,
@@ -328,9 +292,6 @@ export const getShipEngineRates = async (
           warning: rateResponse.errors[0]?.message || 'All carriers failed'
         };
       }
-      
-      // If we have some rates, continue but log the errors
-      console.log(`>>> SUCCESS: ${rateResponse.rates.length} rates available despite ${rateResponse.errors.length} carrier error(s)`);
     }
 
     // Transform ShipEngine rates to simplified format
@@ -338,7 +299,7 @@ export const getShipEngineRates = async (
       .filter(rate => {
         const hasErrors = rate.error_messages && rate.error_messages.length > 0;
         if (hasErrors) {
-          console.log(`>>> Filtering out failed rate: ${rate.carrier_friendly_name} - ${rate.service_type}`);
+          logger.debug(`Filtering out failed rate: ${rate.carrier_friendly_name} - ${rate.service_type}`);
         }
         return !hasErrors;
       })
@@ -364,8 +325,6 @@ export const getShipEngineRates = async (
     // Sort by cost (cheapest first)
     simplifiedRates.sort((a, b) => a.totalCost - b.totalCost);
 
-    console.log(`>>> FINAL RESULT: ${simplifiedRates.length} valid rates from ${[...new Set(simplifiedRates.map(r => r.carrier))].join(', ')}`);
-
     logger.info('ShipEngine rates retrieved successfully', {
       ratesCount: simplifiedRates.length,
       cheapestRate: simplifiedRates[0]?.totalCost,
@@ -381,18 +340,6 @@ export const getShipEngineRates = async (
         : undefined
     };
   } catch (error: any) {
-    // Log FULL error details with raw JSON
-    console.log('\n========== SHIPENGINE API ERROR ==========');
-    console.log('Error Message:', error.message);
-    console.log('HTTP Status:', error.response?.status);
-    console.log('Status Text:', error.response?.statusText);
-    console.log('Response Data (RAW JSON):');
-    console.log(JSON.stringify(error.response?.data, null, 2));
-    console.log('Request URL:', error.config?.url);
-    console.log('API Key Set:', !!SHIPENGINE_API_KEY);
-    console.log('API Key Length:', SHIPENGINE_API_KEY?.length || 0);
-    console.log('=========================================\n');
-    
     logger.error('Error fetching shipping rates from ShipEngine:', {
       error: error.message,
       responseData: error.response?.data,
