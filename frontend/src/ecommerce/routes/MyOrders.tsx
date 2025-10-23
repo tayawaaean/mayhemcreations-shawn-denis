@@ -1162,21 +1162,75 @@ export default function MyOrders() {
         }
       }
       
+      // Check if we have selectedStyles to create detailed breakdown
+      let designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> | undefined = undefined;
+      
+      if (item.customization?.selectedStyles) {
+        console.log('🔍 Found selectedStyles with stored pricingBreakdown, creating design breakdown');
+        const { selectedStyles } = item.customization;
+        
+        const designDetails: any = {
+          coverage: selectedStyles.coverage ? Number(selectedStyles.coverage.price) || 0 : 0,
+          material: selectedStyles.material ? Number(selectedStyles.material.price) || 0 : 0,
+          border: selectedStyles.border ? Number(selectedStyles.border.price) || 0 : 0,
+          backing: selectedStyles.backing ? Number(selectedStyles.backing.price) || 0 : 0,
+          cutting: selectedStyles.cutting ? Number(selectedStyles.cutting.price) || 0 : 0,
+          threads: selectedStyles.threads ? selectedStyles.threads.reduce((sum: number, t: any) => sum + (Number(t.price) || 0), 0) : 0,
+          upgrades: selectedStyles.upgrades ? selectedStyles.upgrades.reduce((sum: number, u: any) => sum + (Number(u.price) || 0), 0) : 0
+        };
+        
+        const designOptions = Object.values(designDetails).reduce((sum: number, val: any) => sum + Number(val), 0);
+        
+        if (designOptions > 0) {
+          designBreakdown = [{
+            designName: 'Custom Embroidery Options',
+            designOptions: designOptions,
+            designDetails: designDetails
+          }];
+          console.log('✅ Created design breakdown:', designBreakdown);
+        }
+      }
+      
       return {
         baseProductPrice: baseProductPrice,
         embroideryPrice: storedEmbroideryPrice,
         embroideryOptionsPrice: storedOptionsPrice,
-        totalPrice: storedTotalPrice
+        totalPrice: storedTotalPrice,
+        designBreakdown: designBreakdown
       };
     }
 
     // Fallback calculation for custom embroidery items
     if (item.productId === 'custom-embroidery' && item.customization?.embroideryData) {
+      const designBreakdown: Array<{designName: string, designOptions: number, designDetails: any}> = [];
+      
+      // If selectedStyles exists, create detailed breakdown
+      if (item.customization.selectedStyles) {
+        const designDetails: any = {
+          coverage: item.customization.selectedStyles.coverage ? Number(item.customization.selectedStyles.coverage.price) || 0 : 0,
+          material: item.customization.selectedStyles.material ? Number(item.customization.selectedStyles.material.price) || 0 : 0,
+          border: item.customization.selectedStyles.border ? Number(item.customization.selectedStyles.border.price) || 0 : 0,
+          backing: item.customization.selectedStyles.backing ? Number(item.customization.selectedStyles.backing.price) || 0 : 0,
+          cutting: item.customization.selectedStyles.cutting ? Number(item.customization.selectedStyles.cutting.price) || 0 : 0,
+          threads: item.customization.selectedStyles.threads ? item.customization.selectedStyles.threads.reduce((sum: number, t: any) => sum + (Number(t.price) || 0), 0) : 0,
+          upgrades: item.customization.selectedStyles.upgrades ? item.customization.selectedStyles.upgrades.reduce((sum: number, u: any) => sum + (Number(u.price) || 0), 0) : 0
+        };
+        
+        const designOptions = Object.values(designDetails).reduce((sum: number, val: any) => sum + Number(val), 0);
+        
+        designBreakdown.push({
+          designName: 'Custom Embroidery Options',
+          designOptions: designOptions,
+          designDetails: designDetails
+        });
+      }
+      
       return {
         baseProductPrice: 0,
         embroideryPrice: Number(item.customization.embroideryData.materialCosts?.totalCost) || 0,
         embroideryOptionsPrice: Number(item.customization.embroideryData.optionsPrice) || 0,
-        totalPrice: Number(item.customization.embroideryData.totalPrice) || 0
+        totalPrice: Number(item.customization.embroideryData.totalPrice) || 0,
+        designBreakdown: designBreakdown.length > 0 ? designBreakdown : undefined
       };
     }
 
@@ -2281,13 +2335,14 @@ export default function MyOrders() {
                               </span>
                             ) : null}
                             
-                            {item.customization.placement && (
+                            {/* Only show placement and size for regular customized products, NOT custom embroidery */}
+                            {item.productId !== 'custom-embroidery' && item.customization.placement && (
                               <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                                 {item.customization.placement.replace('-', ' ')}
                               </span>
                             )}
                             
-                            {item.customization.size && (
+                            {item.productId !== 'custom-embroidery' && item.customization.size && (
                               <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
                                 {item.customization.size}
                               </span>
@@ -3001,8 +3056,8 @@ export default function MyOrders() {
                                       </div>
                                     )}
                                     
-                                    {/* Embroidery Options */}
-                                    {pricing.embroideryOptionsPrice > 0 && (
+                                    {/* Embroidery Options - Only show total if no design breakdown available */}
+                                    {pricing.embroideryOptionsPrice > 0 && (!pricing.designBreakdown || pricing.designBreakdown.length === 0) && (
                                       <div className="flex justify-between text-sm">
                                         <span className="text-gray-600">Embroidery Options:</span>
                                         <span className="font-medium">${pricing.embroideryOptionsPrice.toFixed(2)}</span>

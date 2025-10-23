@@ -153,9 +153,24 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
       
       if (response.success) {
         const updatedCategory = response.data;
-        setCategories(prev => 
-          prev.map(cat => cat.id === id ? updatedCategory : cat)
-        );
+        
+        // Recursive function to update category at any nesting level
+        const updateCategoryRecursive = (categories: Category[]): Category[] => {
+          return categories.map(cat => {
+            // If this is the category we're updating
+            if (cat.id === id) {
+              // Preserve children if they exist in the current state
+              return { ...updatedCategory, children: cat.children };
+            }
+            // If this category has children, recursively update them
+            if (cat.children && cat.children.length > 0) {
+              return { ...cat, children: updateCategoryRecursive(cat.children) };
+            }
+            return cat;
+          });
+        };
+        
+        setCategories(prev => updateCategoryRecursive(prev));
         return updatedCategory;
       } else {
         throw new Error('Failed to update category');
@@ -179,7 +194,20 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
       const response = await categoryApiService.deleteCategory(id, force);
       
       if (response.success) {
-        setCategories(prev => prev.filter(cat => cat.id !== id));
+        // Recursive function to remove category at any nesting level
+        const removeCategoryRecursive = (categories: Category[]): Category[] => {
+          return categories
+            .filter(cat => cat.id !== id)
+            .map(cat => {
+              // If this category has children, recursively filter them
+              if (cat.children && cat.children.length > 0) {
+                return { ...cat, children: removeCategoryRecursive(cat.children) };
+              }
+              return cat;
+            });
+        };
+        
+        setCategories(prev => removeCategoryRecursive(prev));
         return true;
       } else {
         throw new Error('Failed to delete category');
@@ -291,13 +319,36 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
   }, []);
 
   const updateCategoryInLocal = useCallback((category: Category) => {
-    setCategories(prev => 
-      prev.map(cat => cat.id === category.id ? category : cat)
-    );
+    // Recursive function to update category at any nesting level
+    const updateRecursive = (categories: Category[]): Category[] => {
+      return categories.map(cat => {
+        if (cat.id === category.id) {
+          return category;
+        }
+        if (cat.children && cat.children.length > 0) {
+          return { ...cat, children: updateRecursive(cat.children) };
+        }
+        return cat;
+      });
+    };
+    
+    setCategories(prev => updateRecursive(prev));
   }, []);
 
   const removeCategoryFromLocal = useCallback((id: number) => {
-    setCategories(prev => prev.filter(cat => cat.id !== id));
+    // Recursive function to remove category at any nesting level
+    const removeRecursive = (categories: Category[]): Category[] => {
+      return categories
+        .filter(cat => cat.id !== id)
+        .map(cat => {
+          if (cat.children && cat.children.length > 0) {
+            return { ...cat, children: removeRecursive(cat.children) };
+          }
+          return cat;
+        });
+    };
+    
+    setCategories(prev => removeRecursive(prev));
   }, []);
 
   // Load initial data - only run once on mount

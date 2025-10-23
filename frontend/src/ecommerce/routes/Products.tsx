@@ -33,7 +33,7 @@ export default function Products() {
         id: category.id.toString(),
         label: category.name,
         value: category.slug,
-        children: category.children?.map(child => ({
+        children: category.children?.filter(child => child.status === 'active').map(child => ({
           id: child.id.toString(),
           label: child.name,
           value: child.slug
@@ -47,13 +47,14 @@ export default function Products() {
     if (selectedCategory) {
       const selectedCategoryData = categories.find(cat => cat.slug === selectedCategory)
       if (selectedCategoryData?.children) {
+        const activeChildren = selectedCategoryData.children.filter(child => child.status === 'active')
         setSubcategoryDropdownItems([
           {
             id: 'all',
             label: `All ${selectedCategoryData.name}`,
             value: ''
           },
-          ...selectedCategoryData.children.map(child => ({
+          ...activeChildren.map(child => ({
             id: child.id.toString(),
             label: child.name,
             value: child.slug
@@ -158,6 +159,18 @@ export default function Products() {
     // Calculate total stock from variants
     const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
     
+    // Get available colors from variants or product definition
+    const availableColors = product.variants && product.variants.length > 0
+      ? [...new Set(product.variants.map((v: any) => v.color).filter(Boolean))]
+      : product.availableColors || []
+    
+    // Get available sizes from product definition or variants
+    const availableSizes = product.availableSizes && Array.isArray(product.availableSizes) && product.availableSizes.length > 0
+      ? product.availableSizes
+      : product.variants && product.variants.length > 0
+        ? [...new Set(product.variants.map((v: any) => v.size).filter(Boolean))]
+        : []
+    
     return {
       id: product.id.toString(),
       title: product.title,
@@ -165,19 +178,19 @@ export default function Products() {
       description: product.description,
       image: product.image,
       alt: product.alt,
-      badges: [],
+      badges: Array.isArray(product.badges) ? product.badges : [],
       category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
       subcategory: product.subcategory?.slug,
-      availableColors: [],
-      availableSizes: [],
-      materials: [],
-      averageRating: 0,
-      totalReviews: 0,
+      availableColors: availableColors,
+      availableSizes: availableSizes,
+      materials: Array.isArray(product.materials) ? product.materials : [],
+      averageRating: product.averageRating || 0,
+      totalReviews: product.totalReviews || 0,
       stock: totalStock, // Use calculated stock from variants
       sku: product.sku,
       status: product.status,
       hasSizing: product.hasSizing,
-      variants: product.variants || [] // Include variants for detailed stock info
+      variants: Array.isArray(product.variants) ? product.variants : [] // Include variants for detailed stock info
     }
   })
 

@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { X, User, Mail, Phone, MapPin, ShoppingBag, DollarSign, Calendar, Edit } from 'lucide-react'
 import { Customer } from '../../types'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 import { User as ApiUser } from '../../services/apiService'
 
 interface CustomerDetailModalProps {
@@ -184,7 +186,7 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
     e.preventDefault()
     if (validateForm() && customer) {
       // Remove empty phone field to avoid validation errors
-      const dataToSave = { ...formData }
+      const dataToSave: any = { ...formData }
       if (!dataToSave.phone || dataToSave.phone.trim() === '') {
         delete dataToSave.phone
       }
@@ -221,7 +223,10 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:p-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name *
+                  <span className="inline-flex items-center">
+                    First Name *
+                    <InfoTooltip text={fieldDescriptions.user.firstName} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -237,7 +242,10 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name *
+                  <span className="inline-flex items-center">
+                    Last Name *
+                    <InfoTooltip text={fieldDescriptions.user.lastName} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -253,7 +261,10 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
+                  <span className="inline-flex items-center">
+                    Email *
+                    <InfoTooltip text={fieldDescriptions.customer.email} />
+                  </span>
                 </label>
                 <input
                   type="email"
@@ -269,7 +280,10 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone
+                  <span className="inline-flex items-center">
+                    Phone
+                    <InfoTooltip text={fieldDescriptions.customer.phone} />
+                  </span>
                 </label>
                 <input
                   type="tel"
@@ -282,7 +296,10 @@ export const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ isOpen, on
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
+                  <span className="inline-flex items-center">
+                    Status
+                    <InfoTooltip text={fieldDescriptions.customer.status} />
+                  </span>
                 </label>
                 <select
                   value={formData.isActive ? 'active' : 'inactive'}

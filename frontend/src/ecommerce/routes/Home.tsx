@@ -1,13 +1,75 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Hero from '../components/Hero'
 import ProductGrid from '../components/ProductGrid'
-import { products } from '../../data/products'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw } from 'lucide-react'
 import Button from '../../components/Button'
+import { productApiService, Product } from '../../shared/productApiService'
+import { getAllProductImages } from '../../shared/imageUtils'
 
 export default function Home() {
-  const featured = products.slice(0, 4)
+  const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch featured products from database
+  useEffect(() => {
+    const fetchFeaturedProducts = async () => {
+      try {
+        setLoading(true)
+        // Fetch products with featured flag set to true
+        const response = await productApiService.getProducts({
+          featured: true,
+          status: 'active',
+          limit: 4
+        })
+        
+        if (response.success && response.data) {
+          // Transform database products to frontend format
+          const transformed = response.data.map(product => {
+            const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
+            const availableColors = product.variants && product.variants.length > 0
+              ? [...new Set(product.variants.map((v: any) => v.color).filter(Boolean))]
+              : product.availableColors || []
+            const availableSizes = product.availableSizes && Array.isArray(product.availableSizes) && product.availableSizes.length > 0
+              ? product.availableSizes
+              : product.variants && product.variants.length > 0
+                ? [...new Set(product.variants.map((v: any) => v.size).filter(Boolean))]
+                : []
+            
+            return {
+              id: product.id.toString(),
+              title: product.title,
+              price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+              description: product.description,
+              image: product.image,
+              alt: product.alt,
+              badges: Array.isArray(product.badges) ? product.badges : [],
+              category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
+              subcategory: product.subcategory?.slug,
+              availableColors: availableColors,
+              availableSizes: availableSizes,
+              materials: Array.isArray(product.materials) ? product.materials : [],
+              averageRating: product.averageRating || 0,
+              totalReviews: product.totalReviews || 0,
+              stock: totalStock,
+              sku: product.sku,
+              status: product.status,
+              hasSizing: product.hasSizing,
+              variants: Array.isArray(product.variants) ? product.variants : []
+            }
+          })
+          
+          setFeaturedProducts(transformed)
+        }
+      } catch (error) {
+        console.error('Error fetching featured products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFeaturedProducts()
+  }, [])
 
   return (
     <main>
@@ -24,7 +86,18 @@ export default function Home() {
               Discover our most popular embroidered products, carefully crafted with attention to detail and quality.
             </p>
           </div>
-          <ProductGrid products={featured} />
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading featured products...</p>
+            </div>
+          ) : featuredProducts.length > 0 ? (
+            <ProductGrid products={featuredProducts} />
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-gray-600">No featured products available at the moment.</p>
+            </div>
+          )}
           <div className="text-center mt-12">
             <Link to="/products">
               <Button variant="outline" size="lg" className="group">

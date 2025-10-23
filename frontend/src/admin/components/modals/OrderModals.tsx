@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { X, Package, Truck, CheckCircle, XCircle, Clock, User, Mail, Phone, MapPin, CreditCard, DollarSign, AlertCircle, FileText } from 'lucide-react'
 import { Order } from '../../types'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface OrderDetailModalProps {
   isOpen: boolean
@@ -405,7 +407,12 @@ export const StatusUpdateModal: React.FC<StatusUpdateModalProps> = ({ isOpen, on
         <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 flex flex-col">
           <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Update Order Status</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+              <span className="inline-flex items-center">
+                Update Order Status
+                <InfoTooltip text={fieldDescriptions.order.status} />
+              </span>
+            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"

@@ -148,7 +148,7 @@ export class AuthController {
       let role = await Role.findOne({ where: { name: ROLES.CUSTOMER } });
       if (!role) {
         // Create default roles if they don't exist
-        await this.createDefaultRoles();
+        await AuthController.createDefaultRoles();
         role = await Role.findOne({ where: { name: ROLES.CUSTOMER } });
       }
 

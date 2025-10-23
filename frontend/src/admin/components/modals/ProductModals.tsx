@@ -3,6 +3,8 @@ import { X, AlertTriangle, Upload, Image as ImageIcon, Star } from 'lucide-react
 import { AdminProduct } from '../../hooks/useProducts'
 import { categoryApiService, Category } from '../../../shared/categoryApiService'
 import { ProductCreateData } from '../../../shared/productApiService'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface AddProductModalProps {
   isOpen: boolean
@@ -45,12 +47,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     sku: '',
     weight: '',
     dimensions: '',
-    hasSizing: false
+    hasSizing: false,
+    availableSizes: [] as string[]
   })
 
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [newSize, setNewSize] = useState('')
 
   // Fetch categories when modal opens
   useEffect(() => {
@@ -152,7 +156,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required'
     if (imageFiles.length === 0) newErrors.images = 'At least one image is required'
     if (!formData.alt.trim()) newErrors.alt = 'Alt text is required'
-    if (!formData.categoryId) newErrors.categoryId = 'Category is required'
+    if (!formData.categoryId || formData.categoryId === 0) newErrors.categoryId = 'Category is required'
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required'
     
     setErrors(newErrors)
@@ -170,16 +174,26 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           imageFiles.map(file => convertToBase64(file))
         )
         
-        onSave({
+        const productData = {
           ...formData,
           price: parseFloat(formData.price),
           images: base64Images,
           image: base64Images[formData.primaryImageIndex], // Primary image for backward compatibility
           primaryImageIndex: formData.primaryImageIndex,
           categoryId: formData.categoryId,
-          subcategoryId: formData.subcategoryId || undefined,
+          subcategoryId: formData.subcategoryId > 0 ? formData.subcategoryId : undefined,
           weight: formData.weight ? parseFloat(formData.weight) : undefined
+        }
+        
+        console.log('Creating product with data:', {
+          ...productData,
+          images: '[BASE64_DATA]', // Don't log full base64
+          image: '[BASE64_DATA]',
+          availableSizes: productData.availableSizes,
+          hasSizing: productData.hasSizing
         })
+        
+        onSave(productData)
         
         // Reset form
         setFormData({
@@ -198,11 +212,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           sku: '',
           weight: '',
           dimensions: '',
-          hasSizing: false
+          hasSizing: false,
+          availableSizes: []
         })
         setImageFiles([])
         setImagePreviews([])
         setErrors({})
+        setNewSize('')
         onClose()
       } catch (error) {
         console.error('Error converting images:', error)
@@ -234,7 +250,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Title *
+                  <span className="inline-flex items-center">
+                    Product Title *
+                    <InfoTooltip text={fieldDescriptions.product.title} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -250,7 +269,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Slug *
+                  <span className="inline-flex items-center">
+                    Slug *
+                    <InfoTooltip text={fieldDescriptions.product.sku} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -266,7 +288,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SKU *
+                  <span className="inline-flex items-center">
+                    SKU *
+                    <InfoTooltip text={fieldDescriptions.product.sku} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -282,11 +307,21 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
+                  <span className="inline-flex items-center">
+                    Category *
+                    <InfoTooltip text={fieldDescriptions.product.categoryId} />
+                  </span>
                 </label>
                 <select
                   value={formData.categoryId}
-                  onChange={(e) => setFormData({ ...formData, categoryId: parseInt(e.target.value) })}
+                  onChange={(e) => {
+                    // Reset subcategory when category changes to avoid showing wrong subcategories
+                    setFormData({ 
+                      ...formData, 
+                      categoryId: parseInt(e.target.value),
+                      subcategoryId: 0 
+                    })
+                  }}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 ${
                     errors.categoryId ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -301,17 +336,25 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subcategory
+                  <span className="inline-flex items-center">
+                    Subcategory
+                    <InfoTooltip text={fieldDescriptions.product.subcategoryId} />
+                  </span>
                 </label>
                 <select
                   value={formData.subcategoryId}
                   onChange={(e) => setFormData({ ...formData, subcategoryId: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                  disabled={!formData.categoryId || formData.categoryId === 0}
                 >
-                  <option value={0}>Select Subcategory</option>
-                  {categories
-                    .flatMap(cat => cat.children || [])
-                    .map(subcategory => (
+                  <option value={0}>
+                    {!formData.categoryId || formData.categoryId === 0 
+                      ? 'Select a category first' 
+                      : 'Select Subcategory (Optional)'}
+                  </option>
+                  {formData.categoryId && categories
+                    .find(cat => cat.id === formData.categoryId)
+                    ?.children?.map(subcategory => (
                       <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                     ))}
                 </select>
@@ -319,7 +362,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price *
+                  <span className="inline-flex items-center">
+                    Price *
+                    <InfoTooltip text={fieldDescriptions.product.price} />
+                  </span>
                 </label>
                 <input
                   type="number"
@@ -337,7 +383,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
+                  <span className="inline-flex items-center">
+                    Status
+                    <InfoTooltip text={fieldDescriptions.product.status} />
+                  </span>
                 </label>
                 <select
                   value={formData.status}
@@ -359,7 +408,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
                 <label htmlFor="featured" className="ml-2 block text-sm text-gray-700">
-                  Featured Product
+                  <span className="inline-flex items-center">
+                    Featured Product
+                    <InfoTooltip text={fieldDescriptions.product.featured} />
+                  </span>
                 </label>
               </div>
 
@@ -372,14 +424,95 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
                 <label htmlFor="hasSizing" className="ml-2 block text-sm text-gray-700">
-                  Has Sizing (Apparel products with multiple sizes)
+                  <span className="inline-flex items-center">
+                    Has Sizing (Apparel products with multiple sizes)
+                    <InfoTooltip text={fieldDescriptions.product.hasSizing} />
+                  </span>
                 </label>
               </div>
+
+              {/* Size Management Section */}
+              {formData.hasSizing && (
+                <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="inline-flex items-center">
+                      Available Sizes
+                      <InfoTooltip text={fieldDescriptions.product.availableSizes} />
+                    </span>
+                  </label>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={newSize}
+                      onChange={(e) => setNewSize(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (newSize.trim() && !formData.availableSizes.includes(newSize.trim())) {
+                            setFormData({ 
+                              ...formData, 
+                              availableSizes: [...formData.availableSizes, newSize.trim()] 
+                            })
+                            setNewSize('')
+                          }
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                      placeholder="Enter size (e.g., XS, S, M, L, XL)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newSize.trim() && !formData.availableSizes.includes(newSize.trim())) {
+                          setFormData({ 
+                            ...formData, 
+                            availableSizes: [...formData.availableSizes, newSize.trim()] 
+                          })
+                          setNewSize('')
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      Add Size
+                    </button>
+                  </div>
+                  
+                  {formData.availableSizes.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.availableSizes.map((size, index) => (
+                        <div
+                          key={index}
+                          className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-full text-sm"
+                        >
+                          <span>{size}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                availableSizes: formData.availableSizes.filter((_, i) => i !== index)
+                              })
+                            }}
+                            className="text-red-500 hover:text-red-700 font-bold"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No sizes added yet. Add sizes above.</p>
+                  )}
+                </div>
+              )}
 
               {/* Multiple Image Upload Section */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Images * (PNG, JPG, etc.) - Up to 10 images
+                  <span className="inline-flex items-center">
+                    Product Images * (PNG, JPG, etc.) - Up to 10 images
+                    <InfoTooltip text={fieldDescriptions.product.image} />
+                  </span>
                 </label>
                 
                 {/* Upload Area */}
@@ -443,28 +576,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                   onChange={handleFileChange}
                 />
-                
-                {/* Debug: Test button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    console.log('Test button clicked')
-                    
-                    if (fileInputRef.current) {
-                      console.log('Test: Input ref found, triggering click')
-                      fileInputRef.current.value = ''
-                      fileInputRef.current.click()
-                    } else {
-                      console.error('Test: File input ref not found')
-                    }
-                  }}
-                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                >
-                  Test File Upload
-                </button>
-                
+
                 {/* Image Previews */}
                 {imagePreviews.length > 0 && (
                   <div className="mt-4">
@@ -529,7 +641,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Alt Text *
+                  <span className="inline-flex items-center">
+                    Alt Text *
+                    <InfoTooltip text="Alternative text for images. Describes the image for accessibility and SEO. Be descriptive." />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -545,7 +660,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
+                  <span className="inline-flex items-center">
+                    Description *
+                    <InfoTooltip text={fieldDescriptions.product.description} />
+                  </span>
                 </label>
                 <textarea
                   value={formData.description}
@@ -604,12 +722,14 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
     sku: '',
     weight: '',
     dimensions: '',
-    hasSizing: false
+    hasSizing: false,
+    availableSizes: [] as string[]
   })
 
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [newSize, setNewSize] = useState('')
 
   // Initialize form data when product changes
   useEffect(() => {
@@ -635,7 +755,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
         sku: product.sku || '',
         weight: product.weight?.toString() || '',
         dimensions: product.dimensions || '',
-        hasSizing: product.hasSizing || false
+        hasSizing: product.hasSizing || false,
+        availableSizes: product.availableSizes && Array.isArray(product.availableSizes) ? product.availableSizes : []
       })
       
       // Set previews for existing images
@@ -751,7 +872,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
     if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required'
     if (imagePreviews.length === 0) newErrors.images = 'At least one image is required'
     if (!formData.alt.trim()) newErrors.alt = 'Alt text is required'
-    if (!formData.categoryId) newErrors.categoryId = 'Category is required'
+    if (!formData.categoryId || formData.categoryId === 0) newErrors.categoryId = 'Category is required'
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required'
     
     setErrors(newErrors)
@@ -782,7 +903,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
           images: allImages,
           primaryImageIndex: formData.primaryImageIndex,
           categoryId: formData.categoryId,
-          subcategoryId: formData.subcategoryId || undefined,
+          subcategoryId: formData.subcategoryId > 0 ? formData.subcategoryId : undefined,
           weight: formData.weight ? parseFloat(formData.weight) : undefined
           // updatedAt will be handled by the database automatically
         })
@@ -821,7 +942,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Title *
+                  <span className="inline-flex items-center">
+                    Product Title *
+                    <InfoTooltip text={fieldDescriptions.product.title} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -837,7 +961,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Slug *
+                  <span className="inline-flex items-center">
+                    Slug *
+                    <InfoTooltip text={fieldDescriptions.product.sku} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -853,7 +980,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SKU *
+                  <span className="inline-flex items-center">
+                    SKU *
+                    <InfoTooltip text={fieldDescriptions.product.sku} />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -869,11 +999,21 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category *
+                  <span className="inline-flex items-center">
+                    Category *
+                    <InfoTooltip text={fieldDescriptions.product.categoryId} />
+                  </span>
                 </label>
                 <select
                   value={formData.categoryId}
-                  onChange={(e) => setFormData({ ...formData, categoryId: parseInt(e.target.value) })}
+                  onChange={(e) => {
+                    // Reset subcategory when category changes to avoid showing wrong subcategories
+                    setFormData({ 
+                      ...formData, 
+                      categoryId: parseInt(e.target.value),
+                      subcategoryId: 0 
+                    })
+                  }}
                   className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900 ${
                     errors.categoryId ? 'border-red-300' : 'border-gray-300'
                   }`}
@@ -888,17 +1028,25 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Subcategory
+                  <span className="inline-flex items-center">
+                    Subcategory
+                    <InfoTooltip text={fieldDescriptions.product.subcategoryId} />
+                  </span>
                 </label>
                 <select
                   value={formData.subcategoryId}
                   onChange={(e) => setFormData({ ...formData, subcategoryId: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                  disabled={!formData.categoryId || formData.categoryId === 0}
                 >
-                  <option value={0}>Select Subcategory</option>
-                  {categories
-                    .flatMap(cat => cat.children || [])
-                    .map(subcategory => (
+                  <option value={0}>
+                    {!formData.categoryId || formData.categoryId === 0 
+                      ? 'Select a category first' 
+                      : 'Select Subcategory (Optional)'}
+                  </option>
+                  {formData.categoryId && categories
+                    .find(cat => cat.id === formData.categoryId)
+                    ?.children?.map(subcategory => (
                       <option key={subcategory.id} value={subcategory.id}>{subcategory.name}</option>
                     ))}
                 </select>
@@ -906,7 +1054,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Price *
+                  <span className="inline-flex items-center">
+                    Price *
+                    <InfoTooltip text={fieldDescriptions.product.price} />
+                  </span>
                 </label>
                 <input
                   type="number"
@@ -924,7 +1075,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
+                  <span className="inline-flex items-center">
+                    Status
+                    <InfoTooltip text={fieldDescriptions.product.status} />
+                  </span>
                 </label>
                 <select
                   value={formData.status}
@@ -963,10 +1117,88 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
                 </label>
               </div>
 
+              {/* Size Management Section */}
+              {formData.hasSizing && (
+                <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="inline-flex items-center">
+                      Available Sizes
+                      <InfoTooltip text={fieldDescriptions.product.availableSizes} />
+                    </span>
+                  </label>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={newSize}
+                      onChange={(e) => setNewSize(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (newSize.trim() && !formData.availableSizes.includes(newSize.trim())) {
+                            setFormData({ 
+                              ...formData, 
+                              availableSizes: [...formData.availableSizes, newSize.trim()] 
+                            })
+                            setNewSize('')
+                          }
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-gray-900"
+                      placeholder="Enter size (e.g., XS, S, M, L, XL)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newSize.trim() && !formData.availableSizes.includes(newSize.trim())) {
+                          setFormData({ 
+                            ...formData, 
+                            availableSizes: [...formData.availableSizes, newSize.trim()] 
+                          })
+                          setNewSize('')
+                        }
+                      }}
+                      className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                    >
+                      Add Size
+                    </button>
+                  </div>
+                  
+                  {formData.availableSizes.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {formData.availableSizes.map((size, index) => (
+                        <div
+                          key={index}
+                          className="inline-flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-full text-sm"
+                        >
+                          <span>{size}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                availableSizes: formData.availableSizes.filter((_, i) => i !== index)
+                              })
+                            }}
+                            className="text-red-500 hover:text-red-700 font-bold"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No sizes added yet. Add sizes above.</p>
+                  )}
+                </div>
+              )}
+
               {/* Multiple Image Upload Section */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Product Images * (PNG, JPG, etc.) - Up to 10 images
+                  <span className="inline-flex items-center">
+                    Product Images * (PNG, JPG, etc.) - Up to 10 images
+                    <InfoTooltip text={fieldDescriptions.product.image} />
+                  </span>
                 </label>
                 
                 {/* Upload Area */}
@@ -1067,7 +1299,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Alt Text *
+                  <span className="inline-flex items-center">
+                    Alt Text *
+                    <InfoTooltip text="Alternative text for images. Describes the image for accessibility and SEO. Be descriptive." />
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -1083,7 +1318,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
+                  <span className="inline-flex items-center">
+                    Description *
+                    <InfoTooltip text={fieldDescriptions.product.description} />
+                  </span>
                 </label>
                 <textarea
                   value={formData.description}

@@ -66,6 +66,11 @@ export default function Customize() {
   const [embroideryPricing, setEmbroideryPricing] = useState<CostBreakdown | null>(null)
   const [pricingLoading, setPricingLoading] = useState(false)
 
+  // Reset initialization flag when product ID changes to ensure fresh initialization
+  useEffect(() => {
+    initializedRef.current = false
+  }, [id])
+
   // Fetch product data from API
   useEffect(() => {
     const fetchProduct = async () => {
@@ -98,6 +103,8 @@ export default function Customize() {
           productName: product.title,
           productImage: product.image,
           basePrice: product.price,
+          color: '', // Reset color selection
+          size: '', // Reset size selection
           design: null, // Clear previous design
           designs: [], // Clear previous designs
           mockup: undefined, // Clear previous mockup
@@ -112,12 +119,14 @@ export default function Customize() {
           }
         })
       } else {
-        // Same product or first time, just update basic info
+        // Same product or first time, just update basic info and reset selections
       setCustomizationData({
         productId: product.id.toString(),
         productName: product.title,
         productImage: product.image,
-        basePrice: product.price
+        basePrice: product.price,
+        color: '', // Reset color selection
+        size: '' // Reset size selection
       })
       }
       initializedRef.current = true
@@ -270,11 +279,23 @@ export default function Customize() {
 
   // Get all available sizes (considering currently selected color if any)
   const getAvailableSizes = () => {
-    if (!product?.variants) return []
+    // Check if product has defined sizes - use those as the source of truth
+    const productSizes = product?.availableSizes && Array.isArray(product.availableSizes) && product.availableSizes.length > 0
+      ? product.availableSizes
+      : []
+    
+    // If product has no variants, return defined sizes or "One Size" if no sizing
+    if (!product?.variants || product.variants.length === 0) {
+      // If product has no sizes and no hasSizing flag, return "One Size"
+      if (productSizes.length === 0 && !product?.hasSizing) {
+        return ['One Size']
+      }
+      return productSizes
+    }
     
     // If a color is already selected, show only sizes available for that color
     if (customizationData.color) {
-      const sizes = product.variants
+      const variantSizes = product.variants
         .filter((variant: any) => 
           variant.stock > 0 && 
           variant.isActive && 
@@ -282,16 +303,36 @@ export default function Customize() {
         )
         .map((variant: any) => variant.size)
         .filter((size: string, index: number, arr: string[]) => arr.indexOf(size) === index)
-      return sizes
+      
+      // If product has defined sizes, filter to only show those that have stock
+      if (productSizes.length > 0) {
+        return productSizes.filter((size: string) => 
+          variantSizes.some((vs: string) => vs.toLowerCase() === size.toLowerCase())
+        )
+      }
+      
+      return variantSizes
     }
     
     // If no color selected yet, show all sizes that have stock in at least one color
-    const sizes = product.variants
+    const variantSizes = product.variants
       .filter((variant: any) => variant.stock > 0 && variant.isActive)
       .map((variant: any) => variant.size)
       .filter((size: string, index: number, arr: string[]) => arr.indexOf(size) === index)
     
-    return sizes
+    // If product has defined sizes, filter to only show those that have stock
+    if (productSizes.length > 0) {
+      return productSizes.filter((size: string) => 
+        variantSizes.some((vs: string) => vs.toLowerCase() === size.toLowerCase())
+      )
+    }
+    
+    // If no variant sizes found and product doesn't have sizing, return "One Size"
+    if (variantSizes.length === 0 && !product?.hasSizing) {
+      return ['One Size']
+    }
+    
+    return variantSizes
   }
   
   // Check if a specific color+size combination is in stock
@@ -1250,6 +1291,21 @@ export default function Customize() {
                 {showFinalView ? 'How It Will Look' : 'Product Preview'}
               </h3>
               
+              {/* Mockup Disclaimer Notice */}
+              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start space-x-2">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-900 font-medium">Mockup Preview Notice</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      The colors and product shown here are for visualization purposes only. 
+                      Final product colors and appearance may vary slightly from this mockup. 
+                      This preview helps you visualize design placement and sizing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
               {/* Product Image with Design Overlay */}
               <div className="flex justify-center items-center">
                 <div className="relative max-w-2xl w-full" ref={productRef}>
@@ -1659,18 +1715,44 @@ export default function Customize() {
                      </div>
                    )}
 
-                   {/* Size Guide - Only show if there are multiple sizes */}
-                   {getAvailableSizes().length > 1 && (
+                   {/* Size Guide - Only show for apparel products with multiple sizes */}
+                   {getAvailableSizes().length > 1 && product?.hasSizing && (
                      <div className="bg-gray-50 rounded-lg p-3 sm:p-4">
                        <h5 className="font-medium text-gray-900 mb-2 text-sm sm:text-base">Size Guide</h5>
                        <div className="text-xs sm:text-sm text-gray-600 space-y-1">
-                         <p><strong>XS:</strong> Chest 32-34" | Length 26"</p>
-                         <p><strong>S:</strong> Chest 34-36" | Length 27"</p>
-                         <p><strong>M:</strong> Chest 36-38" | Length 28"</p>
-                         <p><strong>L:</strong> Chest 38-40" | Length 29"</p>
-                         <p><strong>XL:</strong> Chest 40-42" | Length 30"</p>
-                         <p><strong>XXL:</strong> Chest 42-44" | Length 31"</p>
+                         {getAvailableSizes().map((size: string) => {
+                           // Standard apparel measurements mapping
+                           const measurements: { [key: string]: string } = {
+                             'XS': 'Chest 32-34" | Length 26"',
+                             'S': 'Chest 34-36" | Length 27"',
+                             'M': 'Chest 36-38" | Length 28"',
+                             'L': 'Chest 38-40" | Length 29"',
+                             'XL': 'Chest 40-42" | Length 30"',
+                             'XXL': 'Chest 42-44" | Length 31"',
+                             'XXXL': 'Chest 44-46" | Length 32"',
+                             '2XL': 'Chest 42-44" | Length 31"',
+                             '3XL': 'Chest 44-46" | Length 32"'
+                           }
+                           
+                           // Get measurement for this size (case-insensitive)
+                           const sizeKey = Object.keys(measurements).find(
+                             key => key.toLowerCase() === size.toLowerCase()
+                           )
+                           const measurement = sizeKey ? measurements[sizeKey] : null
+                           
+                           // Only show sizes that have measurements defined
+                           if (!measurement) return null
+                           
+                           return (
+                             <p key={size}>
+                               <strong>{size.toUpperCase()}:</strong> {measurement}
+                             </p>
+                           )
+                         })}
                        </div>
+                       <p className="text-xs text-gray-500 mt-2 italic">
+                         Measurements are approximate. Please refer to our detailed size chart for exact specifications.
+                       </p>
                      </div>
                    )}
                  </div>

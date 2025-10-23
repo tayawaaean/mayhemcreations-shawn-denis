@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import type { Product } from '../../types'
 import { Link } from 'react-router-dom'
-import { Heart, Eye, Star } from 'lucide-react'
+import { Eye, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import ProductSlideshow from './ProductSlideshow'
 import { getAllProductImages } from '../../shared/imageUtils'
@@ -60,7 +60,7 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
           
           {/* Other Badges */}
-          {product.badges && product.badges.length > 0 && (
+          {product.badges && Array.isArray(product.badges) && product.badges.length > 0 && (
             <>
               {product.badges.map((badge: string, index: number) => (
                 <span
@@ -78,9 +78,6 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-opacity duration-200 ${
           isHovered ? 'opacity-100' : 'opacity-0'
         }`}>
-          <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
-            <Heart className="w-4 h-4 text-gray-600" />
-          </button>
           <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
             <Eye className="w-4 h-4 text-gray-600" />
           </button>

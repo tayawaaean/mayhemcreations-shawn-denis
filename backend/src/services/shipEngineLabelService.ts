@@ -275,13 +275,14 @@ export class ShipEngineLabelService {
         // Ship From address (your warehouse/business address)
         ship_from: {
           name: 'Mayhem Creations',
-          phone: '555-555-5555',
+          phone: process.env.ORIGIN_PHONE || '614-715-4742',
           company_name: 'Mayhem Creations',
-          address_line1: '123 Business St',
-          city_locality: 'Austin',
-          state_province: 'TX',
-          postal_code: '78701',
-          country_code: 'US'
+          address_line1: '128 Persimmon Dr',
+          city_locality: 'Newark',
+          state_province: 'OH',
+          postal_code: '43055',
+          country_code: 'US',
+          address_residential_indicator: 'no'
         },
         
         // Ship To address (customer address)

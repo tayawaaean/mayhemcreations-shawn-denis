@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { X, DollarSign, Palette, Scissors, Circle, ArrowUp, Layers, Sparkles, Square } from 'lucide-react'
 import { EmbroideryOption } from '../../types'
 import ImageUpload from '../ImageUpload'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 // Embroidery type options with icons and descriptions
 const embroideryTypes = [
@@ -61,7 +63,10 @@ const TypeSelect: React.FC<{
   return (
     <div className="relative">
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        Type *
+        <span className="inline-flex items-center">
+          Type *
+          <InfoTooltip text={fieldDescriptions.embroidery.category} />
+        </span>
       </label>
       <div
         onClick={() => setIsOpen(!isOpen)}
@@ -226,7 +231,10 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name *
+              <span className="inline-flex items-center">
+                Name *
+                <InfoTooltip text={fieldDescriptions.embroidery.name} />
+              </span>
             </label>
             <input
               type="text"
@@ -249,7 +257,10 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image
+              <span className="inline-flex items-center">
+                Image
+                <InfoTooltip text="Image showing this embroidery option. Helps customers visualize their choice." />
+              </span>
             </label>
             <ImageUpload
               value={formData.image || ''}
@@ -261,7 +272,10 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Price *
+              <span className="inline-flex items-center">
+                Price *
+                <InfoTooltip text={fieldDescriptions.embroidery.basePrice} />
+              </span>
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -281,7 +295,10 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              <span className="inline-flex items-center">
+                Description
+                <InfoTooltip text={fieldDescriptions.embroidery.description} />
+              </span>
             </label>
             <textarea
               name="description"
@@ -387,7 +404,10 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name *
+              <span className="inline-flex items-center">
+                Name *
+                <InfoTooltip text={fieldDescriptions.embroidery.name} />
+              </span>
             </label>
             <input
               type="text"
@@ -410,7 +430,10 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Image
+              <span className="inline-flex items-center">
+                Image
+                <InfoTooltip text="Image showing this embroidery option. Helps customers visualize their choice." />
+              </span>
             </label>
             <ImageUpload
               value={formData.image || ''}
@@ -422,7 +445,10 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Price *
+              <span className="inline-flex items-center">
+                Price *
+                <InfoTooltip text={fieldDescriptions.embroidery.basePrice} />
+              </span>
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -442,7 +468,10 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              <span className="inline-flex items-center">
+                Description
+                <InfoTooltip text={fieldDescriptions.embroidery.description} />
+              </span>
             </label>
             <textarea
               name="description"

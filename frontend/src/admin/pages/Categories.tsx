@@ -11,7 +11,7 @@ import {
   Search,
   Filter
 } from 'lucide-react'
-import { AddCategoryModal, EditCategoryModal, DeleteCategoryModal } from '../components/modals/CategoryModals'
+import { AddCategoryModal, EditCategoryModal, DeleteCategoryModal, BulkDeleteConfirmationModal, ForceDeleteConfirmationModal, DeleteResultModal } from '../components/modals/CategoryModals'
 import HelpModal from '../components/modals/HelpModal'
 import { useCategories } from '../hooks/useCategories'
 import { Category } from '../types'
@@ -37,7 +37,12 @@ const Categories: React.FC = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
+  const [isForceDeleteModalOpen, setIsForceDeleteModalOpen] = useState(false)
+  const [isDeleteResultModalOpen, setIsDeleteResultModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [failedCategoriesCache, setFailedCategoriesCache] = useState<number[]>([])
+  const [deleteResult, setDeleteResult] = useState({ success: 0, failed: 0 })
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
@@ -123,16 +128,32 @@ const Categories: React.FC = () => {
     }
   }
 
-  const handleDeleteCategory = async (categoryId: number) => {
+  const handleDeleteCategory = async (categoryId: number, force: boolean = false) => {
     try {
-      const success = await deleteCategory(categoryId)
+      const success = await deleteCategory(categoryId, force)
       
       if (success) {
         setIsDeleteModalOpen(false)
         setSelectedCategory(null)
+      } else if (!force) {
+        // If delete failed and we haven't tried force yet, show force delete modal
+        setIsDeleteModalOpen(false)
+        setFailedCategoriesCache([categoryId])
+        setDeleteResult({ success: 0, failed: 1 })
+        setIsForceDeleteModalOpen(true)
+      } else {
+        // Force delete also failed
+        setIsDeleteModalOpen(false)
+        setSelectedCategory(null)
+        setDeleteResult({ success: 0, failed: 1 })
+        setIsDeleteResultModalOpen(true)
       }
     } catch (error) {
       console.error('Error deleting category:', error)
+      setIsDeleteModalOpen(false)
+      setSelectedCategory(null)
+      setDeleteResult({ success: 0, failed: 1 })
+      setIsDeleteResultModalOpen(true)
     }
   }
 
@@ -145,6 +166,86 @@ const Categories: React.FC = () => {
     if (selectedCategory) {
       await handleDeleteCategory(selectedCategory.id)
     }
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedCategories.length === 0) return
+    setIsBulkDeleteModalOpen(true)
+  }
+
+  const handleBulkDeleteConfirm = async () => {
+    setIsBulkDeleteModalOpen(false)
+    
+    try {
+      let successCount = 0
+      const failedCategories: number[] = []
+      
+      // First attempt: Delete without force flag
+      for (const categoryId of selectedCategories) {
+        const success = await deleteCategory(categoryId, false)
+        if (success) {
+          successCount++
+        } else {
+          failedCategories.push(categoryId)
+        }
+      }
+      
+      // If some categories failed, show force delete modal
+      if (failedCategories.length > 0) {
+        setFailedCategoriesCache(failedCategories)
+        setDeleteResult({ success: successCount, failed: failedCategories.length })
+        setIsForceDeleteModalOpen(true)
+      } else {
+        // All succeeded, show result
+        setDeleteResult({ success: successCount, failed: 0 })
+        setSelectedCategories([])
+        setIsDeleteResultModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Error during bulk delete:', error)
+      setDeleteResult({ success: 0, failed: selectedCategories.length })
+      setSelectedCategories([])
+      setIsDeleteResultModalOpen(true)
+    }
+  }
+
+  const handleForceDeleteConfirm = async () => {
+    setIsForceDeleteModalOpen(false)
+    
+    try {
+      let additionalSuccess = 0
+      
+      // Force delete the failed ones
+      for (const categoryId of failedCategoriesCache) {
+        const success = await deleteCategory(categoryId, true)
+        if (success) {
+          additionalSuccess++
+        }
+      }
+      
+      // Update result and show summary
+      const finalSuccess = deleteResult.success + additionalSuccess
+      const finalFailed = failedCategoriesCache.length - additionalSuccess
+      
+      setDeleteResult({ success: finalSuccess, failed: finalFailed })
+      setSelectedCategories([])
+      setFailedCategoriesCache([])
+      setIsDeleteResultModalOpen(true)
+    } catch (error) {
+      console.error('Error during force delete:', error)
+      setDeleteResult({ success: deleteResult.success, failed: failedCategoriesCache.length })
+      setSelectedCategories([])
+      setFailedCategoriesCache([])
+      setIsDeleteResultModalOpen(true)
+    }
+  }
+
+  const handleForceDeleteCancel = () => {
+    setIsForceDeleteModalOpen(false)
+    // Show result of partial deletion
+    setSelectedCategories([])
+    setFailedCategoriesCache([])
+    setIsDeleteResultModalOpen(true)
   }
 
   const handleToggleStatus = async (categoryId: number) => {
@@ -357,7 +458,13 @@ const Categories: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Bulk Edit</button>
               <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Change Status</button>
-              <button className="text-xs sm:text-sm text-red-700 hover:text-red-800 px-2 py-1 hover:bg-red-100 rounded">Delete</button>
+              <button 
+                onClick={handleBulkDelete}
+                disabled={loading}
+                className="text-xs sm:text-sm text-red-700 hover:text-red-800 px-2 py-1 hover:bg-red-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
@@ -578,6 +685,32 @@ const Categories: React.FC = () => {
         }}
         onConfirm={handleConfirmDelete}
         category={selectedCategory}
+      />
+
+      <BulkDeleteConfirmationModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        onConfirm={handleBulkDeleteConfirm}
+        count={selectedCategories.length}
+      />
+
+      <ForceDeleteConfirmationModal
+        isOpen={isForceDeleteModalOpen}
+        onClose={() => {
+          setIsForceDeleteModalOpen(false)
+          setSelectedCategories([])
+          setFailedCategoriesCache([])
+        }}
+        onConfirm={handleForceDeleteConfirm}
+        onCancel={handleForceDeleteCancel}
+        failedCount={failedCategoriesCache.length}
+      />
+
+      <DeleteResultModal
+        isOpen={isDeleteResultModalOpen}
+        onClose={() => setIsDeleteResultModalOpen(false)}
+        successCount={deleteResult.success}
+        failedCount={deleteResult.failed}
       />
     </div>
   )

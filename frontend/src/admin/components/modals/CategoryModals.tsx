@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { X, Image as ImageIcon, Upload } from 'lucide-react'
 import { Category } from '../../types'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface AddCategoryModalProps {
   isOpen: boolean
@@ -22,6 +24,28 @@ interface DeleteCategoryModalProps {
   onClose: () => void
   onConfirm: () => void
   category: Category | null
+}
+
+interface BulkDeleteConfirmationModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  count: number
+}
+
+interface ForceDeleteConfirmationModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  onCancel: () => void
+  failedCount: number
+}
+
+interface DeleteResultModalProps {
+  isOpen: boolean
+  onClose: () => void
+  successCount: number
+  failedCount: number
 }
 
 export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
@@ -167,7 +191,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name *
+              <span className="inline-flex items-center">
+                Name *
+                <InfoTooltip text={fieldDescriptions.category.name} />
+              </span>
             </label>
             <input
               type="text"
@@ -182,7 +209,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Slug *
+              <span className="inline-flex items-center">
+                Slug *
+                <InfoTooltip text={fieldDescriptions.category.slug} />
+              </span>
             </label>
             <input
               type="text"
@@ -197,7 +227,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              <span className="inline-flex items-center">
+                Description
+                <InfoTooltip text={fieldDescriptions.category.description} />
+              </span>
             </label>
             <textarea
               name="description"
@@ -211,7 +244,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Parent Category
+              <span className="inline-flex items-center">
+                Parent Category
+                <InfoTooltip text={fieldDescriptions.category.parentId} />
+              </span>
             </label>
             <select
               name="parentId"
@@ -228,7 +264,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort Order
+              <span className="inline-flex items-center">
+                Sort Order
+                <InfoTooltip text={fieldDescriptions.category.sortOrder} />
+              </span>
             </label>
             <input
               type="number"
@@ -244,7 +283,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           {/* Image Upload Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category Image (PNG, JPG, etc.)
+              <span className="inline-flex items-center">
+                Category Image (PNG, JPG, etc.)
+                <InfoTooltip text={fieldDescriptions.category.image} />
+              </span>
             </label>
             <div 
               className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors cursor-pointer"
@@ -326,7 +368,10 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <label htmlFor="status" className="ml-2 block text-sm text-gray-900">
-              Active
+              <span className="inline-flex items-center">
+                Active
+                <InfoTooltip text={fieldDescriptions.category.status} />
+              </span>
             </label>
           </div>
 
@@ -499,7 +544,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Name *
+              <span className="inline-flex items-center">
+                Name *
+                <InfoTooltip text={fieldDescriptions.category.name} />
+              </span>
             </label>
             <input
               type="text"
@@ -514,7 +562,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Slug *
+              <span className="inline-flex items-center">
+                Slug *
+                <InfoTooltip text={fieldDescriptions.category.slug} />
+              </span>
             </label>
             <input
               type="text"
@@ -529,7 +580,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
+              <span className="inline-flex items-center">
+                Description
+                <InfoTooltip text={fieldDescriptions.category.description} />
+              </span>
             </label>
             <textarea
               name="description"
@@ -543,7 +597,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Parent Category
+              <span className="inline-flex items-center">
+                Parent Category
+                <InfoTooltip text={fieldDescriptions.category.parentId} />
+              </span>
             </label>
             <select
               name="parentId"
@@ -560,7 +617,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Sort Order
+              <span className="inline-flex items-center">
+                Sort Order
+                <InfoTooltip text={fieldDescriptions.category.sortOrder} />
+              </span>
             </label>
             <input
               type="number"
@@ -576,7 +636,10 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           {/* Image Upload Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category Image (PNG, JPG, etc.)
+              <span className="inline-flex items-center">
+                Category Image (PNG, JPG, etc.)
+                <InfoTooltip text={fieldDescriptions.category.image} />
+              </span>
             </label>
             <div 
               className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors cursor-pointer"
@@ -744,6 +807,187 @@ export const DeleteCategoryModal: React.FC<DeleteCategoryModalProps> = ({
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
             >
               Delete Category
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const BulkDeleteConfirmationModal: React.FC<BulkDeleteConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  count
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Bulk Delete Categories</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <ImageIcon className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete <strong>{count}</strong> categor{count > 1 ? 'ies' : 'y'}?
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-sm text-amber-800">
+                  <strong>Warning:</strong> This action cannot be undone. Categories with dependencies (subcategories or products) will require force deletion.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Delete Categories
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const ForceDeleteConfirmationModal: React.FC<ForceDeleteConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  onCancel,
+  failedCount
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Force Delete Required</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <ImageIcon className="h-5 w-5 text-red-600" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-gray-600 mb-4">
+                <strong>{failedCount}</strong> categor{failedCount > 1 ? 'ies' : 'y'} could not be deleted because they have dependencies (subcategories or products).
+              </p>
+              
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-red-800 font-semibold mb-2">
+                  Do you want to FORCE DELETE them?
+                </p>
+                <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                  <li>All subcategories will be deleted</li>
+                  <li>Products will be unlinked from these categories</li>
+                  <li>This action cannot be undone</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-3 mt-6">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Force Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export const DeleteResultModal: React.FC<DeleteResultModalProps> = ({
+  isOpen,
+  onClose,
+  successCount,
+  failedCount
+}) => {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Delete Complete</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          <div className="space-y-4">
+            <div className={`p-4 rounded-lg ${failedCount > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-green-50 border border-green-200'}`}>
+              <p className={`text-sm font-medium ${failedCount > 0 ? 'text-amber-900' : 'text-green-900'}`}>
+                Bulk delete completed
+              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-sm text-gray-700">
+                  <strong>{successCount}</strong> categor{successCount !== 1 ? 'ies' : 'y'} deleted successfully
+                </p>
+                {failedCount > 0 && (
+                  <p className="text-sm text-gray-700">
+                    <strong>{failedCount}</strong> categor{failedCount !== 1 ? 'ies' : 'y'} failed or skipped
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Close
             </button>
           </div>
         </div>

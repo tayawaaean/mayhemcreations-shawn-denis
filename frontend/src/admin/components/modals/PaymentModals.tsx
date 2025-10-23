@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import { X, CheckCircle, DollarSign, AlertTriangle, CreditCard } from 'lucide-react'
 import { PaymentLog } from '../../types/paymentLogs'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface PaymentConfirmationModalProps {
   isOpen: boolean
@@ -218,7 +220,10 @@ export const RefundModal: React.FC<RefundModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Refund Amount *
+                    <span className="inline-flex items-center">
+                      Refund Amount *
+                      <InfoTooltip text={fieldDescriptions.payment.amount} />
+                    </span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
@@ -240,7 +245,10 @@ export const RefundModal: React.FC<RefundModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Refund Reason *
+                    <span className="inline-flex items-center">
+                      Refund Reason *
+                      <InfoTooltip text="Reason for the refund. Select the most appropriate option for this situation." />
+                    </span>
                   </label>
                   <select
                     value={reason}
@@ -261,7 +269,10 @@ export const RefundModal: React.FC<RefundModalProps> = ({
                 {reason === 'Other' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Additional Notes
+                      <span className="inline-flex items-center">
+                        Additional Notes
+                        <InfoTooltip text={fieldDescriptions.payment.notes} />
+                      </span>
                     </label>
                     <textarea
                       rows={3}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { X, HelpCircle } from 'lucide-react'
 import { FAQ } from '../../types'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface AddFAQModalProps {
   isOpen: boolean
@@ -81,7 +83,10 @@ export const AddFAQModal: React.FC<AddFAQModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Question *
+              <span className="inline-flex items-center">
+                Question *
+                <InfoTooltip text={fieldDescriptions.faq.question} />
+              </span>
             </label>
             <input
               type="text"
@@ -96,7 +101,10 @@ export const AddFAQModal: React.FC<AddFAQModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Answer *
+              <span className="inline-flex items-center">
+                Answer *
+                <InfoTooltip text={fieldDescriptions.faq.answer} />
+              </span>
             </label>
             <textarea
               name="answer"
@@ -112,7 +120,10 @@ export const AddFAQModal: React.FC<AddFAQModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category *
+                <span className="inline-flex items-center">
+                  Category *
+                  <InfoTooltip text={fieldDescriptions.faq.category} />
+                </span>
               </label>
               <select
                 name="category"
@@ -133,7 +144,10 @@ export const AddFAQModal: React.FC<AddFAQModalProps> = ({
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sort Order
+                <span className="inline-flex items-center">
+                  Sort Order
+                  <InfoTooltip text={fieldDescriptions.faq.sortOrder} />
+                </span>
               </label>
               <input
                 type="number"
@@ -254,7 +268,10 @@ export const EditFAQModal: React.FC<EditFAQModalProps> = ({
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Question *
+              <span className="inline-flex items-center">
+                Question *
+                <InfoTooltip text={fieldDescriptions.faq.question} />
+              </span>
             </label>
             <input
               type="text"
@@ -269,7 +286,10 @@ export const EditFAQModal: React.FC<EditFAQModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Answer *
+              <span className="inline-flex items-center">
+                Answer *
+                <InfoTooltip text={fieldDescriptions.faq.answer} />
+              </span>
             </label>
             <textarea
               name="answer"
@@ -285,7 +305,10 @@ export const EditFAQModal: React.FC<EditFAQModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category *
+                <span className="inline-flex items-center">
+                  Category *
+                  <InfoTooltip text={fieldDescriptions.faq.category} />
+                </span>
               </label>
               <select
                 name="category"
@@ -306,7 +329,10 @@ export const EditFAQModal: React.FC<EditFAQModalProps> = ({
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sort Order
+                <span className="inline-flex items-center">
+                  Sort Order
+                  <InfoTooltip text={fieldDescriptions.faq.sortOrder} />
+                </span>
               </label>
               <input
                 type="number"

@@ -169,7 +169,7 @@ const CategoryDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             name: category.name,
             href: `/products?category=${category.slug}`,
             description: category.description || '',
-            subcategories: category.children?.map((child: Category) => ({
+            subcategories: category.children?.filter((child: Category) => child.status === 'active').map((child: Category) => ({
               name: child.name,
               href: `/products?category=${category.slug}&subcategory=${child.slug}`
             })) || [],
@@ -290,7 +290,7 @@ const MobileCategorySection: React.FC<{ onClose: () => void }> = ({ onClose }) =
           name: category.name,
           slug: category.slug,
           href: `/products?category=${category.slug}`,
-          subcategories: category.children?.map((child: Category) => ({
+          subcategories: category.children?.filter((child: Category) => child.status === 'active').map((child: Category) => ({
             name: child.name,
             href: `/products?category=${category.slug}&subcategory=${child.slug}`
           })) || []

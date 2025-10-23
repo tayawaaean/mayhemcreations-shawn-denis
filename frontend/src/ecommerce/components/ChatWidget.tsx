@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip, UserPlus } from 'lucide-react'
+import { MessageCircle, X, Send, Minimize2, Maximize2, Paperclip, UserPlus, ChevronDown, ChevronRight } from 'lucide-react'
 import { useRealTimeChat } from '../../shared/realTimeChatContext'
 import { useAuth } from '../context/AuthContext'
 import Button from '../../components/Button'
@@ -29,6 +29,7 @@ export default function ChatWidget() {
   const [isMinimized, setIsMinimized] = useState(false)
   const [emailInput, setEmailInput] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [showQuickQuestions, setShowQuickQuestions] = useState(true) // Track if quick questions section is visible
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
@@ -46,6 +47,14 @@ export default function ChatWidget() {
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  // Auto-hide quick questions after user sends their first message
+  useEffect(() => {
+    if (messages.length > 1) {
+      // More than just the welcome message means user has sent at least one message
+      setShowQuickQuestions(false)
+    }
+  }, [messages.length])
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -323,22 +332,42 @@ export default function ChatWidget() {
             </div>
 
             {/* Quick Questions */}
-            {messages.length <= 1 && (
-              <div className="px-4 py-2 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickQuestions.slice(0, 4).map((question, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleQuickQuestion(question)}
-                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full transition-colors"
-                    >
-                      {question}
-                    </button>
-                  ))}
+            <div className="border-t border-gray-200">
+              {/* Toggle button - shown after first message is sent */}
+              {messages.length > 1 && (
+                <button
+                  onClick={() => setShowQuickQuestions(!showQuickQuestions)}
+                  className="w-full px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                >
+                  <span className="font-medium">Quick Questions</span>
+                  {showQuickQuestions ? (
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+              )}
+              
+              {/* Quick questions content - shown by default initially, collapsible after first message */}
+              {showQuickQuestions && (
+                <div className="px-4 py-2">
+                  {messages.length <= 1 && (
+                    <p className="text-xs text-gray-500 mb-2">Quick questions:</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {quickQuestions.slice(0, 4).map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleQuickQuestion(question)}
+                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full transition-colors"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Input */}
             <div className="p-4 border-t border-gray-200">

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { X, Mail, User as UserIcon, Shield } from 'lucide-react'
 import { User as ApiUser } from '../../services/apiService'
+import InfoTooltip from '../InfoTooltip'
+import { fieldDescriptions } from '../../utils/fieldDescriptions'
 
 interface UserDetailModalProps {
   isOpen: boolean
@@ -51,7 +53,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({ isOpen, onClos
               </div>
               <div className="flex items-center text-gray-700">
                 <Shield className="h-4 w-4 mr-2 text-gray-400" />
-                Last login: {user.lastLogin.toLocaleString()}
+                Last login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'Never'}
               </div>
             </div>
           </div>
@@ -96,7 +98,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // Remove empty phone field to avoid validation errors
-    const dataToSave = { ...formData }
+    const dataToSave: any = { ...formData }
     if (!dataToSave.phone || dataToSave.phone.trim() === '') {
       delete dataToSave.phone
     }
@@ -120,7 +122,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    First Name
+                    <InfoTooltip text={fieldDescriptions.user.firstName} />
+                  </span>
+                </label>
                 <input
                   type="text"
                   value={formData.firstName}
@@ -129,7 +136,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    Last Name
+                    <InfoTooltip text={fieldDescriptions.user.lastName} />
+                  </span>
+                </label>
                 <input
                   type="text"
                   value={formData.lastName}
@@ -139,7 +151,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="inline-flex items-center">
+                  Email
+                  <InfoTooltip text={fieldDescriptions.user.email} />
+                </span>
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -151,7 +168,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="inline-flex items-center">
+                  Phone
+                  <InfoTooltip text="Contact phone number. Include country code for international users." />
+                </span>
+              </label>
               <input
                 type="tel"
                 value={formData.phone}
@@ -161,7 +183,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    Status
+                    <InfoTooltip text={fieldDescriptions.user.status} />
+                  </span>
+                </label>
                 <select
                   value={formData.isActive ? 'active' : 'inactive'}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'active' })}
@@ -172,7 +199,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    Role
+                    <InfoTooltip text={fieldDescriptions.user.role} />
+                  </span>
+                </label>
                 <div className="px-3 py-2 bg-gray-100 rounded-md text-sm text-gray-600">
                   {user.role.displayName}
                 </div>
@@ -216,24 +248,24 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
 interface AddUserModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (user: Omit<AdminUser, 'id' | 'lastLogin'>) => void
+  onSave: (user: any) => void
 }
 
 export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'staff' as AdminUser['role'],
-    status: 'active' as AdminUser['status']
+    password: '',
+    role: 'staff' as 'admin' | 'staff' | 'seller',
+    status: 'active' as 'active' | 'inactive'
   })
 
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const { password, ...rest } = formData
     // Note: Passwords are never stored in localStorage for security
-    onSave({ ...rest })
+    onSave({ ...formData })
     onClose()
   }
 
@@ -262,7 +294,12 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onS
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <span className="inline-flex items-center">
+                  Email
+                  <InfoTooltip text={fieldDescriptions.user.email} />
+                </span>
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -275,21 +312,32 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onS
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    Role
+                    <InfoTooltip text={fieldDescriptions.user.role} />
+                  </span>
+                </label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as AdminUser['role'] })}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'staff' | 'seller' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
+                  <option value="staff">Staff</option>
+                  <option value="seller">Seller</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <span className="inline-flex items-center">
+                    Status
+                    <InfoTooltip text={fieldDescriptions.user.status} />
+                  </span>
+                </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as AdminUser['status'] })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="active">Active</option>

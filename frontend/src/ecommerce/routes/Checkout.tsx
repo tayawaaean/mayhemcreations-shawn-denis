@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useCart } from '../context/CartContext'
-import { products } from '../../data/products'
+import { productApiService } from '../../shared/productApiService'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 import Button from '../../components/Button'
 import { calculateShippingRates, ShippingRate } from '../../shared/shippingApiService'
@@ -25,9 +25,13 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Checkout() {
   const navigate = useNavigate()
-  const { items, clear } = useCart()
+  const { items, clear, remove } = useCart()
   const { showError, showSuccess, showWarning } = useAlertModal()
   const { user, isLoggedIn } = useAuth()
+  
+  // Fetch products from API instead of using static data
+  const [products, setProducts] = useState<any[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
 
   // Helper function to find product by ID (handles different ID formats)
   const findProductById = (productId: string | number) => {
@@ -68,6 +72,29 @@ export default function Checkout() {
     shippingServiceName: string | null
     estimatedDeliveryDays: number | null
   } | null>(null)
+
+  // Fetch products from API on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true)
+        const response = await productApiService.getProducts({ 
+          status: 'active',
+          limit: 1000 // Get all active products
+        })
+        setProducts(response.data || [])
+        console.log('✅ Loaded', response.data?.length || 0, 'products from API')
+      } catch (error) {
+        console.error('❌ Error fetching products:', error)
+        showError('Failed to load products')
+        setProducts([])
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+    
+    fetchProducts()
+  }, [])
 
   // Debug cart items on mount
   useEffect(() => {
@@ -814,6 +841,18 @@ export default function Checkout() {
     )
   }
 
+  // Show loading indicator while products are being fetched
+  if (productsLoading) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading products...</p>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 w-full">
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-8 w-full">
@@ -1242,8 +1281,57 @@ export default function Checkout() {
                             {/* Customization Details */}
                             {item.customization && (
                               <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
-                                {/* Color and Size */}
-                                {(item.customization.color || item.customization.size) && (
+                                {/* Custom Embroidery Options Breakdown */}
+                                {isCustomEmbroidery && item.customization.selectedStyles && (
+                                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-1.5">
+                                    <p className="text-xs sm:text-sm font-semibold text-purple-900 mb-2">Selected Embroidery Options:</p>
+                                    {item.customization.selectedStyles.coverage && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Coverage:</span> {item.customization.selectedStyles.coverage.name}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.coverage.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.material && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Material:</span> {item.customization.selectedStyles.material.name}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.material.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.threads && item.customization.selectedStyles.threads.length > 0 && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Threads:</span> {item.customization.selectedStyles.threads.map((t: any) => t.name).join(', ')}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.threads.reduce((sum: number, t: any) => sum + t.price, 0).toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.border && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Border:</span> {item.customization.selectedStyles.border.name}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.border.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.backing && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Backing:</span> {item.customization.selectedStyles.backing.name}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.backing.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.upgrades && item.customization.selectedStyles.upgrades.length > 0 && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Upgrades:</span> {item.customization.selectedStyles.upgrades.map((u: any) => u.name).join(', ')}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.upgrades.reduce((sum: number, u: any) => sum + u.price, 0).toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.cutting && (
+                                      <div className="flex items-center justify-between text-xs text-gray-700">
+                                        <span><span className="font-medium">Cutting:</span> {item.customization.selectedStyles.cutting.name}</span>
+                                        <span className="text-gray-600">${item.customization.selectedStyles.cutting.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Color and Size - Only for regular customized items, NOT custom embroidery */}
+                                {!isCustomEmbroidery && (item.customization.color || item.customization.size) && (
                                   <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
                                     {item.customization.color && (
                                       <div>
@@ -1271,10 +1359,14 @@ export default function Checkout() {
                                 {/* Price Breakdown */}
                                 <div className="bg-white rounded-lg p-3 space-y-2 text-xs sm:text-sm">
                                   <div className="font-medium text-gray-900 mb-2">Price Breakdown</div>
-                                  <div className="flex justify-between text-gray-600">
-                                    <span>Base Price:</span>
-                                    <span className="font-medium">${Number(product?.price || 0).toFixed(2)}</span>
-                                  </div>
+                                  
+                                  {/* Base Price - Only show for regular customized items, NOT custom embroidery */}
+                                  {!isCustomEmbroidery && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Base Price:</span>
+                                      <span className="font-medium">${Number(product?.price || 0).toFixed(2)}</span>
+                                    </div>
+                                  )}
                                   
                                   {/* Embroidery Details */}
                                   {item.customization.designs && item.customization.designs.map((design: any, designIndex: number) => {
@@ -1398,7 +1490,21 @@ export default function Checkout() {
                         if (!product && !isCustomEmbroidery) {
                           return (
                             <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                              <p className="text-red-800">❌ Product not found: {item.productId}</p>
+                              <div className="flex items-center justify-between">
+                                <p className="text-red-800">❌ Product not found: {item.productId}</p>
+                                <button
+                                  onClick={async () => {
+                                    await remove(item.productId)
+                                    showSuccess('Invalid item removed from cart')
+                                  }}
+                                  className="text-red-600 hover:text-red-800 underline text-sm font-medium"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <p className="text-red-600 text-sm mt-2">
+                                This product no longer exists. Please remove it to continue.
+                              </p>
                             </div>
                           )
                         }
@@ -1527,8 +1633,8 @@ export default function Checkout() {
                               </div>
                         </div>
                         
-                        {/* Color and Size Info */}
-                        {item.customization && (item.customization.color || item.customization.size) && (
+                        {/* Color and Size Info - Only for regular customized items, NOT custom embroidery */}
+                        {!isCustomEmbroidery && item.customization && (item.customization.color || item.customization.size) && (
                           <div className="border-t border-gray-200 pt-2 sm:pt-3 mt-2 sm:mt-3">
                             <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
                               {item.customization.color && (

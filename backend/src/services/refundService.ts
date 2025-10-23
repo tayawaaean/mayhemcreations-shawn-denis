@@ -801,11 +801,20 @@ export class RefundService {
         logger.error('No PayPal capture ID found anywhere for refund:', {
           refundId: refund.id,
           orderId: refund.orderId,
-          orderNumber: refund.orderNumber
+          orderNumber: refund.orderNumber,
+          checkedSources: ['manualCaptureId', 'order.paymentIntentId', 'payments.provider_transaction_id', 'payments.gateway_response']
         });
         return {
           success: false,
-          message: 'MANUAL_REFUND_REQUIRED: PayPal capture ID not found. Please:\n1. Log into your PayPal dashboard\n2. Find the transaction for this order\n3. Process the refund manually\n4. Update the refund status in the admin panel\n\nAlternatively, you can provide the PayPal capture ID manually when approving the refund.'
+          message: 'MANUAL_REFUND_REQUIRED: PayPal capture ID not found. Please:\n\n' +
+            '1. Log into your PayPal dashboard (https://www.paypal.com or https://www.sandbox.paypal.com)\n' +
+            `2. Search for order number: ${refund.orderNumber}\n` +
+            '3. Find the transaction and click on it to view details\n' +
+            '4. Look for "Transaction ID" or "Capture ID" (format: XXXXXXXXXXXXX or similar)\n' +
+            '5. Either:\n' +
+            '   a) Process the refund manually in PayPal, then mark this request as "Completed" in the admin panel\n' +
+            '   b) Copy the Capture ID and try approving the refund again with manual Capture ID entry\n\n' +
+            'Note: If you recently switched between sandbox and live PayPal accounts, the transaction may be in a different environment.'
         };
       }
 
@@ -817,10 +826,19 @@ export class RefundService {
         isManual: !!manualCaptureId
       });
 
-      // Create PayPal refund request using the actual PayPal capture ID
-      // Note: PayPal SDK structure may have changed - using generic approach
-      const request = new paypal.orders.OrdersGetRequest(captureId);
-      // TODO: Update PayPal SDK integration for refund functionality
+      // Create PayPal refund request using the Captures Refund API
+      // Using the correct PayPal API for refunding a capture
+      const request = new paypal.payments.CapturesRefundRequest(captureId);
+      
+      // Set request body with refund amount and currency
+      request.requestBody({
+        amount: {
+          value: Number(refund.refundAmount).toFixed(2),
+          currency_code: refund.currency || 'USD'
+        },
+        note_to_payer: `Refund for order ${refund.orderNumber}`,
+        invoice_id: refund.orderNumber
+      });
 
       // Execute refund via PayPal API
       const paypalRefund = await paypalClient.execute(request);

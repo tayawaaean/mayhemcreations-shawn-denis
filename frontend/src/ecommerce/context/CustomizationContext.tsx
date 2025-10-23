@@ -512,8 +512,8 @@ const defaultCustomizationData: CustomizationData = {
   productImage: '',
   basePrice: 0,
   quantity: 1,
-  color: '#000000',
-  size: '',
+  color: '', // Default to empty so user must select a color
+  size: '', // Default to empty so user must select a size
   notes: '',
   // Multi-embroidery support
   designs: [],

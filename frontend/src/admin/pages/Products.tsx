@@ -26,7 +26,8 @@ const Products: React.FC = () => {
   const itemsPerPage = 10
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = searchQuery === '' || 
+                         (product.title && product.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
                          (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesCategory = selectedCategory === 'all' || product.category?.slug === selectedCategory
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus
@@ -60,8 +61,11 @@ const Products: React.FC = () => {
     try {
       await createProduct(productData as AdminProduct)
       setIsAddModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating product:', error)
+      // Show user-friendly error message
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create product'
+      alert(`Error: ${errorMessage}`)
     }
   }
 

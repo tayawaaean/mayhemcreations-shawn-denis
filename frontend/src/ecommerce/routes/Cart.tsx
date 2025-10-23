@@ -551,6 +551,55 @@ export default function Cart() {
                                       Size: {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
                                     </p>
                               )}
+                              
+                              {/* Detailed Embroidery Options */}
+                              {item.customization.selectedStyles && (
+                                <div className="mt-2 pt-2 border-t border-gray-200 space-y-1">
+                                  <p className="text-xs font-semibold text-gray-700">Selected Options:</p>
+                                  {item.customization.selectedStyles.coverage && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Coverage:</span> {item.customization.selectedStyles.coverage.name}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.coverage.price.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.material && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Material:</span> {item.customization.selectedStyles.material.name}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.material.price.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.threads && item.customization.selectedStyles.threads.length > 0 && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Threads:</span> {item.customization.selectedStyles.threads.map((t: any) => t.name).join(', ')}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.threads.reduce((sum: number, t: any) => sum + t.price, 0).toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.border && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Border:</span> {item.customization.selectedStyles.border.name}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.border.price.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.backing && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Backing:</span> {item.customization.selectedStyles.backing.name}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.backing.price.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.upgrades && item.customization.selectedStyles.upgrades.length > 0 && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Upgrades:</span> {item.customization.selectedStyles.upgrades.map((u: any) => u.name).join(', ')}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.upgrades.reduce((sum: number, u: any) => sum + u.price, 0).toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                  {item.customization.selectedStyles.cutting && (
+                                    <div className="flex items-center justify-between text-xs text-gray-600">
+                                      <span><span className="font-medium">Cutting:</span> {item.customization.selectedStyles.cutting.name}</span>
+                                      <span className="text-gray-500">${item.customization.selectedStyles.cutting.price.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </>
                           ) : (
                             <>

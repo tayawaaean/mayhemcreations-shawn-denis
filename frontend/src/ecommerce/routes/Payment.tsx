@@ -60,7 +60,9 @@ export default function Payment() {
   const [orderData, setOrderData] = useState<OrderData | null>(null)
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isPayPalProcessing, setIsPayPalProcessing] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
+  const paypalProcessedRef = React.useRef(false) // Track if PayPal has been processed
   
   // Payment method state
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal' | null>(null)
@@ -216,7 +218,14 @@ export default function Payment() {
       }
       
       if (orderData && !loading) {
+        // Prevent duplicate processing
+        if (paypalProcessedRef.current) {
+          console.log('⚠️ PayPal already processed, skipping...')
+          return
+        }
+        
         console.log('✅ PayPal payment success, capturing payment...')
+        paypalProcessedRef.current = true
         handlePayPalReturn(paypalToken)
       } else if (!orderData && !loading) {
         console.error('❌ Order data failed to load')
@@ -441,7 +450,8 @@ export default function Payment() {
             product_data: {
               name: productName,
               description: productDescription,
-              images: product?.image ? [product.image] : undefined,
+              // Note: Removed images to prevent URL length issues with base64-encoded images
+              // Stripe has a 2048 character limit for URLs and base64 images are too large
             },
             unit_amount: Math.round(itemPrice * 100), // Stripe expects amount in cents
           },
@@ -657,6 +667,7 @@ export default function Payment() {
   const handlePayPalReturn = async (paypalToken: string) => {
     try {
       setIsProcessing(true)
+      setIsPayPalProcessing(true)
       
       // Get the actual PayPal order ID from sessionStorage
       // The token in the URL is NOT the order ID - we need the ID we saved before redirect
@@ -673,6 +684,7 @@ export default function Payment() {
       if (!paypalOrderId) {
         console.error('❌ PayPal order ID not found in sessionStorage')
         showError('PayPal order information missing. Please try again.')
+        paypalProcessedRef.current = false // Reset for retry
         navigate('/my-orders')
         return
       }
@@ -680,6 +692,7 @@ export default function Payment() {
       if (!orderData) {
         console.error('❌ Order data not available for PayPal capture')
         showError('Order information not loaded')
+        paypalProcessedRef.current = false // Reset for retry
         navigate('/my-orders')
         return
       }
@@ -730,6 +743,7 @@ export default function Payment() {
       } else {
         console.error('❌ PayPal capture failed:', response.message)
         showError(response.message || 'Failed to capture PayPal payment')
+        paypalProcessedRef.current = false // Reset for retry
         // Don't navigate away on error - let user retry
       }
     } catch (error: any) {
@@ -739,9 +753,11 @@ export default function Payment() {
         response: error.response?.data
       })
       showError('Failed to complete PayPal payment. Please contact support.')
+      paypalProcessedRef.current = false // Reset for retry
       // Don't navigate away on error - let user retry
     } finally {
       setIsProcessing(false)
+      setIsPayPalProcessing(false)
     }
   }
 
@@ -814,7 +830,34 @@ export default function Payment() {
   ]
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8 sm:py-12">
+    <>
+      {/* PayPal Processing Overlay */}
+      {isPayPalProcessing && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md mx-4 text-center">
+            <div className="mb-6">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-[#0070BA] mx-auto"></div>
+            </div>
+            <div className="mb-4">
+              <img 
+                src="https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_111x69.jpg" 
+                alt="PayPal Logo" 
+                className="w-24 h-auto mx-auto mb-4"
+              />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Processing PayPal Payment</h3>
+            <p className="text-gray-600 mb-4">
+              Please wait while we confirm your payment with PayPal...
+            </p>
+            <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+              <Lock className="w-4 h-4" />
+              <span>Secure payment processing</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="min-h-screen bg-gray-50 py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
@@ -1038,7 +1081,21 @@ export default function Payment() {
                         if (!product && !isCustomEmbroidery) {
                           return (
                             <div key={index} className="bg-red-50 border border-red-200 rounded-lg p-2 sm:p-3">
-                              <p className="text-red-800 text-xs sm:text-sm">Product not found: {item.productId}</p>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-red-800 text-xs sm:text-sm">Product not found: {item.productId}</p>
+                                <button
+                                  onClick={() => {
+                                    // Navigate back to checkout to remove the item
+                                    navigate('/checkout')
+                                  }}
+                                  className="text-red-600 hover:text-red-800 underline text-xs font-medium whitespace-nowrap"
+                                >
+                                  Go to Cart
+                                </button>
+                              </div>
+                              <p className="text-red-600 text-xs mt-1">
+                                This product no longer exists. Please remove it from your cart.
+                              </p>
                             </div>
                           )
                         }
@@ -1081,6 +1138,66 @@ export default function Payment() {
                                     <span className="truncate">Customized</span>
                                     {item.customization.designs && (
                                       <span className="ml-1 whitespace-nowrap">• {item.customization.designs.length} design{item.customization.designs.length > 1 ? 's' : ''}</span>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {/* Detailed Embroidery Options Breakdown for Custom Embroidery */}
+                                {isCustomEmbroidery && item.customization?.selectedStyles && (
+                                  <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-gray-200 space-y-1">
+                                    <p className="text-xs font-semibold text-gray-700 mb-1.5">Selected Options:</p>
+                                    {item.customization.selectedStyles.coverage && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Coverage:</span>
+                                        <span>{item.customization.selectedStyles.coverage.name}</span>
+                                        <span className="ml-auto text-gray-500">${item.customization.selectedStyles.coverage.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.material && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Material:</span>
+                                        <span>{item.customization.selectedStyles.material.name}</span>
+                                        <span className="ml-auto text-gray-500">${item.customization.selectedStyles.material.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.threads && item.customization.selectedStyles.threads.length > 0 && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Threads:</span>
+                                        <span className="truncate">{item.customization.selectedStyles.threads.map((t: any) => t.name).join(', ')}</span>
+                                        <span className="ml-auto text-gray-500 whitespace-nowrap">
+                                          ${item.customization.selectedStyles.threads.reduce((sum: number, t: any) => sum + t.price, 0).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.border && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Border:</span>
+                                        <span>{item.customization.selectedStyles.border.name}</span>
+                                        <span className="ml-auto text-gray-500">${item.customization.selectedStyles.border.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.backing && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Backing:</span>
+                                        <span>{item.customization.selectedStyles.backing.name}</span>
+                                        <span className="ml-auto text-gray-500">${item.customization.selectedStyles.backing.price.toFixed(2)}</span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.upgrades && item.customization.selectedStyles.upgrades.length > 0 && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Upgrades:</span>
+                                        <span className="truncate">{item.customization.selectedStyles.upgrades.map((u: any) => u.name).join(', ')}</span>
+                                        <span className="ml-auto text-gray-500 whitespace-nowrap">
+                                          ${item.customization.selectedStyles.upgrades.reduce((sum: number, u: any) => sum + u.price, 0).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {item.customization.selectedStyles.cutting && (
+                                      <div className="flex items-center text-[10px] sm:text-xs text-gray-600">
+                                        <span className="font-medium mr-1">Cutting:</span>
+                                        <span>{item.customization.selectedStyles.cutting.name}</span>
+                                        <span className="ml-auto text-gray-500">${item.customization.selectedStyles.cutting.price.toFixed(2)}</span>
+                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -1217,6 +1334,19 @@ export default function Payment() {
                             {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
                           </p>
                         )}
+                        {isCustomEmbroidery && item.customization?.selectedStyles && (
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {[
+                              item.customization.selectedStyles.coverage && 'Coverage',
+                              item.customization.selectedStyles.material && 'Material',
+                              item.customization.selectedStyles.threads?.length > 0 && `${item.customization.selectedStyles.threads.length} Thread${item.customization.selectedStyles.threads.length > 1 ? 's' : ''}`,
+                              item.customization.selectedStyles.border && 'Border',
+                              item.customization.selectedStyles.backing && 'Backing',
+                              item.customization.selectedStyles.upgrades?.length > 0 && `${item.customization.selectedStyles.upgrades.length} Upgrade${item.customization.selectedStyles.upgrades.length > 1 ? 's' : ''}`,
+                              item.customization.selectedStyles.cutting && 'Cutting'
+                            ].filter(Boolean).join(' • ')}
+                          </p>
+                        )}
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-600">Qty: {item.quantity}</span>
                           <span className="text-xs font-semibold text-accent">${(itemPrice * item.quantity).toFixed(2)}</span>
@@ -1276,6 +1406,7 @@ export default function Payment() {
         </div>
       </div>
     </main>
+    </>
   )
 }
 

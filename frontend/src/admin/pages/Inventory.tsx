@@ -18,6 +18,8 @@ import {
 import HelpModal from '../components/modals/HelpModal'
 import { variantApiService, Variant, VariantInventoryStatus } from '../../shared/variantApiService'
 import { useProducts } from '../hooks/useProducts'
+import InfoTooltip from '../components/InfoTooltip'
+import { fieldDescriptions } from '../utils/fieldDescriptions'
 
 const Inventory: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -62,9 +64,8 @@ const Inventory: React.FC = () => {
   const [subcategories, setSubcategories] = useState<any[]>([])
   const [filteredProducts, setFilteredProducts] = useState<any[]>([])
   
-  // Size options for apparel
-  const apparelSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-  const accessorySizes = ['One Size', 'Small', 'Medium', 'Large']
+  // Default size options as fallback (used only if product has no custom sizes defined)
+  const defaultApparelSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
 
   // Load products and inventory data on component mount
   useEffect(() => {
@@ -133,12 +134,29 @@ const Inventory: React.FC = () => {
     const selectedProduct = products.find(p => p.id.toString() === newVariant.productId)
     if (!selectedProduct) return []
     
-    // Check if product has sizing (apparel)
-    if (selectedProduct.hasSizing) {
-      return apparelSizes
-    } else {
-      return accessorySizes
+    // Debug logging to see what's in the selected product
+    console.log('Selected product for sizes:', {
+      id: selectedProduct.id,
+      title: selectedProduct.title,
+      availableSizes: selectedProduct.availableSizes,
+      hasSizing: selectedProduct.hasSizing
+    })
+    
+    // First check if product has custom sizes defined - use those directly
+    if (selectedProduct.availableSizes && Array.isArray(selectedProduct.availableSizes) && selectedProduct.availableSizes.length > 0) {
+      console.log('Using custom sizes from product:', selectedProduct.availableSizes)
+      return selectedProduct.availableSizes
     }
+    
+    // If product has sizing enabled but no custom sizes, use default apparel sizes
+    if (selectedProduct.hasSizing) {
+      console.log('Using default apparel sizes')
+      return defaultApparelSizes
+    }
+    
+    // If product doesn't have sizing (accessories, patches, etc.), use "One Size"
+    console.log('Using "One Size" as fallback')
+    return ['One Size']
   }
 
   // Refresh data when low stock threshold changes (for filtering display)
@@ -876,7 +894,10 @@ const Inventory: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color *
+                    <span className="inline-flex items-center">
+                      Color *
+                      <InfoTooltip text={fieldDescriptions.variant.color} />
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -889,7 +910,10 @@ const Inventory: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color Hex
+                    <span className="inline-flex items-center">
+                      Color Hex
+                      <InfoTooltip text="Hex color code for display (e.g., #FF0000 for red). Used to show color preview in product listings." />
+                    </span>
                   </label>
                   <input
                     type="color"
@@ -903,7 +927,10 @@ const Inventory: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Size *
+                    <span className="inline-flex items-center">
+                      Size *
+                      <InfoTooltip text={fieldDescriptions.variant.size} />
+                    </span>
                   </label>
                   <select
                     value={newVariant.size}
@@ -922,7 +949,10 @@ const Inventory: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU *
+                    <span className="inline-flex items-center">
+                      SKU *
+                      <InfoTooltip text={fieldDescriptions.variant.sku} />
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -937,7 +967,10 @@ const Inventory: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Initial Stock
+                  <span className="inline-flex items-center">
+                    Initial Stock
+                    <InfoTooltip text={fieldDescriptions.variant.stock} />
+                  </span>
                 </label>
                 <input
                   type="number"
@@ -1066,7 +1099,10 @@ const Inventory: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color *
+                    <span className="inline-flex items-center">
+                      Color *
+                      <InfoTooltip text={fieldDescriptions.variant.color} />
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -1079,7 +1115,10 @@ const Inventory: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Color Hex
+                    <span className="inline-flex items-center">
+                      Color Hex
+                      <InfoTooltip text="Hex color code for display (e.g., #FF0000 for red). Used to show color preview in product listings." />
+                    </span>
                   </label>
                   <input
                     type="color"
@@ -1093,7 +1132,10 @@ const Inventory: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Size *
+                    <span className="inline-flex items-center">
+                      Size *
+                      <InfoTooltip text={fieldDescriptions.variant.size} />
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -1106,7 +1148,10 @@ const Inventory: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    SKU *
+                    <span className="inline-flex items-center">
+                      SKU *
+                      <InfoTooltip text={fieldDescriptions.variant.sku} />
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -1121,7 +1166,10 @@ const Inventory: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stock
+                  <span className="inline-flex items-center">
+                    Stock
+                    <InfoTooltip text={fieldDescriptions.variant.stock} />
+                  </span>
                 </label>
                 <input
                   type="number"
