@@ -4,6 +4,7 @@
 import axios from 'axios'
 import { QueryTypes } from 'sequelize'
 import { sequelize } from '../config/database'
+import { getOriginAddress } from './addressService'
 
 // Interface for label request parameters
 interface LabelRequest {
@@ -232,19 +233,13 @@ export class ShipEngineLabelService {
         return countryMap[country] || 'US'
       }
 
+      // Get dynamic origin address
+      const originAddress = await getOriginAddress();
+
       // Build shipment configuration
       const shipmentConfig: any = {
         // Ship From address (your warehouse/business address)
-        ship_from: {
-          name: 'Mayhem Creations',
-          phone: '555-555-5555',
-          company_name: 'Mayhem Creations',
-          address_line1: '123 Business St',
-          city_locality: 'Austin',
-          state_province: 'TX',
-          postal_code: '78701',
-          country_code: 'US'
-        },
+        ship_from: originAddress,
         
         // Ship To address (customer address)
         ship_to: {
@@ -277,6 +272,8 @@ export class ShipEngineLabelService {
       // Add carrier and service from order's shipping method if available
       if (shippingMethod?.carrierId) {
         shipmentConfig.carrier_id = shippingMethod.carrierId
+      } else if (process.env.SHIPENGINE_DEFAULT_CARRIER_ID) {
+        shipmentConfig.carrier_id = process.env.SHIPENGINE_DEFAULT_CARRIER_ID
       } else if (process.env.SHIPENGINE_CARRIER_ID) {
         shipmentConfig.carrier_id = process.env.SHIPENGINE_CARRIER_ID
       }

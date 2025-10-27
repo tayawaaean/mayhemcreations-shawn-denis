@@ -16,6 +16,7 @@ import { Payment, PaymentAttributes, PaymentCreationAttributes } from './payment
 import ProductReview, { ProductReviewAttributes, ProductReviewCreationAttributes } from './productReviewModel';
 import { RefundRequest, RefundRequestAttributes, RefundRequestCreationAttributes } from './refundRequestModel';
 import Contact, { ContactAttributes, ContactCreationAttributes } from './contactModel';
+import Address, { AddressAttributes, AddressCreationAttributes } from './addressModel';
 
 // Define model associations
 const setupAssociations = (): void => {
@@ -307,6 +308,9 @@ export {
   Contact,
   ContactAttributes,
   ContactCreationAttributes,
+  Address,
+  AddressAttributes,
+  AddressCreationAttributes,
 };
 
 // Export all models for easy access
@@ -328,6 +332,7 @@ export const models = {
   ProductReview,
   RefundRequest,
   Contact,
+  Address,
 };
 
 // Database synchronization function

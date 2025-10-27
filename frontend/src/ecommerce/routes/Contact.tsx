@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageCircle, Calendar, Users, Facebook, Instagram, AlertCircle } from 'lucide-react'
 import Button from '../../components/Button'
 import { apiClient } from '../../shared/axiosConfig'
 import axios from 'axios'
+import { addressApiService } from '../../shared/addressApiService'
+import { Address } from '../../types/address'
 
 // Custom SVG Icons for social media platforms
 const EtsyIcon = ({ className }: { className?: string }) => (
@@ -30,6 +32,21 @@ export default function Contact() {
   const [sent, setSent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [originAddress, setOriginAddress] = useState<Address | null>(null)
+
+  // Fetch origin address on component mount
+  useEffect(() => {
+    const fetchOriginAddress = async () => {
+      try {
+        const address = await addressApiService.getDefaultOriginAddress()
+        setOriginAddress(address)
+      } catch (error) {
+        console.error('Failed to fetch origin address:', error)
+      }
+    }
+
+    fetchOriginAddress()
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -79,13 +96,17 @@ export default function Contact() {
     {
       icon: Phone,
       title: 'Phone',
-      details: ['614-715-4742'],
+      details: [originAddress?.phone || '614-715-4742'],
       description: 'Call us for immediate assistance'
     },
     {
       icon: MapPin,
       title: 'Address',
-      details: ['128 Persimmon Dr', 'Newark, OH 43055'],
+      details: originAddress ? [
+        originAddress.address_line1,
+        originAddress.address_line2,
+        `${originAddress.city}, ${originAddress.state} ${originAddress.postal_code}`
+      ].filter(Boolean) : ['128 Persimmon Dr', 'Newark, OH 43055'],
       description: 'Visit our workshop'
     },
     {

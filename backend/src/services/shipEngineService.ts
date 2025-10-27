@@ -6,6 +6,7 @@
 
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import { getOriginAddress } from './addressService';
 
 // ShipEngine API configuration
 const SHIPENGINE_API_URL = 'https://api.shipengine.com/v1';
@@ -26,18 +27,7 @@ export interface ShipEngineAddress {
   address_residential_indicator?: 'yes' | 'no' | 'unknown';
 }
 
-// Origin address configuration (Newark, OH warehouse)
-const ORIGIN_ADDRESS: ShipEngineAddress = {
-  name: 'Mayhem Creations',
-  phone: process.env.ORIGIN_PHONE || '614-715-4742', // Business phone number
-  company_name: 'Mayhem Creations',
-  address_line1: '128 Persimmon Dr',
-  city_locality: 'Newark',
-  state_province: 'OH',
-  postal_code: '43055',
-  country_code: 'US',
-  address_residential_indicator: 'no' as const // Commercial address
-};
+// Origin address will be fetched dynamically from database
 
 export interface ShipEnginePackage {
   package_code?: string; // e.g., "package", "flat_rate_envelope", etc.
@@ -51,6 +41,21 @@ export interface ShipEnginePackage {
     height: number;
     unit: 'inch' | 'centimeter';
   };
+  items?: ShipEngineProduct[]; // Products for tax calculations
+}
+
+export interface ShipEngineProduct {
+  product_id: string;
+  product_code: string;
+  product_name: string;
+  product_category: string;
+  unit_price: {
+    currency: string;
+    amount: number;
+  };
+  quantity: number;
+  harmonized_tariff_code: string;
+  country_of_origin: string;
 }
 
 export interface ShipEngineRateRequest {
@@ -62,6 +67,17 @@ export interface ShipEngineRateRequest {
     ship_from?: ShipEngineAddress;
     packages: ShipEnginePackage[];
     confirmation?: 'none' | 'delivery' | 'signature' | 'adult_signature' | 'direct_signature';
+    customs?: {
+      contents: string;
+      customs_items: Array<{
+        description: string;
+        quantity: number;
+        value: number;
+        harmonized_tariff_code?: string;
+        country_of_origin?: string;
+      }>;
+      non_delivery: 'return_to_sender' | 'treat_as_abandoned';
+    };
     advanced_options?: {
       bill_to_account?: string;
       bill_to_country_code?: string;
@@ -149,12 +165,16 @@ export interface SimplifiedRate {
   carrier: string;
   carrierCode: string;
   shipmentCost: number;
-  otherCost: number;
+  taxAmount?: number; // Tax amount from ShipEngine
+  insuranceCost?: number; // Insurance fees
+  confirmationCost?: number; // Delivery confirmation fees
+  otherCost: number; // Additional fees (fuel surcharge, residential, etc.)
   totalCost: number;
   estimatedDeliveryDays?: number;
   estimatedDeliveryDate?: string;
   guaranteed?: boolean;
   trackable?: boolean;
+  rateId?: string; // ShipEngine rate ID for label creation
 }
 
 export interface RatesResult {
@@ -182,8 +202,12 @@ export const getShipEngineRates = async (
       throw new Error('ShipEngine API key not configured');
     }
 
+    // Get dynamic origin address
+    const originAddress = await getOriginAddress();
+
     logger.info('Requesting shipping rates from ShipEngine', {
       destination: `${destinationAddress.city_locality}, ${destinationAddress.state_province} ${destinationAddress.postal_code}`,
+      origin: `${originAddress.city_locality}, ${originAddress.state_province} ${originAddress.postal_code}`,
       packageCount: packages.length,
       totalWeight: packages.reduce((sum, pkg) => sum + pkg.weight.value, 0),
     });
@@ -191,63 +215,115 @@ export const getShipEngineRates = async (
     // Get carrier IDs if not provided
     let carrierIds: string[] = options?.carrierIds || [];
     
-    // Check for hardcoded test carrier ID in environment
-    const testCarrierId = process.env.SHIPENGINE_TEST_CARRIER_ID || 'se-3697717';
-    
     if (carrierIds.length === 0) {
-      try {
-        logger.debug('Fetching carriers from ShipEngine');
-        const carriersResponse = await axios.get(`${SHIPENGINE_API_URL}/carriers`, {
-          headers: {
-            'API-Key': SHIPENGINE_API_KEY,
-          },
-        });
-        
-        const carriers = carriersResponse.data.carriers || [];
-        carrierIds = carriers.map((carrier: any) => carrier.carrier_id).filter((id: string) => id);
-        
-        logger.info('Retrieved carrier IDs from ShipEngine', {
+      // First, try to use configured production carriers from environment
+      const configuredCarriers = process.env.SHIPENGINE_CARRIER_IDS;
+      if (configuredCarriers) {
+        carrierIds = configuredCarriers.split(',').map(id => id.trim()).filter(id => id);
+        logger.info('Using configured production carriers', {
           carrierCount: carrierIds.length,
-          carriers: carriers.map((c: any) => c.friendly_name || c.carrier_code),
+          carriers: carrierIds,
         });
-        
-        // If no carriers found via API, try using the test carrier ID
-        if (carrierIds.length === 0) {
-          logger.warn(`No carriers returned from API, using test carrier ID: ${testCarrierId}`);
+      } else {
+        // Fallback: fetch carriers from ShipEngine API
+        try {
+          logger.debug('Fetching carriers from ShipEngine API');
+          const carriersResponse = await axios.get(`${SHIPENGINE_API_URL}/carriers`, {
+            headers: {
+              'API-Key': SHIPENGINE_API_KEY,
+            },
+          });
+          
+          const carriers = carriersResponse.data.carriers || [];
+          carrierIds = carriers.map((carrier: any) => carrier.carrier_id).filter((id: string) => id);
+          
+          logger.info('Retrieved carrier IDs from ShipEngine API', {
+            carrierCount: carrierIds.length,
+            carriers: carriers.map((c: any) => c.friendly_name || c.carrier_code),
+          });
+        } catch (carrierError: any) {
+          logger.error('Failed to fetch carriers from API:', carrierError.response?.data || carrierError.message);
+          
+          // Final fallback to test carrier
+          const testCarrierId = process.env.SHIPENGINE_TEST_CARRIER_ID || 'se-3697717';
+          logger.warn(`Using fallback test carrier ID: ${testCarrierId}`);
           carrierIds = [testCarrierId];
         }
-      } catch (carrierError: any) {
-        logger.error('Failed to fetch carriers:', carrierError.response?.data || carrierError.message);
-        logger.warn(`Falling back to test carrier ID: ${testCarrierId}`);
-        carrierIds = [testCarrierId];
       }
     }
+
+    // Prepare customs items from packages for tax calculation
+    const allCustomsItems: Array<{
+      description: string;
+      quantity: number;
+      value: number;
+      harmonized_tariff_code: string;
+      country_of_origin: string;
+    }> = [];
+    
+    // Extract items from all packages to create shipment-level customs items
+    packages.forEach(pkg => {
+      if (pkg.items) {
+        pkg.items.forEach(item => {
+          allCustomsItems.push({
+            description: item.product_name,
+            quantity: item.quantity,
+            value: item.unit_price.amount,
+            harmonized_tariff_code: item.harmonized_tariff_code,
+            country_of_origin: item.country_of_origin,
+          });
+        });
+      }
+    });
 
     // Prepare rate request
     const rateRequest: ShipEngineRateRequest = {
       shipment: {
         validate_address: 'validate_and_clean',
-        ship_from: ORIGIN_ADDRESS,
+        ship_from: originAddress,
         ship_to: destinationAddress,
         packages: packages,
         confirmation: options?.confirmation || 'none',
+        // Add customs items at shipment level for tax calculation
+        ...(allCustomsItems.length > 0 && {
+          customs: {
+            contents: 'merchandise',
+            customs_items: allCustomsItems,
+            non_delivery: 'return_to_sender', // Required field for customs
+          },
+        }),
       },
       rate_options: {
         carrier_ids: carrierIds,
         service_codes: options?.serviceCodes,
-        calculate_tax_amount: false,
+        calculate_tax_amount: true, // Now safe to enable with customs items
       },
     };
+
+    logger.info('ShipEngine customs items for tax calculation:', {
+      customsItemCount: allCustomsItems.length,
+      sampleItems: allCustomsItems.slice(0, 2).map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        value: item.value,
+        tariff_code: item.harmonized_tariff_code,
+        origin: item.country_of_origin,
+      })),
+    });
 
     logger.info('ShipEngine API Request:', {
       url: `${SHIPENGINE_API_URL}/rates`,
       hasApiKey: !!SHIPENGINE_API_KEY,
       apiKeyPrefix: SHIPENGINE_API_KEY?.substring(0, 12) + '...',
       carrierIds: rateRequest.rate_options?.carrier_ids,
+      calculateTax: rateRequest.rate_options?.calculate_tax_amount,
+      hasCustoms: !!rateRequest.shipment.customs,
+      customsItemCount: rateRequest.shipment.customs?.customs_items?.length || 0,
       packages: rateRequest.shipment.packages.map(p => ({
         package_code: p.package_code,
         weight: p.weight,
-        dimensions: p.dimensions
+        dimensions: p.dimensions,
+        itemCount: p.items?.length || 0,
       })),
     });
 
@@ -309,10 +385,12 @@ export const getShipEngineRates = async (
         carrier: rate.carrier_friendly_name,
         carrierCode: rate.carrier_code,
         shipmentCost: rate.shipping_amount.amount,
-        otherCost: (rate.insurance_amount?.amount || 0) + 
-                   (rate.confirmation_amount?.amount || 0) + 
-                   (rate.other_amount?.amount || 0),
+        taxAmount: rate.tax_amount?.amount || 0, // Tax amount from ShipEngine
+        insuranceCost: rate.insurance_amount?.amount || 0, // Insurance fees
+        confirmationCost: rate.confirmation_amount?.amount || 0, // Delivery confirmation fees
+        otherCost: rate.other_amount?.amount || 0, // Additional fees (fuel surcharge, residential, etc.)
         totalCost: rate.shipping_amount.amount + 
+                   (rate.tax_amount?.amount || 0) + // Include tax in total cost
                    (rate.insurance_amount?.amount || 0) + 
                    (rate.confirmation_amount?.amount || 0) + 
                    (rate.other_amount?.amount || 0),
@@ -320,6 +398,7 @@ export const getShipEngineRates = async (
         estimatedDeliveryDate: rate.estimated_delivery_date,
         guaranteed: rate.guaranteed_service || false,
         trackable: rate.trackable !== false,
+        rateId: rate.rate_id, // Include rate ID for label creation
       }));
 
     // Sort by cost (cheapest first)
@@ -348,7 +427,12 @@ export const getShipEngineRates = async (
       requestUrl: error.config?.url,
       hasApiKey: !!SHIPENGINE_API_KEY,
       apiKeyLength: SHIPENGINE_API_KEY?.length,
+      stack: error.stack,
+      fullError: error,
     });
+
+    // Log the full error object
+    logger.error('Full error details:', error);
 
     // Extract detailed error message
     const errorData = error.response?.data;
@@ -410,6 +494,21 @@ export const calculatePackageWeight = (items: any[]): { value: number; unit: 'ou
 export const createPackageFromItems = (items: any[]): ShipEnginePackage => {
   const weight = calculatePackageWeight(items);
   
+  // Convert items to ShipEngine product format for tax calculations
+  const products = items.map(item => ({
+    product_id: item.id || item.productId || `product_${Math.random().toString(36).substr(2, 9)}`,
+    product_code: item.sku || item.productCode || 'DEFAULT',
+    product_name: item.name || item.productName || 'Product',
+    product_category: item.category || 'general',
+    unit_price: {
+      currency: 'usd',
+      amount: parseFloat(item.price || item.unitPrice || 0),
+    },
+    quantity: parseInt(item.quantity || 1),
+    harmonized_tariff_code: item.harmonizedTariffCode || '9999999999', // Default HTS code
+    country_of_origin: item.countryOfOrigin || 'US',
+  }));
+
   return {
     package_code: 'package', // Standard package type
     weight: {
@@ -422,6 +521,7 @@ export const createPackageFromItems = (items: any[]): ShipEnginePackage => {
       height: 6,
       unit: 'inch',
     },
+    items: products, // Include products for tax calculations
   };
 };
 
@@ -705,6 +805,26 @@ class ShipEngineService {
 // Export singleton instance
 export const shipEngineService = new ShipEngineService();
 
-// Export origin address for reference
-export { ORIGIN_ADDRESS };
+// Export getOriginAddress function for reference
+/**
+ * Get all configured production carriers
+ */
+export const getConfiguredCarriers = (): string[] => {
+  const configuredCarriers = process.env.SHIPENGINE_CARRIER_IDS;
+  if (configuredCarriers) {
+    return configuredCarriers.split(',').map(id => id.trim()).filter(id => id);
+  }
+  return [];
+};
+
+/**
+ * Get default carrier ID for label creation
+ */
+export const getDefaultCarrierId = (): string => {
+  return process.env.SHIPENGINE_DEFAULT_CARRIER_ID || 
+         process.env.SHIPENGINE_CARRIER_ID || 
+         'se-3938918'; // Stamps.com as fallback
+};
+
+export { getOriginAddress };
 

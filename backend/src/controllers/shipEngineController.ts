@@ -10,7 +10,10 @@ import {
   createPackageFromItems,
   getFallbackShippingRates,
   shipEngineService,
+  getConfiguredCarriers,
+  getDefaultCarrierId,
 } from '../services/shipEngineService';
+import { getOriginAddress } from '../services/addressService';
 import { logger } from '../utils/logger';
 
 interface AuthenticatedRequest extends Request {
@@ -87,15 +90,18 @@ export const calculateShipEngineRates = async (
             rate.estimatedDeliveryDays >= 2
         ) || ratesResult.rates[0]; // Default to cheapest if no suitable rate found
 
+      // Get origin address for response
+      const originAddress = await getOriginAddress();
+
       res.status(200).json({
         success: true,
         data: {
           rates: ratesResult.rates,
           recommendedRate,
           origin: {
-            city: 'Newark',
-            state: 'OH',
-            postalCode: '43055',
+            city: originAddress.city_locality,
+            state: originAddress.state_province,
+            postalCode: originAddress.postal_code,
           },
         },
         message: 'Shipping rates calculated successfully',
@@ -368,16 +374,19 @@ export const getShipEngineStatus = async (
   try {
     const isConfigured = shipEngineService.isConfigured();
 
+    // Get origin address for response
+    const originAddress = await getOriginAddress();
+
     res.status(200).json({
       success: true,
       data: {
         configured: isConfigured,
         origin: {
-          address: '128 Persimmon Dr',
-          city: 'Newark',
-          state: 'OH',
-          postalCode: '43055',
-          country: 'US',
+          address: originAddress.address_line1,
+          city: originAddress.city_locality,
+          state: originAddress.state_province,
+          postalCode: originAddress.postal_code,
+          country: originAddress.country_code,
         },
       },
       message: isConfigured
@@ -396,6 +405,46 @@ export const getShipEngineStatus = async (
   }
 };
 
+/**
+ * Get configured production carriers
+ * @route GET /api/v1/shipping/shipengine/configured-carriers
+ * @access Private (Admin only)
+ */
+export const getConfiguredProductionCarriers = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const configuredCarriers = getConfiguredCarriers();
+    const defaultCarrierId = getDefaultCarrierId();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        carriers: configuredCarriers,
+        defaultCarrierId,
+        carrierCount: configuredCarriers.length,
+      },
+      message: 'Configured carriers retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+    logger.info('Configured carriers retrieved', {
+      userId: req.user?.id,
+      carrierCount: configuredCarriers.length,
+      defaultCarrier: defaultCarrierId,
+    });
+  } catch (error: any) {
+    logger.error('Get configured carriers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve configured carriers',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 export default {
   calculateShipEngineRates,
   validateAddress,
@@ -404,5 +453,6 @@ export default {
   trackShipment,
   testShipEngineConnection,
   getShipEngineStatus,
+  getConfiguredProductionCarriers,
 };
 

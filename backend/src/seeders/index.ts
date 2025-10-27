@@ -8,6 +8,7 @@ import { seedVariants, clearVariants } from './variantSeeder';
 import { seedEmbroideryOptions, clearEmbroideryOptions } from './embroideryOptionSeeder';
 import { seedFAQs, clearFAQs } from './faqSeeder';
 import { seedMaterialCosts, clearMaterialCosts } from './materialCostSeeder';
+import { seedAddresses, clearAddresses } from './addressSeeder';
 // Schema alteration imports removed
 import { seedMultiImageProducts, clearMultiImageProducts, updateExistingProductsWithImages } from './multiImageProductSeeder';
 import { 
@@ -46,6 +47,7 @@ export interface SeederOptions {
   embroideryOnly?: boolean;
   faqsOnly?: boolean;
   materialCostsOnly?: boolean;
+  addressesOnly?: boolean;
   multiImageProductsOnly?: boolean;
   updateExistingProducts?: boolean;
   useApi?: boolean; // Use API-based seeding with authentication
@@ -80,6 +82,8 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
         await clearVariants();
       } else if (options.embroideryOnly) {
         await clearEmbroideryOptions();
+      } else if (options.addressesOnly) {
+        await clearAddresses();
       } else {
         await clearUsers();
         await clearRoles();
@@ -87,6 +91,7 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
         await clearProducts(); // Clear products second to avoid foreign key constraint
         await clearCategories();
         await clearEmbroideryOptions();
+        await clearAddresses();
       }
     }
 
@@ -149,13 +154,19 @@ export async function runSeeders(options: SeederOptions = {}): Promise<void> {
     }
 
     // Seed Material Costs
-    if (options.materialCostsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly)) {
+    if (options.materialCostsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.addressesOnly)) {
       logger.info('🌱 Seeding material costs...');
       await seedMaterialCosts();
     }
 
+    // Seed Addresses
+    if (options.addressesOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly)) {
+      logger.info('🌱 Seeding addresses...');
+      await seedAddresses();
+    }
+
     // Seed Multi-Image Products
-    if (options.multiImageProductsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly)) {
+    if (options.multiImageProductsOnly || (!options.rolesOnly && !options.usersOnly && !options.categoriesOnly && !options.productsOnly && !options.variantsOnly && !options.embroideryOnly && !options.faqsOnly && !options.materialCostsOnly && !options.addressesOnly)) {
       logger.info('🌱 Seeding multi-image products...');
       await seedMultiImageProducts();
     }
@@ -228,6 +239,7 @@ async function displaySeedingSummary(): Promise<void> {
     const { Category } = await import('../models/categoryModel');
     const Product = (await import('../models/productModel')).default;
     const { Variant } = await import('../models/variantModel');
+    const Address = (await import('../models/addressModel')).default;
 
     const roleCount = await Role.count();
     const userCount = await User.count();
@@ -239,6 +251,8 @@ async function displaySeedingSummary(): Promise<void> {
     const activeProductCount = await Product.count({ where: { status: 'active' } });
     const variantCount = await Variant.count();
     const activeVariantCount = await Variant.count({ where: { isActive: true } });
+    const addressCount = await Address.count();
+    const defaultOriginCount = await Address.count({ where: { type: 'origin', is_default: true } });
 
     logger.info('📊 Seeding Summary:');
     logger.info(`   • Roles created: ${roleCount}`);
@@ -251,6 +265,8 @@ async function displaySeedingSummary(): Promise<void> {
     logger.info(`   • Active products: ${activeProductCount}`);
     logger.info(`   • Total variants: ${variantCount}`);
     logger.info(`   • Active variants: ${activeVariantCount}`);
+    logger.info(`   • Total addresses: ${addressCount}`);
+    logger.info(`   • Default origin addresses: ${defaultOriginCount}`);
     
     // Display role breakdown
     const roles = await Role.findAll({
@@ -317,6 +333,9 @@ if (require.main === module) {
         break;
       case '--material-costs-only':
         options.materialCostsOnly = true;
+        break;
+      case '--addresses-only':
+        options.addressesOnly = true;
         break;
       case '--multi-image-products-only':
         options.multiImageProductsOnly = true;

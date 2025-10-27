@@ -1,0 +1,41 @@
+{
+  "name": "mayhem-creations-production",
+  "version": "1.0.0",
+  "description": "Production deployment configuration for Mayhem Creations",
+  "scripts": {
+    "deploy": "node scripts/deploy-production.js",
+    "deploy:windows": "powershell -ExecutionPolicy Bypass -File scripts/deploy-production.ps1",
+    "deploy:linux": "bash scripts/deploy-production.sh",
+    "pm2:start": "pm2 start ecosystem.config.yaml --env production",
+    "pm2:stop": "pm2 stop all",
+    "pm2:restart": "pm2 restart all",
+    "pm2:reload": "pm2 reload all",
+    "pm2:delete": "pm2 delete all",
+    "pm2:status": "pm2 list",
+    "pm2:logs": "pm2 logs",
+    "pm2:monit": "pm2 monit",
+    "pm2:save": "pm2 save",
+    "pm2:startup": "pm2 startup",
+    "build:all": "npm run build:backend && npm run build:services",
+    "build:backend": "cd backend && npm run build",
+    "build:services": "cd services && npm run build",
+    "install:all": "npm run install:backend && npm run install:services",
+    "install:backend": "cd backend && npm ci --production",
+    "install:services": "cd services && npm ci --production",
+    "health:check": "curl -f http://localhost:5001/api/health && curl -f http://localhost:5002/health",
+    "logs:backend": "pm2 logs mayhem-backend",
+    "logs:email": "pm2 logs mayhem-email-service",
+    "logs:all": "pm2 logs"
+  },
+  "keywords": [
+    "pm2",
+    "production",
+    "deployment",
+    "mayhem-creations"
+  ],
+  "author": "Mayhem Creations",
+  "license": "MIT",
+  "devDependencies": {
+    "pm2": "^5.3.0"
+  }
+}

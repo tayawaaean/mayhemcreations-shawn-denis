@@ -84,7 +84,8 @@ const navigationSections = [
     name: 'Shipping',
     icon: Truck,
     items: [
-      { name: 'Shipping Management', href: '/admin/shipping', icon: Truck, adminOnly: false }
+      { name: 'Shipping Management', href: '/admin/shipping', icon: Truck, adminOnly: false },
+      { name: 'Addresses', href: '/admin/addresses', icon: Cog, adminOnly: true }
     ]
   },
   {
@@ -325,7 +326,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-colors"
               >
                 <LogOut className="mr-3 h-5 w-5" />
-                Logout Employee
+                Logout
               </button>
             </div>
           </div>

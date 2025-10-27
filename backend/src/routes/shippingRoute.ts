@@ -12,6 +12,7 @@ import {
   trackShipment,
   testShipEngineConnection,
   getShipEngineStatus,
+  getConfiguredProductionCarriers,
 } from '../controllers/shipEngineController';
 import { authenticate } from '../middlewares/auth';
 
@@ -72,6 +73,13 @@ router.get('/shipengine/test', testShipEngineConnection);
  * @access Private (Admin only)
  */
 router.get('/shipengine/status', getShipEngineStatus);
+
+/**
+ * @route GET /api/v1/shipping/shipengine/configured-carriers
+ * @desc Get configured production carriers
+ * @access Private (Admin only)
+ */
+router.get('/shipengine/configured-carriers', getConfiguredProductionCarriers);
 
 export default router;
 

@@ -29,6 +29,7 @@ import ShippingManagement from './pages/ShippingManagement'
 import RefundManagement from './pages/RefundManagement'
 import SystemLogs from './pages/SystemLogs'
 import Profile from './pages/Profile'
+import Addresses from './pages/Addresses'
 import AdminNotFound from './pages/NotFound'
 
 const AdminApp: React.FC = () => {
@@ -59,6 +60,7 @@ const AdminApp: React.FC = () => {
                         <Route path="material-costs-test" element={<MaterialCostsTest />} />
                         <Route path="analytics" element={<Analytics />} />
                         <Route path="shipping" element={<ShippingManagement />} />
+                        <Route path="addresses" element={<Addresses />} />
                         <Route path="payment-management" element={<PaymentManagement />} />
                         <Route path="payment-logs" element={<PaymentLogs />} />
                         <Route path="refund-management" element={<RefundManagement />} />

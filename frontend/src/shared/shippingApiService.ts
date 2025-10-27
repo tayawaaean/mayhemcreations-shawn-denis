@@ -38,10 +38,18 @@ export interface ShippingRate {
   serviceName: string;
   serviceCode: string;
   shipmentCost: number;
-  otherCost: number;
+  taxAmount?: number; // Tax amount from ShipEngine
+  insuranceCost?: number; // Insurance fees
+  confirmationCost?: number; // Delivery confirmation fees
+  otherCost: number; // Additional fees (fuel surcharge, residential, etc.)
   totalCost: number;
   estimatedDeliveryDays?: number;
+  estimatedDeliveryDate?: string;
+  guaranteed?: boolean;
+  trackable?: boolean;
   carrier: string;
+  carrierCode: string;
+  rateId?: string; // ShipEngine rate ID for label creation
 }
 
 export interface ShippingRatesResponse {

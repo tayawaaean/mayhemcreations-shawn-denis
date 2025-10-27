@@ -8,23 +8,13 @@ import axios from 'axios';
 import { logger } from '../utils/logger';
 import { OrderReview } from '../models/orderReviewModel';
 import { sequelize } from '../config/database';
+import { getOriginAddress } from './addressService';
 
 // ShipEngine API configuration
 const SHIPENGINE_API_URL = 'https://api.shipengine.com/v1';
 const SHIPENGINE_API_KEY = process.env.SHIPSTATION_API_KEY || '';
 
-// Origin address (Newark, OH)
-const ORIGIN_ADDRESS = {
-  name: 'Mayhem Creations',
-  phone: process.env.ORIGIN_PHONE || '',
-  company_name: 'Mayhem Creations',
-  address_line1: '128 Persimmon Dr',
-  city_locality: 'Newark',
-  state_province: 'OH',
-  postal_code: '43055',
-  country_code: 'US',
-  address_residential_indicator: 'no' as const
-};
+// Origin address will be fetched dynamically from database
 
 export interface CreateLabelRequest {
   orderId: number;
@@ -93,14 +83,18 @@ export const createShippingLabel = async (
 
     // Use order's shipping method or provided override
     const serviceCode = request.serviceCode || shippingMethod?.serviceCode || 'usps_priority_mail';
-    const carrierCode = request.carrierCode || shippingMethod?.carrierCode || 'stamps_com';
+    const carrierCode = request.carrierCode || shippingMethod?.carrierCode || process.env.SHIPENGINE_DEFAULT_CARRIER_ID || 'stamps_com';
+
+    // Get dynamic origin address
+    const originAddress = await getOriginAddress();
 
     logger.info('Creating shipping label', {
       orderId: request.orderId,
       serviceCode,
       carrierCode,
       weight: totalWeight,
-      testLabel: request.testLabel
+      testLabel: request.testLabel,
+      origin: `${originAddress.city_locality}, ${originAddress.state_province}`
     });
 
     // Prepare ShipEngine label request
@@ -120,7 +114,7 @@ export const createShippingLabel = async (
           country_code: shippingAddress.country || 'US',
           address_residential_indicator: 'yes' as const
         },
-        ship_from: ORIGIN_ADDRESS,
+        ship_from: originAddress,
         packages: [
           {
             weight: {

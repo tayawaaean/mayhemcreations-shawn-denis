@@ -121,9 +121,10 @@ export default function Checkout() {
   })
 
   const steps = [
-    { number: 1, title: 'Shipping', description: 'Address & shipping method' },
-    { number: 2, title: 'Review Order', description: 'Verify all details' },
-    { number: 3, title: 'Submit', description: 'Submit for review' }
+    { number: 1, title: 'Shipping Address', description: 'Enter your delivery address' },
+    { number: 2, title: 'Shipping Method', description: 'Choose your shipping option' },
+    { number: 3, title: 'Review Order', description: 'Verify all details' },
+    { number: 4, title: 'Submit', description: 'Submit for review' }
   ]
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -266,8 +267,8 @@ export default function Checkout() {
   }
 
   const calculateTax = () => {
-    const subtotal = calculateSubtotal()
-    return (Number(subtotal) || 0) * 0.08 // 8% tax
+    // Use dynamic tax from ShipEngine if available, otherwise 0
+    return (selectedShippingRate?.taxAmount || 0)
   }
   
   const calculateShipping = () => {
@@ -397,13 +398,11 @@ export default function Checkout() {
         
         setShippingRates(response.data.rates)
         
-        // Auto-select recommended rate
-        if (response.data.recommendedRate) {
-          setSelectedShippingRate(response.data.recommendedRate)
-          console.log('✅ Selected recommended shipping rate:', response.data.recommendedRate)
-        } else if (response.data.rates.length > 0) {
-          setSelectedShippingRate(response.data.rates[0])
-          console.log('✅ Selected first available shipping rate:', response.data.rates[0])
+        // Auto-select the cheapest rate (first one, as they're sorted by cost)
+        if (response.data.rates.length > 0) {
+          const cheapestRate = response.data.rates[0] // First rate is the cheapest
+          setSelectedShippingRate(cheapestRate)
+          console.log('✅ Auto-selected cheapest shipping rate:', cheapestRate)
         }
 
         if (response.data.warning) {
@@ -469,15 +468,18 @@ export default function Checkout() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        // Step 1: Only validate form fields are filled (shipping will be calculated when clicking Continue)
+        // Step 1: Only validate form fields are filled
         return formData.firstName && formData.lastName && formData.email && 
                formData.phone && formData.address && formData.city && 
                formData.state && formData.zipCode
       case 2:
-        // Step 2: Must have shipping rate selected to proceed to final review
+        // Step 2: Must have shipping rate selected to proceed to review
         return selectedShippingRate !== null
       case 3:
-        // Step 3: Ready to submit (all previous validation passed)
+        // Step 3: Ready to proceed to final submit
+        return true
+      case 4:
+        // Step 4: Ready to submit (all previous validation passed)
         return true
       default:
         return false
@@ -486,7 +488,7 @@ export default function Checkout() {
 
   const handleNext = async () => {
     if (currentStep < steps.length) {
-      // Calculate shipping rate when moving from step 1 (shipping info) to step 2 (review)
+      // Calculate shipping rate when moving from step 1 (address) to step 2 (shipping selection)
       if (currentStep === 1) {
         console.log('📦 Moving from step 1 to step 2, calculating shipping...')
         // Set loading state first and force a render before starting calculation
@@ -495,6 +497,14 @@ export default function Checkout() {
         await new Promise(resolve => setTimeout(resolve, 150))
         await calculateShippingRate()
         console.log('📦 Shipping calculated, now moving to step 2')
+      }
+      // Validate shipping method selection when moving from step 2 to step 3
+      if (currentStep === 2) {
+        if (!selectedShippingRate) {
+          showWarning('Please select a shipping method before continuing', 'Select Shipping Method')
+          return // Don't advance to next step
+        }
+        console.log('📦 Shipping method selected, moving to review')
       }
       setCurrentStep(prev => prev + 1)
     }
@@ -1138,8 +1148,90 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Step 2: Review Order & Submit */}
+            {/* Step 2: Shipping Method Selection */}
             {currentStep === 2 && (
+              <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
+                  <Truck className="w-5 h-5 mr-2 text-accent" />
+                  Select Shipping Method
+                </h2>
+                
+                <div className="space-y-4 sm:space-y-6">
+                  {/* Show shipping rates if available */}
+                  {shippingRates.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-4">
+                        Please select your preferred shipping method. Rates are sorted by cost.
+                      </p>
+                      
+                      {/* Shipping Method Selection */}
+                      <div className="space-y-3">
+                        {shippingRates.map((rate, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setSelectedShippingRate(rate)}
+                            className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                              selectedShippingRate === rate
+                                ? 'border-accent bg-accent/5'
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className={`font-medium ${selectedShippingRate === rate ? 'text-accent' : 'text-gray-900'}`}>
+                                  {rate.serviceName}
+                                </h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {rate.carrier}
+                                  {rate.estimatedDeliveryDays && ` • ${rate.estimatedDeliveryDays} business days`}
+                                  {rate.guaranteed && ' • Guaranteed delivery'}
+                                  {rate.trackable && ' • Trackable'}
+                                </p>
+                                {rate.otherCost > 0 && (
+                                  <p className="text-xs text-gray-500 mt-1 cursor-help" title="Additional fees and surcharges imposed by the carrier (fuel surcharges, residential delivery fees, signature confirmation, etc.)">
+                                    Other fees included
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right ml-4">
+                                <span className={`text-lg font-semibold ${selectedShippingRate === rate ? 'text-accent' : 'text-gray-900'}`}>
+                                  ${rate.totalCost.toFixed(2)}
+                                </span>
+                                {selectedShippingRate === rate && (
+                                  <CheckCircle className="w-5 h-5 text-accent mt-1 mx-auto" />
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show error if no rates */}
+                  {shippingError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start">
+                        <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-red-900 mb-1">Shipping Calculation Failed</h4>
+                          <p className="text-sm text-red-700 whitespace-pre-line">{shippingError}</p>
+                          <button
+                            onClick={() => setCurrentStep(1)}
+                            className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Change Address
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review Order */}
+            {currentStep === 3 && (
               <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
                   <CheckCircle className="w-5 h-5 mr-2 text-accent" />
@@ -1147,7 +1239,7 @@ export default function Checkout() {
                 </h2>
                 
                 <div className="space-y-4 sm:space-y-6">
-                  {/* Shipping Method Selection */}
+                  {/* Selected Shipping Method Display */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-base sm:text-lg font-medium text-gray-900 flex items-center">
@@ -1155,12 +1247,12 @@ export default function Checkout() {
                         Selected Shipping Method
                       </h3>
                       <button
-                        onClick={() => setCurrentStep(1)}
+                        onClick={() => setCurrentStep(2)}
                         className="text-sm text-accent hover:underline"
                       >
-                        Change Address
+                        Change Method
                       </button>
-                          </div>
+                    </div>
                     
                     {selectedShippingRate && (
                       <div className="border-2 border-accent bg-accent/5 rounded-lg p-4">
@@ -1169,21 +1261,15 @@ export default function Checkout() {
                             <h4 className="font-medium text-gray-900">{selectedShippingRate.serviceName}</h4>
                             <p className="text-sm text-gray-600 mt-1">
                               {selectedShippingRate.carrier} • {selectedShippingRate.estimatedDeliveryDays ? `${selectedShippingRate.estimatedDeliveryDays} business days` : 'Standard delivery'}
-                        </p>
+                            </p>
                           </div>
                           <span className="text-lg font-semibold text-gray-900">
                             ${selectedShippingRate.totalCost.toFixed(2)}
                           </span>
                         </div>
-                        </div>
-                  )}
-
-                    {shippingError && (
-                      <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                        <p className="text-sm text-amber-800">{shippingError}</p>
-                          </div>
-            )}
-                    </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Order Items Review */}
                           <div>
@@ -1368,8 +1454,8 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* Step 3: Final Order Summary & Submit */}
-            {currentStep === 3 && (
+            {/* Step 4: Final Order Summary & Submit */}
+            {currentStep === 4 && (
               <div className="bg-white rounded-lg sm:rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
                   <CheckCircle className="w-5 h-5 mr-2 text-accent" />
@@ -1681,8 +1767,13 @@ export default function Checkout() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm sm:text-base">
-                      <span className="text-gray-600">Tax (8%):</span>
-                      <span className="font-medium whitespace-nowrap ml-2">${calculateTax().toFixed(2)}</span>
+                      <span className="text-gray-600">Tax:</span>
+                      <span className="font-medium whitespace-nowrap ml-2">
+                        ${calculateTax().toFixed(2)}
+                        {selectedShippingRate?.taxAmount && selectedShippingRate.taxAmount > 0 && (
+                          <span className="text-xs text-gray-500 ml-1">(calculated by ShipEngine)</span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between text-lg sm:text-xl font-bold pt-2 border-t">
                       <span className="text-gray-900">Order Total:</span>
@@ -1738,8 +1829,10 @@ export default function Checkout() {
                   className="w-full sm:w-auto"
                 >
                   {currentStep === 1 && isCalculatingShipping ? 'Calculating...' : 
-                   currentStep === 1 ? 'Continue to Shipping' :
-                   'Review Order Summary'}
+                   currentStep === 1 ? 'Continue to Select Shipping' :
+                   currentStep === 2 ? 'Continue to Review' :
+                   currentStep === 3 ? 'Review Order' :
+                   'Review Order'}
                   {!isCalculatingShipping && <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />}
                 </Button>
               ) : (
@@ -1849,7 +1942,7 @@ export default function Checkout() {
                 )}
                 
                 <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Tax (8%):</span>
+                  <span className="text-gray-600">Tax:</span>
                   <span className="font-medium">${calculateTax().toFixed(2)}</span>
                 </div>
                 

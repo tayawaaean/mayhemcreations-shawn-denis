@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Facebook, Instagram, Phone, MapPin, ExternalLink } from 'lucide-react'
+import { addressApiService } from '../../shared/addressApiService'
+import { Address } from '../../types/address'
 
 // Custom SVG Icons for social media platforms
 const EtsyIcon = ({ className }: { className?: string }) => (
@@ -16,6 +18,22 @@ const TikTokIcon = ({ className }: { className?: string }) => (
 )
 
 export default function Footer() {
+  const [originAddress, setOriginAddress] = useState<Address | null>(null)
+
+  // Fetch origin address on component mount
+  useEffect(() => {
+    const fetchOriginAddress = async () => {
+      try {
+        const address = await addressApiService.getDefaultOriginAddress()
+        setOriginAddress(address)
+      } catch (error) {
+        console.error('Failed to fetch origin address:', error)
+      }
+    }
+
+    fetchOriginAddress()
+  }, [])
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="container py-12">
@@ -78,11 +96,21 @@ export default function Footer() {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Phone className="w-4 h-4 text-accent" />
-                <span className="text-gray-400 text-sm">614-715-4742</span>
+                <span className="text-gray-400 text-sm">{originAddress?.phone || '614-715-4742'}</span>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="w-4 h-4 text-accent mt-1" />
-                <span className="text-gray-400 text-sm">128 Persimmon Dr<br />Newark, OH 43055</span>
+                <span className="text-gray-400 text-sm">
+                  {originAddress ? (
+                    <>
+                      {originAddress.address_line1}<br />
+                      {originAddress.address_line2 && <>{originAddress.address_line2}<br /></>}
+                      {originAddress.city}, {originAddress.state} {originAddress.postal_code}
+                    </>
+                  ) : (
+                    <>128 Persimmon Dr<br />Newark, OH 43055</>
+                  )}
+                </span>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
