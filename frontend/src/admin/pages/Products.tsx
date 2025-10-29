@@ -6,14 +6,29 @@ import {
   Edit, 
   Trash2, 
   Package,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  RefreshCw,
+  CheckCircle
 } from 'lucide-react'
 import { AddProductModal, EditProductModal, DeleteProductModal } from '../components/modals/ProductModals'
 import HelpModal from '../components/modals/HelpModal'
 import { useProducts, AdminProduct } from '../hooks/useProducts'
+import { apiService, ErrorCategory } from '../services/apiService'
+
+// Toast notification interface
+interface Toast {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  message: string
+  action?: {
+    label: string
+    onClick: () => void
+  }
+}
 
 const Products: React.FC = () => {
-  const { products, loading, error, createProduct, updateProduct, deleteProduct } = useProducts()
+  const { products, loading, error, createProduct, updateProduct, deleteProduct, fetchProducts } = useProducts()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedStatus, setSelectedStatus] = useState('all')
@@ -23,7 +38,29 @@ const Products: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [operationLoading, setOperationLoading] = useState(false)
   const itemsPerPage = 10
+
+  // Toast management functions
+  const showToast = (type: Toast['type'], message: string, action?: Toast['action']) => {
+    const id = Date.now().toString()
+    const newToast: Toast = { id, type, message, action }
+    setToasts(prev => [...prev, newToast])
+    
+    // Auto-dismiss after 7 seconds for errors, 5 seconds for others
+    const duration = type === 'error' ? 7000 : 5000
+    setTimeout(() => {
+      removeToast(id)
+    }, duration)
+  }
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id))
+  }
+
+  const showSuccessToast = (message: string) => showToast('success', message)
+  const showErrorToast = (message: string, action?: Toast['action']) => showToast('error', message, action)
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -57,32 +94,126 @@ const Products: React.FC = () => {
 
 
   const handleAddProduct = async (productData: any) => {
+    setOperationLoading(true)
     try {
       await createProduct(productData as AdminProduct)
       setIsAddModalOpen(false)
-    } catch (error) {
-      console.error('Error creating product:', error)
+      showSuccessToast('Product created successfully')
+      console.log('✅ Product created:', productData.title)
+    } catch (error: any) {
+      console.error('❌ Error creating product:', error)
+      
+      // Extract error information using apiService
+      const errorInfo = apiService.extractErrorInfo(error)
+      
+      // Specific error messages based on error type
+      let errorMessage = `Failed to create product: ${errorInfo.message}`
+      
+      if (errorInfo.category === 'validation') {
+        errorMessage = 'Validation error: Please check all required fields are filled correctly.'
+      } else if (errorInfo.category === 'network') {
+        errorMessage = 'Network error: Unable to reach the server. Please check your connection.'
+      } else if (errorInfo.category === 'timeout') {
+        errorMessage = 'Request timed out. The server took too long to respond.'
+      }
+      
+      // Show error toast with retry option for retryable errors
+      if (errorInfo.retryable) {
+        showErrorToast(errorMessage, {
+          label: 'Retry',
+          onClick: () => handleAddProduct(productData)
+        })
+      } else {
+        showErrorToast(errorMessage)
+      }
+    } finally {
+      setOperationLoading(false)
     }
   }
 
   const handleUpdateProduct = async (product: AdminProduct) => {
+    setOperationLoading(true)
     try {
       await updateProduct(product.id, product)
       setIsEditModalOpen(false)
-    } catch (error) {
-      console.error('Error updating product:', error)
+      setSelectedProduct(null)
+      showSuccessToast('Product updated successfully')
+      console.log('✅ Product updated:', product.title)
+    } catch (error: any) {
+      console.error('❌ Error updating product:', error)
+      
+      const errorInfo = apiService.extractErrorInfo(error)
+      
+      let errorMessage = `Failed to update product: ${errorInfo.message}`
+      
+      // Handle specific error scenarios
+      if (error?.response?.status === 409) {
+        errorMessage = 'This product was modified by another user. Please refresh and try again.'
+      } else if (error?.response?.status === 404) {
+        errorMessage = 'Product not found. It may have been deleted.'
+      } else if (errorInfo.category === 'validation') {
+        errorMessage = 'Validation error: Please check all fields are valid.'
+      } else if (errorInfo.category === 'network') {
+        errorMessage = 'Network error: Unable to save changes. Please check your connection.'
+      }
+      
+      if (errorInfo.retryable) {
+        showErrorToast(errorMessage, {
+          label: 'Retry',
+          onClick: () => handleUpdateProduct(product)
+        })
+      } else {
+        showErrorToast(errorMessage)
+      }
+      
+      // Keep modal open on error so user can retry
+    } finally {
+      setOperationLoading(false)
     }
   }
 
   const handleConfirmDelete = async () => {
-    if (selectedProduct) {
-      try {
-        await deleteProduct(selectedProduct.id)
+    if (!selectedProduct) return
+    
+    setOperationLoading(true)
+    const productName = selectedProduct.title
+    const productId = selectedProduct.id
+    
+    try {
+      await deleteProduct(productId)
+      setIsDeleteModalOpen(false)
+      setSelectedProduct(null)
+      showSuccessToast(`Product "${productName}" deleted successfully`)
+      console.log('✅ Product deleted:', productName)
+    } catch (error: any) {
+      console.error('❌ Error deleting product:', error)
+      
+      const errorInfo = apiService.extractErrorInfo(error)
+      
+      let errorMessage = `Failed to delete product: ${errorInfo.message}`
+      
+      // Handle specific delete errors
+      if (error?.response?.status === 409) {
+        errorMessage = 'Cannot delete: This product has active orders or inventory. Please archive it instead.'
+      } else if (error?.response?.status === 404) {
+        errorMessage = 'Product not found. It may have already been deleted.'
+        // Close modal since product doesn't exist
         setIsDeleteModalOpen(false)
         setSelectedProduct(null)
-      } catch (error) {
-        console.error('Error deleting product:', error)
+      } else if (errorInfo.category === 'network') {
+        errorMessage = 'Network error: Unable to delete product. Please check your connection.'
       }
+      
+      if (errorInfo.retryable && error?.response?.status !== 404) {
+        showErrorToast(errorMessage, {
+          label: 'Retry',
+          onClick: handleConfirmDelete
+        })
+      } else {
+        showErrorToast(errorMessage)
+      }
+    } finally {
+      setOperationLoading(false)
     }
   }
 
@@ -105,13 +236,26 @@ const Products: React.FC = () => {
       <div className="flex items-center justify-center min-h-[50vh] px-4">
         <div className="text-center max-w-md">
           <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-sm sm:text-base text-red-600 mb-4 break-words">Error loading products: {error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base"
-          >
-            Retry
-          </button>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Products</h3>
+          <p className="text-sm sm:text-base text-red-600 mb-4 break-words">{error}</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <button 
+              onClick={() => fetchProducts()} 
+              className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 text-sm sm:text-base flex items-center justify-center"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </button>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm sm:text-base"
+            >
+              Reload Page
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            If this problem persists, please contact support.
+          </p>
         </div>
       </div>
     )
@@ -483,6 +627,71 @@ const Products: React.FC = () => {
         onConfirm={handleConfirmDelete}
         product={selectedProduct}
       />
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-start p-4 rounded-lg shadow-lg border animate-slide-in ${
+              toast.type === 'success' 
+                ? 'bg-green-50 border-green-200' 
+                : toast.type === 'error'
+                ? 'bg-red-50 border-red-200'
+                : toast.type === 'warning'
+                ? 'bg-yellow-50 border-yellow-200'
+                : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            {toast.type === 'success' && (
+              <CheckCircle className="w-5 h-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
+            )}
+            {toast.type === 'error' && (
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+            )}
+            
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium ${
+                toast.type === 'success' ? 'text-green-800' :
+                toast.type === 'error' ? 'text-red-800' :
+                toast.type === 'warning' ? 'text-yellow-800' :
+                'text-blue-800'
+              }`}>
+                {toast.message}
+              </p>
+              
+              {toast.action && (
+                <button
+                  onClick={() => {
+                    toast.action!.onClick()
+                    removeToast(toast.id)
+                  }}
+                  className={`mt-2 text-sm font-medium underline ${
+                    toast.type === 'success' ? 'text-green-700 hover:text-green-800' :
+                    toast.type === 'error' ? 'text-red-700 hover:text-red-800' :
+                    toast.type === 'warning' ? 'text-yellow-700 hover:text-yellow-800' :
+                    'text-blue-700 hover:text-blue-800'
+                  }`}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={() => removeToast(toast.id)}
+              className={`ml-3 flex-shrink-0 ${
+                toast.type === 'success' ? 'text-green-400 hover:text-green-600' :
+                toast.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                toast.type === 'warning' ? 'text-yellow-400 hover:text-yellow-600' :
+                'text-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -13,11 +13,21 @@ import {
   X,
   RefreshCw,
   Download,
-  Upload
+  Upload,
+  CheckCircle
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { variantApiService, Variant, VariantInventoryStatus } from '../../shared/variantApiService'
 import { useProducts } from '../hooks/useProducts'
+import { apiService, ErrorCategory } from '../services/apiService'
+
+// Toast notification interface
+interface Toast {
+  id: string
+  message: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  action?: { label: string; onClick: () => void }
+}
 
 const Inventory: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -37,6 +47,8 @@ const Inventory: React.FC = () => {
   const [variantData, setVariantData] = useState<VariantInventoryStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [adjustingStock, setAdjustingStock] = useState<string | null>(null)
   const [newVariant, setNewVariant] = useState({
     productId: '',
     categoryId: '',
@@ -65,6 +77,21 @@ const Inventory: React.FC = () => {
   // Size options for apparel
   const apparelSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
   const accessorySizes = ['One Size', 'Small', 'Medium', 'Large']
+
+  // Toast notification functions
+  const showToast = (message: string, type: Toast['type'], action?: Toast['action']) => {
+    const id = Date.now().toString()
+    setToasts(prev => [...prev, { id, message, type, action }])
+    setTimeout(() => removeToast(id), 5000)
+  }
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id))
+  }
+
+  const showSuccessToast = (message: string) => showToast(message, 'success')
+  const showErrorToast = (message: string, action?: Toast['action']) => showToast(message, 'error', action)
+  const showWarningToast = (message: string) => showToast(message, 'warning')
 
   // Load products and inventory data on component mount
   useEffect(() => {
@@ -213,18 +240,71 @@ const Inventory: React.FC = () => {
 
 
   const handleStockAdjustment = async (itemId: string, adjustment: number) => {
+    setAdjustingStock(itemId)
     try {
       const item = filteredItems.find(i => i.id === itemId)
-      if (!item) return
+      if (!item) {
+        showErrorToast('Item not found. Please refresh the page.')
+        return
+      }
 
-      // Adjust variant stock
-      await variantApiService.adjustVariantStock(Number(itemId), adjustment, `Manual adjustment via inventory management`)
+      // Validation: Check if adjustment would result in negative stock
+      const newStock = item.stock + adjustment
+      if (newStock < 0) {
+        showWarningToast(`Cannot reduce stock below 0. Current stock: ${item.stock}`)
+        return
+      }
+
+      // Adjust variant stock using API
+      await variantApiService.adjustVariantStock(
+        Number(itemId), 
+        adjustment, 
+        `Manual adjustment via inventory management`
+      )
+      
+      // Success feedback
+      showSuccessToast(`Stock ${adjustment > 0 ? 'increased' : 'decreased'} by ${Math.abs(adjustment)} for ${item.productTitle}`)
       
       // Reload inventory data to get updated stock levels
       await loadInventoryData()
-    } catch (error) {
-      console.error('Error adjusting stock:', error)
-      setError(error instanceof Error ? error.message : 'Failed to adjust stock')
+    } catch (error: any) {
+      console.error('❌ Error adjusting stock:', error)
+      
+      // Extract error information from apiService
+      const errorInfo = apiService.extractErrorInfo(error)
+      
+      let errorMessage = `Failed to adjust stock: ${errorInfo.message}`
+      
+      // Specific error handling based on category
+      if (errorInfo.category === 'validation') {
+        if (error?.response?.data?.message?.includes('insufficient')) {
+          errorMessage = 'Insufficient stock. Cannot reduce stock below current commitments.'
+        } else if (error?.response?.data?.message?.includes('concurrent')) {
+          errorMessage = 'Stock was modified by another user. Please refresh and try again.'
+        } else {
+          errorMessage = `Validation error: ${error?.response?.data?.message || 'Invalid stock adjustment'}`
+        }
+      } else if (errorInfo.category === 'network') {
+        errorMessage = 'Network error: Unable to reach the server. Please check your connection.'
+      } else if (errorInfo.category === 'timeout') {
+        errorMessage = 'Request timed out. The server took too long to respond.'
+      } else if (errorInfo.category === 'server') {
+        errorMessage = 'Server error: Please try again in a few moments.'
+      } else if (errorInfo.category === 'not_found') {
+        errorMessage = 'Variant not found. It may have been deleted.'
+      }
+      
+      // Show error toast with retry option for retryable errors
+      if (errorInfo.retryable) {
+        showErrorToast(errorMessage, {
+          label: 'Retry',
+          onClick: () => handleStockAdjustment(itemId, adjustment)
+        })
+      } else {
+        showErrorToast(errorMessage)
+      }
+    } finally {
+      setAdjustingStock(null)
     }
   }
 
@@ -621,13 +701,15 @@ const Inventory: React.FC = () => {
                       <div className="flex items-center justify-end space-x-2">
                         <button
                           onClick={() => handleStockAdjustment(item.id, -1)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                          disabled={adjustingStock === item.id}
+                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleStockAdjustment(item.id, 1)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                          disabled={adjustingStock === item.id}
+                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
@@ -671,13 +753,15 @@ const Inventory: React.FC = () => {
                       <div className="flex items-center space-x-2 ml-2">
                         <button
                           onClick={() => handleStockAdjustment(item.id, -1)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                          disabled={adjustingStock === item.id}
+                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleStockAdjustment(item.id, 1)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                          disabled={adjustingStock === item.id}
+                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
@@ -1154,6 +1238,74 @@ const Inventory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-md">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`flex items-start p-4 rounded-lg shadow-lg border animate-slide-in ${
+              toast.type === 'success' 
+                ? 'bg-green-50 border-green-200' 
+                : toast.type === 'error'
+                ? 'bg-red-50 border-red-200'
+                : toast.type === 'warning'
+                ? 'bg-yellow-50 border-yellow-200'
+                : 'bg-blue-50 border-blue-200'
+            }`}
+          >
+            {toast.type === 'success' && (
+              <CheckCircle className="w-5 h-5 text-green-600 mr-3 mt-0.5 flex-shrink-0" />
+            )}
+            {toast.type === 'error' && (
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+            )}
+            {toast.type === 'warning' && (
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+            )}
+            
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium ${
+                toast.type === 'success' ? 'text-green-800' :
+                toast.type === 'error' ? 'text-red-800' :
+                toast.type === 'warning' ? 'text-yellow-800' :
+                'text-blue-800'
+              }`}>
+                {toast.message}
+              </p>
+              
+              {toast.action && (
+                <button
+                  onClick={() => {
+                    toast.action!.onClick()
+                    removeToast(toast.id)
+                  }}
+                  className={`mt-2 text-sm font-medium underline ${
+                    toast.type === 'success' ? 'text-green-700 hover:text-green-800' :
+                    toast.type === 'error' ? 'text-red-700 hover:text-red-800' :
+                    toast.type === 'warning' ? 'text-yellow-700 hover:text-yellow-800' :
+                    'text-blue-700 hover:text-blue-800'
+                  }`}
+                >
+                  {toast.action.label}
+                </button>
+              )}
+            </div>
+            
+            <button
+              onClick={() => removeToast(toast.id)}
+              className={`ml-3 flex-shrink-0 ${
+                toast.type === 'success' ? 'text-green-400 hover:text-green-600' :
+                toast.type === 'error' ? 'text-red-400 hover:text-red-600' :
+                toast.type === 'warning' ? 'text-yellow-400 hover:text-yellow-600' :
+                'text-blue-400 hover:text-blue-600'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
 
     </div>
   )

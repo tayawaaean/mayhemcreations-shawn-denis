@@ -9,6 +9,9 @@ import { NotificationProvider } from './context/NotificationContext'
 import SharedLayout from './components/layout/SharedLayout'
 import Sidebar from './components/layout/Sidebar'
 import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
+import NetworkStatusIndicator from './components/NetworkStatusIndicator'
+import SessionTimeoutMonitor from './components/SessionTimeoutMonitor'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
 import PendingReview from './pages/PendingReview'
@@ -34,51 +37,62 @@ import AdminNotFound from './pages/NotFound'
 
 const AdminApp: React.FC = () => {
   return (
-    <AdminAuthProvider>
-      <RoleProvider initialRole="admin">
-        <AdminProvider>
-          <InventoryProvider>
-            <AdminChatProvider>
-              <NotificationProvider>
-                <Routes>
-                <Route path="/*" element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Routes>
-                      <Route path="/*" element={<SharedLayout SidebarComponent={Sidebar} />}>
-                        <Route index element={<Dashboard />} />
-                        <Route path="products" element={<Products />} />
-                        <Route path="orders" element={<PendingReview />} />
-                        <Route path="customers" element={<Customers />} />
-                        <Route path="reviews" element={<Reviews />} />
-                        <Route path="users" element={<UsersPage />} />
-                        <Route path="messages" element={<Messages />} />
-                        <Route path="inventory" element={<Inventory />} />
-                        <Route path="categories" element={<Categories />} />
-                        <Route path="embroidery" element={<Embroidery />} />
-                        <Route path="faqs" element={<FAQs />} />
-                        <Route path="material-costs" element={<MaterialCosts />} />
-                        <Route path="material-costs-test" element={<MaterialCostsTest />} />
-                        <Route path="analytics" element={<Analytics />} />
-                        <Route path="shipping" element={<ShippingManagement />} />
-                        <Route path="addresses" element={<Addresses />} />
-                        <Route path="payment-management" element={<PaymentManagement />} />
-                        <Route path="payment-logs" element={<PaymentLogs />} />
-                        <Route path="refund-management" element={<RefundManagement />} />
-                        <Route path="system-logs" element={<SystemLogs />} />
-                        <Route path="profile" element={<Profile />} />
-                        <Route path="*" element={<AdminNotFound />} />
-                      </Route>
-                    </Routes>
-                  </ProtectedRoute>
-                }>
-                </Route>
-              </Routes>
-              </NotificationProvider>
-            </AdminChatProvider>
-          </InventoryProvider>
-        </AdminProvider>
-      </RoleProvider>
-    </AdminAuthProvider>
+    <ErrorBoundary>
+      <AdminAuthProvider>
+        <RoleProvider initialRole="admin">
+          <AdminProvider>
+            <InventoryProvider>
+              <AdminChatProvider>
+                <NotificationProvider>
+                  {/* Network status indicator */}
+                  <NetworkStatusIndicator />
+                  
+                  {/* Session timeout monitor */}
+                  <SessionTimeoutMonitor 
+                    warningTimeMinutes={5}
+                    sessionTimeoutMinutes={30}
+                  />
+                  
+                  <Routes>
+                    <Route path="/*" element={
+                      <ProtectedRoute requiredRole="admin">
+                        <Routes>
+                          <Route path="/*" element={<SharedLayout SidebarComponent={Sidebar} />}>
+                            <Route index element={<Dashboard />} />
+                            <Route path="products" element={<Products />} />
+                            <Route path="orders" element={<PendingReview />} />
+                            <Route path="customers" element={<Customers />} />
+                            <Route path="reviews" element={<Reviews />} />
+                            <Route path="users" element={<UsersPage />} />
+                            <Route path="messages" element={<Messages />} />
+                            <Route path="inventory" element={<Inventory />} />
+                            <Route path="categories" element={<Categories />} />
+                            <Route path="embroidery" element={<Embroidery />} />
+                            <Route path="faqs" element={<FAQs />} />
+                            <Route path="material-costs" element={<MaterialCosts />} />
+                            <Route path="material-costs-test" element={<MaterialCostsTest />} />
+                            <Route path="analytics" element={<Analytics />} />
+                            <Route path="shipping" element={<ShippingManagement />} />
+                            <Route path="addresses" element={<Addresses />} />
+                            <Route path="payment-management" element={<PaymentManagement />} />
+                            <Route path="payment-logs" element={<PaymentLogs />} />
+                            <Route path="refund-management" element={<RefundManagement />} />
+                            <Route path="system-logs" element={<SystemLogs />} />
+                            <Route path="profile" element={<Profile />} />
+                            <Route path="*" element={<AdminNotFound />} />
+                          </Route>
+                        </Routes>
+                      </ProtectedRoute>
+                    }>
+                    </Route>
+                  </Routes>
+                </NotificationProvider>
+              </AdminChatProvider>
+            </InventoryProvider>
+          </AdminProvider>
+        </RoleProvider>
+      </AdminAuthProvider>
+    </ErrorBoundary>
   )
 }
 

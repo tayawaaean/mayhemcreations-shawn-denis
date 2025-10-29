@@ -74,11 +74,33 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
         // Navigate to admin dashboard
         navigate('/admin')
       } else {
-        setError('Invalid email or password')
+        setError('Invalid email or password. Please check your credentials and try again.')
       }
     } catch (error: any) {
       console.error('Login error:', error)
-      setError(error.message || 'An error occurred during login')
+      
+      // Categorize login errors for better user guidance
+      let errorMessage = 'Login failed. '
+      
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'No internet connection. Please check your connection and try again.'
+      } else if (error?.response?.status === 429) {
+        errorMessage = 'Too many login attempts. Please wait a few minutes and try again.'
+      } else if (error?.response?.status >= 500) {
+        errorMessage = 'Server error. Please try again in a few moments or contact support.'
+      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage = 'Invalid email or password. Please check your credentials.'
+      } else if (error?.response?.status === 404) {
+        errorMessage = 'Login service unavailable. Please contact support.'
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else {
+        errorMessage += 'Please try again or contact support if this persists.'
+      }
+      
+      setError(errorMessage)
     }
   }
 

@@ -1,12 +1,19 @@
 import React, { useState, useRef } from 'react'
-import { Upload, X, Image as ImageIcon, Plus } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, Plus, AlertCircle } from 'lucide-react'
 
 interface ImageUploadProps {
   value?: string | string[]
   onChange: (imageUrls: string | string[]) => void
   multiple?: boolean
   maxFiles?: number
+  maxSizeMB?: number
   className?: string
+  onError?: (error: string) => void
+}
+
+interface FileError {
+  fileName: string
+  error: string
 }
 
 const ImageUpload: React.FC<ImageUploadProps> = ({ 
@@ -14,15 +21,23 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   onChange, 
   multiple = false, 
   maxFiles = 1,
-  className = ''
+  maxSizeMB = 5,
+  className = '',
+  onError
 }) => {
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [errors, setErrors] = useState<FileError[]>([])
+  const [generalError, setGeneralError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Normalize value to always be an array for easier handling
   const images = Array.isArray(value) ? value : (value ? [value] : [])
   const hasImages = images.length > 0
+  
+  // Supported image types
+  const SUPPORTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+  const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -49,45 +64,184 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   }
 
+  // Validate file type
+  const validateFileType = (file: File): { valid: boolean; error?: string } => {
+    // Check MIME type
+    if (!SUPPORTED_TYPES.includes(file.type.toLowerCase())) {
+      return {
+        valid: false,
+        error: `Invalid file type. Supported formats: ${SUPPORTED_EXTENSIONS.join(', ').toUpperCase()}`
+      }
+    }
+    
+    // Also check file extension as backup
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!extension || !SUPPORTED_EXTENSIONS.includes(extension)) {
+      return {
+        valid: false,
+        error: `Invalid file extension. Supported formats: ${SUPPORTED_EXTENSIONS.join(', ').toUpperCase()}`
+      }
+    }
+    
+    return { valid: true }
+  }
+
+  // Validate file size
+  const validateFileSize = (file: File): { valid: boolean; error?: string } => {
+    const maxSizeBytes = maxSizeMB * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      return {
+        valid: false,
+        error: `File too large. Maximum size is ${maxSizeMB}MB (current: ${(file.size / 1024 / 1024).toFixed(2)}MB)`
+      }
+    }
+    return { valid: true }
+  }
+
+  // Clear all errors
+  const clearErrors = () => {
+    setErrors([])
+    setGeneralError(null)
+  }
+
   const handleFiles = async (files: File[]) => {
     if (files.length === 0) return
     
-    const validFiles = files.filter(file => file.type.startsWith('image/'))
-    if (validFiles.length === 0) {
-      alert('Please select valid image files')
+    // Clear previous errors
+    clearErrors()
+    
+    const fileErrors: FileError[] = []
+    
+    // Check if no files provided
+    if (files.length === 0) {
+      setGeneralError('No files selected.')
+      if (onError) onError('No files selected.')
       return
     }
 
-    if (!multiple && validFiles.length > 1) {
-      alert('Please select only one image')
+    // Check single file restriction
+    if (!multiple && files.length > 1) {
+      const error = 'Only one image can be uploaded at a time.'
+      setGeneralError(error)
+      if (onError) onError(error)
       return
     }
 
     // Check if adding these files would exceed maxFiles
     const currentCount = images.length
-    const newCount = currentCount + validFiles.length
+    const newCount = currentCount + files.length
     if (newCount > maxFiles) {
-      alert(`Maximum ${maxFiles} images allowed. You can add ${maxFiles - currentCount} more.`)
+      const error = `Maximum ${maxFiles} ${maxFiles === 1 ? 'image' : 'images'} allowed. You can add ${maxFiles - currentCount} more.`
+      setGeneralError(error)
+      if (onError) onError(error)
       return
+    }
+
+    // Validate each file
+    const validatedFiles: { file: File; dataUrl: string | null }[] = []
+    
+    for (const file of files) {
+      // Validate file type
+      const typeValidation = validateFileType(file)
+      if (!typeValidation.valid) {
+        fileErrors.push({ fileName: file.name, error: typeValidation.error! })
+        continue
+      }
+      
+      // Validate file size
+      const sizeValidation = validateFileSize(file)
+      if (!sizeValidation.valid) {
+        fileErrors.push({ fileName: file.name, error: sizeValidation.error! })
+        continue
+      }
+      
+      validatedFiles.push({ file, dataUrl: null })
+    }
+
+    // If all files failed validation
+    if (validatedFiles.length === 0) {
+      setErrors(fileErrors)
+      const firstError = fileErrors[0]?.error || 'All files failed validation.'
+      if (onError) onError(firstError)
+      return
+    }
+
+    // If some files failed, show warnings but continue with valid files
+    if (fileErrors.length > 0) {
+      setErrors(fileErrors)
     }
 
     setUploading(true)
 
     try {
-      const uploadPromises = validFiles.map(file => {
+      // Read files with enhanced error handling
+      const uploadPromises = validatedFiles.map(({ file }) => {
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
+          
+          // FileReader load event
           reader.onload = (e) => {
-            const result = e.target?.result as string
-            resolve(result)
+            try {
+              const result = e.target?.result
+              
+              if (!result) {
+                reject(new Error('FileReader returned no result'))
+                return
+              }
+              
+              if (typeof result !== 'string') {
+                reject(new Error('FileReader returned non-string result'))
+                return
+              }
+              
+              // Validate the data URL format
+              if (!result.startsWith('data:image/')) {
+                reject(new Error('Invalid image data format'))
+                return
+              }
+              
+              resolve(result)
+            } catch (parseError) {
+              reject(new Error('Failed to parse file data'))
+            }
           }
-          reader.onerror = () => reject(new Error('Failed to read file'))
-          reader.readAsDataURL(file)
+          
+          // FileReader error event
+          reader.onerror = (error) => {
+            console.error('FileReader error:', error)
+            
+            // Categorize FileReader errors
+            const errorMessage = reader.error?.message || 'Unknown error'
+            if (reader.error?.name === 'NotFoundError') {
+              reject(new Error('File not found. It may have been moved or deleted.'))
+            } else if (reader.error?.name === 'SecurityError') {
+              reject(new Error('Security error. Unable to read this file.'))
+            } else if (reader.error?.name === 'NotReadableError') {
+              reject(new Error('File is not readable. It may be corrupted.'))
+            } else if (reader.error?.name === 'AbortError') {
+              reject(new Error('File reading was aborted.'))
+            } else {
+              reject(new Error(`Failed to read file: ${errorMessage}`))
+            }
+          }
+          
+          // FileReader abort event
+          reader.onabort = () => {
+            reject(new Error('File reading was aborted'))
+          }
+          
+          // Start reading the file
+          try {
+            reader.readAsDataURL(file)
+          } catch (readError) {
+            reject(new Error('Failed to start file reading'))
+          }
         })
       })
 
       const newImageUrls = await Promise.all(uploadPromises)
       
+      // Update image state
       if (multiple) {
         const updatedImages = [...images, ...newImageUrls]
         onChange(updatedImages)
@@ -95,11 +249,27 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         onChange(newImageUrls[0])
       }
       
+      // Clear errors on success
+      clearErrors()
       setUploading(false)
-    } catch (error) {
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    } catch (error: any) {
       console.error('Error uploading images:', error)
-      alert('Error uploading images. Please try again.')
+      
+      const errorMessage = error?.message || 'Error uploading images. Please try again.'
+      setGeneralError(errorMessage)
+      if (onError) onError(errorMessage)
+      
       setUploading(false)
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
   }
 
@@ -122,6 +292,47 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
 
   return (
     <div className={className}>
+      {/* General Error Message */}
+      {generalError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
+          <AlertCircle className="w-5 h-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm text-red-800 font-medium">{generalError}</p>
+          </div>
+          <button
+            onClick={clearErrors}
+            className="text-red-400 hover:text-red-600 ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Individual File Errors */}
+      {errors.length > 0 && !generalError && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-start mb-2">
+            <AlertCircle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-yellow-800 font-medium">
+              {errors.length === 1 ? '1 file' : `${errors.length} files`} could not be uploaded:
+            </p>
+          </div>
+          <ul className="ml-7 space-y-1">
+            {errors.map((error, index) => (
+              <li key={index} className="text-xs text-yellow-700">
+                <strong>{error.fileName}:</strong> {error.error}
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={clearErrors}
+            className="mt-2 text-xs text-yellow-600 hover:text-yellow-800 underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {hasImages ? (
         <div className="space-y-4">
           {/* Image Grid */}
@@ -199,7 +410,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                     Drag and drop or click to browse
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    PNG, JPG, GIF up to 10MB
+                    {SUPPORTED_EXTENSIONS.map(ext => ext.toUpperCase()).join(', ')} up to {maxSizeMB}MB
                   </p>
                   {multiple && (
                     <p className="text-xs text-gray-400 mt-1">
@@ -249,7 +460,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                 Drag and drop or click to browse
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                PNG, JPG, GIF up to 10MB
+                {SUPPORTED_EXTENSIONS.map(ext => ext.toUpperCase()).join(', ')} up to {maxSizeMB}MB
               </p>
               {multiple && (
                 <p className="text-xs text-gray-400 mt-1">

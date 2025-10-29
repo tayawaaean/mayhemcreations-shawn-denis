@@ -28,6 +28,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [showErrorSummary, setShowErrorSummary] = useState(false)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -156,11 +157,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required'
     
     setErrors(newErrors)
+    setShowErrorSummary(Object.keys(newErrors).length > 0)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setShowErrorSummary(false)
     if (validateForm() && imageFiles.length > 0) {
       try {
         setLoading(true)

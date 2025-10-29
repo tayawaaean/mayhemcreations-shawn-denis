@@ -109,6 +109,8 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorCategory, setErrorCategory] = useState<'timeout' | 'network' | 'server' | 'rate_limit' | 'auth' | 'validation' | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [selectedDemo, setSelectedDemo] = useState<EmployeeUser | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,9 +175,70 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
       }
     } catch (error: any) {
       console.error('Login error:', error)
-      // Log failed login attempt
-      loggingService.logFailedLoginAttempt(formData.email, error.message || 'Login error')
-      setError(error.message || 'An error occurred during login')
+      
+      // Enhanced error categorization with retry logic
+      let errorMessage = 'Login failed. '
+      let category: 'timeout' | 'network' | 'server' | 'rate_limit' | 'auth' | 'validation' = 'server'
+      let canRetry = false
+      
+      // Categorize the error based on type
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. The server is taking too long to respond. Please try again.'
+        category = 'timeout'
+        canRetry = true
+      } else if (!navigator.onLine) {
+        errorMessage = 'No internet connection detected. Please check your network connection and try again.'
+        category = 'network'
+        canRetry = true
+      } else if (error?.response?.status === 429) {
+        const retryAfter = error?.response?.headers?.['retry-after']
+        errorMessage = `Too many login attempts. Please wait ${retryAfter ? `${retryAfter} seconds` : 'a few minutes'} before trying again.`
+        category = 'rate_limit'
+        canRetry = false
+      } else if (error?.response?.status >= 500) {
+        errorMessage = 'Server error encountered. Our systems are experiencing issues. Please try again in a few moments.'
+        category = 'server'
+        canRetry = true
+      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage = 'Invalid email or password. Please check your credentials.'
+        category = 'auth'
+        canRetry = false
+      } else if (error?.response?.status === 404) {
+        errorMessage = 'Employee login service unavailable. Please contact IT support.'
+        category = 'server'
+        canRetry = false
+      } else if (error?.message?.includes('Role not authorized') || error?.message?.includes('not authorized')) {
+        errorMessage = 'Your account does not have employee access. Please contact your administrator.'
+        category = 'auth'
+        canRetry = false
+      } else if (error?.response?.status >= 400 && error?.response?.status < 500) {
+        errorMessage = error?.response?.data?.message || error?.message || 'Invalid request. Please check your input.'
+        category = 'validation'
+        canRetry = false
+      } else if (error?.message) {
+        errorMessage = error.message
+        canRetry = true
+      } else {
+        errorMessage += 'An unexpected error occurred. Please try again or contact IT support.'
+        canRetry = true
+      }
+      
+      // Log failed login attempt with categorized error
+      loggingService.logFailedLoginAttempt(formData.email, `[${category.toUpperCase()}] ${errorMessage}`)
+      
+      setError(errorMessage)
+      setErrorCategory(category)
+      
+      // Auto-retry logic for transient errors (with exponential backoff)
+      if (canRetry && retryCount < 2) {
+        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000)
+        setTimeout(() => {
+          console.log(`Auto-retrying login (attempt ${retryCount + 1}/2)...`)
+          setRetryCount(prev => prev + 1)
+        }, backoffDelay)
+      } else if (retryCount >= 2) {
+        setError(errorMessage + ' Multiple retry attempts failed. Please contact IT support.')
+      }
     } finally {
       setIsLoading(false)
     }
@@ -194,7 +257,22 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
       ...prev,
       [e.target.name]: e.target.value
     }))
+    // Reset error state when user makes changes
     setError('')
+    setErrorCategory(null)
+    setRetryCount(0)
+  }
+
+  // Manual retry function
+  const handleRetry = () => {
+    setError('')
+    setErrorCategory(null)
+    setRetryCount(0)
+    // Trigger form submission
+    const form = document.querySelector('form') as HTMLFormElement
+    if (form) {
+      form.requestSubmit()
+    }
   }
 
   return (
@@ -280,9 +358,32 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-md">
-                <AlertCircle className="w-4 h-4 text-red-600 mr-2" />
-                <span className="text-sm text-red-600">{error}</span>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md space-y-2">
+                <div className="flex items-start">
+                  <AlertCircle className="w-4 h-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-sm text-red-600 block">{error}</span>
+                    {errorCategory && (
+                      <span className="text-xs text-red-500 mt-1 block">
+                        Error Type: {errorCategory === 'timeout' ? 'Connection Timeout' : 
+                                    errorCategory === 'network' ? 'Network Error' :
+                                    errorCategory === 'server' ? 'Server Error' :
+                                    errorCategory === 'rate_limit' ? 'Rate Limited' :
+                                    errorCategory === 'auth' ? 'Authentication Failed' :
+                                    'Validation Error'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {(errorCategory === 'timeout' || errorCategory === 'network' || errorCategory === 'server') && !isLoading && (
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="w-full mt-2 px-3 py-1.5 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded-md transition-colors"
+                  >
+                    Retry Login
+                  </button>
+                )}
               </div>
             )}
 

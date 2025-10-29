@@ -5,6 +5,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Address } from '../../types/address';
+import { apiService, ErrorCategory } from '../services/apiService';
+import { AlertCircle, CheckCircle, X } from 'lucide-react';
+
+// Field error mapping
+interface FieldErrors {
+  [key: string]: string;
+}
 
 interface AddressManagementProps {
   onAddressChange?: (address: Address | null) => void;
@@ -17,6 +24,9 @@ const AddressManagement: React.FC<AddressManagementProps> = ({ onAddressChange }
   const [showForm, setShowForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [filterType, setFilterType] = useState<'all' | 'origin' | 'return' | 'warehouse'>('all');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({

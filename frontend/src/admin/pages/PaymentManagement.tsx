@@ -18,6 +18,7 @@ import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import HelpModal from '../components/modals/HelpModal'
 import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
 import { formatDateOnly } from '../../utils/dateFormatter'
+import { apiService, ErrorCategory } from '../services/apiService'
 
 const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -60,9 +61,30 @@ const PaymentManagement: React.FC = () => {
         } else {
           setError(response.error || 'Failed to fetch payments')
         }
-      } catch (err) {
-        setError('Failed to fetch payments')
-        console.error('Error fetching payments:', err)
+      } catch (err: any) {
+        console.error('❌ Error fetching payments:', err)
+        
+        // Extract error information using apiService
+        const errorInfo = apiService.extractErrorInfo(err)
+        
+        let errorMessage = 'Failed to fetch payments'
+        
+        // Provide specific error messages based on category
+        if (errorInfo.category === 'timeout') {
+          errorMessage = 'Request timed out while fetching payments. The server took too long to respond.'
+        } else if (errorInfo.category === 'network') {
+          errorMessage = 'Network error: Unable to reach the server. Please check your internet connection.'
+        } else if (errorInfo.category === 'auth') {
+          errorMessage = 'Authentication error: Your session may have expired. Please log in again.'
+        } else if (errorInfo.category === 'server') {
+          errorMessage = 'Server error: Our systems are experiencing issues. Please try again in a few moments.'
+        } else if (errorInfo.category === 'not_found') {
+          errorMessage = 'Payment service not found. Please contact support.'
+        } else if (errorInfo.message) {
+          errorMessage = `Failed to fetch payments: ${errorInfo.message}`
+        }
+        
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }

@@ -21,6 +21,7 @@ import {
 import { PaymentLog, PaymentLogStats, PaymentProvider, PaymentStatus, PaymentMethod } from '../types/paymentLogs'
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import { formatDateOnly, formatDateTime } from '../../utils/dateFormatter'
+import { apiService, ErrorCategory } from '../services/apiService'
 
 const PaymentLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -75,9 +76,30 @@ const PaymentLogs: React.FC = () => {
           }
         }
 
-      } catch (err) {
-        setError('Failed to fetch payment data')
-        console.error('Error fetching payment data:', err)
+      } catch (err: any) {
+        console.error('❌ Error fetching payment data:', err)
+        
+        // Extract error information using apiService
+        const errorInfo = apiService.extractErrorInfo(err)
+        
+        let errorMessage = 'Failed to fetch payment data'
+        
+        // Provide specific error messages based on category
+        if (errorInfo.category === 'timeout') {
+          errorMessage = 'Request timed out while fetching payment logs. The server took too long to respond.'
+        } else if (errorInfo.category === 'network') {
+          errorMessage = 'Network error: Unable to reach the server. Please check your internet connection.'
+        } else if (errorInfo.category === 'auth') {
+          errorMessage = 'Authentication error: Your session may have expired. Please log in again.'
+        } else if (errorInfo.category === 'server') {
+          errorMessage = 'Server error: Our systems are experiencing issues. Please try again in a few moments.'
+        } else if (errorInfo.category === 'not_found') {
+          errorMessage = 'Payment logs service not found. Please contact support.'
+        } else if (errorInfo.message) {
+          errorMessage = `Failed to fetch payment logs: ${errorInfo.message}`
+        }
+        
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -201,9 +223,20 @@ const PaymentLogs: React.FC = () => {
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
-          <div className="flex items-center">
-            <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mr-2 flex-shrink-0" />
-            <span className="text-sm sm:text-base text-red-800 break-words">{error}</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <div className="flex items-center">
+              <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 mr-2 flex-shrink-0" />
+              <span className="text-sm sm:text-base text-red-800 break-words">{error}</span>
+            </div>
+            <button
+              onClick={() => {
+                setError(null)
+                setCurrentPage(1) // Reset to first page to trigger refetch
+              }}
+              className="w-full sm:w-auto sm:ml-auto text-sm text-red-600 hover:text-red-800 underline"
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
