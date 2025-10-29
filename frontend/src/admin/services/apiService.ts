@@ -305,13 +305,84 @@ class ApiService {
 
   // Authentication methods
   async login(email: string, password: string, expectedRole?: string): Promise<ApiResponse> {
-    // Use centralized auth service for login
-    const success = await centralizedAuthService.login(email, password);
-    
-    if (success) {
-      return { success: true, message: 'Login successful', timestamp: new Date().toISOString() };
-    } else {
-      return { success: false, message: 'Login failed', timestamp: new Date().toISOString() };
+    try {
+      // Call the API directly to get full response with user data
+      const response = await apiClient.post('/auth/login', { email, password });
+      
+      // Check if login was successful and we have user data
+      if (response.data.success && response.data.data?.user) {
+        const userRole = response.data.data.user.role?.name || response.data.data.user.role;
+        
+        // If expectedRole is provided, validate the user has the correct role
+        if (expectedRole && expectedRole === 'employee') {
+          // Check if user has an employee role (admin, manager, designer, support, moderator)
+          const employeeRoles = ['admin', 'manager', 'designer', 'support', 'moderator'];
+          if (!employeeRoles.includes(userRole)) {
+            // Role validation failed - this is not an employee account
+            return {
+              success: false,
+              message: 'This account does not have employee access. Please use a valid employee account.',
+              timestamp: new Date().toISOString(),
+              errorCategory: 'auth',
+              retryable: false
+            };
+          }
+        }
+        
+        // Role validation passed, now use centralized auth service to complete login
+        // This will handle storing auth data and updating state properly
+        const loginSuccess = await centralizedAuthService.login(email, password);
+        
+        if (loginSuccess) {
+          return {
+            success: true,
+            message: 'Login successful',
+            data: response.data.data,
+            timestamp: new Date().toISOString()
+          };
+        } else {
+          return {
+            success: false,
+            message: 'Failed to establish session',
+            timestamp: new Date().toISOString(),
+            errorCategory: 'auth',
+            retryable: false
+          };
+        }
+      } else {
+        // Login failed - invalid credentials
+        return {
+          success: false,
+          message: response.data.message || 'Invalid email or password',
+          timestamp: new Date().toISOString(),
+          errorCategory: 'auth',
+          retryable: false
+        };
+      }
+    } catch (error: any) {
+      console.error('❌ Login error in apiService:', error);
+      
+      // Extract error information
+      const errorInfo = this.extractErrorInfo(error);
+      
+      // Check if it's a role authorization error
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        return {
+          success: false,
+          message: error?.response?.data?.message || 'Invalid email or password',
+          timestamp: new Date().toISOString(),
+          errorCategory: 'auth',
+          retryable: false
+        };
+      }
+      
+      return {
+        success: false,
+        message: error.message || errorInfo.message || 'Login failed',
+        timestamp: new Date().toISOString(),
+        errorCategory: errorInfo.category,
+        retryable: errorInfo.retryable
+      };
     }
   }
 
