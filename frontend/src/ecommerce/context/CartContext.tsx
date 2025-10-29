@@ -18,6 +18,11 @@ type CartContextType = {
   cleanupInvalidItems: () => void
   clearLocalStorageIfNeeded: () => void
   refreshCart: () => Promise<void>
+  // New error state properties
+  cartLoadError: string | null
+  cartSyncError: string | null
+  reloadCart: () => Promise<void>
+  isSyncing: boolean
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -61,6 +66,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(false)
   const [isCleared, setIsCleared] = useState(false)
   const hasSyncedRef = useRef(false) // Track if we've already synced the cart
+  
+  // Error state management
+  const [cartLoadError, setCartLoadError] = useState<string | null>(null)
+  const [cartSyncError, setCartSyncError] = useState<string | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   /**
    * Load cart from database
@@ -69,6 +79,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       console.log('🛒 Attempting to load cart from database...')
       setIsLoading(true)
+      setCartLoadError(null) // Clear previous errors
+      
       const response = await cartApiService.getCart()
       
       console.log('🛒 Cart API response:', response)
@@ -104,9 +116,32 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         console.log('🛒 Cart API failed:', response.message)
+        // Set error but don't throw - use localStorage as fallback
+        const errorMsg = response.message || 'Failed to load cart from server'
+        setCartLoadError(errorMsg)
+        showWarning(`Cart load issue: ${errorMsg}. Using cached data.`, 'Cart Sync Warning')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('🛒 Error loading cart from database:', error)
+      
+      // Categorize error for user notification
+      let errorMessage = 'Failed to load cart from server. '
+      
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage = 'Authentication issue. Please sign in again to sync your cart.'
+      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout while loading cart. Using cached data.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'No internet connection. Showing cached cart items.'
+      } else if (error?.response?.status >= 500) {
+        errorMessage = 'Server error while loading cart. Using cached data.'
+      } else {
+        errorMessage += 'Using cached cart data.'
+      }
+      
+      setCartLoadError(errorMessage)
+      showWarning(errorMessage, 'Cart Load Error')
+      
       // Fallback to localStorage if database fails
       try {
         const raw = localStorage.getItem(LOCAL_KEY)
@@ -118,14 +153,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
           }))
           setItems(itemsWithReviewStatus)
+          console.log('🛒 Loaded', itemsWithReviewStatus.length, 'items from localStorage fallback')
         }
       } catch (e) {
         console.error('Error loading cart from localStorage:', e)
+        showError('Failed to load cart. Please refresh the page.', 'Cart Error')
       }
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, showError, showWarning])
 
   /**
    * Sync cart with database
@@ -134,7 +171,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isLoggedIn) return
 
     try {
-      setIsLoading(true)
+      setIsSyncing(true)
+      setCartSyncError(null) // Clear previous sync errors
+      
       // Use the current items from state instead of compressed localStorage data
       // This ensures we sync the full customization data including preview images
       const currentItems = items
@@ -179,13 +218,39 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
           console.warn('🛒 Could not save to localStorage:', error)
         }
+        
+        console.log('✅ Cart synced successfully with database')
+      } else {
+        // Sync failed but don't throw - cart is still usable locally
+        const errorMsg = response.message || 'Cart sync failed'
+        setCartSyncError(errorMsg)
+        console.warn('⚠️ Cart sync failed:', errorMsg)
+        showWarning(`Cart sync issue: ${errorMsg}. Your changes are saved locally but may not sync across devices.`, 'Cart Sync Warning')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error syncing cart with database:', error)
+      
+      // Categorize sync error for user notification
+      let errorMessage = 'Failed to sync cart with server. '
+      
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage = 'Authentication expired. Your cart is saved locally. Please sign in again to sync.'
+      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Sync timeout. Your cart is saved locally but may not sync across devices.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'No internet. Your cart is saved locally and will sync when connection is restored.'
+      } else if (error?.response?.status >= 500) {
+        errorMessage = 'Server error. Your cart is saved locally but may not sync until server recovers.'
+      } else {
+        errorMessage += 'Your cart is saved locally but may not sync across devices.'
+      }
+      
+      setCartSyncError(errorMessage)
+      showInfo(errorMessage, 'Cart Sync Status')
     } finally {
-      setIsLoading(false)
+      setIsSyncing(false)
     }
-  }, [isLoggedIn, items]) // Include items dependency to sync full data
+  }, [isLoggedIn, items, showWarning, showInfo]) // Include items dependency to sync full data
 
   // Load cart from database when user logs in
   useEffect(() => {
@@ -261,9 +326,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cartData = JSON.stringify(compressedItems)
       
       // Check if data is too large (localStorage has ~5-10MB limit)
-      if (cartData.length > 4 * 1024 * 1024) { // 4MB limit
+      // Use 3MB as safe limit to account for other localStorage data
+      if (cartData.length > 3 * 1024 * 1024) { // 3MB limit
+        const sizeMB = (cartData.length / 1024 / 1024).toFixed(2)
         console.warn('🛒 Cart data too large for localStorage, skipping save')
-        console.warn('🛒 Cart data size:', (cartData.length / 1024 / 1024).toFixed(2), 'MB')
+        console.warn('🛒 Cart data size:', sizeMB, 'MB')
+        
+        showError(
+          `Your cart has too many custom designs (${sizeMB}MB). To save your cart, please:\n\n` +
+          `1. Complete checkout for current items\n` +
+          `2. Or remove some customized items\n` +
+          `3. Sign in to sync cart to your account\n\n` +
+          `Your cart will be lost if you close this page without signing in.`,
+          'Cart Storage Full'
+        )
         return
       }
       
@@ -273,13 +349,47 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
         console.error('🛒 localStorage quota exceeded, cart data too large')
         console.error('🛒 Cart items:', items.length, 'items')
-        // Optionally clear old data or show warning to user
-        showWarning('Cart data is too large to save locally. Some items may not persist after refresh.', 'Cart Storage Warning')
+        
+        // Provide specific guidance to user
+        showError(
+          `Cart storage full! Your cart has too many items or large custom designs.\n\n` +
+          `To save your cart:\n` +
+          `1. Sign in to sync cart to your account (recommended)\n` +
+          `2. Complete checkout to free up space\n` +
+          `3. Remove some customized items\n\n` +
+          `Without action, your cart may be lost on page refresh.`,
+          'Storage Quota Exceeded'
+        )
+        
+        // Try to at least save essential cart info without large files
+        try {
+          const minimalItems = items.map(item => ({
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            reviewStatus: item.reviewStatus,
+            product: item.product,
+            customization: item.customization ? {
+              ...item.customization,
+              mockup: undefined, // Remove large mockup
+              designs: item.customization.designs?.map((design: any) => ({
+                ...design,
+                preview: undefined, // Remove large preview
+                file: undefined // Remove large file
+              }))
+            } : undefined
+          }))
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(minimalItems))
+          console.log('🛒 Saved minimal cart data without images')
+        } catch (retryError) {
+          console.error('🛒 Failed to save even minimal cart data:', retryError)
+        }
       } else {
         console.error('🛒 Error saving cart to localStorage:', error)
+        showWarning('Failed to save cart locally. Please sign in to sync your cart.', 'Cart Save Error')
       }
     }
-  }, [items])
+  }, [items, showError, showWarning])
 
   // Validate stock for a product, optionally checking a specific variant
   const validateStock = async (
@@ -633,38 +743,76 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
-  const cleanupInvalidItems = () => {
-    console.log('🧹 Cleaning up invalid cart items...')
-    setItems(prevItems => {
-      const validItems = prevItems.filter(item => {
-        // Keep custom embroidery items
-        if (item.productId === 'custom-embroidery') {
-          return true;
-        }
-        
-        // For other items, we need to validate they exist in products
-        const productExists = products.some((p: any) => p.id === item.productId);
-        
-        if (!productExists) {
-          console.warn(`🧹 Removing invalid item with productId: ${item.productId}`);
-        }
-        
-        return productExists;
-      });
+  const cleanupInvalidItems = async () => {
+    console.log('🧹 Checking for invalid cart items...')
+    
+    // First identify invalid items
+    const invalidItems: CartItem[] = []
+    const validItems: CartItem[] = []
+    
+    items.forEach(item => {
+      // Keep custom embroidery items
+      if (item.productId === 'custom-embroidery') {
+        validItems.push(item)
+        return
+      }
       
-      if (validItems.length !== prevItems.length) {
-        console.log(`🧹 Cleaned up ${prevItems.length - validItems.length} invalid items`);
-        // Update localStorage with cleaned items
+      // For other items, validate they exist in products
+      const productExists = products.some((p: any) => p.id === item.productId)
+      
+      if (productExists) {
+        validItems.push(item)
+      } else {
+        console.warn(`🧹 Found invalid item with productId: ${item.productId}`)
+        invalidItems.push(item)
+      }
+    })
+    
+    // If no invalid items, nothing to do
+    if (invalidItems.length === 0) {
+      console.log('✅ No invalid items found in cart')
+      return
+    }
+    
+    // Show confirmation modal before removing items
+    const invalidItemNames = invalidItems.map(item => 
+      item.product?.name || `Product ID: ${item.productId}`
+    ).join('\n• ')
+    
+    const shouldRemove = window.confirm(
+      `Found ${invalidItems.length} invalid item(s) in your cart that are no longer available:\n\n` +
+      `• ${invalidItemNames}\n\n` +
+      `Would you like to remove them from your cart?\n\n` +
+      `Click OK to remove, or Cancel to keep them for now.`
+    )
+    
+    if (shouldRemove) {
+      console.log(`🧹 Removing ${invalidItems.length} invalid items with user confirmation`)
+      setItems(validItems)
+      
+      // Update localStorage with cleaned items
+      try {
+        const compressedItems = compressCartData(validItems)
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
+        console.log('✅ Cart cleaned up successfully')
+      } catch (error) {
+        console.warn('🛒 Could not save to localStorage:', error)
+      }
+      
+      // If logged in, sync with database
+      if (isLoggedIn) {
         try {
-          const compressedItems = compressCartData(validItems)
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems));
+          await syncWithDatabase()
         } catch (error) {
-          console.warn('🛒 Could not save to localStorage:', error)
+          console.error('Failed to sync cleaned cart with database:', error)
         }
       }
       
-      return validItems;
-    });
+      showInfo(`Removed ${invalidItems.length} unavailable item(s) from your cart`, 'Cart Updated')
+    } else {
+      console.log('🧹 User chose to keep invalid items')
+      showInfo('Invalid items kept in cart. They may cause issues at checkout.', 'Cart Cleanup Skipped')
+    }
   }
 
   // Method to refresh cart from database (can be called from components)
@@ -674,6 +822,34 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await loadCartFromDatabase()
     }
   }, [isLoggedIn, user?.id, loadCartFromDatabase])
+
+  // Method to manually reload cart (exposed to components for error recovery)
+  const reloadCart = useCallback(async () => {
+    console.log('🔄 Manual cart reload requested...')
+    setCartLoadError(null)
+    setCartSyncError(null)
+    
+    if (isLoggedIn && user && user.id) {
+      await loadCartFromDatabase()
+    } else {
+      // For guest users, just reload from localStorage
+      try {
+        const raw = localStorage.getItem(LOCAL_KEY)
+        if (raw) {
+          const items = JSON.parse(raw)
+          const itemsWithReviewStatus = items.map((item: any) => ({
+            ...item,
+            reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
+          }))
+          setItems(itemsWithReviewStatus)
+          showInfo('Cart reloaded from local storage', 'Cart Reloaded')
+        }
+      } catch (e) {
+        console.error('Error reloading cart from localStorage:', e)
+        showError('Failed to reload cart. Please refresh the page.', 'Reload Failed')
+      }
+    }
+  }, [isLoggedIn, user?.id, loadCartFromDatabase, showInfo, showError])
 
   return <CartContext.Provider value={{ 
     items, 
@@ -686,7 +862,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncWithDatabase,
     cleanupInvalidItems,
     clearLocalStorageIfNeeded,
-    refreshCart
+    refreshCart,
+    cartLoadError,
+    cartSyncError,
+    reloadCart,
+    isSyncing
   }}>{children}</CartContext.Provider>
 }
 
