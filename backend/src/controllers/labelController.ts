@@ -103,6 +103,21 @@ export class LabelController {
       })
     } catch (error: any) {
       console.error('❌ Label creation error:', error)
+      
+      // Check if error is due to insufficient balance
+      if (error.message?.includes('INSUFFICIENT_BALANCE')) {
+        const message = error.message.replace('INSUFFICIENT_BALANCE: ', '')
+        res.status(402).json({
+          success: false,
+          error: 'Insufficient Balance',
+          message: message,
+          code: 'INSUFFICIENT_BALANCE',
+          details: 'Please add funds to your ShipEngine account to continue creating labels.'
+        })
+        return
+      }
+      
+      // Generic error response for other errors
       res.status(500).json({
         success: false,
         error: 'Failed to create shipping label',

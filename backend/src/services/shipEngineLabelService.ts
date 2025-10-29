@@ -115,6 +115,18 @@ export class ShipEngineLabelService {
       }
     } catch (error: any) {
       console.error('❌ ShipEngine Label Creation Error:', error.response?.data || error.message)
+      
+      // Check if error is due to insufficient balance
+      const errorMessage = error.response?.data?.message || error.message || ''
+      const errorDetails = JSON.stringify(error.response?.data || {})
+      
+      if (errorMessage.toLowerCase().includes('insufficient') || 
+          errorMessage.toLowerCase().includes('balance') ||
+          errorDetails.toLowerCase().includes('insufficient') ||
+          errorDetails.toLowerCase().includes('balance')) {
+        throw new Error('INSUFFICIENT_BALANCE: Your ShipEngine account has insufficient balance to create this label. Please add funds to your account.')
+      }
+      
       throw new Error(`Failed to create shipping label: ${error.response?.data?.message || error.message}`)
     }
   }
@@ -344,6 +356,18 @@ export class ShipEngineLabelService {
       }
     } catch (error: any) {
       console.error('❌ ShipEngine Label Creation Error:', error.response?.data || error.message)
+      
+      // Check if error is due to insufficient balance
+      const errorMessage = error.response?.data?.message || error.message || ''
+      const errorDetails = JSON.stringify(error.response?.data || {})
+      
+      if (errorMessage.toLowerCase().includes('insufficient') || 
+          errorMessage.toLowerCase().includes('balance') ||
+          errorDetails.toLowerCase().includes('insufficient') ||
+          errorDetails.toLowerCase().includes('balance')) {
+        throw new Error('INSUFFICIENT_BALANCE: Your ShipEngine account has insufficient balance to create this label. Please add funds to your account.')
+      }
+      
       throw new Error(`Failed to create shipping label: ${error.response?.data?.message || error.message}`)
     }
   }
