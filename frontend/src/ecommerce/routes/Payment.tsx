@@ -91,13 +91,28 @@ export default function Payment() {
         if (data.success && data.data) {
           setBackendProducts(data.data)
           console.log('📦 Loaded backend products:', data.data.length)
+        } else {
+          console.warn('⚠️ Failed to load backend products, using cached data')
+          // Show warning if products fail to load
+          showError(
+            'Unable to load the latest product information. Prices may not be current. Please refresh the page.',
+            'Product Data Warning'
+          )
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading backend products:', error)
+        // Notify user about pricing data issue
+        const errorMessage = error?.message?.includes('timeout') || error?.code === 'ECONNABORTED'
+          ? 'Connection timeout while loading product data. Prices may not be current.'
+          : !navigator.onLine
+            ? 'No internet connection. Product prices may not be up to date.'
+            : 'Unable to load latest product information. Please refresh the page if prices appear incorrect.'
+        
+        showError(errorMessage, 'Product Data Error')
       }
     }
     loadBackendProducts()
-  }, [])
+  }, [showError])
 
   // Helper function to get pricing breakdown (matches MyOrders implementation)
   const getPricingBreakdown = (item: any): {
@@ -288,15 +303,26 @@ export default function Payment() {
             console.log('📍 Normalized shipping address:', shippingAddr)
             console.log('📍 Address field value:', shippingAddr.address)
             
-            // Validate critical address fields
-            if (!shippingAddr.address || !shippingAddr.city || !shippingAddr.state || !shippingAddr.zipCode) {
+            // Validate critical address fields and provide specific feedback
+            const missingFields: string[] = []
+            if (!shippingAddr.address) missingFields.push('Street Address')
+            if (!shippingAddr.city) missingFields.push('City')
+            if (!shippingAddr.state) missingFields.push('State')
+            if (!shippingAddr.zipCode) missingFields.push('ZIP Code')
+            
+            if (missingFields.length > 0) {
               console.error('⚠️ Incomplete shipping address detected:', {
                 hasAddress: !!shippingAddr.address,
                 hasCity: !!shippingAddr.city,
                 hasState: !!shippingAddr.state,
-                hasZipCode: !!shippingAddr.zipCode
+                hasZipCode: !!shippingAddr.zipCode,
+                missingFields
               })
-              showError('Shipping address is incomplete. Please contact support.')
+              
+              const fieldList = missingFields.join(', ')
+              const errorMessage = `Your shipping address is missing: ${fieldList}. Please update your order in "My Orders" or contact support for assistance.`
+              
+              showError(errorMessage, 'Incomplete Shipping Address')
               navigate('/my-orders')
               return
             }
@@ -729,8 +755,28 @@ export default function Payment() {
         }, 1500)
       } else {
         console.error('❌ PayPal capture failed:', response.message)
-        showError(response.message || 'Failed to capture PayPal payment')
-        // Don't navigate away on error - let user retry
+        
+        // Provide specific guidance based on error type
+        let errorTitle = 'PayPal Payment Failed'
+        let errorMessage = response.message || 'Failed to capture PayPal payment'
+        
+        // Check if it's a duplicate capture attempt
+        if (response.message?.includes('already') || response.message?.includes('duplicate')) {
+          errorTitle = 'Payment Already Processed'
+          errorMessage = 'This payment has already been processed. Please check "My Orders" to confirm.'
+        }
+        // Check if PayPal declined
+        else if (response.message?.includes('declined') || response.message?.includes('insufficient')) {
+          errorTitle = 'Payment Declined'
+          errorMessage = 'PayPal declined this payment. Please check your PayPal account or try a different payment method.'
+        }
+        // Generic retry message
+        else {
+          errorMessage = `${errorMessage} You can try again or choose a different payment method.`
+        }
+        
+        showError(errorMessage, errorTitle)
+        // Don't navigate away - allow user to retry or choose different method
       }
     } catch (error: any) {
       console.error('❌ PayPal capture error:', error)
@@ -738,8 +784,35 @@ export default function Payment() {
         message: error.message,
         response: error.response?.data
       })
-      showError('Failed to complete PayPal payment. Please contact support.')
-      // Don't navigate away on error - let user retry
+      
+      // Categorize error for user guidance
+      let errorTitle = 'PayPal Payment Error'
+      let errorMessage = 'Failed to complete PayPal payment.'
+      
+      if (error?.response?.status === 400) {
+        errorTitle = 'Invalid Payment Data'
+        errorMessage = 'The payment information is invalid. Please try again or contact support.'
+      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorTitle = 'Authentication Error'
+        errorMessage = 'Payment session expired. Please return to checkout and try again.'
+      } else if (error?.response?.status === 409) {
+        errorTitle = 'Payment Already Processed'
+        errorMessage = 'This payment may have already been processed. Please check "My Orders" before retrying.'
+      } else if (error?.response?.status >= 500) {
+        errorTitle = 'Server Error'
+        errorMessage = 'Our server encountered an error. Your payment may not have been processed. Please check your PayPal account before retrying.'
+      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorTitle = 'Connection Timeout'
+        errorMessage = 'Payment verification timed out. Please check your PayPal account to confirm if payment was processed before retrying.'
+      } else if (!navigator.onLine) {
+        errorTitle = 'No Internet Connection'
+        errorMessage = 'Lost connection during payment. Please check your internet and verify payment status in your PayPal account.'
+      } else {
+        errorMessage += ' Please contact support if the issue persists.'
+      }
+      
+      showError(errorMessage, errorTitle)
+      // Don't navigate away - let user check PayPal and retry if needed
     } finally {
       setIsProcessing(false)
     }

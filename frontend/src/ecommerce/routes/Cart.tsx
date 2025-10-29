@@ -22,14 +22,56 @@ export default function Cart() {
   
   // Import useAuth to check login status
   const { isLoggedIn, user } = useAuth()
+  
+  // State for cart refresh error handling
+  const [cartRefreshError, setCartRefreshError] = useState<string | null>(null)
+  const [isRefreshingCart, setIsRefreshingCart] = useState(false)
 
   // Refresh cart from database when cart page is visited
   useEffect(() => {
-    console.log('🛒 Cart page loaded, refreshing cart from database...')
-    refreshCart()
-    // Force component re-render to pick up latest cart state
-    setKey(prev => prev + 1)
+    const loadCart = async () => {
+      try {
+        console.log('🛒 Cart page loaded, refreshing cart from database...')
+        setIsRefreshingCart(true)
+        setCartRefreshError(null)
+        await refreshCart()
+        // Force component re-render to pick up latest cart state
+        setKey(prev => prev + 1)
+      } catch (error: any) {
+        console.error('🛒 Failed to refresh cart:', error)
+        const errorMessage = error?.response?.status === 401 
+          ? 'Please sign in to view your cart'
+          : error?.message?.includes('timeout') || error?.code === 'ECONNABORTED'
+            ? 'Connection timeout. Please check your internet and try again.'
+            : error?.response?.status >= 500
+              ? 'Our server is having issues. Please try again in a moment.'
+              : 'Failed to load your cart. Your items are safe, please try refreshing.'
+        setCartRefreshError(errorMessage)
+      } finally {
+        setIsRefreshingCart(false)
+      }
+    }
+    
+    loadCart()
   }, [location.pathname, refreshCart])
+  
+  // Function to manually retry cart refresh
+  const handleRetryRefresh = async () => {
+    try {
+      setIsRefreshingCart(true)
+      setCartRefreshError(null)
+      await refreshCart()
+      setKey(prev => prev + 1)
+    } catch (error: any) {
+      console.error('🛒 Retry failed:', error)
+      const errorMessage = error?.response?.status === 401 
+        ? 'Please sign in to view your cart'
+        : 'Still unable to load cart. Please try again or contact support.'
+      setCartRefreshError(errorMessage)
+    } finally {
+      setIsRefreshingCart(false)
+    }
+  }
   
   // Debug logging
   console.log('🛒 Cart component - Raw items:', items)
@@ -124,6 +166,11 @@ export default function Cart() {
                   itemPrice += materialCosts.totalCost;
                 } catch (error) {
                   console.warn('Failed to calculate material costs for design:', design.name, error);
+                  // Show user-facing warning about pricing calculation
+                  showWarning(
+                    `Unable to calculate exact price for design "${design.name}". The displayed price may not include all customization costs. Please review at checkout.`,
+                    'Pricing Calculation Warning'
+                  );
                 }
               }
               
@@ -474,12 +521,48 @@ export default function Cart() {
         // Clear localStorage as well to prevent reloading
         localStorage.removeItem('mayhem_cart_v1')
       } else {
-        showError('Failed to submit for review. Please try again.', 'Submission Failed')
+        // Detailed error message based on response
+        const errorTitle = 'Order Submission Failed'
+        let errorMessage = 'Failed to submit for review. Please try again.'
+        
+        // Check for specific validation errors
+        if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
+          errorMessage = `Validation Error: ${response.errors.join(', ')}`
+        } else if (response.message) {
+          errorMessage = response.message
+        }
+        
+        showError(errorMessage, errorTitle)
       }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting for review:', error)
-      showError('Failed to submit for review. Please try again.', 'Error')
+      
+      // Categorize error and provide specific guidance
+      let errorTitle = 'Order Submission Error'
+      let errorMessage = 'Failed to submit for review. Please try again.'
+      
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorTitle = 'Authentication Required'
+        errorMessage = 'Please sign in again to submit your order.'
+      } else if (error?.response?.status === 400) {
+        errorTitle = 'Invalid Order Data'
+        errorMessage = error?.response?.data?.message || 'Some items in your cart have invalid data. Please review and try again.'
+      } else if (error?.response?.status === 409) {
+        errorTitle = 'Duplicate Submission'
+        errorMessage = 'This order may have already been submitted. Please check "My Orders".'
+      } else if (error?.response?.status >= 500) {
+        errorTitle = 'Server Error'
+        errorMessage = 'Our server is experiencing issues. Your cart is saved. Please try again in a few moments.'
+      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorTitle = 'Connection Timeout'
+        errorMessage = 'The submission is taking too long. Please check your connection and try again.'
+      } else if (error?.message?.includes('Network Error') || !navigator.onLine) {
+        errorTitle = 'No Internet Connection'
+        errorMessage = 'Please check your internet connection and try again. Your cart is saved.'
+      }
+      
+      showError(errorMessage, errorTitle)
     }
   }
 
@@ -493,6 +576,49 @@ export default function Cart() {
           </Link>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Shopping Cart</h1>
         </div>
+
+        {/* Cart Refresh Error Banner */}
+        {cartRefreshError && (
+          <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-500 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-red-800">Cart Loading Error</h3>
+                  <p className="mt-1 text-sm text-red-700">{cartRefreshError}</p>
+                  <div className="mt-3">
+                    <Button
+                      onClick={handleRetryRefresh}
+                      disabled={isRefreshingCart}
+                      size="sm"
+                      variant="outline"
+                      className="text-sm bg-white hover:bg-red-50 text-red-700 border-red-300"
+                    >
+                      {isRefreshingCart ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700 mr-2"></div>
+                          Retrying...
+                        </>
+                      ) : (
+                        'Retry Loading Cart'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setCartRefreshError(null)}
+                className="ml-3 flex-shrink-0 text-red-400 hover:text-red-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {items.length === 0 ? (
           <div className="text-center py-12 sm:py-16">

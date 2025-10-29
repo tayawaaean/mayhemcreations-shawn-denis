@@ -385,12 +385,28 @@ export default function OrderCheckout() {
         setShippingRates([fallbackRate])
         setSelectedShippingRate(fallbackRate)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching shipping rates:', error)
-      setShippingError('Unable to fetch shipping rates. Using estimated rates.')
+      
+      // Provide specific error message based on error type
+      let errorMessage = 'Unable to fetch shipping rates. '
+      
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage += 'Connection timed out. Please check your internet and click "Retry" below.'
+      } else if (!navigator.onLine) {
+        errorMessage += 'No internet connection. Please connect and click "Retry" below.'
+      } else if (error?.response?.status >= 500) {
+        errorMessage += 'Our server is having issues. Click "Retry" or proceed with estimated rates.'
+      } else if (error?.response?.status === 400) {
+        errorMessage += 'Invalid address. Please check your shipping information above.'
+      } else {
+        errorMessage += 'Click "Retry" below or proceed with estimated $9.99 standard shipping.'
+      }
+      
+      setShippingError(errorMessage)
       // Set default fallback rate
       const fallbackRate = {
-        serviceName: 'Standard Shipping',
+        serviceName: 'Standard Shipping (Estimated)',
         serviceCode: 'standard',
         shipmentCost: 9.99,
         otherCost: 0,
@@ -403,6 +419,12 @@ export default function OrderCheckout() {
     } finally {
       setIsLoadingShipping(false)
     }
+  }
+  
+  // Manual retry function for shipping rates
+  const handleRetryShipping = async () => {
+    setShippingError(null)
+    await fetchShippingRates()
   }
 
   const canProceed = () => {
@@ -683,11 +705,53 @@ export default function OrderCheckout() {
         })
       } else {
         console.error('❌ PayPal capture failed:', response.message)
-        setPaymentError(response.message || 'Failed to capture PayPal payment')
+        
+        // Provide detailed error guidance based on error type
+        let errorMessage = response.message || 'Failed to capture PayPal payment'
+        
+        // Categorize PayPal capture errors
+        if (response.message?.includes('already') || response.message?.includes('duplicate')) {
+          errorMessage = 'This payment has already been processed. Check "My Orders" to confirm your order status.'
+        } else if (response.message?.includes('declined') || response.message?.includes('insufficient')) {
+          errorMessage = 'PayPal declined this payment. Please check your PayPal account balance or try a different payment method.'
+        } else if (response.message?.includes('expired')) {
+          errorMessage = 'Payment session expired. Please start the checkout process again.'
+        } else {
+          errorMessage += '\n\nNext Steps:\n• Check your PayPal account to see if payment was processed\n• Try again with PayPal or use Credit Card\n• Contact support if issue persists'
+        }
+        
+        setPaymentError(errorMessage)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ PayPal capture error:', error)
-      setPaymentError('Failed to complete PayPal payment. Please contact support.')
+      
+      // Provide specific error guidance to help customer recover
+      let errorMessage = 'Failed to complete PayPal payment. '
+      let nextSteps = ''
+      
+      if (error?.response?.status === 400) {
+        errorMessage += 'The payment data is invalid.'
+        nextSteps = '\n\nPlease verify:\n• Your shipping address is correct\n• All required fields are filled\n• Try again or contact support'
+      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage += 'Authentication failed.'
+        nextSteps = '\n\nPlease:\n• Return to checkout and try again\n• Make sure you completed PayPal login\n• Contact support if issue persists'
+      } else if (error?.response?.status === 409) {
+        errorMessage += 'This payment may have already been processed.'
+        nextSteps = '\n\nPlease:\n• Check "My Orders" for this order\n• Verify in your PayPal account\n• Contact support before retrying'
+      } else if (error?.response?.status >= 500) {
+        errorMessage += 'Our server encountered an error.'
+        nextSteps = '\n\nWhat to do:\n• Your payment may not have been processed\n• Check your PayPal account first\n• Wait a moment and try again\n• Contact support if problem continues'
+      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage += 'Connection timed out during payment verification.'
+        nextSteps = '\n\nImportant:\n• Check your PayPal account to confirm payment status\n• Do not retry until you verify payment wasn\'t processed\n• Contact support if you were charged but order not completed'
+      } else if (!navigator.onLine) {
+        errorMessage += 'Lost internet connection.'
+        nextSteps = '\n\nPlease:\n• Reconnect to the internet\n• Check PayPal for payment status\n• Verify payment wasn\'t processed before retrying'
+      } else {
+        nextSteps = '\n\nRecommended actions:\n• Check your PayPal account transaction history\n• Contact support for assistance\n• Have your order ID ready: ' + (order?.id || 'N/A')
+      }
+      
+      setPaymentError(errorMessage + nextSteps)
     } finally {
       setIsProcessing(false)
     }
@@ -1075,10 +1139,29 @@ export default function OrderCheckout() {
                         <p className="text-sm text-gray-600 mt-2">Calculating shipping rates...</p>
                       </div>
                     ) : shippingError ? (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start">
-                        <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm text-yellow-800">{shippingError}</p>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-medium text-yellow-900 mb-1">Shipping Rates Error</h4>
+                            <p className="text-sm text-yellow-800 mb-3">{shippingError}</p>
+                            <Button
+                              onClick={handleRetryShipping}
+                              disabled={isLoadingShipping}
+                              size="sm"
+                              variant="outline"
+                              className="text-sm bg-white hover:bg-yellow-50 text-yellow-700 border-yellow-300"
+                            >
+                              {isLoadingShipping ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-700 mr-2"></div>
+                                  Retrying...
+                                </>
+                              ) : (
+                                'Retry Fetching Rates'
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : shippingRates.length > 0 ? (
