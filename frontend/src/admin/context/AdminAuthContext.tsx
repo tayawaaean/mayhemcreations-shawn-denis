@@ -296,7 +296,8 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       }
       
       setError(errorMessage);
-      throw error;
+      // Return false instead of throwing to prevent unexpected navigation
+      return false;
     } finally {
       setIsLoading(false);
     }

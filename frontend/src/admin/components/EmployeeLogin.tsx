@@ -160,13 +160,23 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
         // Log successful login attempt
         const logRole = employeeUser.role === 'admin' ? 'admin' : 'seller'
         loggingService.logLoginAttempt(formData.email, true, logRole)
-        onLogin(employeeUser)
         
-        // Navigate based on role
-        if (employeeUser.role === 'admin') {
-          navigate('/admin')
-        } else {
-          navigate('/seller')
+        // Call onLogin and handle any errors from AdminAuthContext
+        try {
+          await onLogin(employeeUser)
+          
+          // Navigate based on role only if onLogin succeeds
+          if (employeeUser.role === 'admin') {
+            navigate('/admin')
+          } else {
+            navigate('/seller')
+          }
+        } catch (loginError: any) {
+          console.error('❌ onLogin failed:', loginError)
+          // Error is already set in AdminAuthContext, just log it here
+          loggingService.logFailedLoginAttempt(formData.email, loginError?.message || 'Login callback failed')
+          setError(loginError?.message || 'Login failed. Please try again.')
+          // Don't navigate on error - stay on login page
         }
       } else {
         // Log failed login attempt
