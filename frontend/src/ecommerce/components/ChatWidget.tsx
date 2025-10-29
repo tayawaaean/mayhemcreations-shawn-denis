@@ -29,6 +29,10 @@ export default function ChatWidget() {
   const [isMinimized, setIsMinimized] = useState(false)
   const [emailInput, setEmailInput] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [fileUploadError, setFileUploadError] = useState<string | null>(null)
+  const [messageSendError, setMessageSendError] = useState<string | null>(null)
+  const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
@@ -76,11 +80,73 @@ export default function ChatWidget() {
     }, 100)
   }
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (inputText.trim()) {
-      sendMessage(inputText.trim())
-      setInputText('')
+    if (!inputText.trim()) return
+    
+    const messageToSend = inputText.trim()
+    setInputText('') // Clear input immediately for better UX
+    setMessageSendError(null)
+    setIsSendingMessage(true)
+    
+    try {
+      await sendMessage(messageToSend)
+      setLastFailedMessage(null) // Clear any previous failed message
+    } catch (error: any) {
+      console.error('Failed to send message:', error)
+      
+      // Categorize send errors
+      let errorMessage = 'Failed to send message. '
+      
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Message send timeout. Please check your internet connection and try again.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'No internet connection. Please check your connection and try again.'
+      } else if (error?.response?.status === 429) {
+        errorMessage = 'Too many messages. Please wait a moment before sending again.'
+      } else if (error?.response?.status >= 500) {
+        errorMessage = 'Server error. Your message could not be sent. Please try again.'
+      } else if (error?.response?.status === 401) {
+        errorMessage = 'Session expired. Please refresh the page and try again.'
+      } else {
+        errorMessage += 'Please try again or contact support if this continues.'
+      }
+      
+      setMessageSendError(errorMessage)
+      setLastFailedMessage(messageToSend) // Save for retry
+      setInputText(messageToSend) // Restore message to input for easy retry
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }
+  
+  const handleRetryMessage = async () => {
+    if (!lastFailedMessage) return
+    
+    setMessageSendError(null)
+    setIsSendingMessage(true)
+    
+    try {
+      await sendMessage(lastFailedMessage)
+      setLastFailedMessage(null)
+      setInputText('') // Clear input on successful retry
+      console.log('✅ Message sent successfully on retry')
+    } catch (error: any) {
+      console.error('❌ Message retry failed:', error)
+      
+      let errorMessage = 'Retry failed. '
+      
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. Please check your internet and try again.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'Still no internet connection. Please connect and try again.'
+      } else {
+        errorMessage += 'Please try again or contact support.'
+      }
+      
+      setMessageSendError(errorMessage)
+    } finally {
+      setIsSendingMessage(false)
     }
   }
 
@@ -91,14 +157,107 @@ export default function ChatWidget() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    
+    setFileUploadError(null)
+    
+    // Validate file before processing
+    const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain']
+    
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      setFileUploadError(`File is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum size is 5MB. Please choose a smaller file.`)
+      e.target.value = ''
+      return
+    }
+    
+    // Check file type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setFileUploadError(`File type "${file.type || 'unknown'}" is not supported. Allowed types: Images (JPEG, PNG, GIF, WebP), PDF, and Text files.`)
+      e.target.value = ''
+      return
+    }
+    
     try {
       const reader = new FileReader()
-      reader.onload = () => {
-        const event = new CustomEvent('ecom_send_attachment', { detail: { file, dataUrl: String(reader.result) } })
-        window.dispatchEvent(event)
+      
+      // Add error handler for FileReader
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error)
+        
+        let errorMessage = 'Failed to read file. '
+        
+        // Categorize FileReader errors
+        if (reader.error) {
+          switch (reader.error.name) {
+            case 'NotFoundError':
+              errorMessage = 'File not found. It may have been moved or deleted.'
+              break
+            case 'SecurityError':
+              errorMessage = 'Security error reading file. Please try a different file.'
+              break
+            case 'NotReadableError':
+              errorMessage = 'File is not readable. It may be corrupted or in use by another program.'
+              break
+            case 'EncodingError':
+              errorMessage = 'File encoding error. The file may be corrupted.'
+              break
+            default:
+              errorMessage += 'Please try again or choose a different file.'
+          }
+        } else {
+          errorMessage += 'Please try again or choose a different file.'
+        }
+        
+        setFileUploadError(errorMessage)
       }
+      
+      // Add abort handler
+      reader.onabort = () => {
+        console.warn('File read was aborted')
+        setFileUploadError('File upload was cancelled. Please try again.')
+      }
+      
+      reader.onload = () => {
+        try {
+          // Validate result before dispatching
+          if (!reader.result) {
+            setFileUploadError('Failed to process file. Please try again.')
+            return
+          }
+          
+          const dataUrl = String(reader.result)
+          
+          // Additional validation for data URL
+          if (!dataUrl.startsWith('data:')) {
+            setFileUploadError('File processing error. Please try again.')
+            return
+          }
+          
+          // Dispatch the event with file data
+          const event = new CustomEvent('ecom_send_attachment', { 
+            detail: { 
+              file, 
+              dataUrl 
+            } 
+          })
+          window.dispatchEvent(event)
+          
+          console.log('✅ File uploaded successfully:', file.name)
+          setFileUploadError(null)
+        } catch (error) {
+          console.error('Error processing file:', error)
+          setFileUploadError('Error processing file. Please try again.')
+        }
+      }
+      
+      // Start reading the file
       reader.readAsDataURL(file)
+    } catch (error: any) {
+      console.error('Unexpected error during file upload:', error)
+      setFileUploadError('Unexpected error uploading file. Please try again or choose a different file.')
     } finally {
+      // Always clear the input value so the same file can be selected again
       e.target.value = ''
     }
   }
@@ -342,15 +501,63 @@ export default function ChatWidget() {
 
             {/* Input */}
             <div className="p-4 border-t border-gray-200">
+              {/* File Upload Error */}
+              {fileUploadError && (
+                <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-red-800 mb-1">File Upload Failed</p>
+                      <p className="text-xs text-red-700">{fileUploadError}</p>
+                    </div>
+                    <button
+                      onClick={() => setFileUploadError(null)}
+                      className="ml-2 text-red-400 hover:text-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Message Send Error */}
+              {messageSendError && (
+                <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-red-800 mb-1">Message Send Failed</p>
+                      <p className="text-xs text-red-700 mb-2">{messageSendError}</p>
+                      {lastFailedMessage && (
+                        <button
+                          onClick={handleRetryMessage}
+                          disabled={isSendingMessage}
+                          className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSendingMessage ? 'Retrying...' : 'Retry Send'}
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setMessageSendError(null)
+                        setLastFailedMessage(null)
+                      }}
+                      className="ml-2 text-red-400 hover:text-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               {/* Status message */}
-              {isConnected && !isAdminOnline && (
+              {!fileUploadError && !messageSendError && isConnected && !isAdminOnline && (
                 <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-xs text-blue-700">
                     💬 Chat is connected! Your messages will be sent via email and we'll respond as soon as possible.
                   </p>
                 </div>
               )}
-              {isConnected && isAdminOnline && (
+              {!fileUploadError && !messageSendError && isConnected && isAdminOnline && (
                 <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-xs text-green-700">
                     ✅ Admin is online! You can chat in real-time.
@@ -392,9 +599,16 @@ export default function ChatWidget() {
                   type="submit"
                   size="sm"
                   className="px-3 py-2"
-                  disabled={!inputText.trim() || (!isLoggedIn && !hasProvidedEmail)}
+                  disabled={!inputText.trim() || (!isLoggedIn && !hasProvidedEmail) || isSendingMessage}
                 >
-                  <Send className="w-4 h-4" />
+                  {isSendingMessage ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
                 </Button>
               </form>
             </div>
