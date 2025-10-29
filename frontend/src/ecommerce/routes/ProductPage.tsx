@@ -7,6 +7,9 @@ import { productApiService, Product } from '../../shared/productApiService'
 import { getAllProductImages } from '../../shared/imageUtils'
 import { productReviewApiService, ProductReview, ReviewStats } from '../../shared/productReviewApiService'
 
+// Placeholder for review images that fail to load
+const REVIEW_IMAGE_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23f9fafb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23d1d5db"%3EImage Unavailable%3C/text%3E%3C/svg%3E'
+
 export default function ProductPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -16,6 +19,8 @@ export default function ProductPage() {
   const [reviews, setReviews] = useState<ProductReview[]>([])
   const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null)
   const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
+  const [isRetryingReviews, setIsRetryingReviews] = useState(false)
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -44,20 +49,81 @@ export default function ProductPage() {
       
       try {
         setReviewsLoading(true)
+        setReviewsError(null)
         const response = await productReviewApiService.getProductReviews(parseInt(id))
         if (response.success && response.data) {
           setReviews(response.data.reviews)
           setReviewStats(response.data.stats)
+        } else {
+          // API returned unsuccessful response
+          setReviewsError(response.message || 'Failed to load reviews')
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching reviews:', err)
+        
+        // Categorize review loading errors
+        let errorMessage = 'Failed to load reviews. '
+        
+        if (err?.message?.includes('timeout') || err?.code === 'ECONNABORTED') {
+          errorMessage = 'Connection timeout while loading reviews. Product reviews may not be available.'
+        } else if (!navigator.onLine) {
+          errorMessage = 'No internet connection. Reviews cannot be loaded.'
+        } else if (err?.response?.status >= 500) {
+          errorMessage = 'Server error while loading reviews. Reviews may not be available right now.'
+        } else if (err?.response?.status === 404) {
+          errorMessage = 'No reviews found for this product.'
+        } else {
+          errorMessage += 'Reviews may not be available right now.'
+        }
+        
+        setReviewsError(errorMessage)
       } finally {
         setReviewsLoading(false)
+        setIsRetryingReviews(false)
       }
     }
 
     fetchReviews()
   }, [id])
+  
+  // Function to retry loading reviews
+  const handleRetryReviews = async () => {
+    if (!id) return
+    
+    setIsRetryingReviews(true)
+    setReviewsLoading(true)
+    setReviewsError(null)
+    
+    try {
+      const response = await productReviewApiService.getProductReviews(parseInt(id))
+      if (response.success && response.data) {
+        setReviews(response.data.reviews)
+        setReviewStats(response.data.stats)
+        console.log('✅ Reviews reloaded successfully')
+      } else {
+        setReviewsError(response.message || 'Failed to load reviews')
+      }
+    } catch (err: any) {
+      console.error('❌ Reviews retry failed:', err)
+      
+      let errorMessage = 'Retry failed. '
+      
+      if (err?.message?.includes('timeout') || err?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. Please check your internet and try again.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'Still no internet connection. Please connect and try again.'
+      } else if (err?.response?.status >= 500) {
+        errorMessage = 'Server is still having issues. Please try again later.'
+      } else {
+        errorMessage += 'Reviews may not be available. You can still purchase this product.'
+      }
+      
+      setReviewsError(errorMessage)
+    } finally {
+      setReviewsLoading(false)
+      setIsRetryingReviews(false)
+    }
+  }
 
   const renderStars = (rating: number) => {
     return (
@@ -310,11 +376,57 @@ export default function ProductPage() {
         <div id="reviews-section" className="mt-8 sm:mt-12 pt-8 sm:pt-12 border-t border-gray-200">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Customer Reviews</h2>
           
+          {/* Reviews Error Banner */}
+          {reviewsError && !reviewsLoading && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6 mb-6 shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <h3 className="text-sm font-semibold text-yellow-800 mb-1">
+                      Reviews Unavailable
+                    </h3>
+                    <p className="text-sm text-yellow-700">{reviewsError}</p>
+                    <p className="text-sm text-yellow-600 mt-2">
+                      Don't worry - you can still view product details and make a purchase.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex-shrink-0 ml-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetryReviews}
+                    disabled={isRetryingReviews}
+                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-50 disabled:opacity-50"
+                  >
+                    {isRetryingReviews ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-yellow-700" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Retrying...
+                      </>
+                    ) : (
+                      'Retry'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {reviewsLoading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading reviews...</p>
             </div>
-          ) : (
+          ) : !reviewsError ? (
             <>
               {/* Review Stats */}
               {reviewStats && reviewStats.totalReviews > 0 && (
@@ -392,22 +504,51 @@ export default function ProductPage() {
                       {/* Review Images */}
                       {review.images && (() => {
                         try {
-                          const images = JSON.parse(review.images);
+                          let images: string[] = [];
+                          
+                          // Try to parse images if it's a JSON string
+                          if (typeof review.images === 'string') {
+                            try {
+                              images = JSON.parse(review.images);
+                            } catch (parseError) {
+                              console.warn(`Failed to parse images for review ${review.id}:`, parseError);
+                              return null;
+                            }
+                          } else if (Array.isArray(review.images)) {
+                            images = review.images;
+                          }
+                          
+                          // Validate images array and filter out invalid entries
                           if (Array.isArray(images) && images.length > 0) {
+                            const validImages = images.filter((img: any) => 
+                              typeof img === 'string' && img.trim() !== ''
+                            );
+                            
+                            if (validImages.length === 0) {
+                              console.warn(`Review ${review.id} has no valid images`);
+                              return null;
+                            }
+                            
                             return (
                               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                                {images.map((image: string, imgIndex: number) => (
+                                {validImages.map((image: string, imgIndex: number) => (
                                   <img
                                     key={imgIndex}
                                     src={image}
-                                    alt={`Review ${imgIndex + 1}`}
+                                    alt={`Review image ${imgIndex + 1} for ${product?.title || 'product'}`}
                                     className="w-full h-24 sm:h-32 object-contain rounded-lg border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onError={(e) => {
+                                      console.warn(`Failed to load review image ${imgIndex + 1} for review ${review.id}`);
+                                      e.currentTarget.src = REVIEW_IMAGE_PLACEHOLDER;
+                                      e.currentTarget.classList.add('opacity-60');
+                                    }}
                                   />
                                 ))}
                               </div>
                             );
                           }
                         } catch (e) {
+                          console.error(`Error rendering images for review ${review.id}:`, e);
                           return null;
                         }
                         return null;
@@ -424,7 +565,7 @@ export default function ProductPage() {
                 )}
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </main>

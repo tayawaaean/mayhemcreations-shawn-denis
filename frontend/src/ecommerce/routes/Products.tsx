@@ -7,6 +7,9 @@ import { useSearchParams } from 'react-router-dom'
 import { categoryApiService, Category } from '../../shared/categoryApiService'
 import { productApiService, Product } from '../../shared/productApiService'
 
+// Placeholder image for products with missing or invalid images
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18" fill="%239ca3af"%3ENo Image Available%3C/text%3E%3C/svg%3E'
+
 export default function Products() {
   const [searchParams] = useSearchParams()
   const [sortBy, setSortBy] = useState('featured')
@@ -18,6 +21,7 @@ export default function Products() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
   const [categoryDropdownItems, setCategoryDropdownItems] = useState<DropdownItem[]>([])
   const [subcategoryDropdownItems, setSubcategoryDropdownItems] = useState<DropdownItem[]>([])
 
@@ -94,6 +98,7 @@ export default function Products() {
             try {
               parsedImages = JSON.parse(p.images)
             } catch (e) {
+              console.warn(`Failed to parse images for product ${p.id}:`, e)
               parsedImages = []
             }
           }
@@ -108,16 +113,79 @@ export default function Products() {
         setCategories(categoriesResponse.data || [])
         setProducts(productsResponse.data || [])
         setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data || []))
-      } catch (err) {
-        setError('Failed to load data')
+      } catch (err: any) {
         console.error('Error fetching data:', err)
+        
+        // Categorize error for better user guidance
+        let errorMessage = 'Failed to load products. '
+        
+        if (err?.message?.includes('timeout') || err?.code === 'ECONNABORTED') {
+          errorMessage = 'Connection timeout while loading products. Please check your internet connection and try again.'
+        } else if (!navigator.onLine) {
+          errorMessage = 'No internet connection. Please check your connection and try again.'
+        } else if (err?.response?.status >= 500) {
+          errorMessage = 'Our server is having issues. Please try again in a few moments.'
+        } else if (err?.response?.status === 404) {
+          errorMessage = 'Products service not found. Please contact support if this persists.'
+        } else {
+          errorMessage += 'Please try again.'
+        }
+        
+        setError(errorMessage)
       } finally {
         setLoading(false)
+        setIsRetrying(false)
       }
     }
 
     fetchData()
   }, [])
+  
+  // Function to retry loading products
+  const handleRetry = async () => {
+    setIsRetrying(true)
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const [categoriesResponse, productsResponse] = await Promise.all([
+        categoryApiService.getCategories({
+          includeChildren: true,
+          status: 'active',
+          sortBy: 'sortOrder',
+          sortOrder: 'ASC'
+        }),
+        productApiService.getProducts({
+          status: 'active',
+          limit: 50
+        })
+      ])
+      
+      setCategories(categoriesResponse.data || [])
+      setProducts(productsResponse.data || [])
+      setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data || []))
+      console.log('✅ Products reloaded successfully')
+    } catch (err: any) {
+      console.error('❌ Retry failed:', err)
+      
+      let errorMessage = 'Retry failed. '
+      
+      if (err?.message?.includes('timeout') || err?.code === 'ECONNABORTED') {
+        errorMessage = 'Connection timeout. Please check your internet and try again.'
+      } else if (!navigator.onLine) {
+        errorMessage = 'Still no internet connection. Please connect and try again.'
+      } else if (err?.response?.status >= 500) {
+        errorMessage = 'Server is still having issues. Please wait a few minutes and try again.'
+      } else {
+        errorMessage += 'Please refresh the page or contact support if this continues.'
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+      setIsRetrying(false)
+    }
+  }
 
   // Get category and subcategory from URL params
   useEffect(() => {
@@ -158,13 +226,20 @@ export default function Products() {
     // Calculate total stock from variants
     const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
     
+    // Validate and provide fallback for product image
+    let productImage = product.image
+    if (!productImage || productImage.trim() === '') {
+      console.warn(`Product ${product.id} (${product.title}) has no image, using placeholder`)
+      productImage = PLACEHOLDER_IMAGE
+    }
+    
     return {
       id: product.id.toString(),
       title: product.title,
       price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
       description: product.description,
-      image: product.image,
-      alt: product.alt,
+      image: productImage,
+      alt: product.alt || product.title || 'Product image',
       badges: [],
       category: product.category?.slug as 'apparel' | 'accessories' | 'embroidery' || 'apparel',
       subcategory: product.subcategory?.slug,
@@ -272,15 +347,41 @@ export default function Products() {
 
         {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-6 mb-6 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-semibold text-red-800 mb-1">
+                    Error Loading Products
+                  </h3>
+                  <p className="text-sm text-red-700 whitespace-pre-line">{error}</p>
+                </div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
+              <div className="flex-shrink-0 ml-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetry}
+                  disabled={isRetrying}
+                  className="border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {isRetrying ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-700" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Retrying...
+                    </>
+                  ) : (
+                    'Retry'
+                  )}
+                </Button>
               </div>
             </div>
           </div>
@@ -463,7 +564,11 @@ export default function Products() {
                       <img 
                         src={product.image} 
                         alt={product.alt} 
-                        className="w-24 h-24 object-cover rounded-lg shadow-sm" 
+                        className="w-24 h-24 object-cover rounded-lg shadow-sm"
+                        onError={(e) => {
+                          console.warn(`Failed to load image for product ${product.id}, using placeholder`)
+                          e.currentTarget.src = PLACEHOLDER_IMAGE
+                        }}
                       />
                     </div>
                     <div className="flex-1 min-w-0">
