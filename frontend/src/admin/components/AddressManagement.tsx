@@ -51,20 +51,9 @@ const AddressManagement: React.FC<AddressManagementProps> = ({ onAddressChange }
   const fetchAddresses = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/v1/admin/addresses', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch addresses');
-      }
-
-      const data = await response.json();
-      setAddresses(data.data);
+      const { apiClient } = await import('../../shared/axiosConfig')
+      const { data } = await apiClient.get('/admin/addresses')
+      setAddresses(data.data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch addresses');
     } finally {
@@ -76,25 +65,13 @@ const AddressManagement: React.FC<AddressManagementProps> = ({ onAddressChange }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
+      const { apiClient } = await import('../../shared/axiosConfig')
       const url = editingAddress 
-        ? `/api/v1/admin/addresses/${editingAddress.id}`
-        : '/api/v1/admin/addresses';
+        ? `/admin/addresses/${editingAddress.id}`
+        : '/admin/addresses';
       
       const method = editingAddress ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save address');
-      }
+      await apiClient.request({ url, method, data: formData })
 
       await fetchAddresses();
       resetForm();
@@ -111,18 +88,8 @@ const AddressManagement: React.FC<AddressManagementProps> = ({ onAddressChange }
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/v1/admin/addresses/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete address');
-      }
+      const { apiClient } = await import('../../shared/axiosConfig')
+      await apiClient.delete(`/admin/addresses/${id}`)
 
       await fetchAddresses();
     } catch (err) {
@@ -133,18 +100,8 @@ const AddressManagement: React.FC<AddressManagementProps> = ({ onAddressChange }
   // Set default address
   const handleSetDefault = async (id: number) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/v1/admin/addresses/${id}/set-default`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to set default address');
-      }
+      const { apiClient } = await import('../../shared/axiosConfig')
+      await apiClient.put(`/admin/addresses/${id}/set-default`)
 
       await fetchAddresses();
     } catch (err) {

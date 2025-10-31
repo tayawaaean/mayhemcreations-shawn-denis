@@ -5,6 +5,7 @@ import { Request, Response } from 'express'
 import { QueryTypes } from 'sequelize'
 import { shipEngineLabelService } from '../services/shipEngineLabelService'
 import { sequelize } from '../config/database'
+import { logger } from '../utils/logger'
 
 export class LabelController {
   /**
@@ -18,8 +19,10 @@ export class LabelController {
    * }
    */
   async createLabel(req: Request, res: Response): Promise<void> {
+    let requestOrderId: number | undefined
     try {
       const { orderId, rateId } = req.body
+      requestOrderId = orderId
 
       // Validate required fields
       if (!orderId) {
@@ -30,7 +33,7 @@ export class LabelController {
         return
       }
 
-      console.log(`📦 Creating label for order ${orderId}${rateId ? ` with rate ${rateId}` : ''}`)
+      logger.info(`Creating label for order ${orderId}${rateId ? ` with rate ${rateId}` : ''}`, { orderId, rateId })
 
       // Check if order exists and get current label status
       const [orderCheck] = await sequelize.query(
@@ -52,36 +55,38 @@ export class LabelController {
       const order = orderCheck
 
       // Check if label already exists and log current status
-      console.log(`🔍 Current label status for order ${orderId}:`, {
-        trackingNumber: order.tracking_number || 'None',
+      logger.debug('Current label status for order', {
+        orderId,
+        trackingNumber: order.tracking_number || null,
         hasLabelUrl: !!order.shipping_label_url,
-        labelUrlLength: order.shipping_label_url?.length || 0,
-        carrierCode: order.carrier_code || 'None',
-        serviceCode: order.service_code || 'None',
+        carrierCode: order.carrier_code || null,
+        serviceCode: order.service_code || null,
         status: order.status
       })
 
       if (order.tracking_number) {
-        console.log(`⚠️ Label already exists for order ${orderId}: ${order.tracking_number}`)
-        console.log(`🔄 Proceeding to create new label and update database...`)
+        logger.info(`Label already exists for order ${orderId}, creating new label`, {
+          orderId,
+          existingTrackingNumber: order.tracking_number
+        })
       }
 
       let labelData
 
       // If we have a rate ID from checkout, use it (faster)
       if (rateId) {
-        console.log(`⚡ Using existing rate ${rateId} for faster label creation`)
+        logger.debug(`Using existing rate for faster label creation`, { rateId, orderId })
         labelData = await shipEngineLabelService.createLabelFromRate(rateId, orderId)
       } else {
         // Otherwise, create label from scratch
-        console.log(`🔨 Creating label from shipment details`)
+        logger.debug('Creating label from shipment details', { orderId })
         labelData = await shipEngineLabelService.createLabelFromShipment(orderId)
       }
 
       // Save label info to database
       await shipEngineLabelService.saveLabelToOrder(orderId, labelData)
 
-      console.log(`✅ Label created and saved for order ${orderId}`)
+      logger.info(`Label created and saved for order ${orderId}`, { orderId })
 
       // Return success response
       const wasUpdate = !!order.tracking_number
@@ -102,7 +107,7 @@ export class LabelController {
         }
       })
     } catch (error: any) {
-      console.error('❌ Label creation error:', error)
+      logger.error('Label creation error', { orderId: requestOrderId, error: error.message, stack: error.stack })
       
       // Check if error is due to insufficient balance
       if (error.message?.includes('INSUFFICIENT_BALANCE')) {
@@ -131,8 +136,10 @@ export class LabelController {
    * GET /api/v1/labels/order/:orderId
    */
   async getLabelByOrderId(req: Request, res: Response): Promise<void> {
+    let paramOrderId: string | undefined
     try {
       const { orderId } = req.params
+      paramOrderId = orderId
 
       // Validate order ID
       if (!orderId || isNaN(Number(orderId))) {
@@ -201,7 +208,7 @@ export class LabelController {
         }
       })
     } catch (error: any) {
-      console.error('❌ Get label error:', error)
+      logger.error('Get label error', { orderId: paramOrderId, error: error.message })
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve label information',
@@ -257,7 +264,7 @@ export class LabelController {
         }
       })
     } catch (error: any) {
-      console.error('❌ Get all labels error:', error)
+      logger.error('Get all labels error', { error: error.message })
       res.status(500).json({
         success: false,
         error: 'Failed to retrieve labels',
@@ -271,8 +278,10 @@ export class LabelController {
    * GET /api/v1/labels/check/:orderId
    */
   async checkExistingLabel(req: Request, res: Response): Promise<void> {
+    let paramOrderId2: string | undefined
     try {
       const orderId = req.params.orderId
+      paramOrderId2 = orderId
 
       if (!orderId) {
         res.status(400).json({ 
@@ -282,7 +291,7 @@ export class LabelController {
         return
       }
 
-      console.log(`🔍 Checking existing label for order ${orderId}`)
+      logger.debug(`Checking existing label for order ${orderId}`, { orderId })
 
       // Check if order exists and get label status
       const [order] = await sequelize.query(
@@ -321,7 +330,7 @@ export class LabelController {
         }
       })
     } catch (error: any) {
-      console.error('❌ Check existing label error:', error)
+      logger.error('Check existing label error', { orderId: paramOrderId2, error: error.message })
       res.status(500).json({
         success: false,
         error: 'Failed to check existing label',

@@ -40,9 +40,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   // Lifecycle method called after error is caught
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error to console for debugging
-    console.error('🚨 ErrorBoundary caught an error:', error, errorInfo);
-
     // Update state with error details
     this.setState(prevState => ({
       error,
@@ -55,25 +52,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       this.props.onError(error, errorInfo);
     }
 
-    // Log to error tracking service if available
-    try {
-      // Send to logging service
-      const errorData = {
-        message: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        url: window.location.href
-      };
-      
-      console.log('📊 Error logged:', errorData);
-      
-      // You can integrate with error tracking services like Sentry here
-      // window.Sentry?.captureException(error, { contexts: { react: errorInfo } });
-    } catch (loggingError) {
-      console.error('Failed to log error:', loggingError);
-    }
+    // Silent error handling - no logging in production
   }
 
   // Handle retry action
@@ -95,15 +74,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     window.location.href = '/admin';
   };
 
-  // Copy error details to clipboard
+  // Copy error details to clipboard (dev only)
   handleCopyError = (): void => {
+    if (process.env.NODE_ENV !== 'development') return;
+    
     const { error, errorInfo } = this.state;
     const errorText = `Error: ${error?.message}\n\nStack: ${error?.stack}\n\nComponent Stack: ${errorInfo?.componentStack}`;
     
     navigator.clipboard.writeText(errorText).then(() => {
       alert('Error details copied to clipboard');
-    }).catch((err) => {
-      console.error('Failed to copy error details:', err);
+    }).catch(() => {
+      // Silent failure
     });
   };
 
@@ -147,46 +128,48 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </div>
             )}
 
-            {/* Error details (collapsible) */}
-            <details className="mb-6 bg-gray-50 rounded-md">
-              <summary className="cursor-pointer p-4 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">
-                <Bug className="inline w-4 h-4 mr-2" />
-                Technical Details (for developers)
-              </summary>
-              <div className="p-4 space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Error Message:</h3>
-                  <pre className="text-xs bg-red-50 text-red-900 p-3 rounded overflow-x-auto">
-                    {error?.message || 'Unknown error'}
-                  </pre>
+            {/* Error details (only in development) */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mb-6 bg-gray-50 rounded-md">
+                <summary className="cursor-pointer p-4 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md">
+                  <Bug className="inline w-4 h-4 mr-2" />
+                  Technical Details (development only)
+                </summary>
+                <div className="p-4 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Error Message:</h3>
+                    <pre className="text-xs bg-red-50 text-red-900 p-3 rounded overflow-x-auto">
+                      {error?.message || 'Unknown error'}
+                    </pre>
+                  </div>
+                  
+                  {error?.stack && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">Stack Trace:</h3>
+                      <pre className="text-xs bg-gray-100 text-gray-800 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                        {error.stack}
+                      </pre>
+                    </div>
+                  )}
+
+                  {errorInfo?.componentStack && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 mb-2">Component Stack:</h3>
+                      <pre className="text-xs bg-gray-100 text-gray-800 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
+                        {errorInfo.componentStack}
+                      </pre>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={this.handleCopyError}
+                    className="text-sm text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Copy Error Details
+                  </button>
                 </div>
-                
-                {error?.stack && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Stack Trace:</h3>
-                    <pre className="text-xs bg-gray-100 text-gray-800 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
-                      {error.stack}
-                    </pre>
-                  </div>
-                )}
-
-                {errorInfo?.componentStack && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Component Stack:</h3>
-                    <pre className="text-xs bg-gray-100 text-gray-800 p-3 rounded overflow-x-auto max-h-40 overflow-y-auto">
-                      {errorInfo.componentStack}
-                    </pre>
-                  </div>
-                )}
-
-                <button
-                  onClick={this.handleCopyError}
-                  className="text-sm text-blue-600 hover:text-blue-700 underline"
-                >
-                  Copy Error Details
-                </button>
-              </div>
-            </details>
+              </details>
+            )}
 
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -224,7 +207,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             {/* Help text */}
             <div className="mt-6 text-center text-sm text-gray-500">
               <p>
-                If this problem persists, please contact IT support with the error details above.
+                If this problem persists, please contact support for assistance.
               </p>
             </div>
           </div>

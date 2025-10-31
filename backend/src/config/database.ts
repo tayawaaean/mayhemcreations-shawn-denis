@@ -20,12 +20,12 @@ const sequelize = new Sequelize({
     underscored: true, // Use snake_case for column names
     freezeTableName: true, // Don't pluralize table names
     indexes: [], // Disable automatic index creation to prevent duplicate key errors
-    hooks: {
+    hooks: process.env.NODE_ENV === 'development' ? {
       beforeSync: () => {
         console.log('🔧 Database sync enabled for email column addition');
         return Promise.resolve();
       }
-    }
+    } : {}
   },
   dialectOptions: {
     charset: 'utf8mb4',
@@ -50,13 +50,12 @@ const syncDatabase = async (force: boolean = false): Promise<void> => {
     // Import models to ensure they're registered
     await import('../models');
     
-    // Sync database with alter to avoid recreating indexes
-    await sequelize.sync({ 
-      force: false, // Never force recreate
-      alter: true,  // Use alter to modify existing tables
-      logging: console.log // Enable logging to see what's happening
-    });
-    console.log('✅ Database synchronized successfully.');
+    // Avoid alter sync in production; use migrations instead
+    const isDev = process.env.NODE_ENV === 'development';
+    if (isDev) {
+      await sequelize.sync({ force: false, alter: true });
+      console.log('✅ Database synchronized successfully.');
+    }
   } catch (error) {
     console.error('❌ Error synchronizing database:', error);
     throw error;

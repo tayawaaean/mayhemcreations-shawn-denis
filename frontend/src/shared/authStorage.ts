@@ -234,14 +234,8 @@ class AuthStorageService {
       }
 
       // Call backend logout endpoint to revoke session (session-based auth uses cookies)
-      const apiBaseUrl = this.getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for session-based auth
-      });
+      const { apiClient } = await import('./axiosConfig');
+      const response = await apiClient.post('/auth/logout', {}, { withCredentials: true });
 
       // Clear local storage regardless of backend response
       this.clearAuthData();

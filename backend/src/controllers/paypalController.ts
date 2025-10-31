@@ -75,10 +75,10 @@ export const createPayPalOrderHandler = async (
       cancelUrl,
     };
 
-    console.log('🔍 PayPal Controller - orderData:', orderData);
+    logger.debug('PayPal Controller - orderData:', { orderData });
 
     const validation = validatePayPalOrderData(orderData);
-    console.log('🔍 PayPal Controller - validation result:', validation);
+    logger.debug('PayPal Controller - validation result:', { validation });
     
     if (!validation.isValid) {
       res.status(400).json({
@@ -410,7 +410,7 @@ export const capturePayPalOrderHandler = async (
             logger.error('Error emitting WebSocket event:', wsError);
           }
 
-          console.log('✅ PayPal payment successful and order updated:', {
+          logger.info('PayPal payment successful and order updated:', {
             orderId: order.id,
             paypalOrderId: orderId,
             amount: order.total,

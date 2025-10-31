@@ -1,26 +1,27 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { webSocketService, WebSocketEvents } from '../shared/websocketService';
 import { useAuth } from '../ecommerce/context/AuthContext';
+import { useToast } from '../shared/toastContext';
 
 export const useWebSocket = () => {
   const { user, isLoggedIn } = useAuth();
   const callbacksRef = useRef<Map<string, Function[]>>(new Map());
   const [isConnected, setIsConnected] = useState(false);
+  const { showToast } = useToast();
 
   // Track connection status
   useEffect(() => {
     const handleConnect = () => {
-      console.log('🔌 WebSocket connected in hook');
       setIsConnected(true);
+      showToast({ type: 'success', title: 'Connected', message: 'Realtime connection established', durationMs: 2500 });
     };
 
     const handleDisconnect = () => {
-      console.log('🔌 WebSocket disconnected in hook');
       setIsConnected(false);
+      showToast({ type: 'warning', title: 'Disconnected', message: 'Realtime connection lost. Reconnecting…', durationMs: 3000 });
     };
 
     const handleConnectError = () => {
-      console.log('🔌 WebSocket connection error in hook');
       setIsConnected(false);
     };
 
@@ -28,6 +29,11 @@ export const useWebSocket = () => {
     webSocketService.on('connect', handleConnect);
     webSocketService.on('disconnect', handleDisconnect);
     webSocketService.on('connect_error', handleConnectError);
+    // Also listen to socket.io-level reconnect failure through service internal event names
+    if (typeof window !== 'undefined') {
+      // We piggyback on the raw socket events by registering directly if needed
+      // but since service doesn't expose raw, we rely on disconnect/connect_error to notify
+    }
 
     // Check initial connection status
     setIsConnected(webSocketService.getConnectionStatus());

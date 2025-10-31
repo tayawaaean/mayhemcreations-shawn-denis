@@ -60,7 +60,8 @@ export const securityHeaders = helmet({
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
+      // Allow API calls and websockets via nginx reverse proxy on same host
+      connectSrc: ["'self'", "https:", "http:", "wss:", "ws:"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],

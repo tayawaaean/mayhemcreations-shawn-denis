@@ -55,12 +55,8 @@ const ShippingManagement: React.FC = () => {
       setLoading(true)
       setError(null)
       
-      const response = await fetch('/api/v1/shipping/shipengine/test', {
-        method: 'GET',
-        credentials: 'include', // Include cookies for session-based auth
-      })
-      
-      const data = await response.json()
+      const { apiClient } = await import('../../shared/axiosConfig')
+      const { data } = await apiClient.get('/shipping/shipengine/test', { withCredentials: true })
       
       if (data.success) {
         alert('✅ ShipEngine API Connection Successful!\n\n' + 

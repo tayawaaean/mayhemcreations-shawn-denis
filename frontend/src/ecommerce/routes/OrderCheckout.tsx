@@ -101,12 +101,10 @@ export default function OrderCheckout() {
   // Load order from sessionStorage on component mount
   useEffect(() => {
     const orderData = sessionStorage.getItem('checkoutOrder')
-    console.log('🔍 Loading order data from sessionStorage:', orderData)
     
     if (orderData) {
       try {
         const parsedOrder = JSON.parse(orderData)
-        console.log('✅ Parsed order data:', parsedOrder)
         setOrder(parsedOrder)
         
         // Pre-fill form with saved shipping address if available
@@ -126,7 +124,7 @@ export default function OrderCheckout() {
             country: savedAddress.country || 'United States',
             notes: parsedOrder.customerNotes || parsedOrder.customer_notes || ''
           }))
-          console.log('✅ Pre-filled form with saved shipping address')
+          // pre-filled
         }
         
         // Set shipping rate from stored method if available
@@ -155,7 +153,7 @@ export default function OrderCheckout() {
             estimatedDeliveryDays: savedMethod.estimatedDeliveryDays,
             estimatedDeliveryDate: savedMethod.estimatedDeliveryDate
           }])
-          console.log('✅ Pre-loaded shipping rate from stored method')
+          // pre-loaded rate
         }
         
         // Also load saved form data if returning from PayPal
@@ -164,7 +162,6 @@ export default function OrderCheckout() {
           try {
             const parsedFormData = JSON.parse(savedFormData)
             setFormData(parsedFormData)
-            console.log('✅ Restored form data from sessionStorage')
           } catch (error) {
             console.error('❌ Error parsing form data:', error)
           }
@@ -174,7 +171,7 @@ export default function OrderCheckout() {
         navigate('/my-orders')
       }
     } else {
-      console.log('❌ No order data found in sessionStorage')
+      // no order data
       // No order data found, redirect to orders page
       navigate('/my-orders')
     }
@@ -191,21 +188,11 @@ export default function OrderCheckout() {
     const paypalToken = urlParams.get('token') // PayPal's token parameter
     const payerId = urlParams.get('PayerID') // PayPal's payer ID parameter
 
-    console.log('🔍 Payment return detected:', { 
-      success, 
-      canceled, 
-      paypalSuccess, 
-      paypalCanceled, 
-      orderId, 
-      paypalToken, 
-      payerId,
-      hasOrder: !!order,
-      orderLoaded: !!order?.id
-    })
+    
 
     // Handle Stripe success
     if (success === 'true' && orderId) {
-      console.log('✅ Stripe payment success detected')
+      
       // Clean up checkout data
       sessionStorage.removeItem('checkoutOrder')
       sessionStorage.removeItem('checkoutFormData')
@@ -369,7 +356,7 @@ export default function OrderCheckout() {
           setShippingError(response.data.warning)
         }
         
-        console.log('✅ Shipping rates fetched:', response.data.rates)
+        // shipping rates fetched
       } else {
         setShippingError('Unable to fetch shipping rates. Using estimated rates.')
         // Set default fallback rate
@@ -646,16 +633,7 @@ export default function OrderCheckout() {
   const handlePayPalReturn = async (paypalToken: string, customerEmail: string) => {
     try {
       setIsProcessing(true)
-      console.log('🔄 Capturing PayPal payment...', { 
-        paypalToken, 
-        orderId: order?.id,
-        hasFormData: !!formData.email,
-        formData: {
-          email: formData.email,
-          firstName: formData.firstName,
-          lastName: formData.lastName
-        }
-      })
+      
 
       if (!order || !order.id) {
         console.error('❌ No order found in state - this should not happen as useEffect waits for order')
@@ -687,10 +665,10 @@ export default function OrderCheckout() {
         }
       })
 
-      console.log('📦 PayPal capture response:', response)
+      
 
       if (response.success) {
-        console.log('✅ PayPal payment captured successfully')
+        
         // Clean up checkout data
         sessionStorage.removeItem('checkoutOrder')
         sessionStorage.removeItem('checkoutFormData')
@@ -1467,14 +1445,11 @@ export default function OrderCheckout() {
                     <div className="space-y-4">
                       {order?.items?.length > 0 ? (
                         order.items.map((item, index) => {
-                          console.log('📦 Order item:', item);
                           
                           // Use item's embedded product data first, then try to find in products array
                           const displayImage = item.productImage || item.customization?.mockup || (item.product?.images?.[0]) || 'https://via.placeholder.com/100';
                           const displayName = item.productName || (item.product?.title) || `Product #${item.productId}`;
                           const itemPrice = item.price || calculateItemPrice(item);
-                          
-                          console.log('📦 Display data:', { displayImage, displayName, itemPrice });
                           
                           return (
                             <div key={index} className="border border-gray-200 rounded-lg p-4">

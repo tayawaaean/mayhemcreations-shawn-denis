@@ -4,8 +4,7 @@
  */
 
 import { Address } from '../types/address';
-
-const API_BASE_URL = '/api/v1';
+import { apiClient } from './axiosConfig';
 
 export interface AddressApiService {
   getDefaultOriginAddress(): Promise<Address | null>;
@@ -16,22 +15,19 @@ export interface AddressApiService {
 class AddressApiServiceImpl implements AddressApiService {
   private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('token');
-    
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
+    const method = (options.method || 'GET').toUpperCase();
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(options.headers || {}),
+    } as any;
+    const data = options.body ? JSON.parse(options.body as string) : undefined;
 
-    if (!response.ok) {
+    const response = await apiClient.request({ url: endpoint, method, headers, data, withCredentials: true });
+    if (response.status >= 400) {
       throw new Error(`API request failed: ${response.statusText}`);
     }
-
-    const data = await response.json();
-    return data.data || data;
+    return response.data?.data ?? response.data;
   }
 
   async getDefaultOriginAddress(): Promise<Address | null> {

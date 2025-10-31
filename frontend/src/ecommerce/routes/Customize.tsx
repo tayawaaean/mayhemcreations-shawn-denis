@@ -215,8 +215,8 @@ export default function Customize() {
 
   // Monitor step changes and ensure proper rendering
   useEffect(() => {
-    console.log(`🔄 Step changed to ${currentStep}`)
-    console.log(`📊 Current designs count: ${customizationData.designs.length}`)
+    // console.log(`🔄 Step changed to ${currentStep}`)
+    // console.log(`📊 Current designs count: ${customizationData.designs.length}`)
     
     // Scroll to top when step changes to ensure visibility
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -227,9 +227,9 @@ export default function Customize() {
         console.error('⚠️ WARNING: Reached step 4 but no designs found! Redirecting back to step 2.')
         setCurrentStep(2)
       } else {
-        console.log('✅ Step 4 loaded with', customizationData.designs.length, 'designs')
+        // console.log('✅ Step 4 loaded with', customizationData.designs.length, 'designs')
         customizationData.designs.forEach((design, index) => {
-          console.log(`  Design ${index + 1}:`, {
+          // console.log(`  Design ${index + 1}:`, {
             id: design.id,
             name: design.name,
             hasStyles: !!design.selectedStyles,
@@ -809,7 +809,7 @@ export default function Customize() {
           // Wait for state to settle before moving to next step
           await new Promise(resolve => setTimeout(resolve, 50))
           
-          console.log('💾 Mockup captured and saved to localStorage')
+          // console.log('💾 Mockup captured and saved to localStorage')
         } catch (e) {
           console.error('Failed to capture mockup at step 3:', e)
           // Even if mockup capture fails, ensure we restore the view state
@@ -819,7 +819,7 @@ export default function Customize() {
 
       // Move to next step after async operations complete
       if (currentStep < steps.length) {
-        console.log(`📍 Moving from step ${currentStep} to step ${currentStep + 1}`)
+        // console.log(`📍 Moving from step ${currentStep} to step ${currentStep + 1}`)
         setCurrentStep(currentStep + 1)
         
         // Add a small delay to allow the embroidery options component to load
@@ -935,7 +935,7 @@ export default function Customize() {
       }
 
       // Add customized item to cart with stock validation
-      console.log('🛒 Calling addToCart with:', {
+      // console.log('🛒 Calling addToCart with:', {
         productId: product.id.toString(),
         quantity: customizationData.quantity,
         customization: {
@@ -968,7 +968,7 @@ export default function Customize() {
                 patchHeight: design.dimensions.height
               });
               designTotalPrice += materialCosts.totalCost;
-              console.log('🔧 Customize: Adding material cost to design total:', {
+              // console.log('🔧 Customize: Adding material cost to design total:', {
                 designName: design.name,
                 dimensions: design.dimensions,
                 materialCost: materialCosts.totalCost,
@@ -1000,7 +1000,7 @@ export default function Customize() {
             }
           }
           
-          console.log('🛒 Customize: Design final total price:', {
+          // console.log('🛒 Customize: Design final total price:', {
             designName: design.name,
             totalPrice: designTotalPrice
           });
@@ -1044,10 +1044,10 @@ export default function Customize() {
         designRotation: customizationData.designRotation
       })
       
-      console.log('🛒 addToCart result:', success)
+      // console.log('🛒 addToCart result:', success)
       
       if (success) {
-        console.log('✅ Successfully added to cart, showing confirmation')
+        // console.log('✅ Successfully added to cart, showing confirmation')
         // Wait for state to fully update and sync across all components
         await new Promise(resolve => setTimeout(resolve, 300))
         setShowCartConfirmation(true)

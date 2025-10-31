@@ -73,21 +73,13 @@ export default function Cart() {
     }
   }
   
-  // Debug logging
-  console.log('🛒 Cart component - Raw items:', items)
-  console.log('🛒 Cart component - Items length:', items.length)
-  console.log('🛒 Cart component - User logged in:', isLoggedIn)
-  console.log('🛒 Cart component - User:', user)
-  
-  // Check localStorage
+  // Check localStorage for cart persistence
   const localStorageCart = localStorage.getItem('mayhem_cart_v1')
-  console.log('🛒 localStorage cart data:', localStorageCart)
   if (localStorageCart) {
     try {
-      const parsedCart = JSON.parse(localStorageCart)
-      console.log('🛒 Parsed localStorage cart:', parsedCart)
+      JSON.parse(localStorageCart)
     } catch (e) {
-      console.error('🛒 Error parsing localStorage cart:', e)
+      console.error('Error parsing localStorage cart:', e)
     }
   }
   // Create virtual product for custom embroidery
@@ -104,25 +96,12 @@ export default function Cart() {
   const enriched = items.map((it) => {
     let product = it.product; // Use product data from cart item
     
-    console.log('🛒 Processing item:', { 
-      productId: it.productId, 
-      hasProduct: !!it.product,
-      productTitle: it.product?.title || 'No product'
-    })
-    
     // Handle custom embroidery product
     if (it.productId === 'custom-embroidery') {
       product = customEmbroideryProduct;
-      console.log('🛒 Using custom embroidery product')
     } else if (!product) {
       // Fallback: try to find product if it's missing from cart item
       product = products.find((p) => p.id === it.productId);
-      if (product) {
-        console.log('🛒 Found product via fallback lookup:', product.id, product.title)
-      } else {
-        console.log('🛒 No product found for ID:', it.productId)
-        console.log('🛒 Available product IDs:', products.map(p => ({ id: p.id, type: typeof p.id })))
-      }
     }
     
     return {
@@ -131,12 +110,8 @@ export default function Cart() {
     };
   }).filter(item => {
     const hasProduct = !!item.product;
-    console.log('🛒 Item has product:', hasProduct, item.productId)
     return hasProduct;
   }) // Filter out items without product data
-  
-  console.log('🛒 Enriched items after processing:', enriched)
-  console.log('🛒 Enriched items length:', enriched.length)
   
   const calculateItemPrice = (item: typeof enriched[0]) => {
     // For custom embroidery items, use the total price from embroideryData

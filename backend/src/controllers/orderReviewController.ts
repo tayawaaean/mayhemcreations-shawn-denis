@@ -13,13 +13,13 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Create order_reviews table (temporary endpoint)
+ * Create order_reviews table
  * @route POST /api/v1/orders/create-table
- * @access Public (temporarily for setup)
+ * @access Public (for setup - should be removed or protected after initial deployment)
  */
 export const createOrderReviewsTable = async (req: Request, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
-    console.log('🔄 Creating order_reviews table...');
+    logger.info('Creating order_reviews table');
 
     // Create order_reviews table
     await sequelize.query(`
@@ -43,7 +43,6 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
         INDEX idx_submitted_at (submitted_at)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
-    console.log('✅ order_reviews table created');
 
     // Add order_review_id column to carts table
     await sequelize.query(`
@@ -53,7 +52,6 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
       ADD INDEX idx_order_review_id (order_review_id),
       ADD FOREIGN KEY (order_review_id) REFERENCES order_reviews(id) ON DELETE SET NULL
     `);
-    console.log('✅ order_review_id column added to carts table');
 
     // Add picture reply and confirmation fields
     await sequelize.query(`
@@ -63,7 +61,6 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
       ADD COLUMN picture_reply_uploaded_at DATETIME NULL AFTER customer_confirmations,
       ADD COLUMN customer_confirmed_at DATETIME NULL AFTER picture_reply_uploaded_at
     `);
-    console.log('✅ Picture reply and confirmation fields added to order_reviews table');
 
     res.status(200).json({
       success: true,
@@ -93,46 +90,13 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
     const userId = req.user?.id;
     const { items, subtotal, shipping, tax, total, submittedAt, shippingAddress, shippingMethod, customerNotes } = req.body;
 
-    console.log('🔍 Submit for review request:', {
+    logger.info('Submit for review request', {
       userId,
       itemsCount: items?.length,
-      items: items?.map((item: any) => ({
-        id: item.id,
-        productId: item.productId,
-        hasCustomization: !!item.customization,
-        customizationKeys: item.customization ? Object.keys(item.customization) : [],
-        hasDesigns: !!item.customization?.designs?.length,
-        designsCount: item.customization?.designs?.length || 0,
-        hasMockup: !!item.customization?.mockup,
-        mockupLength: item.customization?.mockup?.length || 0,
-        firstDesignPreview: item.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none',
-        firstDesignFile: item.customization?.designs?.[0]?.file?.substring(0, 50) + '...' || 'none',
-        // 🎯 NEW: Check pricing breakdown
-        pricingBreakdown: item.pricingBreakdown,
-        productPrice: item.product?.price,
-        productName: item.productName,
-        productSnapshot: item.productSnapshot,
-        quantity: item.quantity
-      })),
       subtotal,
       shipping,
       tax,
       total
-    });
-
-    // Debug detailed item data being saved
-    console.log('🔍 DETAILED ITEMS DATA BEING SAVED:');
-    items?.forEach((item: any, index: number) => {
-      console.log(`🔍 Item ${index + 1} full data:`, {
-        productId: item.productId,
-        quantity: item.quantity,
-        product: item.product,
-        productName: item.productName,
-        productSnapshot: item.productSnapshot,
-        customization: item.customization,
-        pricingBreakdown: item.pricingBreakdown,
-        reviewStatus: item.reviewStatus
-      });
     });
 
     if (!userId) {
@@ -172,12 +136,6 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       });
     }
 
-    console.log('🔍 Shipping information:', {
-      shippingAddress,
-      shippingMethod,
-      customerNotes: customerNotes || 'none'
-    });
-
     // Create order review record using raw query with proper insertId handling
     const replacements = [
       userId,
@@ -192,9 +150,6 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       customerNotes || null, // NEW: customer notes
       shippingMethod.carrier || null // NEW: shipping carrier for indexing
     ];
-    
-    console.log('🔍 SQL replacements:', replacements);
-    console.log('🔍 Replacement count:', replacements.length);
     
     const [result] = await sequelize.query(`
       INSERT INTO order_reviews (
@@ -228,16 +183,11 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
       orderReviewId = (result as any).insertId;
     }
     
-    console.log('🔍 Order review created with ID:', orderReviewId);
-    console.log('🔍 Full result:', result);
-    console.log('🔍 Result type:', typeof result, 'Is array:', Array.isArray(result));
-    
     if (!orderReviewId) {
       // Fallback: query the last inserted ID
-      console.log('🔍 No insertId found, querying last inserted ID...');
+      logger.debug('No insertId found, querying last inserted ID');
       const [lastIdResult] = await sequelize.query('SELECT LAST_INSERT_ID() as lastId');
       orderReviewId = Array.isArray(lastIdResult) ? (lastIdResult[0] as any)?.lastId : (lastIdResult as any)?.lastId;
-      console.log('🔍 Last inserted ID:', orderReviewId);
     }
     
     if (!orderReviewId) {
@@ -246,7 +196,6 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
 
     // Update cart items to mark them as submitted for review
     const cartItemIds = items.map((item: any) => item.id).filter(Boolean);
-    console.log('🔍 Cart item IDs to update:', cartItemIds);
     
     if (cartItemIds.length > 0) {
       try {
@@ -259,20 +208,17 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
           WHERE id IN (${placeholders})
         `;
         
-        console.log('🔍 Executing query:', query);
-        console.log('🔍 Replacements:', [orderReviewId, ...cartItemIds]);
-        
         await sequelize.query(query, {
           replacements: [orderReviewId, ...cartItemIds]
         });
         
-        console.log('✅ Cart items updated successfully');
+        logger.debug('Cart items updated successfully', { orderReviewId, cartItemCount: cartItemIds.length });
       } catch (updateError) {
-        console.error('❌ Error updating cart items:', updateError);
+        logger.error('Error updating cart items', { orderReviewId, error: updateError });
         // Don't fail the entire operation if cart update fails
       }
     } else {
-      console.log('⚠️ No cart item IDs found to update');
+      logger.warn('No cart item IDs found to update', { orderReviewId });
     }
 
     res.status(201).json({
@@ -399,25 +345,6 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
       replacements: [userId]
     });
 
-    // Debug: Log order data structure
-    console.log('🔍 Retrieved orders for user:', {
-      userId,
-      ordersCount: (orders as any[]).length,
-      firstOrderData: (orders as any[])[0] ? {
-        id: (orders as any[])[0].id,
-        orderDataKeys: (orders as any[])[0].order_data ? Object.keys((orders as any[])[0].order_data) : [],
-        orderDataLength: (orders as any[])[0].order_data ? JSON.stringify((orders as any[])[0].order_data).length : 0,
-        firstItemCustomization: (orders as any[])[0].order_data?.[0]?.customization ? {
-          hasDesigns: !!((orders as any[])[0].order_data[0].customization.designs?.length),
-          designsCount: ((orders as any[])[0].order_data[0].customization.designs?.length) || 0,
-          hasMockup: !!((orders as any[])[0].order_data[0].customization.mockup),
-          mockupLength: ((orders as any[])[0].order_data[0].customization.mockup?.length) || 0,
-          firstDesignPreview: ((orders as any[])[0].order_data[0].customization.designs?.[0]?.preview?.substring(0, 50)) + '...' || 'none',
-          firstDesignFile: ((orders as any[])[0].order_data[0].customization.designs?.[0]?.file?.substring(0, 50)) + '...' || 'none'
-        } : null
-      } : null
-    });
-
     res.status(200).json({
       success: true,
       data: orders,
@@ -443,8 +370,7 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
  */
 export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
-    console.log('🔍 Getting all review orders...');
-    console.log('👤 User making request:', req.user);
+    logger.info('Getting all review orders', { adminId: req.user?.id });
     
     const [orders] = await sequelize.query(`
       SELECT 
@@ -491,36 +417,7 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
       ORDER BY order_reviews.created_at DESC
     `);
 
-    console.log('📊 Found orders:', orders);
-
-    // 🎯 NEW: Debug the order_data being returned
-    console.log('🔍 ADMIN RETRIEVAL - ORDER DATA BEING RETURNED:');
-    (orders as any[]).forEach((order, index) => {
-      console.log(`🔍 Order ${index + 1} (ID: ${order.id}) data:`);
-      console.log(`🔍 - Subtotal: ${order.subtotal}`);
-      console.log(`🔍 - Shipping: ${order.shipping}`);
-      console.log(`🔍 - Tax: ${order.tax}`);
-      console.log(`🔍 - Total: ${order.total}`);
-      console.log(`🔍 - Order data type: ${typeof order.order_data}`);
-      console.log(`🔍 - Order data value: ${order.order_data}`);
-      
-      try {
-        const parsedData = typeof order.order_data === 'string' ? JSON.parse(order.order_data) : order.order_data;
-        if (Array.isArray(parsedData)) {
-          parsedData.forEach((item: any, itemIndex: number) => {
-            console.log(`🔍   Item ${itemIndex + 1}:`, {
-              productId: item.productId,
-              quantity: item.quantity,
-              pricingBreakdown: item.pricingBreakdown,
-              productPrice: item.product?.price,
-              customization: item.customization ? 'EXISTS' : 'MISSING'
-            });
-          });
-        }
-      } catch (e) {
-        console.log(`🔍   Parse error: ${e}`);
-      }
-    });
+    logger.debug('Retrieved all review orders', { orderCount: (orders as any[]).length });
 
     res.status(200).json({
       success: true,

@@ -92,8 +92,6 @@ export function useRetry() {
         lastError = error
         attempt++
 
-        console.warn(`⚠️ Attempt ${attempt}/${maxAttempts} failed:`, error?.message || error)
-
         setState(prev => ({
           ...prev,
           attemptCount: attempt,
@@ -107,8 +105,6 @@ export function useRetry() {
             initialDelay * Math.pow(backoffMultiplier, attempt - 1),
             maxDelay
           )
-
-          console.log(`🔄 Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxAttempts})`)
 
           // Call onRetry callback if provided
           if (onRetry) {
@@ -131,7 +127,6 @@ export function useRetry() {
       lastError: lastError
     })
 
-    console.error(`❌ All ${attempt} attempts failed. Last error:`, lastError)
     throw lastError
   }, [])
 
@@ -209,7 +204,7 @@ export async function retryableApiCall<T>(
           initialDelay * Math.pow(backoffMultiplier, attempt - 1),
           maxDelay
         )
-        console.log(`🔄 Retrying API call in ${delay}ms (attempt ${attempt + 1}/${maxAttempts})`)
+        // Retrying with exponential backoff
         await new Promise(resolve => setTimeout(resolve, delay))
       } else {
         throw error

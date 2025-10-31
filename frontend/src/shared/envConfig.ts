@@ -63,8 +63,17 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
       googleClientId: getEnvVar('VITE_REACT_APP_GOOGLE_CLIENT_ID', ''),
       googleOAuthScriptUrl: getEnvVar('VITE_REACT_APP_GOOGLE_OAUTH_SCRIPT_URL', 'https://accounts.google.com/gsi/client'),
       
-      // API Configuration
-      apiBaseUrl: getEnvVar('VITE_REACT_APP_API_URL', 'http://localhost:5001/api/v1'),
+      // API Configuration - In production, use relative URL if no env var set
+      apiBaseUrl: (() => {
+        const envUrl = getEnvVar('VITE_REACT_APP_API_URL', '');
+        if (envUrl) return envUrl;
+        // In production, nginx proxies /api/ to backend, so use relative URL
+        if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          return '/api/v1';
+        }
+        // Development fallback
+        return 'http://localhost:5001/api/v1';
+      })(),
       
       // App Configuration
       appName: getEnvVar('VITE_REACT_APP_APP_NAME', 'Mayhem Creations'),

@@ -120,7 +120,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     ? orderReview.order_data 
     : JSON.parse(orderReview.order_data as string);
 
-  console.log('🔍 Converting order review to order:', {
+  // console.log('🔍 Converting order review to order:', {
     orderId: orderReview.id,
     orderData: orderData,
     total: orderReview.total,
@@ -134,7 +134,7 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     const parsedReplies = Array.isArray(orderReview.admin_picture_replies) ? 
       orderReview.admin_picture_replies : 
       JSON.parse(orderReview.admin_picture_replies as string);
-    console.log('🔍 Picture replies debug:', {
+    // console.log('🔍 Picture replies debug:', {
       replies: parsedReplies,
       itemIds: parsedReplies.map((r: any) => r.itemId),
       orderItemIds: orderData.map((item: any) => ({ 

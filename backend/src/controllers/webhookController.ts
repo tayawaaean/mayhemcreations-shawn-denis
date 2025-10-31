@@ -472,7 +472,7 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
         logger.error('Error emitting WebSocket event:', wsError);
       }
 
-      console.log('✅ Payment successful and order approved for processing:', {
+      logger.info('Payment successful and order approved for processing', {
         orderId: order.id,
         paymentIntentId: paymentIntent.id,
         amount: paymentIntent.amount / 100,
@@ -566,7 +566,7 @@ const handlePaymentIntentFailed = async (paymentIntent: any) => {
       logger.error('Error logging failed payment:', paymentError);
     }
     
-    console.log('❌ Payment failed:', {
+    logger.warn('Payment failed', {
       id: paymentIntent.id,
       amount: paymentIntent.amount / 100,
       currency: paymentIntent.currency,
@@ -901,7 +901,7 @@ const handleCheckoutSessionCompleted = async (session: any) => {
         logger.error('Error emitting WebSocket event:', wsError);
       }
 
-      console.log('✅ Checkout completed and order approved for processing:', {
+      logger.info('Checkout completed and order approved for processing', {
         orderId: order.id,
         sessionId: session.id,
         amount: session.amount_total / 100,
@@ -935,9 +935,7 @@ const handleCheckoutSessionExpired = async (session: any) => {
     // - Send reminder email
     // - Log the expiration
     
-    console.log('⏰ Checkout expired:', {
-      sessionId: session.id,
-    });
+    logger.info('Checkout expired', { sessionId: session.id });
 
   } catch (error: any) {
     logger.error('Error handling checkout expiration:', error);
@@ -963,7 +961,7 @@ const handlePaymentIntentCreated = async (paymentIntent: any) => {
     // - Update inventory (reserve items)
     // - Create payment tracking record
     
-    console.log('🔄 Payment initiated:', {
+    logger.info('Payment initiated', {
       id: paymentIntent.id,
       amount: paymentIntent.amount / 100,
       currency: paymentIntent.currency,
@@ -993,7 +991,7 @@ const handleChargeSucceeded = async (charge: any) => {
     // - Trigger fulfillment process
     // - Update customer payment history
     
-    console.log('💳 Charge successful:', {
+    logger.info('Charge successful', {
       id: charge.id,
       amount: charge.amount / 100,
       currency: charge.currency,
@@ -1022,7 +1020,7 @@ const handleChargeUpdated = async (charge: any) => {
     // - Handle disputes, refunds, etc.
     // - Update payment records
     
-    console.log('🔄 Charge updated:', {
+    logger.info('Charge updated', {
       id: charge.id,
       status: charge.status,
       amount: charge.amount / 100,
@@ -1051,7 +1049,7 @@ const handleCustomerCreated = async (customer: any) => {
     // - Create customer profile
     // - Add to marketing lists
     
-    console.log('👤 Customer created:', {
+    logger.info('Customer created', {
       id: customer.id,
       email: customer.email,
       name: customer.name,
@@ -1078,7 +1076,7 @@ const handleCustomerUpdated = async (customer: any) => {
     // - Update marketing lists
     // - Log customer changes
     
-    console.log('👤 Customer updated:', {
+    logger.info('Customer updated', {
       id: customer.id,
       email: customer.email,
     });
@@ -1106,7 +1104,7 @@ const handleInvoicePaymentSucceeded = async (invoice: any) => {
     // - Process recurring billing
     // - Update customer subscription records
     
-    console.log('📄 Invoice paid:', {
+    logger.info('Invoice paid', {
       id: invoice.id,
       amount: invoice.amount_paid / 100,
       currency: invoice.currency,
@@ -1135,7 +1133,7 @@ const handleInvoicePaymentFailed = async (invoice: any) => {
     // - Implement retry logic
     // - Handle subscription suspension
     
-    console.log('❌ Invoice payment failed:', {
+    logger.warn('Invoice payment failed', {
       id: invoice.id,
       amount: invoice.amount_due / 100,
       currency: invoice.currency,
@@ -1164,7 +1162,7 @@ const handleSubscriptionCreated = async (subscription: any) => {
     // - Create subscription records
     // - Set up customer access
     
-    console.log('🔄 Subscription created:', {
+    logger.info('Subscription created', {
       id: subscription.id,
       customer: subscription.customer,
       status: subscription.status,
@@ -1192,7 +1190,7 @@ const handleSubscriptionUpdated = async (subscription: any) => {
     // - Sync subscription status
     // - Handle proration
     
-    console.log('🔄 Subscription updated:', {
+    logger.info('Subscription updated', {
       id: subscription.id,
       status: subscription.status,
     });
@@ -1219,7 +1217,7 @@ const handleSubscriptionDeleted = async (subscription: any) => {
     // - Update customer access
     // - Process final billing
     
-    console.log('🗑️ Subscription deleted:', {
+    logger.info('Subscription deleted', {
       id: subscription.id,
       customer: subscription.customer,
     });
@@ -1249,7 +1247,7 @@ const handleDisputeCreated = async (dispute: any) => {
     // - Create dispute tracking record
     // - Send dispute notification
     
-    console.log('⚠️ Dispute created:', {
+    logger.warn('Dispute created', {
       id: dispute.id,
       reason: dispute.reason,
       amount: dispute.amount / 100,
@@ -1281,7 +1279,7 @@ const handleRefundCreated = async (refund: any) => {
     // - Update customer records
     // - Handle partial refunds
     
-    console.log('💰 Refund created:', {
+    logger.info('Refund created', {
       id: refund.id,
       amount: refund.amount / 100,
       reason: refund.reason,

@@ -5,7 +5,21 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+// Get API base URL from environment or use relative path (nginx will proxy)
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_REACT_APP_API_URL;
+  if (envUrl) return envUrl;
+  
+  // In production, nginx proxies /api/ to backend, so use relative URL
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api/v1';
+  }
+  
+  // Development fallback
+  return 'http://localhost:5001/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ShippingAddress {
   firstName?: string;

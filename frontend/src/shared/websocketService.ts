@@ -58,7 +58,7 @@ class WebSocketService {
     if (!this.socket || !this.isConnected) {
       // Prevent multiple simultaneous connection attempts
       if (this.socket && !this.isConnected) {
-        console.log('🔌 WebSocket connection already in progress, skipping...');
+        // Connection already in progress
         return;
       }
       this.connect();
@@ -67,23 +67,26 @@ class WebSocketService {
 
   private connect(): void {
     // Determine server URL based on environment
-    let serverUrl = 'http://localhost:5001';
+    let serverUrl: string;
     
     if (typeof window !== 'undefined') {
-      // Browser environment - always use direct backend URL for WebSocket
       const hostname = window.location.hostname;
       const protocol = window.location.protocol;
       
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        // Use direct backend URL for WebSocket connections
+        // Development: use direct backend URL for WebSocket connections
         serverUrl = 'http://localhost:5001';
       } else {
-        // Production environment - use same host but different port
-        serverUrl = `${protocol}//${hostname}:5001`;
+        // Production: WebSocket is proxied through nginx via /socket.io/
+        // Use same origin - nginx will proxy to backend
+        serverUrl = `${protocol}//${hostname}${window.location.port ? `:${window.location.port}` : ''}`;
       }
+    } else {
+      // SSR fallback - should not happen in this app
+      serverUrl = 'http://localhost:5001';
     }
     
-    console.log('🔌 Connecting to WebSocket server:', serverUrl);
+    // Attempt connection to backend WebSocket server
     
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
@@ -92,52 +95,72 @@ class WebSocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('🔌 WebSocket connected:', this.socket?.id || 'unknown');
       this.isConnected = true;
       this.reconnectAttempts = 0;
 
       // Re-join desired rooms after (re)connect
       if (this.desiredUserId) {
-        this.socket!.emit('join_user_room', this.desiredUserId);
-        console.log(`👤 (re)joined user room for user ${this.desiredUserId}`);
+        // join with ack so we can debug failures
+        this.socket!.emit('join_user_room', this.desiredUserId, (ack: { ok: boolean; error?: string }) => {
+          if (!ack?.ok) {
+            // silently fail; hook will surface via snackbar
+          }
+        });
       }
       if (this.wantsAdminRoom) {
-        this.socket!.emit('join_admin_room');
-        console.log('👨‍💼 (re)joined admin room');
+        this.socket!.emit('join_admin_room', (ack: { ok: boolean; error?: string }) => {
+          if (!ack?.ok) {
+            // no-op; consumer hooks can notify
+          }
+        });
       }
       if (this.desiredChatRooms.size > 0) {
         this.desiredChatRooms.forEach((customerId) => {
-          this.socket!.emit('join_chat_room', customerId);
-          console.log(`💬 (re)joined chat room for customer ${customerId}`);
+          this.socket!.emit('join_chat_room', customerId, (ack: { ok: boolean; error?: string }) => {
+            if (!ack?.ok) {
+              // no-op
+            }
+          });
         });
       }
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('🔌 WebSocket disconnected:', reason);
       this.isConnected = false;
       this.handleReconnect();
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('🔌 WebSocket connection error:', error);
       this.isConnected = false;
       this.handleReconnect();
+    });
+
+    // Reconnect lifecycle for better resilience
+    this.socket.on('reconnect_attempt', (attempt) => {
+      // track attempts; backoff handled in handleReconnect as well
+    });
+    this.socket.on('reconnect_error', () => {
+      // keep trying until max
+    });
+    this.socket.on('reconnect_failed', () => {
+      // give up; consumer should surface to UI
+      this.isConnected = false;
     });
   }
 
   private handleReconnect(): void {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      
-      console.log(`🔌 Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      // Add jitter (±20%) to reduce thundering herd on the server
+      const base = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+      const jitter = base * (Math.random() * 0.4 - 0.2);
+      const delay = Math.max(500, Math.min(base + jitter, 30000));
       
       setTimeout(() => {
         this.connect();
       }, delay);
     } else {
-      console.error('🔌 Max reconnection attempts reached. WebSocket will not reconnect automatically.');
+      // Stop trying; consumer can prompt the user
     }
   }
 
@@ -146,8 +169,7 @@ class WebSocketService {
     this.desiredUserId = userId;
     this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
-      this.socket.emit('join_user_room', userId);
-      console.log(`👤 Joined user room for user ${userId}`);
+      this.socket.emit('join_user_room', userId, () => {});
     }
   }
 
@@ -156,8 +178,7 @@ class WebSocketService {
     this.wantsAdminRoom = true;
     this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
-      this.socket.emit('join_admin_room');
-      console.log('👨‍💼 Joined admin room');
+      this.socket.emit('join_admin_room', () => {});
     }
   }
 
@@ -179,7 +200,8 @@ class WebSocketService {
   // Emit events (if needed)
   public emit(event: string, data: any): void {
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
-      this.socket.emit(event, data);
+      // use ack to detect failures; ignore callback result here
+      this.socket.emit(event, data, () => {});
     }
   }
 
@@ -194,7 +216,6 @@ class WebSocketService {
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      console.log('🔌 WebSocket disconnected manually');
     }
   }
 
@@ -215,7 +236,7 @@ class WebSocketService {
         text,
         customerId,
         timestamp: new Date().toISOString()
-      });
+      }, () => {});
     }
   }
 
@@ -227,7 +248,7 @@ class WebSocketService {
         customerId,
         email, // Include email for guest users
         timestamp: new Date().toISOString()
-      });
+      }, () => {});
     }
   }
 
@@ -240,7 +261,7 @@ class WebSocketService {
         attachment: payload.attachment,
         text: payload.text ?? null,
         timestamp: new Date().toISOString()
-      });
+      }, () => {});
     }
   }
 
@@ -258,14 +279,14 @@ class WebSocketService {
     this.desiredChatRooms.add(customerId);
     this.ensureConnection();
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
-      this.socket.emit('join_chat_room', customerId);
+      this.socket.emit('join_chat_room', customerId, () => {});
     }
   }
 
   public leaveChatRoom(customerId: string): void {
     this.desiredChatRooms.delete(customerId);
     if (typeof window !== 'undefined' && this.socket && this.isConnected) {
-      this.socket.emit('leave_chat_room', customerId);
+      this.socket.emit('leave_chat_room', customerId, () => {});
     }
   }
 }

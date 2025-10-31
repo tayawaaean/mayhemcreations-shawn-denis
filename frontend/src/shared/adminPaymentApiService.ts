@@ -58,7 +58,16 @@ class AdminPaymentApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+    const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_REACT_APP_API_URL;
+    if (envUrl) {
+      this.baseUrl = envUrl;
+    } else if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // Production: use relative URL (nginx will proxy)
+      this.baseUrl = '/api/v1';
+    } else {
+      // Development fallback
+      this.baseUrl = 'http://localhost:5001/api/v1';
+    }
   }
 
   private async makeRequest<T>(

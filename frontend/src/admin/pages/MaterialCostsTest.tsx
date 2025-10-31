@@ -30,13 +30,8 @@ export default function MaterialCostsTest() {
       setError(null)
       console.log('=== Starting Direct Fetch Test ===')
       
-      const response = await fetch('http://localhost:5001/api/v1/material-costs', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      })
+      const { apiClient } = await import('../../shared/axiosConfig')
+      const response = await apiClient.get('/material-costs', { withCredentials: true })
       
       const data = await response.json()
       console.log('=== Direct Fetch Response ===', { status: response.status, data })

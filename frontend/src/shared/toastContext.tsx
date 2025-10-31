@@ -45,6 +45,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   return (
     <ToastContext.Provider value={value}>
+      {/* Expose a minimal global bridge for non-React modules (e.g., axios) */}
+      <Bridge showToast={showToast} />
       {children}
       {/* Toast container */}
       <div className="fixed top-4 right-4 z-[1000] space-y-2 w-[90vw] max-w-sm">
@@ -72,6 +74,16 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       </div>
     </ToastContext.Provider>
   )
+}
+
+
+// Bridge component to bind showToast to window for non-React code paths
+const Bridge: React.FC<{ showToast: (toast: Omit<Toast, 'id'>) => void }> = ({ showToast }) => {
+  React.useEffect(() => {
+    (window as any).__toast = showToast;
+    return () => { if ((window as any).__toast === showToast) (window as any).__toast = undefined }
+  }, [showToast])
+  return null
 }
 
 

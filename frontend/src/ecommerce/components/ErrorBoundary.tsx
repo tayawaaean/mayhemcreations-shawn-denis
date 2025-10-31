@@ -40,9 +40,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console for debugging
-    console.error('🔴 ErrorBoundary caught an error:', error, errorInfo)
-    
     // Update state with error details
     this.setState(prevState => ({
       error,
@@ -55,10 +52,7 @@ class ErrorBoundary extends Component<Props, State> {
       this.props.onError(error, errorInfo)
     }
 
-    // Log to external error tracking service if available
-    if (typeof window !== 'undefined' && (window as any).logError) {
-      (window as any).logError(error, errorInfo)
-    }
+    // Silent error handling - no logging in production
   }
 
   private handleReset = () => {

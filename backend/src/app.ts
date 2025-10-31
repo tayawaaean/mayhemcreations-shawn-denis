@@ -47,15 +47,26 @@ import { logger } from './utils/logger';
 // Create Express app
 const app = express();
 
-// Trust proxy (for rate limiting and IP detection)
-app.set('trust proxy', 1);
+// Trust reverse proxy (nginx) for correct IP/proto and secure cookies in production
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security middleware
 app.use(securityHeaders);
 
-// CORS configuration
+// CORS configuration with allowlist (supports nginx reverse proxy)
+const allowedOrigins = (process.env.CORS_ALLOWLIST || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+const defaultFrontend = process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // same-origin/no origin
+    if (origin === defaultFrontend || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error('CORS not allowed'), false);
+  },
   credentials: true, // Allow cookies to be sent
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

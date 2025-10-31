@@ -91,25 +91,6 @@ export default function Products() {
           })
         ])
         
-        console.log('API Responses:', { categoriesResponse, productsResponse })
-        console.log('Products with images:', productsResponse.data?.map(p => {
-          let parsedImages = p.images
-          if (typeof p.images === 'string') {
-            try {
-              parsedImages = JSON.parse(p.images)
-            } catch (e) {
-              console.warn(`Failed to parse images for product ${p.id}:`, e)
-              parsedImages = []
-            }
-          }
-          return {
-            id: p.id,
-            title: p.title,
-            image: p.image,
-            images: parsedImages,
-            primaryImageIndex: p.primaryImageIndex
-          }
-        }))
         setCategories(categoriesResponse.data || [])
         setProducts(productsResponse.data || [])
         setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data || []))
@@ -164,7 +145,6 @@ export default function Products() {
       setCategories(categoriesResponse.data || [])
       setProducts(productsResponse.data || [])
       setCategoryDropdownItems(transformCategoriesToDropdown(categoriesResponse.data || []))
-      console.log('✅ Products reloaded successfully')
     } catch (err: any) {
       console.error('❌ Retry failed:', err)
       

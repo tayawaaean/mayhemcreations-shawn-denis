@@ -107,8 +107,8 @@ const Inventory: React.FC = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/v1/categories')
-      const data = await response.json()
+      const { apiClient } = await import('../../shared/axiosConfig')
+      const { data } = await apiClient.get('/categories', { withCredentials: true })
       if (data.success) {
         setCategories(data.data)
       }

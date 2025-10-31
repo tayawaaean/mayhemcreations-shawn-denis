@@ -69,28 +69,9 @@ export default function Checkout() {
     estimatedDeliveryDays: number | null
   } | null>(null)
 
-  // Debug cart items on mount
+  // Monitor cart items changes
   useEffect(() => {
-    console.log('🛒 Checkout: Cart items loaded:', items.length)
-    console.log('🛒 Checkout: Cart items (full details):', JSON.stringify(items, null, 2))
-    if (items.length > 0) {
-      const subtotal = calculateSubtotal()
-      console.log('💰 Checkout: Calculated subtotal:', subtotal)
-      items.forEach((item, index) => {
-        const price = calculateItemPrice(item)
-        console.log(`💰 Item ${index + 1}:`, {
-          productId: item.productId,
-          quantity: item.quantity,
-          storedPrice: (item as any).price,
-          hasProduct: !!item.product,
-          productTitle: item.product?.title || 'Not found',
-          calculatedPrice: price,
-          total: price * item.quantity
-        })
-      })
-    } else {
-      console.warn('⚠️ No cart items found in Checkout!')
-    }
+    // Cart items monitoring removed for production
   }, [items])
 
   // Form states
@@ -288,15 +269,15 @@ export default function Checkout() {
 
   // Calculate shipping rates via backend API
   const calculateShippingRate = async () => {
-    console.log('🚚 Starting shipping calculation...')
-    console.log('👤 User Authentication Status:', {
+    // console.log('🚚 Starting shipping calculation...')
+    // console.log('👤 User Authentication Status:', {
       isLoggedIn,
       userId: user?.id,
       userEmail: user?.email,
       userRole: user?.role
     })
-    console.log('📦 Form Data:', formData)
-    console.log('📦 Cart Items:', items)
+    // console.log('📦 Form Data:', formData)
+    // console.log('📦 Cart Items:', items)
     
     // Check if user is authenticated
     if (!isLoggedIn) {
@@ -314,7 +295,7 @@ export default function Checkout() {
     await new Promise(resolve => setTimeout(resolve, 100))
     
     try {
-      console.log('🚚 Calculating shipping rates via API... (state should be loading now)')
+      // console.log('🚚 Calculating shipping rates via API... (state should be loading now)')
       
       // Prepare shipping address with ALL required fields
       const shippingAddress = {
@@ -333,7 +314,7 @@ export default function Checkout() {
         country: 'US'
       }
       
-      console.log('📍 Shipping Address Being Sent:', shippingAddress)
+      // console.log('📍 Shipping Address Being Sent:', shippingAddress)
       
       // Validate address has required fields
       if (!shippingAddress.street1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode) {
@@ -348,8 +329,8 @@ export default function Checkout() {
         })
       }
       
-      console.log('📝 Full Name for ShipEngine:', shippingAddress.name)
-      console.log('📫 Full Address for ShipEngine:', `${shippingAddress.street1}${shippingAddress.street2 ? ' ' + shippingAddress.street2 : ''}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`)
+      // console.log('📝 Full Name for ShipEngine:', shippingAddress.name)
+      // console.log('📫 Full Address for ShipEngine:', `${shippingAddress.street1}${shippingAddress.street2 ? ' ' + shippingAddress.street2 : ''}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.postalCode}`)
       
       // Prepare cart items for shipping calculation
       const cartItems = items.map((item) => {
@@ -369,11 +350,11 @@ export default function Checkout() {
         }
       })
       
-      console.log('📦 Cart Items Being Sent:', cartItems)
-      console.log('📦 Total items:', cartItems.length)
-      console.log('📦 Total quantity:', cartItems.reduce((sum, item) => sum + item.quantity, 0))
+      // console.log('📦 Cart Items Being Sent:', cartItems)
+      // console.log('📦 Total items:', cartItems.length)
+      // console.log('📦 Total quantity:', cartItems.reduce((sum, item) => sum + item.quantity, 0))
 
-      console.log('🌐 Calling ShipEngine API with:', {
+      // console.log('🌐 Calling ShipEngine API with:', {
         address: shippingAddress,
         items: cartItems
       })
@@ -381,8 +362,8 @@ export default function Checkout() {
       // Call backend API to get shipping rates
       const response = await calculateShippingRates(shippingAddress, cartItems)
 
-      console.log('✅ Shipping rates response:', response)
-      console.log('📊 Response structure:', {
+      // console.log('✅ Shipping rates response:', response)
+      // console.log('📊 Response structure:', {
         success: response.success,
         hasData: !!response.data,
         dataKeys: response.data ? Object.keys(response.data) : [],
@@ -393,8 +374,8 @@ export default function Checkout() {
       })
 
       if (response.success && response.data) {
-        console.log('✅ API call successful, processing rates...')
-        console.log('📋 Available rates:', response.data.rates)
+        // console.log('✅ API call successful, processing rates...')
+        // console.log('📋 Available rates:', response.data.rates)
         
         setShippingRates(response.data.rates)
         
@@ -402,7 +383,7 @@ export default function Checkout() {
         if (response.data.rates.length > 0) {
           const cheapestRate = response.data.rates[0] // First rate is the cheapest
           setSelectedShippingRate(cheapestRate)
-          console.log('✅ Auto-selected cheapest shipping rate:', cheapestRate)
+          // console.log('✅ Auto-selected cheapest shipping rate:', cheapestRate)
         }
 
         if (response.data.warning) {
@@ -517,7 +498,7 @@ export default function Checkout() {
   }
 
   const handlePlaceOrder = async () => {
-    console.log('📦 Starting order submission for review...')
+    // console.log('📦 Starting order submission for review...')
     setIsProcessing(true)
     setPaymentError(null)
     
@@ -525,7 +506,7 @@ export default function Checkout() {
     await new Promise(resolve => setTimeout(resolve, 100))
     
     try {
-      console.log('📦 Submitting order for review... (loading screen should be visible)')
+      // console.log('📦 Submitting order for review... (loading screen should be visible)')
       
       // Prepare order data for review
       const orderData = {
@@ -555,7 +536,7 @@ export default function Checkout() {
                     patchHeight: design.dimensions.height
                   });
                   embroideryPrice += materialCosts.totalCost;
-                  console.log('🔧 Checkout: Calculated material cost for design:', {
+                  // console.log('🔧 Checkout: Calculated material cost for design:', {
                     designName: design.name,
                     dimensions: design.dimensions,
                     materialCost: materialCosts.totalCost
@@ -612,7 +593,7 @@ export default function Checkout() {
           
           const totalPrice = baseProductPrice + embroideryPrice + embroideryOptionsPrice;
           
-          console.log(`📊 Checkout: Item ${index + 1} pricing:`, {
+          // console.log(`📊 Checkout: Item ${index + 1} pricing:`, {
             baseProductPrice,
             embroideryPrice,
             embroideryOptionsPrice,
@@ -754,7 +735,7 @@ export default function Checkout() {
 
   // Loading screen for shipping calculation
   if (isCalculatingShipping) {
-    console.log('🎨 Rendering shipping calculation loading screen')
+    // console.log('🎨 Rendering shipping calculation loading screen')
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
@@ -780,7 +761,7 @@ export default function Checkout() {
 
   // Loading screen for order submission
   if (isProcessing) {
-    console.log('🎨 Rendering order submission loading screen')
+    // console.log('🎨 Rendering order submission loading screen')
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">

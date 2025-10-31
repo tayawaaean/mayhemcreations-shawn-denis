@@ -247,14 +247,8 @@ class MultiAccountStorageService {
       if (!accountData) return true; // Already logged out
 
       // Call backend logout (session-based auth uses cookies)
-      const apiBaseUrl = this.getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for session-based auth
-      });
+      const { apiClient } = await import('./axiosConfig');
+      const response = await apiClient.post('/auth/logout', {}, { withCredentials: true });
 
       // Remove the account from storage
       const multiData = this.getMultiAccountData();

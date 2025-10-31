@@ -311,26 +311,14 @@ export interface CheckoutSessionResult {
 /**
  * Create a Payment Intent
  */
+import { apiClient } from './axiosConfig'
+
 export const createPaymentIntent = async (data: CreatePaymentIntentData): Promise<PaymentIntentResult> => {
   try {
     // Session-based auth - no token needed
 
-    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-intent`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // Include cookies for session-based auth
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create payment intent');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.post(`${envConfig.getApiBaseUrl()}/payments/create-intent`, data, { withCredentials: true })
+    return response.data.data
   } catch (error: any) {
     console.error('Error creating payment intent:', error);
     throw error;
@@ -344,22 +332,8 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
   try {
     // Session-based auth - no token needed
 
-    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/create-checkout-session`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // Include cookies for session-based auth
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create checkout session');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.post(`${envConfig.getApiBaseUrl()}/payments/create-checkout-session`, data, { withCredentials: true })
+    return response.data.data
   } catch (error: any) {
     console.error('Error creating checkout session:', error);
     throw error;
@@ -373,18 +347,8 @@ export const getPaymentIntentStatus = async (paymentIntentId: string): Promise<P
   try {
     // Session-based auth - no token needed
 
-    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/intent/${paymentIntentId}`, {
-      method: 'GET',
-      credentials: 'include', // Include cookies for session-based auth
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to get payment intent status');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.get(`${envConfig.getApiBaseUrl()}/payments/intent/${paymentIntentId}`, { withCredentials: true })
+    return response.data.data
   } catch (error: any) {
     console.error('Error getting payment intent status:', error);
     throw error;
@@ -398,18 +362,8 @@ export const getCheckoutSessionStatus = async (sessionId: string): Promise<Check
   try {
     // Session-based auth - no token needed
 
-    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/session/${sessionId}`, {
-      method: 'GET',
-      credentials: 'include', // Include cookies for session-based auth
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to get checkout session status');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.get(`${envConfig.getApiBaseUrl()}/payments/session/${sessionId}`, { withCredentials: true })
+    return response.data.data
   } catch (error: any) {
     console.error('Error getting checkout session status:', error);
     throw error;
@@ -423,22 +377,8 @@ export const createOrRetrieveCustomer = async (email: string, name?: string) => 
   try {
     // Session-based auth - no token needed
 
-    const response = await fetch(`${envConfig.getApiBaseUrl()}/payments/customer`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // Include cookies for session-based auth
-      body: JSON.stringify({ email, name }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || 'Failed to create customer');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.post(`${envConfig.getApiBaseUrl()}/payments/customer`, { email, name }, { withCredentials: true })
+    return response.data.data
   } catch (error: any) {
     console.error('Error creating customer:', error);
     throw error;

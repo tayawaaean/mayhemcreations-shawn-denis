@@ -52,14 +52,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         })
         
-        // Log cart loading for debugging
-        console.log('🛒 Loading cart from localStorage:', validItems.length, 'items')
-        console.log('🛒 Note: Large files/previews not loaded from localStorage to prevent quota issues')
         return validItems
       }
       return []
     } catch (e) {
-      console.error('🛒 Error parsing cart from localStorage:', e)
+      // Error parsing cart from localStorage - silently fail and return empty cart
       return []
     }
   })
@@ -77,13 +74,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
    */
   const loadCartFromDatabase = useCallback(async () => {
     try {
-      console.log('🛒 Attempting to load cart from database...')
       setIsLoading(true)
       setCartLoadError(null) // Clear previous errors
       
       const response = await cartApiService.getCart()
-      
-      console.log('🛒 Cart API response:', response)
       
       if (response.success && response.data) {
         // Transform backend cart items to frontend format
@@ -104,7 +98,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         })
         
-        console.log('🛒 Transformed cart items:', transformedItems)
         setItems(transformedItems)
         
         // Also save to localStorage for offline access
@@ -115,7 +108,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('🛒 Could not save to localStorage:', error)
         }
       } else {
-        console.log('🛒 Cart API failed:', response.message)
         // Set error but don't throw - use localStorage as fallback
         const errorMsg = response.message || 'Failed to load cart from server'
         setCartLoadError(errorMsg)
@@ -153,7 +145,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved')
           }))
           setItems(itemsWithReviewStatus)
-          console.log('🛒 Loaded', itemsWithReviewStatus.length, 'items from localStorage fallback')
         }
       } catch (e) {
         console.error('Error loading cart from localStorage:', e)
@@ -182,13 +173,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentItems.length === 0) {
         return
       }
-      
-      console.log('🛒 Syncing cart to database with', currentItems.length, 'items')
-      console.log('🛒 First item customization data:', {
-        hasCustomization: !!currentItems[0]?.customization,
-        hasDesigns: !!currentItems[0]?.customization?.designs?.length,
-        firstDesignPreview: currentItems[0]?.customization?.designs?.[0]?.preview?.substring(0, 50) + '...' || 'none'
-      });
       
       const response = await cartApiService.syncCart(currentItems as any)
       
@@ -219,7 +203,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('🛒 Could not save to localStorage:', error)
         }
         
-        console.log('✅ Cart synced successfully with database')
       } else {
         // Sync failed but don't throw - cart is still usable locally
         const errorMsg = response.message || 'Cart sync failed'
@@ -344,7 +327,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       localStorage.setItem(LOCAL_KEY, cartData)
-      console.log('🛒 Saved items to localStorage:', items.length, 'items, size:', (cartData.length / 1024).toFixed(2), 'KB')
     } catch (error) {
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
         console.error('🛒 localStorage quota exceeded, cart data too large')
@@ -380,7 +362,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } : undefined
           }))
           localStorage.setItem(LOCAL_KEY, JSON.stringify(minimalItems))
-          console.log('🛒 Saved minimal cart data without images')
         } catch (retryError) {
           console.error('🛒 Failed to save even minimal cart data:', retryError)
         }
@@ -445,8 +426,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const add = async (productId: string, qty = 1, customization?: CartItem['customization']): Promise<boolean> => {
-    console.log('🛒 CartContext.add called:', {
-      productId,
       qty,
       hasCustomization: !!customization,
       isLoggedIn,
@@ -475,16 +454,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Find the product to include in cart item
     const product = products.find(p => p.id === productId)
-    console.log('🛒 Found product for cart:', product ? { id: product.id, title: product.title } : 'No product found')
 
-    console.log('🛒 User is logged in, adding to database...')
     // Add to database
     try {
       const response = await cartApiService.addToCart(productId, qty, customization)
-      console.log('🛒 Database API response:', response)
       
       if (response.success && response.data) {
-        console.log('🛒 Database response for addToCart:', {
           productId: response.data.productId,
           hasCustomization: !!response.data.customization,
           hasMockup: !!response.data.customization?.mockup,
@@ -494,8 +469,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Update local state with database response
         const newItems = ((prev: CartItem[]) => {
-          console.log('🛒 Updating local state with database response:', {
-            prevItemsCount: prev.length,
             hasCustomization: !!customization,
             newItemData: response.data
           })
@@ -510,7 +483,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
               reviewStatus: response.data!.reviewStatus || (response.data!.customization ? 'pending' : 'approved'),
               product: product // Include the full product data
             }
-            console.log('🛒 Adding new customized item:', newItem)
             return [...prev, newItem]
           }
           
@@ -548,20 +520,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const compressedItems = compressCartData(newItems)
           localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
-          console.log('🛒 Synchronously saved to localStorage')
         } catch (error) {
           console.warn('🛒 Could not save to localStorage:', error)
         }
         
         setIsCleared(false) // Reset cleared flag when adding items
-        console.log('🛒 Successfully added item to cart, returning true')
         return true
       } else {
-        console.log('🛒 Database response failed or no data:', response)
-        
         // If database add failed but user is still logged in, fall back to localStorage
         // This prevents losing the item if there's a temporary API issue
-        console.log('⚠️ Falling back to localStorage due to API failure')
         setItems((prev) => {
           // For customized items, always add as new item (don't merge with existing)
           if (customization) {
@@ -593,7 +560,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Check if the error is an authentication error
       // If so, don't fail the add to cart - fall back to localStorage
       if (error?.response?.status === 401 || error?.response?.status === 403) {
-        console.log('⚠️ Auth error during add to cart, falling back to localStorage')
         setItems((prev) => {
           if (customization) {
             return [...prev, { 
@@ -623,16 +589,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const remove = async (productId: string) => {
-    console.log('🗑️ Removing item:', productId)
-    
     if (isLoggedIn) {
       // Find the cart item ID for database removal
       const item = items.find((p) => p.productId === productId)
       if (item && item.id) {
         try {
-          console.log('🗑️ Removing from database:', item.id)
           await cartApiService.removeFromCart(typeof item.id === 'string' ? parseInt(item.id) : item.id)
-          console.log('✅ Successfully removed from database')
         } catch (error) {
           console.error('❌ Error removing from cart:', error)
         }
@@ -640,15 +602,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     const updatedItems = items.filter((p) => p.productId !== productId)
-    console.log('🗑️ Updated items:', updatedItems.length)
-    
     setItems(updatedItems)
     
     // Update localStorage for both logged-in and guest users
     try {
       const compressedItems = compressCartData(updatedItems)
       localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
-      console.log('🗑️ Updated localStorage')
     } catch (error) {
       console.warn('🛒 Could not save to localStorage:', error)
     }
@@ -699,13 +658,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
   
   const clear = async () => {
-    console.log('🧹 Clearing cart...')
-    
     if (isLoggedIn) {
       try {
-        console.log('🧹 Clearing database cart...')
         await cartApiService.clearCart()
-        console.log('✅ Successfully cleared database cart')
       } catch (error) {
         console.error('❌ Error clearing cart:', error)
       }
@@ -716,7 +671,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Clear localStorage for both logged-in and guest users
     localStorage.removeItem(LOCAL_KEY)
-    console.log('🧹 Cleared localStorage and state')
   }
 
   const clearLocalStorageIfNeeded = () => {
@@ -730,7 +684,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const sizeInMB = totalSize / 1024 / 1024
-      console.log('🛒 Current localStorage usage:', sizeInMB.toFixed(2), 'MB')
       
       // If localStorage is getting full (>3MB), clear some old data
       if (sizeInMB > 3) {
@@ -744,8 +697,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const cleanupInvalidItems = async () => {
-    console.log('🧹 Checking for invalid cart items...')
-    
     // First identify invalid items
     const invalidItems: CartItem[] = []
     const validItems: CartItem[] = []
@@ -770,7 +721,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // If no invalid items, nothing to do
     if (invalidItems.length === 0) {
-      console.log('✅ No invalid items found in cart')
       return
     }
     
@@ -787,14 +737,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     )
     
     if (shouldRemove) {
-      console.log(`🧹 Removing ${invalidItems.length} invalid items with user confirmation`)
       setItems(validItems)
       
       // Update localStorage with cleaned items
       try {
         const compressedItems = compressCartData(validItems)
         localStorage.setItem(LOCAL_KEY, JSON.stringify(compressedItems))
-        console.log('✅ Cart cleaned up successfully')
       } catch (error) {
         console.warn('🛒 Could not save to localStorage:', error)
       }
@@ -810,7 +758,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       showInfo(`Removed ${invalidItems.length} unavailable item(s) from your cart`, 'Cart Updated')
     } else {
-      console.log('🧹 User chose to keep invalid items')
       showInfo('Invalid items kept in cart. They may cause issues at checkout.', 'Cart Cleanup Skipped')
     }
   }
@@ -818,14 +765,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Method to refresh cart from database (can be called from components)
   const refreshCart = useCallback(async () => {
     if (isLoggedIn && user && user.id) {
-      console.log('🔄 Refreshing cart from database...')
       await loadCartFromDatabase()
     }
   }, [isLoggedIn, user?.id, loadCartFromDatabase])
 
   // Method to manually reload cart (exposed to components for error recovery)
   const reloadCart = useCallback(async () => {
-    console.log('🔄 Manual cart reload requested...')
     setCartLoadError(null)
     setCartSyncError(null)
     

@@ -99,7 +99,6 @@ export default function ProductPage() {
       if (response.success && response.data) {
         setReviews(response.data.reviews)
         setReviewStats(response.data.stats)
-        console.log('✅ Reviews reloaded successfully')
       } else {
         setReviewsError(response.message || 'Failed to load reviews')
       }
@@ -166,18 +165,8 @@ export default function ProductPage() {
     )
   }
 
-  // Debug logging
-  console.log('ProductPage received product:', {
-    id: product.id,
-    title: product.title,
-    image: product.image,
-    images: product.images,
-    primaryImageIndex: product.primaryImageIndex
-  })
-
   // Prepare images for slideshow
   const images = getAllProductImages(product)
-  console.log('ProductPage processed images:', images)
   
   // Calculate total stock from variants
   const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0

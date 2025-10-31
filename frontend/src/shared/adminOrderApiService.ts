@@ -5,6 +5,7 @@
 
 import { Order } from '../admin/types';
 import MultiAccountStorageService from './multiAccountStorage';
+import { apiClient } from './axiosConfig';
 
 export interface OrderApiResponse<T> {
   success: boolean;
@@ -28,7 +29,16 @@ class AdminOrderApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
+    const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_REACT_APP_API_URL;
+    if (envUrl) {
+      this.baseUrl = envUrl;
+    } else if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // Production: use relative URL (nginx will proxy)
+      this.baseUrl = '/api/v1';
+    } else {
+      // Development fallback
+      this.baseUrl = 'http://localhost:5001/api/v1';
+    }
   }
 
   private async makeRequest<T>(
@@ -52,28 +62,26 @@ class AdminOrderApiService {
         }
       }
       
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        credentials: 'include', // Include cookies for session-based auth
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      });
+      const method = (options.method || 'GET').toUpperCase();
+      const url = `${this.baseUrl}${endpoint}`;
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) } as any;
+      const body = options.body ? JSON.parse(options.body as string) : undefined;
 
-      const data = await response.json();
+      const response = await apiClient.request({ url, method, headers, data: body, withCredentials: true });
 
-      if (!response.ok) {
+      const data = response.data;
+
+      if (!data?.success && response.status >= 400) {
         return {
           success: false,
-          error: data.message || `HTTP ${response.status}`,
+          error: data?.message || `HTTP ${response.status}`,
         };
       }
 
       return {
         success: true,
-        data: data.data,
-        message: data.message,
+        data: data?.data,
+        message: data?.message,
       };
     } catch (error) {
       console.error('Order API request failed:', error);

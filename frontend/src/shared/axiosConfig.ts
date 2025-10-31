@@ -28,11 +28,10 @@ const createAxiosInstance = (): AxiosInstance => {
   instance.interceptors.request.use(
     async (config) => {
       // For session-based auth, we rely on cookies (withCredentials: true)
-      console.log('🔐 Axios: Using session-based auth (cookies)');
       return config;
     },
     (error: AxiosError) => {
-      console.error('❌ Axios Request Error:', error);
+      // Silent error handling - let response interceptor handle user notifications
       return Promise.reject(error);
     }
   );
@@ -54,23 +53,25 @@ const createAxiosInstance = (): AxiosInstance => {
         
         // Check if session was revoked
         if (errorData?.code === 'SESSION_REVOKED') {
-          console.log('🔐 Axios: Session was revoked - clearing auth and redirecting to home');
-          // Clear auth data and redirect to home with message
+          try { (window as any).__toast?.({ type: 'warning', title: 'Session expired', message: 'Please sign in again' }); } catch {}
+          // Clear auth data and redirect to home
           MultiAccountStorageService.clearAllAccounts();
-          window.location.href = '/?message=session-revoked';
+          window.location.href = '/';
         } else {
-          console.log('🔐 Axios: 401 error detected - session expired, redirecting to home');
-          // Clear auth data and redirect to home (customer login is modal-based)
+          try { (window as any).__toast?.({ type: 'warning', title: 'Session expired', message: 'Please sign in again' }); } catch {}
+          // Clear auth data and redirect to home
           MultiAccountStorageService.clearAllAccounts();
           window.location.href = '/';
         }
       }
       
-      // Handle other errors
+      // Handle other errors with generic messages
       if (error.response?.status === 403) {
-        console.log('🔐 Axios: 403 Forbidden - insufficient permissions');
+        try { (window as any).__toast?.({ type: 'error', title: 'Access denied', message: 'You do not have permission to perform this action' }); } catch {}
       } else if (error.response?.status && error.response.status >= 500) {
-        console.error('❌ Axios: Server error:', error.response.status);
+        try { (window as any).__toast?.({ type: 'error', title: 'Something went wrong', message: 'Please try again later' }); } catch {}
+      } else if (error.response?.status >= 400) {
+        try { (window as any).__toast?.({ type: 'error', title: 'Request failed', message: 'Please check your input and try again' }); } catch {}
       }
       
       return Promise.reject(error);
@@ -86,12 +87,6 @@ const createAxiosInstance = (): AxiosInstance => {
 const updateActivity = (): void => {
   const currentAccount = MultiAccountStorageService.getCurrentAccountData();
   if (currentAccount) {
-    console.log('🔄 Updating activity for account:', {
-      accountType: currentAccount.user.accountType,
-      sessionId: currentAccount.session?.sessionId,
-      hasSessionId: !!currentAccount.session?.sessionId
-    });
-    
     MultiAccountStorageService.storeAccountAuthData(
       currentAccount.user.accountType,
       {

@@ -69,13 +69,6 @@ export default function Payment() {
   // Get order ID from URL or location state
   const orderId = new URLSearchParams(location.search).get('orderId') || location.state?.orderId
   
-  // Debug: Log component mount and URL params
-  console.log('💳 Payment component mounted/updated:', {
-    orderId,
-    fullURL: window.location.href,
-    search: window.location.search,
-    locationState: location.state
-  })
 
   // Backend products state (for pricing calculations)
   const [backendProducts, setBackendProducts] = useState<any[]>([])
@@ -84,13 +77,10 @@ export default function Payment() {
   useEffect(() => {
     const loadBackendProducts = async () => {
       try {
-        const response = await fetch(`${(import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1'}/products`, {
-          credentials: 'include'
-        })
-        const data = await response.json()
+        const { apiClient } = await import('../../shared/axiosConfig')
+        const { data } = await apiClient.get('/products', { withCredentials: true })
         if (data.success && data.data) {
           setBackendProducts(data.data)
-          console.log('📦 Loaded backend products:', data.data.length)
         } else {
           console.warn('⚠️ Failed to load backend products, using cached data')
           // Show warning if products fail to load
@@ -191,18 +181,8 @@ export default function Payment() {
     const paypalToken = urlParams.get('token')
     const payerId = urlParams.get('PayerID')
 
-    console.log('🔍 Payment return detected:', { 
-      success, 
-      canceled, 
-      paypalToken, 
-      payerId,
-      orderData: orderData ? 'loaded' : 'not loaded',
-      loading 
-    })
-
     // Handle Stripe success
     if (success === 'true' && orderId) {
-      console.log('✅ Stripe payment success')
       showSuccess('Payment completed successfully! Redirecting to your orders...')
       
       // Add a small delay to ensure the success message is visible
@@ -223,15 +203,11 @@ export default function Payment() {
     }
     // Handle PayPal success - ONLY after order data is loaded
     else if (paypalToken && payerId) {
-      console.log('🔍 PayPal return detected, checking orderData...')
-      
       if (!orderData && loading) {
-        console.log('⏳ Waiting for order data to load...')
         return // Wait for orderData to load
       }
       
       if (orderData && !loading) {
-        console.log('✅ PayPal payment success, capturing payment...')
         handlePayPalReturn(paypalToken)
       } else if (!orderData && !loading) {
         console.error('❌ Order data failed to load')
@@ -282,8 +258,7 @@ export default function Payment() {
             ? JSON.parse(order.shipping_address)
             : order.shipping_address
           
-          console.log('🔍 Raw shipping address from DB:', shippingAddr)
-          console.log('🔍 Address field names:', shippingAddr ? Object.keys(shippingAddr) : 'null')
+          // Normalizing shipping address from database
           
           // Normalize address field names (handle different formats)
           if (shippingAddr) {
@@ -300,8 +275,6 @@ export default function Payment() {
               country: shippingAddr.country || 'US'
             }
             
-            console.log('📍 Normalized shipping address:', shippingAddr)
-            console.log('📍 Address field value:', shippingAddr.address)
             
             // Validate critical address fields and provide specific feedback
             const missingFields: string[] = []
@@ -351,12 +324,6 @@ export default function Payment() {
             total: Number(order.total) || (subtotal + Number(order.shipping || 0) + Number(order.tax || 0))
           })
           
-          console.log('✅ Order data loaded for payment:', {
-            orderId: order.id,
-            status: order.status,
-            total: order.total,
-            itemsCount: orderItems.length
-          })
         }
       } catch (error) {
         console.error('Error loading order data:', error)
@@ -414,14 +381,6 @@ export default function Payment() {
     // Add shipping and tax to get the correct total
     const correctTotal = itemsSubtotal + order.shipping + order.tax
     
-    console.log('💰 Order total calculation:', {
-      itemsSubtotal: itemsSubtotal.toFixed(2),
-      shipping: order.shipping.toFixed(2),
-      tax: order.tax.toFixed(2),
-      correctTotal: correctTotal.toFixed(2),
-      storedTotal: order.total.toFixed(2)
-    })
-    
     return correctTotal
   }
 
@@ -478,13 +437,7 @@ export default function Payment() {
       const successUrl = `${window.location.origin}/payment?success=true&orderId=${orderData.id}`
       const cancelUrl = `${window.location.origin}/payment?canceled=true&orderId=${orderData.id}`
       
-      console.log('💳 Starting Stripe checkout with address:', {
-        orderId: orderData.id,
-        orderNumber: orderData.orderNumber,
-        shippingAddress: orderData.shippingAddress
-      })
-
-      console.log('💳 Stripe lineItems being sent:', JSON.stringify(lineItems, null, 2))
+      // Starting Stripe checkout
       
       const response = await paymentsApiService.createCheckoutSession({
         lineItems,
@@ -515,25 +468,16 @@ export default function Payment() {
         },
       })
 
-      console.log('💳 Stripe response:', response)
-
       if (response.success && response.data?.url) {
         // Redirect to hosted Stripe Checkout
         window.location.href = response.data.url
         return
       }
 
-      console.error('❌ Stripe checkout failed:', response)
-      showError(response.message || 'Failed to create checkout session')
+      showError('Something went wrong. Please try again.')
       setIsProcessing(false)
     } catch (error: any) {
-      console.error('❌ Stripe payment error:', error)
-      console.error('Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        stack: error?.stack
-      })
-      showError(error?.response?.data?.message || error?.message || 'Failed to process payment. Please try again.')
+      showError('Something went wrong. Please try again.')
       setIsProcessing(false)
     }
   }
@@ -545,11 +489,6 @@ export default function Payment() {
     try {
       setIsProcessing(true)
       
-      console.log('💳 Starting PayPal checkout with order data:', {
-        orderId: orderData.id,
-        orderNumber: orderData.orderNumber,
-        shippingAddress: orderData.shippingAddress
-      })
       
       // Build PayPal order items
       const items = orderData.items.map((item) => {
@@ -617,64 +556,24 @@ export default function Payment() {
         cancelUrl: `${window.location.origin}/payment?paypal_canceled=true&orderId=${orderData.id}`,
       }
       
-      console.log('📦 PayPal payload being sent:', {
-        amount: paypalPayload.amount,
-        shippingAddress: paypalPayload.shippingAddress,
-        customerInfo: paypalPayload.customerInfo,
-        itemsCount: paypalPayload.items.length,
-        items: JSON.stringify(paypalPayload.items, null, 2)
-      })
-
       const response = await paymentsApiService.createPayPalOrder(paypalPayload)
-      
-      console.log('📦 PayPal API response:', response)
 
       if (response.success && response.data?.approvalUrl) {
-        console.log('✅ PayPal order created:', {
-          paypalOrderId: response.data.id,
-          approvalUrl: response.data.approvalUrl,
-          ourOrderId: orderData.id
-        })
-        
         // Store PayPal order ID and flags to bypass auth check when returning from PayPal
-        // The PayPal order ID is needed to capture the payment
-        // The token in the return URL is different from the order ID
-        sessionStorage.setItem('paypal_order_id', response.data.id) // ✅ Store actual PayPal order ID
+        sessionStorage.setItem('paypal_order_id', response.data.id)
         sessionStorage.setItem('paypal_return_expected', String(orderData.id))
         sessionStorage.setItem('paypal_return_timestamp', String(Date.now()))
-        console.log('💾 Saved PayPal order ID and return flags:', {
-          paypalOrderId: response.data.id,
-          ourOrderId: orderData.id
-        })
         
         // Redirect to PayPal for approval
         window.location.href = response.data.approvalUrl
         return
       }
 
-      // Show detailed error messages if validation errors exist
-      console.error('❌ PayPal order creation failed:', {
-        success: response.success,
-        errors: response.errors,
-        message: response.message
-      })
-      
-      if (response.errors && Array.isArray(response.errors) && response.errors.length > 0) {
-        const errorMessage = response.errors.join('\n')
-        showError(errorMessage)
-      } else {
-        showError(response.message || 'Failed to create PayPal order')
-      }
+      // Show generic error message
+      showError('Something went wrong. Please try again.')
       setIsProcessing(false)
     } catch (error: any) {
-      console.error('PayPal payment error:', error)
-      // Check if error response has validation errors
-      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-        const errorMessage = error.response.data.errors.join('\n')
-        showError(errorMessage)
-      } else {
-        showError('Failed to process payment. Please try again.')
-      }
+      showError('Something went wrong. Please try again.')
       setIsProcessing(false)
     }
   }
@@ -688,30 +587,19 @@ export default function Payment() {
       // The token in the URL is NOT the order ID - we need the ID we saved before redirect
       const paypalOrderId = sessionStorage.getItem('paypal_order_id')
       
-      console.log('🔄 Capturing PayPal payment...', { 
-        urlToken: paypalToken, 
-        paypalOrderId: paypalOrderId,
-        orderId: orderData?.id,
-        orderNumber: orderData?.orderNumber,
-        total: getCorrectOrderTotal(orderData!)
-      })
-
       if (!paypalOrderId) {
-        console.error('❌ PayPal order ID not found in sessionStorage')
-        showError('PayPal order information missing. Please try again.')
+        showError('Something went wrong. Please try again.')
         navigate('/my-orders')
         return
       }
 
       if (!orderData) {
-        console.error('❌ Order data not available for PayPal capture')
-        showError('Order information not loaded')
+        showError('Something went wrong. Please try again.')
         navigate('/my-orders')
         return
       }
 
       // Capture the PayPal order using the actual PayPal order ID
-      console.log('📤 Sending capture request to backend with PayPal order ID:', paypalOrderId)
       const response = await paymentsApiService.capturePayPalOrder({
         orderId: paypalOrderId, // ✅ Use the actual PayPal order ID, not the token
         metadata: {
@@ -730,16 +618,11 @@ export default function Payment() {
         }
       })
 
-      console.log('📦 PayPal capture response:', response)
-
       if (response.success) {
-        console.log('✅ PayPal payment captured successfully, redirecting to My Orders...')
-        
         // Clear PayPal return flags and order ID after successful capture
         sessionStorage.removeItem('paypal_order_id')
         sessionStorage.removeItem('paypal_return_expected')
         sessionStorage.removeItem('paypal_return_timestamp')
-        console.log('🧹 Cleared PayPal sessionStorage data')
         
         showSuccess('Payment completed successfully! Redirecting to your orders...')
         
@@ -754,65 +637,13 @@ export default function Payment() {
           })
         }, 1500)
       } else {
-        console.error('❌ PayPal capture failed:', response.message)
-        
-        // Provide specific guidance based on error type
-        let errorTitle = 'PayPal Payment Failed'
-        let errorMessage = response.message || 'Failed to capture PayPal payment'
-        
-        // Check if it's a duplicate capture attempt
-        if (response.message?.includes('already') || response.message?.includes('duplicate')) {
-          errorTitle = 'Payment Already Processed'
-          errorMessage = 'This payment has already been processed. Please check "My Orders" to confirm.'
-        }
-        // Check if PayPal declined
-        else if (response.message?.includes('declined') || response.message?.includes('insufficient')) {
-          errorTitle = 'Payment Declined'
-          errorMessage = 'PayPal declined this payment. Please check your PayPal account or try a different payment method.'
-        }
-        // Generic retry message
-        else {
-          errorMessage = `${errorMessage} You can try again or choose a different payment method.`
-        }
-        
-        showError(errorMessage, errorTitle)
+        // Generic error message for user
+        showError('Something went wrong. Please check your orders or try again.')
         // Don't navigate away - allow user to retry or choose different method
       }
     } catch (error: any) {
-      console.error('❌ PayPal capture error:', error)
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response?.data
-      })
-      
-      // Categorize error for user guidance
-      let errorTitle = 'PayPal Payment Error'
-      let errorMessage = 'Failed to complete PayPal payment.'
-      
-      if (error?.response?.status === 400) {
-        errorTitle = 'Invalid Payment Data'
-        errorMessage = 'The payment information is invalid. Please try again or contact support.'
-      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
-        errorTitle = 'Authentication Error'
-        errorMessage = 'Payment session expired. Please return to checkout and try again.'
-      } else if (error?.response?.status === 409) {
-        errorTitle = 'Payment Already Processed'
-        errorMessage = 'This payment may have already been processed. Please check "My Orders" before retrying.'
-      } else if (error?.response?.status >= 500) {
-        errorTitle = 'Server Error'
-        errorMessage = 'Our server encountered an error. Your payment may not have been processed. Please check your PayPal account before retrying.'
-      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
-        errorTitle = 'Connection Timeout'
-        errorMessage = 'Payment verification timed out. Please check your PayPal account to confirm if payment was processed before retrying.'
-      } else if (!navigator.onLine) {
-        errorTitle = 'No Internet Connection'
-        errorMessage = 'Lost connection during payment. Please check your internet and verify payment status in your PayPal account.'
-      } else {
-        errorMessage += ' Please contact support if the issue persists.'
-      }
-      
-      showError(errorMessage, errorTitle)
-      // Don't navigate away - let user check PayPal and retry if needed
+      // Generic error message
+      showError('Something went wrong. Please try again.')
     } finally {
       setIsProcessing(false)
     }

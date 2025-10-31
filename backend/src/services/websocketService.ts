@@ -280,6 +280,25 @@ export class WebSocketService {
 
       // Handle chat messages (text or attachment)
       socket.on('chat_message', async (data: { messageId: string; text?: string; customerId: string; timestamp: string; type?: 'text' | 'image' | 'file'; attachment?: any; email?: string }) => {
+        // Basic payload validation and size checks for attachments
+        try {
+          if (!data || !data.customerId || typeof data.customerId !== 'string') {
+            return;
+          }
+          if (data.type === 'image' || data.type === 'file') {
+            // If attachment is base64 string, approximate size
+            const MAX_BYTES = 2 * 1024 * 1024; // 2MB per message
+            const isBase64 = typeof data.attachment === 'string' && /^data:.*;base64,/.test(data.attachment);
+            if (isBase64) {
+              const b64 = (data.attachment as string).split(',')[1] || '';
+              const approxBytes = Math.ceil(b64.length * 0.75);
+              if (approxBytes > MAX_BYTES) {
+                logger.warn(`Rejected chat attachment >2MB for customer ${data.customerId}`);
+                return;
+              }
+            }
+          }
+        } catch {}
         logger.info(`💬 Chat message from ${socket.id} for customer ${data.customerId}: ${data.text}`);
 
         // Determine sender based on room membership
@@ -357,17 +376,20 @@ export class WebSocketService {
               ? `User ${data.customerId} is offline` 
               : `Admin is offline`;
             logger.info(`📧 ${reason}, sending email notification`);
-            
-            emailWebhookService.sendChatMessageWebhook({
-              messageId: data.messageId,
-              text: data.text,
-              sender,
-              customerId: data.customerId,
-              type: data.type ?? 'text',
-              attachment: data.attachment ?? null,
-              name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
-              email: profile?.email || data.email || null
-            });
+            try {
+              await emailWebhookService.sendChatMessageWebhook({
+                messageId: data.messageId,
+                text: data.text,
+                sender,
+                customerId: data.customerId,
+                type: data.type ?? 'text',
+                attachment: data.attachment ?? null,
+                name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || null : null,
+                email: profile?.email || data.email || null
+              });
+            } catch (notifyErr: any) {
+              logger.warn(`Failed to send chat email webhook: ${notifyErr?.message || notifyErr}`);
+            }
           } else {
             const reason = sender === 'admin' 
               ? `User ${data.customerId} is online` 

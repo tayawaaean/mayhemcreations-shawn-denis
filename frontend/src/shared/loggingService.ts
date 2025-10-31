@@ -62,17 +62,11 @@ class LoggingService {
     }
 
     try {
-      const response = await fetch(this.config.backendEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(logEntry)
+      const { axios } = await import('./axiosConfig')
+      await axios.post(this.config.backendEndpoint, logEntry, {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: false,
       })
-
-      if (!response.ok) {
-        console.warn('Failed to send log to backend:', response.status)
-      }
     } catch (error) {
       console.warn('Error sending log to backend:', error)
     }

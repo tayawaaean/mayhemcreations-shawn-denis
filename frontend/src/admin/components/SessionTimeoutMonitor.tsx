@@ -36,19 +36,11 @@ const SessionTimeoutMonitor: React.FC<SessionTimeoutMonitorProps> = ({
   // Extend session (make a light API call to keep session alive)
   const extendSession = useCallback(async () => {
     try {
-      // Make a lightweight API call to refresh session
-      const response = await fetch('/api/auth/profile', {
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        resetActivity();
-        console.log('✅ Session extended successfully');
-      } else {
-        console.error('❌ Failed to extend session');
-      }
-    } catch (error) {
-      console.error('❌ Error extending session:', error);
+      const { apiClient } = await import('../../shared/axiosConfig')
+      await apiClient.get('/auth/profile', { withCredentials: true })
+      resetActivity()
+    } catch {
+      // silent; UI will handle on next auth-guarded action
     }
   }, [resetActivity]);
 

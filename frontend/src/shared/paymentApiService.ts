@@ -68,11 +68,22 @@ export interface PayPalCaptureData {
   };
 }
 
+import { apiClient } from './axiosConfig';
+
 class PaymentApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5001/api/v1';
+    const envUrl = (import.meta as any).env.VITE_API_BASE_URL || (import.meta as any).env.VITE_REACT_APP_API_URL;
+    if (envUrl) {
+      this.baseUrl = envUrl;
+    } else if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // Production: use relative URL (nginx will proxy)
+      this.baseUrl = '/api/v1';
+    } else {
+      // Development fallback
+      this.baseUrl = 'http://localhost:5001/api/v1';
+    }
   }
 
   private async makeRequest<T>(
@@ -80,36 +91,23 @@ class PaymentApiService {
     options: RequestInit = {}
   ): Promise<PaymentApiResponse<T>> {
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        credentials: 'include', // Include cookies for session-based auth
-      });
+      const method = (options.method || 'GET').toUpperCase();
+      const url = `${this.baseUrl}${endpoint}`;
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) } as any;
+      const data = options.body ? JSON.parse(options.body as string) : undefined;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.message || `HTTP ${response.status}`,
-          timestamp: new Date().toISOString(),
-        };
-      }
+      const response = await apiClient.request({ url, method, headers, data, withCredentials: true });
 
       return {
         success: true,
-        data: data.data,
-        message: data.message,
-        timestamp: data.timestamp || new Date().toISOString(),
+        data: response.data?.data,
+        message: response.data?.message,
+        timestamp: response.data?.timestamp || new Date().toISOString(),
       };
-    } catch (error) {
-      console.error('Payment API request failed:', error);
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Network error',
+        error: error?.response?.data?.message || error?.message || 'Network error',
         timestamp: new Date().toISOString(),
       };
     }

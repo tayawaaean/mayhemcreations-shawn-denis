@@ -471,7 +471,7 @@ export class AuthController {
       );
 
       // Debug: Log the session data
-      console.log('🔍 Session data created:', {
+      logger.debug('Session data created:', {
         sessionId: sessionData.sessionId,
         userId: sessionData.userId,
         email: sessionData.email,
