@@ -11,11 +11,13 @@ import {
   handlePayPalWebhook
 } from '../controllers/paypalController';
 import { sessionAuthenticate } from '../middlewares/auth';
+import { webhookBodyParser } from '../middlewares/webhookMiddleware';
 
 const router = Router();
 
 // Webhook route (no authentication required - called by PayPal)
-router.post('/webhook', handlePayPalWebhook);
+// Uses webhookBodyParser middleware to preserve raw body for signature verification
+router.post('/webhook', webhookBodyParser, handlePayPalWebhook);
 
 // All other PayPal routes require authentication (supports session or bearer)
 router.use(sessionAuthenticate);

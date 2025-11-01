@@ -26,8 +26,8 @@ export const stripeConfig = {
   paymentMethodTypes: ['card'] as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
   
   // Success/Cancel URLs (will be set dynamically based on request)
-  successUrl: process.env.STRIPE_SUCCESS_URL || 'http://localhost:3000/payment/success',
-  cancelUrl: process.env.STRIPE_CANCEL_URL || 'http://localhost:3000/payment/cancel',
+  successUrl: process.env.STRIPE_SUCCESS_URL || 'http://localhost:5001/payment/success',
+  cancelUrl: process.env.STRIPE_CANCEL_URL || 'http://localhost:5001/payment/cancel',
 };
 
 // Validate Stripe configuration

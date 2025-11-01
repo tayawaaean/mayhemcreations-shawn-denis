@@ -23,7 +23,7 @@ if (process.env.NODE_ENV === 'production' && process.env.REDIS_URL) {
 // Session configuration
 const sessionConfig = session({
   store: sessionStore,
-  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key-change-in-production',
+  secret: process.env.SESSION_SECRET || '7a80de5c6e5655e65a10721fb48115b879da18c28a28e0a51ff08b98ec896934',
   resave: false,
   saveUninitialized: false, // Don't create session until something stored
   rolling: true, // Reset expiration on every request

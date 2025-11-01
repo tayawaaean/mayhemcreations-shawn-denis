@@ -436,20 +436,150 @@ export const retrievePayPalOrder = async (orderId: string): Promise<PayPalOrderD
 
 /**
  * Verify PayPal Webhook Signature
- * Note: This is a placeholder implementation for development
- * In production, implement proper signature verification
+ * Uses PayPal's Verify Webhook Signature API to validate webhook authenticity
+ * Reference: https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
  */
-export const verifyPayPalWebhookSignature = (headers: any, body: string, webhookId?: string) => {
+export const verifyPayPalWebhookSignature = async (
+  headers: any, 
+  body: string | object, 
+  webhookId?: string
+): Promise<boolean> => {
   try {
-    logger.info('PayPal webhook signature verification (mock)', {
-      webhookId: webhookId || 'mock_webhook_id',
-    });
+    // Support environment-specific webhook IDs
+    // If PAYPAL_ENVIRONMENT=production, use PAYPAL_WEBHOOK_ID_LIVE (if set), otherwise use PAYPAL_WEBHOOK_ID
+    // If PAYPAL_ENVIRONMENT=sandbox, use PAYPAL_WEBHOOK_ID_SANDBOX (if set), otherwise use PAYPAL_WEBHOOK_ID
+    const environment = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
+    let webhookIdToUse = webhookId;
     
-    // For development, always return true
-    // In production, implement proper signature verification
-    return true;
+    if (!webhookIdToUse) {
+      if (environment === 'production' && process.env.PAYPAL_WEBHOOK_ID_LIVE) {
+        webhookIdToUse = process.env.PAYPAL_WEBHOOK_ID_LIVE;
+      } else if (environment === 'sandbox' && process.env.PAYPAL_WEBHOOK_ID_SANDBOX) {
+        webhookIdToUse = process.env.PAYPAL_WEBHOOK_ID_SANDBOX;
+      } else {
+        webhookIdToUse = process.env.PAYPAL_WEBHOOK_ID;
+      }
+    }
+    
+    if (!webhookIdToUse) {
+      logger.error('PayPal webhook ID not configured', {
+        environment,
+        hasLive: !!process.env.PAYPAL_WEBHOOK_ID_LIVE,
+        hasSandbox: !!process.env.PAYPAL_WEBHOOK_ID_SANDBOX,
+        hasDefault: !!process.env.PAYPAL_WEBHOOK_ID,
+      });
+      throw new Error(`PAYPAL_WEBHOOK_ID${environment === 'production' ? '_LIVE' : '_SANDBOX'} or PAYPAL_WEBHOOK_ID is required for webhook verification`);
+    }
+
+    // Extract required headers from PayPal webhook
+    const authAlgo = headers['paypal-auth-algo'] as string;
+    const certUrl = headers['paypal-cert-url'] as string;
+    const transmissionId = headers['paypal-transmission-id'] as string;
+    const transmissionSig = headers['paypal-transmission-sig'] as string;
+    const transmissionTime = headers['paypal-transmission-time'] as string;
+
+    // Validate all required headers are present
+    if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
+      logger.error('Missing required PayPal webhook headers', {
+        hasAuthAlgo: !!authAlgo,
+        hasCertUrl: !!certUrl,
+        hasTransmissionId: !!transmissionId,
+        hasTransmissionSig: !!transmissionSig,
+        hasTransmissionTime: !!transmissionTime,
+      });
+      throw new Error('Missing required PayPal webhook headers');
+    }
+
+    // Convert body to JSON string if it's an object
+    const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+
+    // Prepare webhook event from body
+    const webhookEvent = typeof body === 'object' ? body : JSON.parse(bodyString);
+
+    // Use PayPal REST API directly to verify webhook signature
+    // Reference: https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
+    // The checkout-server-sdk doesn't include webhook verification, so we use REST API directly
+    
+    // Get access token for REST API call using axios
+    const axios = await import('axios');
+    
+    // Get the PayPal base URL based on environment
+    const baseUrl = process.env.PAYPAL_ENVIRONMENT === 'production' 
+      ? 'https://api-m.paypal.com'
+      : 'https://api-m.sandbox.paypal.com';
+    
+    // Prepare verification request body
+    const verificationPayload = {
+      auth_algo: authAlgo,
+      cert_url: certUrl,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: transmissionTime,
+      webhook_id: webhookIdToUse,
+      webhook_event: webhookEvent,
+    };
+
+    // Get OAuth token for the API call
+    // We'll need to use PayPal's OAuth endpoint to get a token
+    const clientId = process.env.PAYPAL_CLIENT_ID || '';
+    const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+    
+    // Get OAuth token
+    const tokenResponse = await axios.default.post(
+      `${baseUrl}/v1/oauth2/token`,
+      'grant_type=client_credentials',
+      {
+        auth: {
+          username: clientId,
+          password: clientSecret,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Call PayPal's Verify Webhook Signature endpoint
+    const verifyResponse = await axios.default.post(
+      `${baseUrl}/v1/notifications/verify-webhook-signature`,
+      verificationPayload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const verificationStatus = verifyResponse.data.verification_status;
+
+    // Check verification status
+    if (verificationStatus === 'SUCCESS') {
+      logger.info('PayPal webhook signature verified successfully', {
+        webhookId: webhookIdToUse,
+        transmissionId: transmissionId,
+      });
+      return true;
+    } else {
+      logger.error('PayPal webhook signature verification failed', {
+        webhookId: webhookIdToUse,
+        verificationStatus: verificationStatus,
+        transmissionId: transmissionId,
+      });
+      return false;
+    }
   } catch (error: any) {
-    logger.error('PayPal webhook signature verification failed:', error);
+    logger.error('Error verifying PayPal webhook signature:', error);
+    
+    // In development, allow unverified webhooks for testing
+    // In production, reject unverified webhooks
+    if (process.env.NODE_ENV === 'development' && !process.env.PAYPAL_WEBHOOK_ID) {
+      logger.warn('⚠️ PayPal webhook verification skipped in development (PAYPAL_WEBHOOK_ID not set)');
+      return true; // Allow in development for testing
+    }
+    
     throw new Error(`PayPal webhook signature verification failed: ${error.message}`);
   }
 };

@@ -8,6 +8,7 @@ import {
   createPayPalOrder, 
   capturePayPalOrder, 
   retrievePayPalOrder,
+  verifyPayPalWebhookSignature,
   CreatePayPalOrderData,
   CapturePayPalOrderData,
   validatePayPalOrderData
@@ -25,9 +26,163 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Create PayPal Order
- * @route POST /api/v1/payments/paypal/create-order
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/payments/paypal/create-order:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Create a PayPal order
+ *     description: Creates a new PayPal order with the provided payment details. Returns a PayPal order ID that can be used for payment processing.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *               - items
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 format: float
+ *                 example: 99.99
+ *                 description: Total order amount
+ *               currency:
+ *                 type: string
+ *                 default: USD
+ *                 example: USD
+ *                 description: Payment currency
+ *               description:
+ *                 type: string
+ *                 example: Mayhem Creations Order
+ *                 description: Order description
+ *               items:
+ *                 type: array
+ *                 description: Order items
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: Custom T-Shirt
+ *                     quantity:
+ *                       type: integer
+ *                       example: 1
+ *                     price:
+ *                       type: number
+ *                       format: float
+ *                       example: 99.99
+ *               customerInfo:
+ *                 type: object
+ *                 properties:
+ *                   email:
+ *                     type: string
+ *                     format: email
+ *                     example: customer@example.com
+ *                   name:
+ *                     type: string
+ *                     example: John Doe
+ *                   phone:
+ *                     type: string
+ *                     example: +15551234567
+ *               shippingAddress:
+ *                 type: object
+ *                 description: Shipping address
+ *                 properties:
+ *                   street:
+ *                     type: string
+ *                     example: 123 Main St
+ *                   city:
+ *                     type: string
+ *                     example: Columbus
+ *                   state:
+ *                     type: string
+ *                     example: OH
+ *                   zipCode:
+ *                     type: string
+ *                     example: 43017
+ *                   country:
+ *                     type: string
+ *                     default: US
+ *                     example: US
+ *               metadata:
+ *                 type: object
+ *                 description: Additional order metadata
+ *               returnUrl:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://example.com/payment/success
+ *                 description: URL to redirect after successful payment
+ *               cancelUrl:
+ *                 type: string
+ *                 format: uri
+ *                 example: https://example.com/payment/cancel
+ *                 description: URL to redirect if payment is cancelled
+ *           examples:
+ *             basicOrder:
+ *               summary: Basic order
+ *               value:
+ *                 amount: 99.99
+ *                 currency: USD
+ *                 items:
+ *                   - name: Custom T-Shirt
+ *                     quantity: 1
+ *                     price: 99.99
+ *                 returnUrl: https://example.com/payment/success
+ *                 cancelUrl: https://example.com/payment/cancel
+ *     responses:
+ *       201:
+ *         description: PayPal order created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: 5O190127TN364715T
+ *                           description: PayPal order ID
+ *                         status:
+ *                           type: string
+ *                           example: CREATED
+ *                         links:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *       400:
+ *         description: Invalid order data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               invalidData:
+ *                 summary: Invalid order data
+ *                 value:
+ *                   success: false
+ *                   message: Invalid order data
+ *                   code: INVALID_ORDER_DATA
+ *                   errors:
+ *                     - msg: Amount is required
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const createPayPalOrderHandler = async (
   req: AuthenticatedRequest, 
@@ -116,9 +271,100 @@ export const createPayPalOrderHandler = async (
 };
 
 /**
- * Capture PayPal Order
- * @route POST /api/v1/payments/paypal/capture-order
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/payments/paypal/capture-order:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Capture a PayPal order
+ *     description: Captures payment for an approved PayPal order. This completes the payment transaction and updates the order status.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - orderId
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *                 example: 5O190127TN364715T
+ *                 description: PayPal order ID from create-order response
+ *               metadata:
+ *                 type: object
+ *                 description: Additional order metadata
+ *                 properties:
+ *                   subtotal:
+ *                     type: number
+ *                     example: 89.99
+ *                   shipping:
+ *                     type: number
+ *                     example: 5.00
+ *                   tax:
+ *                     type: number
+ *                     example: 5.00
+ *                   total:
+ *                     type: number
+ *                     example: 99.99
+ *                   customerName:
+ *                     type: string
+ *                     example: John Doe
+ *                   customerEmail:
+ *                     type: string
+ *                     format: email
+ *                     example: customer@example.com
+ *               orderData:
+ *                 type: object
+ *                 description: Complete order data
+ *           examples:
+ *             captureOrder:
+ *               summary: Capture order
+ *               value:
+ *                 orderId: 5O190127TN364715T
+ *                 metadata:
+ *                   subtotal: 89.99
+ *                   shipping: 5.00
+ *                   tax: 5.00
+ *                   total: 99.99
+ *     responses:
+ *       200:
+ *         description: PayPal order captured successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: 5O190127TN364715T
+ *                         status:
+ *                           type: string
+ *                           example: COMPLETED
+ *       400:
+ *         description: Missing or invalid order ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const capturePayPalOrderHandler = async (
   req: AuthenticatedRequest, 
@@ -419,9 +665,71 @@ export const capturePayPalOrderHandler = async (
 };
 
 /**
- * Get PayPal Order Status
- * @route GET /api/v1/payments/paypal/order/:orderId
- * @access Private
+ * @swagger
+ * /api/v1/payments/paypal/order/{orderId}:
+ *   get:
+ *     tags: [Payments]
+ *     summary: Get PayPal order status
+ *     description: Retrieves the current status and details of a PayPal order by order ID.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: orderId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: PayPal order ID
+ *         example: 5O190127TN364715T
+ *     responses:
+ *       200:
+ *         description: PayPal order retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: 5O190127TN364715T
+ *                         status:
+ *                           type: string
+ *                           example: COMPLETED
+ *                         amount:
+ *                           type: number
+ *                           example: 99.99
+ *                         payer:
+ *                           type: object
+ *                           description: Payer information
+ *                         createTime:
+ *                           type: string
+ *                           format: date-time
+ *                         updateTime:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Missing order ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getPayPalOrderStatus = async (
   req: AuthenticatedRequest, 
@@ -466,9 +774,67 @@ export const getPayPalOrderStatus = async (
 };
 
 /**
- * Handle PayPal Webhook Events
- * @route POST /api/v1/payments/paypal/webhook
- * @access Public (PayPal only)
+ * @swagger
+ * /api/v1/payments/paypal/webhook:
+ *   post:
+ *     tags: [Webhooks]
+ *     summary: PayPal webhook endpoint
+ *     description: Receives and processes webhook events from PayPal. This endpoint verifies webhook signatures and handles payment events.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Webhook event ID
+ *               event_type:
+ *                 type: string
+ *                 example: PAYMENT.CAPTURE.COMPLETED
+ *                 description: Type of webhook event
+ *               resource_type:
+ *                 type: string
+ *                 example: capture
+ *               resource:
+ *                 type: object
+ *                 description: Event resource data
+ *               create_time:
+ *                 type: string
+ *                 format: date-time
+ *           examples:
+ *             paymentCompleted:
+ *               summary: Payment capture completed
+ *               value:
+ *                 id: WH-2W42680A68360706X-620RTSHUQI042
+ *                 event_type: PAYMENT.CAPTURE.COMPLETED
+ *                 resource_type: capture
+ *                 create_time: '2025-11-01T12:00:00Z'
+ *     responses:
+ *       200:
+ *         description: Webhook received and processed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *       400:
+ *         description: Invalid webhook signature or format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const handlePayPalWebhook = async (
   req: Request, 
@@ -477,18 +843,39 @@ export const handlePayPalWebhook = async (
 ): Promise<void> => {
   try {
     const headers = req.headers;
-    const body = JSON.stringify(req.body);
+    // Use raw body if available (for signature verification), otherwise use parsed body
+    const body = (req as any).rawBody || req.body;
+    const webhookId = process.env.PAYPAL_WEBHOOK_ID;
 
-    // Verify webhook signature (implement proper verification in production)
-    // const isValid = verifyPayPalWebhookSignature(headers, body);
-    // if (!isValid) {
-    //   res.status(400).json({
-    //     success: false,
-    //     message: 'Invalid webhook signature',
-    //     code: 'INVALID_SIGNATURE',
-    //   });
-    //   return;
-    // }
+    // Verify webhook signature using PayPal's verification API
+    try {
+      const isValid = await verifyPayPalWebhookSignature(headers, body, webhookId);
+      if (!isValid) {
+        logger.error('PayPal webhook signature verification failed');
+        res.status(400).json({
+          success: false,
+          message: 'Invalid webhook signature',
+          code: 'INVALID_SIGNATURE',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+    } catch (verificationError: any) {
+      // In development, allow webhooks without verification for testing
+      // In production, reject invalid signatures
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('PayPal webhook verification error in production:', verificationError);
+        res.status(400).json({
+          success: false,
+          message: 'Webhook signature verification failed',
+          code: 'VERIFICATION_ERROR',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      } else {
+        logger.warn('PayPal webhook verification skipped in development:', verificationError.message);
+      }
+    }
 
     const event = req.body;
     const eventType = event.event_type;

@@ -5,7 +5,86 @@ import { Op } from 'sequelize';
 import { getWebSocketService } from '../services/websocketService';
 
 /**
- * Get all variants with optional filtering
+ * @swagger
+ * /api/v1/variants:
+ *   get:
+ *     tags: [Products]
+ *     summary: Get all product variants
+ *     description: Retrieves a paginated list of product variants with optional filtering and searching.
+ *     parameters:
+ *       - in: query
+ *         name: productId
+ *         schema:
+ *           type: integer
+ *         description: Filter by product ID
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: string
+ *           enum: [true, false, all]
+ *           default: true
+ *         description: Filter by active status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search variants by name, SKU, color, or size
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: Items per page
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: createdAt
+ *         description: Field to sort by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [ASC, DESC]
+ *           default: DESC
+ *         description: Sort order
+ *     responses:
+ *       200:
+ *         description: Variants retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         total:
+ *                           type: integer
+ *                         pages:
+ *                           type: integer
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getVariants = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -86,7 +165,44 @@ export const getVariants = async (req: Request, res: Response): Promise<void> =>
 };
 
 /**
- * Get a single variant by ID
+ * @swagger
+ * /api/v1/variants/{id}:
+ *   get:
+ *     tags: [Products]
+ *     summary: Get variant by ID
+ *     description: Retrieves detailed information about a specific product variant.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Variant ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Variant retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       404:
+ *         description: Variant not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getVariantById = async (req: Request, res: Response): Promise<void> => {
   try {

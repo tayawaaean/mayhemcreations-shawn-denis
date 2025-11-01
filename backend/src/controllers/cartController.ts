@@ -17,9 +17,53 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Get user's cart items
- * @route GET /api/v1/cart
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/cart:
+ *   get:
+ *     tags: [Cart]
+ *     summary: Get user's cart items
+ *     description: Retrieves all items in the authenticated user's shopping cart with product details.
+ *     security:
+ *       - sessionAuth: []
+ *     responses:
+ *       200:
+ *         description: Cart retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: integer
+ *                           productId:
+ *                             type: string
+ *                           quantity:
+ *                             type: integer
+ *                           customization:
+ *                             type: object
+ *                           reviewStatus:
+ *                             type: string
+ *                           product:
+ *                             type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -99,9 +143,100 @@ export const getCart = async (req: AuthenticatedRequest, res: Response, next: Ne
 };
 
 /**
- * Add item to cart
- * @route POST /api/v1/cart
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/cart:
+ *   post:
+ *     tags: [Cart]
+ *     summary: Add item to cart
+ *     description: Adds a product or custom item to the authenticated user's shopping cart.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *             properties:
+ *               productId:
+ *                 oneOf:
+ *                   - type: integer
+ *                     example: 1
+ *                   - type: string
+ *                     example: custom-embroidery
+ *                 description: Product ID (integer) or custom item identifier (string)
+ *               quantity:
+ *                 type: integer
+ *                 default: 1
+ *                 minimum: 1
+ *                 example: 1
+ *                 description: Quantity to add
+ *               customization:
+ *                 type: object
+ *                 description: Customization options for the item
+ *           examples:
+ *             regularProduct:
+ *               summary: Regular product
+ *               value:
+ *                 productId: 1
+ *                 quantity: 2
+ *             customEmbroidery:
+ *               summary: Custom embroidery item
+ *               value:
+ *                 productId: custom-embroidery
+ *                 quantity: 1
+ *                 customization:
+ *                   design: Custom Design
+ *                   text: Hello World
+ *     responses:
+ *       200:
+ *         description: Item added to cart successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         productId:
+ *                           oneOf:
+ *                             - type: integer
+ *                             - type: string
+ *                         quantity:
+ *                           type: integer
+ *                         customization:
+ *                           type: object
+ *       400:
+ *         description: Invalid product ID or insufficient stock
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Product not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const addToCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -247,9 +382,118 @@ export const addToCart = async (req: AuthenticatedRequest, res: Response, next: 
 };
 
 /**
- * Update cart item quantity
- * @route PUT /api/v1/cart/:itemId
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/cart/{itemId}:
+ *   put:
+ *     tags: [Cart]
+ *     summary: Update cart item
+ *     description: Updates the quantity or customization of a cart item.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Cart item ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 2
+ *                 description: New quantity
+ *               customization:
+ *                 type: object
+ *                 description: Updated customization options
+ *           examples:
+ *             updateQuantity:
+ *               summary: Update quantity
+ *               value:
+ *                 quantity: 3
+ *     responses:
+ *       200:
+ *         description: Cart item updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       400:
+ *         description: Invalid quantity or insufficient stock
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Cart item not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *   delete:
+ *     tags: [Cart]
+ *     summary: Remove item from cart
+ *     description: Removes an item from the shopping cart.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: itemId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Cart item ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Item removed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Cart item not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const updateCartItem = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -395,12 +639,42 @@ export const removeFromCart = async (req: AuthenticatedRequest, res: Response, n
 };
 
 /**
- * Clear user's cart
- * @route DELETE /api/v1/cart
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/cart:
+ *   delete:
+ *     tags: [Cart]
+ *     summary: Clear user's cart
+ *     description: Removes all items from the authenticated user's shopping cart.
+ *     security:
+ *       - sessionAuth: []
+ *     responses:
+ *       200:
+ *         description: Cart cleared successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         deletedCount:
+ *                           type: integer
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
-
-
 export const clearCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.id;
@@ -440,9 +714,74 @@ export const clearCart = async (req: AuthenticatedRequest, res: Response, next: 
 };
 
 /**
- * Sync cart from localStorage to database
- * @route POST /api/v1/cart/sync
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/cart/sync:
+ *   post:
+ *     tags: [Cart]
+ *     summary: Sync cart from localStorage
+ *     description: Synchronizes cart items from localStorage to the database. Merges items and updates quantities.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - items
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 description: Cart items from localStorage
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       oneOf:
+ *                         - type: integer
+ *                         - type: string
+ *                     quantity:
+ *                       type: integer
+ *                     customization:
+ *                       type: object
+ *           examples:
+ *             syncItems:
+ *               summary: Sync cart items
+ *               value:
+ *                 items:
+ *                   - productId: 1
+ *                     quantity: 2
+ *                   - productId: custom-embroidery
+ *                     quantity: 1
+ *                     customization:
+ *                       text: Hello
+ *     responses:
+ *       200:
+ *         description: Cart synced successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const syncCart = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {

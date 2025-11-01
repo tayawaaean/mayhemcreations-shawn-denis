@@ -1,6 +1,7 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
-import { Express } from 'express';
+import { Express, Request, Response, NextFunction } from 'express';
+import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 
 /**
  * Swagger Configuration for Mayhem Creations API
@@ -290,7 +291,11 @@ const options: swaggerJsdoc.Options = {
       },
       {
         name: 'Payments',
-        description: 'Payment processing'
+        description: 'Payment processing and payment gateway integration'
+      },
+      {
+        name: 'Webhooks',
+        description: 'Webhook endpoints for payment gateways and external services'
       },
       {
         name: 'Reviews',
@@ -321,6 +326,145 @@ const options: swaggerJsdoc.Options = {
 const specs = swaggerJsdoc(options);
 
 /**
+ * Swagger authentication middleware
+ * Requires admin or seller role to access API documentation
+ * Protected in all environments (production and development)
+ */
+const swaggerAuthMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // Require authentication and admin/seller role in all environments
+  try {
+    // First check session authentication
+    await new Promise<void>((resolve, reject) => {
+      sessionAuthenticate(req, res, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    // Then check role authorization
+    await new Promise<void>((resolve, reject) => {
+      requireRole(['admin', 'seller'])(req, res, (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    // If both checks pass, proceed
+    next();
+  } catch (error: any) {
+    // Check if user is authenticated but lacks required role
+    const user = (req as any).user;
+    const isAuthenticated = !!user;
+    const hasPermission = user && (user.role === 'admin' || user.role === 'seller');
+
+    if (isAuthenticated && !hasPermission) {
+      // User is logged in but doesn't have admin/seller role
+      res.status(403).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Access Denied - API Documentation</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: #fff;
+            }
+            .container {
+              text-align: center;
+              padding: 2rem;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              backdrop-filter: blur(10px);
+              box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+              max-width: 500px;
+            }
+            h1 { margin-top: 0; }
+            p { opacity: 0.9; margin-bottom: 1rem; }
+            .code {
+              background: rgba(0, 0, 0, 0.3);
+              padding: 0.5rem 1rem;
+              border-radius: 5px;
+              font-family: monospace;
+              display: inline-block;
+              margin-top: 1rem;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🔒 Access Denied</h1>
+            <p>API documentation is restricted to administrators and sellers only.</p>
+            <p>Please log in with an admin or seller account to access the documentation.</p>
+            <div class="code">403 Forbidden</div>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      // User is not authenticated
+      res.status(401).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authentication Required - API Documentation</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: #fff;
+            }
+            .container {
+              text-align: center;
+              padding: 2rem;
+              background: rgba(255, 255, 255, 0.1);
+              border-radius: 10px;
+              backdrop-filter: blur(10px);
+              box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+              max-width: 500px;
+            }
+            h1 { margin-top: 0; }
+            p { opacity: 0.9; }
+            .code {
+              background: rgba(0, 0, 0, 0.3);
+              padding: 0.5rem 1rem;
+              border-radius: 5px;
+              font-family: monospace;
+              display: inline-block;
+              margin-top: 1rem;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>🔐 Authentication Required</h1>
+            <p>Please log in to access the API documentation.</p>
+            <div class="code">401 Unauthorized</div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  }
+};
+
+/**
  * Setup Swagger UI for the Express app
  * @param app - Express application instance
  */
@@ -331,6 +475,7 @@ export const setupSwagger = (app: Express): void => {
       .swagger-ui .topbar { display: none; }
       .swagger-ui .info .title { color: #1f2937; }
       .swagger-ui .scheme-container { background: #f9fafb; padding: 20px; border-radius: 8px; }
+      .swagger-ui .info .title::after { content: " (Protected)"; color: #ef4444; font-size: 0.8em; margin-left: 10px; }
     `,
     customSiteTitle: 'Mayhem Creations API Documentation',
     customfavIcon: '/favicon.ico',
@@ -345,7 +490,13 @@ export const setupSwagger = (app: Express): void => {
     }
   };
 
-  // Serve Swagger UI
+  // Protect Swagger routes with authentication in all environments
+  // Apply authentication middleware before serving Swagger UI
+  // Note: This middleware must be applied BEFORE swaggerUi.serve
+  app.use('/api-docs', swaggerAuthMiddleware);
+  app.get('/api-docs.json', swaggerAuthMiddleware);
+
+  // Serve Swagger UI (middleware runs in order, so auth runs first)
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, swaggerUiOptions));
   
   // Serve raw OpenAPI spec

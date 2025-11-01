@@ -11,9 +11,116 @@ import { isSupportedEventType, getEventCategory, isCriticalEvent } from '../util
 import { EmailNotificationService } from '../services/emailNotificationService';
 
 /**
- * Handle Stripe Webhook Events
- * @route POST /api/v1/payments/webhook
- * @access Public (Stripe only)
+ * @swagger
+ * /api/v1/webhooks/stripe:
+ *   post:
+ *     tags: [Webhooks]
+ *     summary: Stripe webhook endpoint
+ *     description: Receives and processes webhook events from Stripe. This endpoint verifies webhook signatures and handles payment events like payment completion, failures, and refunds.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 description: Stripe event ID
+ *                 example: evt_1234567890
+ *               type:
+ *                 type: string
+ *                 example: payment_intent.succeeded
+ *                 description: Type of webhook event
+ *               data:
+ *                 type: object
+ *                 description: Event data containing the Stripe object
+ *               created:
+ *                 type: integer
+ *                 format: int64
+ *                 description: Unix timestamp when event was created
+ *           examples:
+ *             paymentSucceeded:
+ *               summary: Payment intent succeeded
+ *               value:
+ *                 id: evt_1234567890
+ *                 type: payment_intent.succeeded
+ *                 data:
+ *                   object:
+ *                     id: pi_1234567890
+ *                     status: succeeded
+ *                     amount: 9999
+ *                 created: 1698765432
+ *             checkoutCompleted:
+ *               summary: Checkout session completed
+ *               value:
+ *                 id: evt_0987654321
+ *                 type: checkout.session.completed
+ *                 data:
+ *                   object:
+ *                     id: cs_test_1234567890
+ *                     payment_status: paid
+ *                 created: 1698765432
+ *     responses:
+ *       200:
+ *         description: Webhook received and processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 received:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Event processed successfully
+ *       400:
+ *         description: Invalid webhook signature or format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               missingSignature:
+ *                 summary: Missing Stripe signature
+ *                 value:
+ *                   success: false
+ *                   message: Missing Stripe signature
+ *                   code: MISSING_SIGNATURE
+ *               invalidSignature:
+ *                 summary: Invalid signature
+ *                 value:
+ *                   success: false
+ *                   message: Invalid signature
+ *                   code: INVALID_SIGNATURE
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ * 
+ * /api/v1/payments/webhook:
+ *   post:
+ *     tags: [Webhooks]
+ *     summary: Stripe webhook endpoint (alternative route)
+ *     description: Alternative route for Stripe webhooks. Same functionality as /api/v1/webhooks/stripe.
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Webhook received and processed
+ *       400:
+ *         description: Invalid webhook signature or format
+ *       500:
+ *         description: Internal server error
  */
 export const handleStripeWebhook = async (
   req: any, 

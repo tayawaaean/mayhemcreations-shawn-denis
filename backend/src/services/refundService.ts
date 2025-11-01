@@ -26,7 +26,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 import paypal from '@paypal/checkout-server-sdk';
 
 // Initialize PayPal client
-const paypalEnvironment = process.env.PAYPAL_MODE === 'live'
+// Use PAYPAL_ENVIRONMENT (standard) instead of PAYPAL_MODE for consistency
+// PAYPAL_ENVIRONMENT='production' = live environment, anything else = sandbox
+const paypalEnvironment = process.env.PAYPAL_ENVIRONMENT === 'production'
   ? new paypal.core.LiveEnvironment(
       process.env.PAYPAL_CLIENT_ID || '',
       process.env.PAYPAL_CLIENT_SECRET || ''

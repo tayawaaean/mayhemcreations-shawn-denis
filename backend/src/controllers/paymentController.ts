@@ -27,9 +27,87 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Create Payment Intent
- * @route POST /api/v1/payments/create-intent
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/payments/create-intent:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Create a payment intent
+ *     description: Creates a Stripe payment intent for processing a payment. Payment intents track the payment lifecycle.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 format: float
+ *                 example: 99.99
+ *                 description: Payment amount in dollars
+ *               currency:
+ *                 type: string
+ *                 default: usd
+ *                 example: usd
+ *                 description: Payment currency
+ *               description:
+ *                 type: string
+ *                 example: Mayhem Creations Order
+ *                 description: Payment description
+ *               metadata:
+ *                 type: object
+ *                 description: Additional metadata for the payment
+ *           examples:
+ *             basicPayment:
+ *               summary: Basic payment intent
+ *               value:
+ *                 amount: 99.99
+ *                 currency: usd
+ *                 description: Order #12345
+ *     responses:
+ *       201:
+ *         description: Payment intent created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: pi_1234567890
+ *                         client_secret:
+ *                           type: string
+ *                           example: pi_1234567890_secret_xxx
+ *                         status:
+ *                           type: string
+ *                           example: requires_payment_method
+ *       400:
+ *         description: Invalid amount
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const createPaymentIntentHandler = async (
   req: AuthenticatedRequest, 
@@ -136,9 +214,89 @@ export const createPaymentIntentHandler = async (
 };
 
 /**
- * Create Checkout Session
- * @route POST /api/v1/payments/create-checkout-session
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/payments/create-checkout-session:
+ *   post:
+ *     tags: [Payments]
+ *     summary: Create a checkout session
+ *     description: Creates a Stripe Checkout session for hosted payment processing.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - lineItems
+ *             properties:
+ *               lineItems:
+ *                 type: array
+ *                 description: Items to purchase
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     price_data:
+ *                       type: object
+ *                       properties:
+ *                         currency:
+ *                           type: string
+ *                         product_data:
+ *                           type: object
+ *                         unit_amount:
+ *                           type: integer
+ *                     quantity:
+ *                       type: integer
+ *               successUrl:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL to redirect after successful payment
+ *               cancelUrl:
+ *                 type: string
+ *                 format: uri
+ *                 description: URL to redirect if payment is cancelled
+ *               metadata:
+ *                 type: object
+ *                 description: Additional metadata
+ *     responses:
+ *       201:
+ *         description: Checkout session created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: cs_test_1234567890
+ *                         url:
+ *                           type: string
+ *                           format: uri
+ *                           example: https://checkout.stripe.com/pay/cs_test_xxx
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const createCheckoutSessionHandler = async (
   req: AuthenticatedRequest, 
@@ -299,9 +457,62 @@ export const createCheckoutSessionHandler = async (
 };
 
 /**
- * Get Payment Intent Status
- * @route GET /api/v1/payments/intent/:paymentIntentId
- * @access Private
+ * @swagger
+ * /api/v1/payments/intent/{paymentIntentId}:
+ *   get:
+ *     tags: [Payments]
+ *     summary: Get payment intent status
+ *     description: Retrieves the current status and details of a Stripe payment intent.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: paymentIntentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Stripe payment intent ID
+ *         example: pi_1234567890
+ *     responses:
+ *       200:
+ *         description: Payment intent retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                           example: succeeded
+ *                         amount:
+ *                           type: integer
+ *                         currency:
+ *                           type: string
+ *       404:
+ *         description: Payment intent not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getPaymentIntentStatus = async (
   req: AuthenticatedRequest, 

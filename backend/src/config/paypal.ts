@@ -21,8 +21,8 @@ export const paypalConfig = {
   webhookId: process.env.PAYPAL_WEBHOOK_ID || '',
   
   // Success/Cancel URLs (will be set dynamically based on request)
-  successUrl: process.env.PAYPAL_SUCCESS_URL || 'http://localhost:3000/payment/success',
-  cancelUrl: process.env.PAYPAL_CANCEL_URL || 'http://localhost:3000/payment/cancel',
+  successUrl: process.env.PAYPAL_SUCCESS_URL || 'http://localhost:5001/payment/success',
+  cancelUrl: process.env.PAYPAL_CANCEL_URL || 'http://localhost:5001/payment/cancel',
   
   // Branding settings
   brandName: process.env.PAYPAL_BRAND_NAME || 'Mayhem Creations',

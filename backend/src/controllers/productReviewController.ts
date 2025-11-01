@@ -18,9 +18,104 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Create a new product review
- * @route POST /api/v1/reviews
- * @access Private (Customer only - must have purchased the product)
+ * @swagger
+ * /api/v1/reviews:
+ *   post:
+ *     tags: [Reviews]
+ *     summary: Create a product review
+ *     description: Creates a new product review. The user must have purchased the product to review it.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - productId
+ *               - orderId
+ *               - rating
+ *             properties:
+ *               productId:
+ *                 type: integer
+ *                 example: 1
+ *                 description: Product ID to review
+ *               orderId:
+ *                 type: integer
+ *                 example: 123
+ *                 description: Order ID where the product was purchased
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *                 description: Rating from 1 to 5
+ *               title:
+ *                 type: string
+ *                 maxLength: 255
+ *                 example: Great product!
+ *                 description: Review title
+ *               comment:
+ *                 type: string
+ *                 example: This product exceeded my expectations.
+ *                 description: Review comment
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *                 description: Review images (URLs or base64)
+ *           examples:
+ *             basicReview:
+ *               summary: Basic review
+ *               value:
+ *                 productId: 1
+ *                 orderId: 123
+ *                 rating: 5
+ *                 title: Great product!
+ *                 comment: Highly recommend this product.
+ *     responses:
+ *       201:
+ *         description: Review created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         productId:
+ *                           type: integer
+ *                         rating:
+ *                           type: integer
+ *                         title:
+ *                           type: string
+ *                         comment:
+ *                           type: string
+ *       400:
+ *         description: Validation error or user hasn't purchased product
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const createReview = async (
   req: AuthenticatedRequest,

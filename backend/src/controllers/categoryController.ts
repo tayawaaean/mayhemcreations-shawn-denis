@@ -10,7 +10,80 @@ import { logger } from '../utils/logger';
  */
 
 /**
- * Get all categories with optional filtering and hierarchy
+ * @swagger
+ * /api/v1/categories:
+ *   get:
+ *     tags: [Products]
+ *     summary: Get all categories
+ *     description: Retrieves a list of categories with optional filtering and hierarchical structure.
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive]
+ *         description: Filter by category status
+ *       - in: query
+ *         name: parentId
+ *         schema:
+ *           type: integer
+ *         description: Filter by parent category ID (use 'null' for root categories)
+ *       - in: query
+ *         name: includeChildren
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *         description: Include child categories in response
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search categories by name, slug, or description
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           default: sortOrder
+ *         description: Field to sort by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [ASC, DESC]
+ *           default: ASC
+ *         description: Sort order
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                     total:
+ *                       type: integer
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getCategories = async (req: Request, res: Response): Promise<void> => {
   try {
