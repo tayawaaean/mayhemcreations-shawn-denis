@@ -358,7 +358,7 @@ export class AuthController {
       }) as any; // Type assertion needed for included associations
 
       // Only log login attempts as debug (not shown in production)
-      logger.debug('Login attempt', { email, userFound: !!user });
+      // Login attempt - debug logging disabled for verbosity
 
       if (!user) {
         logger.warn('User not found for login', { email });
@@ -412,12 +412,7 @@ export class AuthController {
       // Verify password
       const isPasswordValid = await user.checkPassword(password);
       // Only log password verification as debug (not shown in production)
-      logger.debug('Password verification', { 
-        email, 
-        userId: user.id, 
-        isPasswordValid,
-        needsRehash: user.needsPasswordRehash()
-      });
+      // Password verification - debug logging disabled for verbosity
       
       if (!isPasswordValid) {
         logger.warn('Invalid password for user', { email, userId: user.id });
@@ -869,12 +864,7 @@ export class AuthController {
    */
   static async refreshSession(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      logger.info('🔄 RefreshSession: Starting refresh', {
-        hasUser: !!(req as any).user,
-        userId: (req as any).user?.id,
-        sessionId: (req as any).user?.sessionId,
-        hasSession: SessionService.isAuthenticated(req)
-      });
+      // RefreshSession: Starting refresh - detailed logging disabled
 
       // Check if user is authenticated (either via session or Bearer token)
       const user = (req as any).user;

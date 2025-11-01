@@ -97,12 +97,15 @@ app.use(sanitizeInput);
 // Rate limiting
 app.use(generalRateLimit);
 
-// Request logging
+// Request logging - only log errors, not all requests (too verbose)
+// Set LOG_HTTP=true in .env if you need to log all HTTP requests
 app.use((req, res, next) => {
-  logger.http(`${req.method} ${req.url}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-  });
+  if (process.env.LOG_HTTP === 'true') {
+    logger.http(`${req.method} ${req.url}`, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+  }
   next();
 });
 

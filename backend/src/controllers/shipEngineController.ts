@@ -57,11 +57,7 @@ export const calculateShipEngineRates = async (
       return;
     }
 
-    logger.info('Calculating ShipEngine shipping rates', {
-      userId: req.user?.id,
-      destination: `${address.city}, ${address.state} ${address.postalCode || address.zipCode}`,
-      itemCount: items.length,
-    });
+    // Calculating ShipEngine shipping rates - detailed logging disabled
 
     // Convert address to ShipEngine format
     const shipToAddress = convertToShipEngineAddress(address);
@@ -69,13 +65,7 @@ export const calculateShipEngineRates = async (
     // Create package from items
     const packages = [createPackageFromItems(items)];
 
-    logger.info('ShipEngine request prepared', {
-      packages: packages.map(p => ({
-        weight: p.weight,
-        dimensions: p.dimensions,
-      })),
-      destination: shipToAddress,
-    });
+    // ShipEngine request prepared - detailed logging disabled
 
     // Get rates from ShipEngine
     const ratesResult = await getShipEngineRates(shipToAddress, packages);
@@ -108,13 +98,7 @@ export const calculateShipEngineRates = async (
         timestamp: new Date().toISOString(),
       });
 
-      logger.info('ShipEngine rates calculated successfully', {
-        userId: req.user?.id,
-        ratesCount: ratesResult.rates.length,
-        cheapestRate: ratesResult.rates[0].totalCost,
-        recommendedRate: recommendedRate.totalCost,
-        carriers: [...new Set(ratesResult.rates.map(r => r.carrier))],
-      });
+      // ShipEngine rates calculated successfully - detailed logging disabled
     } else {
       // Return error instead of fallback rates
       logger.error('ShipEngine API failed to calculate rates', {

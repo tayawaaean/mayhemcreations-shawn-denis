@@ -8,7 +8,9 @@ const sequelize = new Sequelize({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306'),
   dialect: 'mysql',
-  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  // Disable SQL query logging - too verbose and cluttered
+  // Set DB_LOGGING=true in .env if you need to debug SQL queries
+  logging: process.env.DB_LOGGING === 'true' ? console.log : false,
   pool: {
     max: 20, // Maximum number of connections in pool
     min: 5,  // Minimum number of connections in pool
@@ -20,12 +22,7 @@ const sequelize = new Sequelize({
     underscored: true, // Use snake_case for column names
     freezeTableName: true, // Don't pluralize table names
     indexes: [], // Disable automatic index creation to prevent duplicate key errors
-    hooks: process.env.NODE_ENV === 'development' ? {
-      beforeSync: () => {
-        console.log('🔧 Database sync enabled for email column addition');
-        return Promise.resolve();
-      }
-    } : {}
+    // beforeSync hook removed - was causing excessive logging during model sync
   },
   dialectOptions: {
     charset: 'utf8mb4',

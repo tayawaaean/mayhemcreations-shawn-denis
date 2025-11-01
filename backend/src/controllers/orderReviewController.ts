@@ -185,7 +185,7 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
     
     if (!orderReviewId) {
       // Fallback: query the last inserted ID
-      logger.debug('No insertId found, querying last inserted ID');
+      // No insertId found, querying last inserted ID - debug logging disabled
       const [lastIdResult] = await sequelize.query('SELECT LAST_INSERT_ID() as lastId');
       orderReviewId = Array.isArray(lastIdResult) ? (lastIdResult[0] as any)?.lastId : (lastIdResult as any)?.lastId;
     }
@@ -212,7 +212,7 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
           replacements: [orderReviewId, ...cartItemIds]
         });
         
-        logger.debug('Cart items updated successfully', { orderReviewId, cartItemCount: cartItemIds.length });
+        // Cart items updated successfully - debug logging disabled
       } catch (updateError) {
         logger.error('Error updating cart items', { orderReviewId, error: updateError });
         // Don't fail the entire operation if cart update fails
@@ -417,7 +417,7 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
       ORDER BY order_reviews.created_at DESC
     `);
 
-    logger.debug('Retrieved all review orders', { orderCount: (orders as any[]).length });
+    // Retrieved all review orders - debug logging disabled for verbosity
 
     res.status(200).json({
       success: true,

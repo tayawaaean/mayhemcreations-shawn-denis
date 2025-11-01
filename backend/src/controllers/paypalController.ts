@@ -75,10 +75,10 @@ export const createPayPalOrderHandler = async (
       cancelUrl,
     };
 
-    logger.debug('PayPal Controller - orderData:', { orderData });
+    // Order data received - debug logging disabled for verbosity
 
     const validation = validatePayPalOrderData(orderData);
-    logger.debug('PayPal Controller - validation result:', { validation });
+    // Validation result - debug logging disabled for verbosity
     
     if (!validation.isValid) {
       res.status(400).json({
@@ -175,19 +175,12 @@ export const capturePayPalOrderHandler = async (
           replacements: [userId]
         });
 
-        logger.info('🔍 Found orders:', {
-          count: Array.isArray(orderResult) ? orderResult.length : 0,
-          orders: orderResult
-        });
+        // Found orders - detailed logging disabled for verbosity
 
         if (Array.isArray(orderResult) && orderResult.length > 0) {
           const order = orderResult[0] as any;
           
-          logger.info('✅ Found order to update:', {
-            orderId: order.id,
-            currentStatus: order.status,
-            currentPaymentStatus: order.payment_status
-          });
+          // Found order to update - detailed logging disabled
           
           // Prioritize form data (metadata) over PayPal shipping address
           // This ensures consistent address usage like Stripe
@@ -221,10 +214,7 @@ export const capturePayPalOrderHandler = async (
             country: shippingDetails.address?.country_code || '',
           } : null);
           
-          logger.info('📍 Using address from:', { 
-            source: useFormData ? 'Form Data (Priority)' : 'PayPal Response (Fallback)',
-            shippingAddress 
-          });
+          // Using address from metadata/form data - detailed logging disabled
           
           // Generate order number if not exists
           const { generateOrderNumber } = await import('../services/paymentRecordService');
@@ -238,11 +228,7 @@ export const capturePayPalOrderHandler = async (
           // The capture.id is the order ID, but the actual capture ID is in purchase_units
           const paypalCaptureId = capture.purchase_units?.[0]?.payments?.captures?.[0]?.id || capture.id;
           
-          logger.info('🔍 PayPal IDs:', {
-            orderId: capture.id, // Order ID (e.g., 5O123456789)
-            captureId: paypalCaptureId, // Capture ID (e.g., 3Y0953011T443932D) - this is what we need for refunds
-            captureIdLocation: capture.purchase_units?.[0]?.payments?.captures?.[0]?.id ? 'purchase_units' : 'fallback'
-          });
+          // PayPal IDs extracted - detailed logging disabled
           
           // Extract pricing information from metadata (passed from frontend)
           const subtotal = metadata?.subtotal ? parseFloat(metadata.subtotal) : order.subtotal || null;
@@ -250,26 +236,10 @@ export const capturePayPalOrderHandler = async (
           const tax = metadata?.tax ? parseFloat(metadata.tax) : order.tax || null;
           const total = metadata?.total ? parseFloat(metadata.total) : order.total || null;
           
-          logger.info('💳 Saving PayPal payment details:', {
-            orderId: order.id,
-            shippingAddress,
-            payerEmail,
-            orderNumber,
-            pricing: { subtotal, shipping, tax, total },
-            paypalCaptureId // Log the capture ID being saved
-          });
+          // Saving PayPal payment details - detailed logging disabled
           
           // Update order status and payment/shipping details with pricing
-          logger.info('💾 Updating order in database:', {
-            orderId: order.id,
-            newStatus: 'approved-processing',
-            paymentStatus: 'completed',
-            orderNumber,
-            subtotal,
-            shipping,
-            tax,
-            total
-          });
+          // Updating order in database - detailed logging disabled
           
           const [updateResult] = await sequelize.query(`
             UPDATE order_reviews 
@@ -306,10 +276,7 @@ export const capturePayPalOrderHandler = async (
             ]
           });
           
-          logger.info('✅ Order update result:', {
-            affectedRows: (updateResult as any).affectedRows,
-            orderId: order.id
-          });
+          // Order update completed - detailed logging disabled
           
           // Verify the update by querying the order again
           const [verifyResult] = await sequelize.query(`

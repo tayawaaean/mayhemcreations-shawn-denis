@@ -29,14 +29,15 @@ export class WebSocketService {
 
   private setupEventHandlers(): void {
     this.io.on('connection', (socket: Socket) => {
-      logger.info(`🔌 Client connected: ${socket.id}`);
+      // Client connected - verbose logging disabled (too many connections)
+      // Set LOG_WS_CONNECTIONS=true in .env if you need to see all WebSocket connections
 
       // Send current admin status to the newly connected client
       socket.emit('admin_status_changed', { 
         isOnline: this.isAdminOnline, 
         timestamp: new Date().toISOString() 
       });
-      logger.info(`📢 Sent initial admin status to new client: ${this.isAdminOnline ? 'online' : 'offline'}`);
+      // Sent initial admin status - verbose logging disabled
 
       // Handle user authentication and room joining
       socket.on('join_user_room', (userId: string) => {
@@ -48,7 +49,7 @@ export class WebSocketService {
         }
         this.connectedUsers.get(userId)!.add(socket.id);
         
-        logger.info(`👤 User ${userId} joined their room`);
+        // User joined their room - verbose logging disabled
       });
 
       // Handle admin joining admin room
@@ -60,15 +61,15 @@ export class WebSocketService {
         const wasAdminOnline = this.isAdminOnline;
         this.isAdminOnline = true;
         
-        logger.info(`👨‍💼 Admin joined admin room: ${socket.id} (Total admins: ${this.adminSockets.size})`);
-
-        // Notify all customers that admin is now online (if this is the first admin)
+        // Admin joined admin room - verbose logging disabled (event may fire multiple times)
+        // Only log when admin status changes (first admin comes online)
         if (!wasAdminOnline) {
           this.io.emit('admin_status_changed', { 
             isOnline: true, 
             timestamp: new Date().toISOString() 
           });
-          logger.info('📢 Notified all customers: Admin is now online');
+          // Admin is now online - important status change logged
+          logger.info(`👨‍💼 Admin is now online (Total admins: ${this.adminSockets.size})`);
         }
 
         // Emit recent conversation threads to this admin
@@ -113,7 +114,7 @@ export class WebSocketService {
       // Handle chat room joining
       socket.on('join_chat_room', async (customerId: string) => {
         socket.join(`chat_${customerId}`);
-        logger.info(`💬 Socket ${socket.id} joined chat room for customer ${customerId}`);
+        // Socket joined chat room - verbose logging disabled
         
         // Set user as online
         this.setUserOnlineStatus(customerId, true);
@@ -160,7 +161,7 @@ export class WebSocketService {
 
         // Send email notification to admin if admin is offline and this is a new customer
         if (!this.isAdminOnlineStatus()) {
-          logger.info(`📧 Admin is offline, sending new customer notification for ${customerId}`);
+          // Admin is offline, sending new customer notification - verbose logging disabled
           emailWebhookService.sendNewCustomerWebhook({
             customerId,
             customerName: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Guest User' : 'Guest User',
@@ -189,7 +190,7 @@ export class WebSocketService {
             customerId,
             messages,
           });
-          logger.info(`📜 Loaded ${messages.length} messages for ${isGuest ? 'guest' : 'user'} ${customerId}`);
+          // Loaded chat history - verbose logging disabled
         } catch (e) {
           logger.warn(`Failed to load chat history for ${customerId}: ${(e as any).message}`);
         }
@@ -198,7 +199,7 @@ export class WebSocketService {
       // Handle chat room leaving
       socket.on('leave_chat_room', async (customerId: string) => {
         socket.leave(`chat_${customerId}`);
-        logger.info(`💬 Socket ${socket.id} left chat room for customer ${customerId}`);
+        // Socket left chat room - verbose logging disabled
         
         // Set user as offline
         this.setUserOnlineStatus(customerId, false);
@@ -299,7 +300,7 @@ export class WebSocketService {
             }
           }
         } catch {}
-        logger.info(`💬 Chat message from ${socket.id} for customer ${data.customerId}: ${data.text}`);
+        // Chat message received - verbose logging disabled
 
         // Determine sender based on room membership
         const isAdmin = socket.rooms.has('admin_room');
@@ -343,7 +344,7 @@ export class WebSocketService {
             isGuest, // Flag to identify guest messages
             email: isGuest ? data.email || null : null, // Store email for guest users
           } as any);
-          logger.info(`💾 Saved message ${created.id} for ${isGuest ? 'guest' : 'user'} ${data.customerId} (type=${data.type ?? 'text'})${isGuest && data.email ? ` with email ${data.email}` : ''}`);
+          // Message saved - verbose logging disabled
         } catch (e) {
           logger.warn(`Failed to persist chat message for ${data.customerId}: ${(e as any).message}`);
         }
@@ -375,7 +376,7 @@ export class WebSocketService {
             const reason = sender === 'admin' 
               ? `User ${data.customerId} is offline` 
               : `Admin is offline`;
-            logger.info(`📧 ${reason}, sending email notification`);
+            // Sending email notification - verbose logging disabled
             try {
               await emailWebhookService.sendChatMessageWebhook({
                 messageId: data.messageId,
@@ -394,14 +395,14 @@ export class WebSocketService {
             const reason = sender === 'admin' 
               ? `User ${data.customerId} is online` 
               : `Admin is online`;
-            logger.info(`📧 ${reason}, skipping email notification`);
+            // Skipping email notification (recipient is online) - verbose logging disabled
           }
         }
       });
 
       // Handle typing status
       socket.on('typing_status', (data: { customerId: string; isTyping: boolean; timestamp: string }) => {
-        logger.info(`⌨️ Typing status from ${socket.id} for customer ${data.customerId}: ${data.isTyping}`);
+        // Typing status update - verbose logging disabled
         
         // Determine sender type based on which room the socket is in
         const isAdmin = socket.rooms.has('admin_room');
@@ -412,25 +413,24 @@ export class WebSocketService {
 
       // Handle disconnection
       socket.on('disconnect', async () => {
-        logger.info(`🔌 Client disconnected: ${socket.id}`);
+        // Client disconnected - verbose logging disabled
         
         // Check if this was an admin socket
         const wasAdminSocket = this.adminSockets.has(socket.id);
         if (wasAdminSocket) {
           this.adminSockets.delete(socket.id);
-          logger.info(`👨‍💼 Admin disconnected: ${socket.id} (Remaining admins: ${this.adminSockets.size})`);
           
           // Update admin online status
           const wasAdminOnline = this.isAdminOnline;
           this.isAdminOnline = this.adminSockets.size > 0;
           
-          // Notify all customers if admin went offline
+          // Notify all customers if admin went offline (important status change)
           if (wasAdminOnline && !this.isAdminOnline) {
             this.io.emit('admin_status_changed', { 
               isOnline: false, 
               timestamp: new Date().toISOString() 
             });
-            logger.info('📢 Notified all customers: Admin is now offline');
+            logger.info(`👨‍💼 Admin is now offline (Remaining admins: ${this.adminSockets.size})`);
           }
         }
         
@@ -546,7 +546,7 @@ export class WebSocketService {
   // Set user online status
   private setUserOnlineStatus(userId: string, isOnline: boolean): void {
     this.userOnlineStatus.set(userId, isOnline);
-    logger.info(`👤 User ${userId} is now ${isOnline ? 'online' : 'offline'}`);
+    // User online status updated - verbose logging disabled
   }
 
   // Handle user disconnection - send conversation summary and check for unread messages
@@ -560,7 +560,7 @@ export class WebSocketService {
       });
 
       if (messages.length === 0) {
-        logger.info(`📧 No messages found for customer ${customerId}, skipping conversation summary`);
+        // No messages found - skipping conversation summary (verbose logging disabled)
         return;
       }
 

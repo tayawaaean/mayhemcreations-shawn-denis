@@ -27,8 +27,12 @@ const level = () => {
   const env = process.env.NODE_ENV || 'development';
   const isDevelopment = env === 'development';
   // Production: Only log errors and warnings (no info/debug noise)
-  // Development: Log everything including debug info
-  return isDevelopment ? 'debug' : 'error';
+  // Development: Log info, warn, and error (skip debug to reduce verbosity)
+  // Set LOG_LEVEL=debug in .env if you need debug logs
+  if (process.env.LOG_LEVEL) {
+    return process.env.LOG_LEVEL;
+  }
+  return isDevelopment ? 'info' : 'error';
 };
 
 // Define different log formats
