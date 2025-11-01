@@ -38,6 +38,12 @@ export interface EnvConfig {
   uiAvatarsBaseUrl: string
   placeholderImageUrl: string
   unsplashBaseUrl: string
+  
+  // Social Media Links
+  socialEtsy: string
+  socialTikTok: string
+  socialFacebook: string
+  socialInstagram: string
 }
 
 class EnvConfigService {
@@ -104,6 +110,12 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
       uiAvatarsBaseUrl: getEnvVar('VITE_REACT_APP_UI_AVATARS_BASE_URL', 'https://ui-avatars.com/api'),
       placeholderImageUrl: getEnvVar('VITE_REACT_APP_PLACEHOLDER_IMAGE_URL', 'https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image'),
       unsplashBaseUrl: getEnvVar('VITE_REACT_APP_UNSPLASH_BASE_URL', 'https://images.unsplash.com'),
+      
+      // Social Media Links
+      socialEtsy: getEnvVar('VITE_REACT_APP_SOCIAL_ETSY', 'https://etsy.com/shop/MayhemCreationLLC'),
+      socialTikTok: getEnvVar('VITE_REACT_APP_SOCIAL_TIKTOK', 'https://tiktok.com/@Mayhem_Creation'),
+      socialFacebook: getEnvVar('VITE_REACT_APP_SOCIAL_FACEBOOK', 'https://facebook.com/MayhemCreationLLC'),
+      socialInstagram: getEnvVar('VITE_REACT_APP_SOCIAL_INSTAGRAM', 'https://instagram.com/Mayhem_Creaton'),
     }
   }
 
@@ -195,6 +207,29 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
       placeholder: this.config.placeholderImageUrl,
       unsplash: this.config.unsplashBaseUrl
     }
+  }
+
+  public getSocialMediaLinks(): {
+    etsy: string
+    tikTok: string
+    facebook: string
+    instagram: string
+  } {
+    return {
+      etsy: this.config.socialEtsy,
+      tikTok: this.config.socialTikTok,
+      facebook: this.config.socialFacebook,
+      instagram: this.config.socialInstagram
+    }
+  }
+
+  public getSocialMediaLinksArray(): string[] {
+    return [
+      this.config.socialEtsy,
+      this.config.socialTikTok,
+      this.config.socialFacebook,
+      this.config.socialInstagram
+    ].filter(Boolean) // Filter out empty strings
   }
 
   // Check if we're in development mode

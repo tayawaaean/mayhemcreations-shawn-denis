@@ -49,14 +49,64 @@ const createAxiosInstance = (): AxiosInstance => {
     async (error: AxiosError) => {
       // For session-based auth, 401 errors mean session expired (e.g., backend restarted)
       if (error.response?.status === 401) {
+        // Determine if this is an admin/seller request or customer request
+        const requestUrl = error.config?.url || '';
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        
+        // Check if request is for admin/seller endpoints or user is on admin/seller pages
+        const isAdminRequest = requestUrl.includes('/admin/') || 
+                               requestUrl.includes('/users?') || 
+                               requestUrl.includes('/messages/') ||
+                               requestUrl.includes('/orders/admin/') ||
+                               currentPath.startsWith('/admin') ||
+                               currentPath.startsWith('/seller');
+        
         // Check if there was a session before clearing (for user notification)
         const hadSession = !!MultiAccountStorageService.getCurrentAccountData()
         const manualLogoutAt = typeof window !== 'undefined' ? localStorage.getItem('auth_manual_logout_at') : null
         const shouldNotify = hadSession && !manualLogoutAt
         
+        // Create separate handlers for admin and customer auth flows
+        const handleAdminReLogin = () => {
+          if (typeof window !== 'undefined') {
+            // Store current path for redirect after login
+            if (currentPath && (currentPath.startsWith('/admin') || currentPath.startsWith('/seller'))) {
+              const redirectPath = encodeURIComponent(currentPath + window.location.search);
+              window.location.href = `/employee-login?redirect=${redirectPath}`;
+            } else {
+              window.location.href = '/employee-login';
+            }
+          }
+        };
+        
+        const handleCustomerReLogin = () => {
+          if (typeof window !== 'undefined') {
+            // Store current path for redirect after login (if on a valid route)
+            if (currentPath && !currentPath.match(/^\/(|home|products|product|cart|checkout|customize|about|faq|contact|employee-login)$/)) {
+              // Only store redirect if not already on home or public pages
+              if (!currentPath.startsWith('/admin') && !currentPath.startsWith('/seller')) {
+                sessionStorage.setItem('auth_redirect_after_login', currentPath + window.location.search);
+              }
+            }
+            
+            // Redirect to home page
+            if (!currentPath.match(/^\/(|home)$/)) {
+              window.location.href = '/';
+            }
+            
+            // Trigger login modal
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('openAuthModal', { detail: { mode: 'login' } }));
+            }, 100);
+          }
+        };
+        
         // Only handle once per tab session to avoid multiple redirects/modals
-        if (!(window as any).__sessionExpiredHandled) {
-          (window as any).__sessionExpiredHandled = true
+        // Use separate flags for admin and customer to handle both flows independently
+        const sessionFlagKey = isAdminRequest ? '__adminSessionExpiredHandled' : '__customerSessionExpiredHandled';
+        
+        if (!(window as any)[sessionFlagKey]) {
+          (window as any)[sessionFlagKey] = true
           
           // Comprehensive cleanup: Clear all cached auth and user data
           // This happens when backend restarts and session is lost, or session was invalidated
@@ -66,8 +116,7 @@ const createAxiosInstance = (): AxiosInstance => {
             
             // Force clear any remaining cached data and flags
             if (typeof window !== 'undefined') {
-              // Clear any auth flags
-              delete (window as any).__sessionExpiredHandled;
+              // Clear any auth flags (but not the current session flag to prevent double redirect)
               delete (window as any).__sessionToastShown;
               
               // Reload contexts by dispatching storage event
@@ -76,30 +125,6 @@ const createAxiosInstance = (): AxiosInstance => {
           } catch (cleanupError) {
             // Silently fail - don't throw errors during cleanup
           }
-          
-          // Helper function to open auth modal and redirect to home
-          const handleReLogin = () => {
-            if (typeof window !== 'undefined') {
-              // Store current path for redirect after login (if on a valid route)
-              const currentPath = window.location.pathname;
-              if (currentPath && !currentPath.match(/^\/(|home|products|product|cart|checkout|customize|about|faq|contact|employee-login)$/)) {
-                // Only store redirect if not already on home or public pages
-                if (!currentPath.startsWith('/admin') && !currentPath.startsWith('/seller')) {
-                  sessionStorage.setItem('auth_redirect_after_login', currentPath + window.location.search);
-                }
-              }
-              
-              // Redirect to home page
-              if (!currentPath.match(/^\/(|home)$/)) {
-                window.location.href = '/';
-              }
-              
-              // Trigger login modal
-              setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('openAuthModal', { detail: { mode: 'login' } }));
-              }, 100);
-            }
-          };
           
           // Show user-friendly toast with re-login action
           if (shouldNotify && !(window as any).__sessionToastShown) {
@@ -111,17 +136,21 @@ const createAxiosInstance = (): AxiosInstance => {
                 durationMs: 8000, // Longer duration for actionable toast
                 action: {
                   label: 'Sign In',
-                  onClick: handleReLogin
+                  onClick: isAdminRequest ? handleAdminReLogin : handleCustomerReLogin
                 }
               });
               (window as any).__sessionToastShown = true;
             } catch {}
           }
           
-          // Automatically handle re-login (redirect and open modal)
+          // Automatically handle re-login (redirect to appropriate login page)
           // Delay slightly to ensure cleanup is complete
           setTimeout(() => {
-            handleReLogin();
+            if (isAdminRequest) {
+              handleAdminReLogin();
+            } else {
+              handleCustomerReLogin();
+            }
           }, 200);
         }
         

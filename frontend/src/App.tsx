@@ -65,7 +65,7 @@ export default function App() {
                 <Products />
               </EcommerceLayout>
             } />
-            <Route path="/product/:id" element={
+            <Route path="/product/:slug" element={
               <EcommerceLayout>
                 <ProductPage />
               </EcommerceLayout>

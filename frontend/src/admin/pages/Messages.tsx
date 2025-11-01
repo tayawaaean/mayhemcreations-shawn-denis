@@ -265,7 +265,7 @@ const Messages: React.FC = () => {
                       ) : (
                         <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center ring-2 ring-gray-100">
                             <span className="text-white font-semibold text-sm">
-                              {getDisplayName(item.customer, item.customerId).charAt(0).toUpperCase()}
+                              {(getDisplayName(item.customer, item.customerId) || '').charAt(0).toUpperCase() || '?'}
                             </span>
                         </div>
                       )}

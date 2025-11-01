@@ -137,8 +137,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         setCartLoadError(errorMsg)
-        // Only show warning for unexpected errors (not auth-related)
-        showWarning(`Cart load issue: ${errorMsg}. Using cached data.`, 'Cart Sync Warning')
+        // Don't show warnings - session issues are handled by axiosConfig 401 handler
       }
     } catch (error: any) {
       // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
@@ -165,7 +164,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setCartLoadError(errorMessage)
-      showWarning(errorMessage, 'Cart Load Error')
+      // Don't show warnings - 401 errors are handled by axiosConfig to clear data and redirect to login
       
       // Fallback to localStorage if database fails
       try {
@@ -186,7 +185,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn, user?.id, user?.role, showError, showWarning]) // Added user.id to ensure user is fully loaded
+  }, [isLoggedIn, user?.id, user?.role]) // Added user.id to ensure user is fully loaded
 
   /**
    * Sync cart with database
@@ -252,8 +251,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         setCartSyncError(errorMsg)
-        // Only show warning for unexpected sync errors
-        showWarning(`Cart sync issue: ${errorMsg}. Your changes are saved locally but may not sync across devices.`, 'Cart Sync Warning')
+        // Don't show warnings - session issues are handled by axiosConfig 401 handler
       }
     } catch (error: any) {
       // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
@@ -280,11 +278,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setCartSyncError(errorMessage)
-      showInfo(errorMessage, 'Cart Sync Status')
+      // Don't show sync status - 401 errors are handled by axiosConfig to clear data and redirect to login
     } finally {
       setIsSyncing(false)
     }
-  }, [isLoggedIn, user?.role, items, showWarning, showInfo]) // Added user.role to dependencies
+  }, [isLoggedIn, user?.role, items]) // Added user.role to dependencies
 
   // Load cart from database when user logs in (only for customers)
   // Only run when explicitly logged in with a valid user ID - don't call API when not logged in
@@ -439,11 +437,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('🛒 Failed to save even minimal cart data:', retryError)
         }
       } else {
-        console.error('🛒 Error saving cart to localStorage:', error)
-        showWarning('Failed to save cart locally. Please sign in to sync your cart.', 'Cart Save Error')
+        // Silently fail - localStorage errors don't need user notification
       }
     }
-  }, [items, showError, showWarning])
+  }, [items])
 
   // Validate stock for a product, optionally checking a specific variant
   const validateStock = async (

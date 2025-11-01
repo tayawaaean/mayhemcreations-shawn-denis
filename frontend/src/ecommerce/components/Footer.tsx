@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Facebook, Instagram, Phone, MapPin, ExternalLink } from 'lucide-react'
 import { addressApiService } from '../../shared/addressApiService'
 import { Address } from '../../types/address'
+import { envConfig } from '../../shared/envConfig'
 
 // Custom SVG Icons for social media platforms
 const EtsyIcon = ({ className }: { className?: string }) => (
@@ -19,6 +20,7 @@ const TikTokIcon = ({ className }: { className?: string }) => (
 
 export default function Footer() {
   const [originAddress, setOriginAddress] = useState<Address | null>(null)
+  const socialLinks = envConfig.getSocialMediaLinks()
 
   // Fetch origin address on component mount
   useEffect(() => {
@@ -53,18 +55,26 @@ export default function Footer() {
               Crafting quality custom embroidery since 2018. We bring your vision to life with professional-grade equipment and exceptional attention to detail.
             </p>
             <div className="flex space-x-4">
-              <a href="https://etsy.com/shop/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
-                <EtsyIcon className="w-5 h-5" />
-              </a>
-              <a href="https://tiktok.com/@Mayhem_Creation" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
-                <TikTokIcon className="w-5 h-5" />
-              </a>
-              <a href="https://facebook.com/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a href="https://instagram.com/Mayhem_Creaton" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
-                <Instagram className="w-5 h-5" />
-              </a>
+              {socialLinks.etsy && (
+                <a href={socialLinks.etsy} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                  <EtsyIcon className="w-5 h-5" />
+                </a>
+              )}
+              {socialLinks.tikTok && (
+                <a href={socialLinks.tikTok} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                  <TikTokIcon className="w-5 h-5" />
+                </a>
+              )}
+              {socialLinks.facebook && (
+                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                  <Facebook className="w-5 h-5" />
+                </a>
+              )}
+              {socialLinks.instagram && (
+                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors">
+                  <Instagram className="w-5 h-5" />
+                </a>
+              )}
             </div>
           </div>
 
@@ -113,22 +123,38 @@ export default function Footer() {
                 </span>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <EtsyIcon className="w-4 h-4 text-accent" />
-                  <a href="https://etsy.com/shop/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@MayhemCreationLLC</a>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <TikTokIcon className="w-4 h-4 text-accent" />
-                  <a href="https://tiktok.com/@Mayhem_Creation" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@Mayhem_Creation</a>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Facebook className="w-4 h-4 text-accent" />
-                  <a href="https://facebook.com/MayhemCreationLLC" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@MayhemCreationLLC</a>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Instagram className="w-4 h-4 text-accent" />
-                  <a href="https://instagram.com/Mayhem_Creaton" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">@Mayhem_Creaton</a>
-                </div>
+                {socialLinks.etsy && (
+                  <div className="flex items-center space-x-3">
+                    <EtsyIcon className="w-4 h-4 text-accent" />
+                    <a href={socialLinks.etsy} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">
+                      {socialLinks.etsy.replace(/https?:\/\/(www\.)?(etsy\.com\/shop\/|shop\.etsy\.com\/)/, '@')}
+                    </a>
+                  </div>
+                )}
+                {socialLinks.tikTok && (
+                  <div className="flex items-center space-x-3">
+                    <TikTokIcon className="w-4 h-4 text-accent" />
+                    <a href={socialLinks.tikTok} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">
+                      {socialLinks.tikTok.replace(/https?:\/\/(www\.)?tiktok\.com\//, '@')}
+                    </a>
+                  </div>
+                )}
+                {socialLinks.facebook && (
+                  <div className="flex items-center space-x-3">
+                    <Facebook className="w-4 h-4 text-accent" />
+                    <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">
+                      {socialLinks.facebook.replace(/https?:\/\/(www\.)?(facebook\.com|fb\.com)\//, '@')}
+                    </a>
+                  </div>
+                )}
+                {socialLinks.instagram && (
+                  <div className="flex items-center space-x-3">
+                    <Instagram className="w-4 h-4 text-accent" />
+                    <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-accent transition-colors text-sm">
+                      {socialLinks.instagram.replace(/https?:\/\/(www\.)?instagram\.com\//, '@')}
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
           </div>

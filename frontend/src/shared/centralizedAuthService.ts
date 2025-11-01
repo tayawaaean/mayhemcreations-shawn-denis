@@ -90,6 +90,14 @@ class CentralizedAuthService {
   }
 
   /**
+   * Public method to refresh auth state from storage
+   * Useful after OAuth login or manual storage updates
+   */
+  public refreshFromStorage(): void {
+    this.initializeFromStorage();
+  }
+
+  /**
    * Subscribe to authentication state changes
    */
   public subscribe(listener: (state: AuthState) => void): () => void {

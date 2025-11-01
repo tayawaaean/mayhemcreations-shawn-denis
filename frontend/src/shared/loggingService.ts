@@ -134,13 +134,14 @@ class LoggingService {
     if (event === 'failed_login_attempt') {
       if (typeof window !== 'undefined' && (window as any).__toast) {
         try {
+          // Show toast notification for failed login attempts
           (window as any).__toast({
             type: 'error',
             message: 'Login failed. Please try again.',
             durationMs: 4000
           })
         } catch (error) {
-          // Silent fallback if toast system not available
+          // Silent fallback if toast system not available or error occurs
         }
       }
     }

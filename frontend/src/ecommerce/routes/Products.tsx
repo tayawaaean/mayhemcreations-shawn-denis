@@ -216,6 +216,7 @@ export default function Products() {
     
     return {
       id: product.id.toString(),
+      slug: product.slug, // Include slug for SEO-friendly URLs
       title: product.title,
       price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
       description: product.description,

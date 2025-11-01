@@ -5,6 +5,8 @@ import { apiClient } from '../../shared/axiosConfig'
 import axios from 'axios'
 import { addressApiService } from '../../shared/addressApiService'
 import { Address } from '../../types/address'
+import SEO from '../../components/SEO'
+import { envConfig } from '../../shared/envConfig'
 
 // Custom SVG Icons for social media platforms
 const EtsyIcon = ({ className }: { className?: string }) => (
@@ -33,6 +35,7 @@ export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [originAddress, setOriginAddress] = useState<Address | null>(null)
+  const socialLinks = envConfig.getSocialMediaLinks()
 
   // Fetch origin address on component mount
   useEffect(() => {
@@ -47,6 +50,26 @@ export default function Contact() {
 
     fetchOriginAddress()
   }, [])
+
+  // Build ContactPage structured data for SEO
+  const contactPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ContactPage',
+    name: 'Contact Mayhem Creations',
+    description: 'Get in touch with Mayhem Creations for custom embroidery services. Contact us by phone, email, or fill out our contact form. We\'re here to help bring your vision to life.',
+    url: 'https://mayhemcreation.com/contact',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'Mayhem Creations',
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'Customer Service',
+        telephone: originAddress?.phone || '614-715-4742',
+        email: 'support@mayhemcreation.com',
+        availableLanguage: 'English'
+      }
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -130,6 +153,12 @@ export default function Contact() {
   if (sent) {
     return (
       <main className="min-h-screen">
+        <SEO
+          title="Message Sent - Mayhem Creations"
+          description="Your message has been sent successfully. We'll get back to you within 24 hours."
+          url="/contact"
+          canonicalUrl="/contact"
+        />
         <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
           <div className="container">
             <div className="max-w-2xl mx-auto text-center">
@@ -180,6 +209,14 @@ export default function Contact() {
 
   return (
     <main className="min-h-screen">
+      <SEO
+        title="Contact Us - Mayhem Creations | Custom Embroidery Services"
+        description="Get in touch with Mayhem Creations for custom embroidery services. Contact us by phone, email, or fill out our contact form. We're here to help bring your vision to life."
+        url="/contact"
+        type="website"
+        structuredData={contactPageSchema}
+        canonicalUrl="/contact"
+      />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
         <div className="container">
@@ -382,42 +419,58 @@ export default function Contact() {
                     Stay connected and see our latest work on social media!
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    <a
-                      href="https://etsy.com/shop/MayhemCreationLLC"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
-                    >
-                      <EtsyIcon className="w-5 h-5 text-accent" />
-                      <span className="text-sm font-medium text-gray-700">@MayhemCreationLLC</span>
-                    </a>
-                    <a
-                      href="https://tiktok.com/@Mayhem_Creation"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
-                    >
-                      <TikTokIcon className="w-5 h-5 text-accent" />
-                      <span className="text-sm font-medium text-gray-700">@Mayhem_Creation</span>
-                    </a>
-                    <a
-                      href="https://facebook.com/MayhemCreationLLC"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
-                    >
-                      <Facebook className="w-5 h-5 text-accent" />
-                      <span className="text-sm font-medium text-gray-700">@MayhemCreationLLC</span>
-                    </a>
-                    <a
-                      href="https://instagram.com/Mayhem_Creaton"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
-                    >
-                      <Instagram className="w-5 h-5 text-accent" />
-                      <span className="text-sm font-medium text-gray-700">@Mayhem_Creaton</span>
-                    </a>
+                    {socialLinks.etsy && (
+                      <a
+                        href={socialLinks.etsy}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                      >
+                        <EtsyIcon className="w-5 h-5 text-accent" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {socialLinks.etsy.replace(/https?:\/\/(www\.)?(etsy\.com\/shop\/|shop\.etsy\.com\/)/, '@')}
+                        </span>
+                      </a>
+                    )}
+                    {socialLinks.tikTok && (
+                      <a
+                        href={socialLinks.tikTok}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                      >
+                        <TikTokIcon className="w-5 h-5 text-accent" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {socialLinks.tikTok.replace(/https?:\/\/(www\.)?tiktok\.com\//, '@')}
+                        </span>
+                      </a>
+                    )}
+                    {socialLinks.facebook && (
+                      <a
+                        href={socialLinks.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                      >
+                        <Facebook className="w-5 h-5 text-accent" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {socialLinks.facebook.replace(/https?:\/\/(www\.)?(facebook\.com|fb\.com)\//, '@')}
+                        </span>
+                      </a>
+                    )}
+                    {socialLinks.instagram && (
+                      <a
+                        href={socialLinks.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-3 p-3 bg-white rounded-lg hover:bg-accent/5 transition-colors duration-200"
+                      >
+                        <Instagram className="w-5 h-5 text-accent" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {socialLinks.instagram.replace(/https?:\/\/(www\.)?instagram\.com\//, '@')}
+                        </span>
+                      </a>
+                    )}
                   </div>
                 </div>
 

@@ -4,14 +4,14 @@ import { logger } from '../utils/logger';
 import nodemailer from 'nodemailer';
 
 // Admin email address from environment variables
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'support@mayhemcreations.com';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'support@mayhemcreation.com';
 
 // Email configuration from environment variables
 const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creations <noreply@mayhemcreation.com>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creation <noreply@mayhemcreation.com>';
 
 // Create nodemailer transporter for contact form emails
 const transporter = nodemailer.createTransport({

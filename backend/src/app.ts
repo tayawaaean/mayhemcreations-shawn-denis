@@ -33,6 +33,7 @@ import refundRoute from './routes/refundRoute';
 import labelRoute from './routes/labelRoute';
 import contactRoute from './routes/contactRoute';
 import webhookRoute from './routes/webhookRoute';
+import sitemapRoute from './routes/sitemapRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
 import { getPublicOriginAddress } from './controllers/addressController';
 
@@ -178,6 +179,7 @@ app.use('/api/v1/shipments', require('./routes/shipmentRoute').default);
 app.use('/api/v1/refunds', refundRoute);
 app.use('/api/v1/labels', labelRoute);
 app.use('/api/v1/contact', contactRoute);
+app.use('/api/v1', sitemapRoute);
 
 // Public address endpoint (no authentication required)
 app.get('/api/v1/addresses/public/origin', getPublicOriginAddress);

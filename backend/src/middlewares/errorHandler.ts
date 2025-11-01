@@ -69,6 +69,19 @@ export const errorHandler = (
     isOperational = true;
   }
 
+  // List of common static file paths that browsers request but don't exist on API backend
+  // These are expected 404s and shouldn't be logged as warnings
+  const commonStaticPaths = [
+    '/favicon.ico',
+    '/robots.txt',
+    '/manifest.json',
+    '/site.webmanifest',
+    '/apple-touch-icon.png',
+    '/android-chrome-192x192.png',
+    '/android-chrome-512x512.png',
+    '/browserconfig.xml',
+  ];
+
   // Log error
   if (statusCode >= 500) {
     logger.error('Server Error:', {
@@ -80,13 +93,21 @@ export const errorHandler = (
       userAgent: req.get('User-Agent'),
     });
   } else {
-    logger.warn('Client Error:', {
-      error: error.message,
-      url: req.url,
-      method: req.method,
-      ip: req.ip,
-      statusCode,
-    });
+    // Suppress logging for expected 404s on common static file paths
+    // These are normal browser requests that don't exist on the API backend
+    const isCommonStaticFile = commonStaticPaths.some(path => req.url.startsWith(path));
+    const isExpected404 = statusCode === 404 && isCommonStaticFile;
+
+    if (!isExpected404) {
+      logger.warn('Client Error:', {
+        error: error.message,
+        url: req.url,
+        method: req.method,
+        ip: req.ip,
+        statusCode,
+      });
+    }
+    // Common static file 404s are silently ignored - no logging needed
   }
 
   // Send error response

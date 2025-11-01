@@ -1012,8 +1012,8 @@ export class AuthController {
         return;
       }
 
-      // Handle Google login
-      const result = await OAuthService.handleGoogleLogin(googleUserInfo, expectedRole);
+      // Handle Google login - pass req and res for session cookie setting
+      const result = await OAuthService.handleGoogleLogin(googleUserInfo, expectedRole, req, res);
 
       if (result.success) {
         res.status(200).json(result);

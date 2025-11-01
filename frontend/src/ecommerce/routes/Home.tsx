@@ -6,9 +6,11 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw } from 'lucide-react'
 import Button from '../../components/Button'
 import SEO from '../../components/SEO'
+import { envConfig } from '../../shared/envConfig'
 
 export default function Home() {
   const featured = products.slice(0, 4)
+  const socialLinks = envConfig.getSocialMediaLinksArray()
 
   // Structured data for Organization
   const organizationSchema = {
@@ -18,9 +20,7 @@ export default function Home() {
     url: 'https://mayhemcreation.com',
     logo: 'https://mayhemcreation.com/logo.png',
     description: 'Premium custom embroidery services and high-quality apparel. Create unique designs for your business or personal use.',
-    sameAs: [
-      // Add social media links when available
-    ],
+    sameAs: socialLinks,
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'Customer Service',

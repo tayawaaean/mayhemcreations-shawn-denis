@@ -12,7 +12,7 @@ import SEO from '../../components/SEO'
 const REVIEW_IMAGE_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23f9fafb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23d1d5db"%3EImage Unavailable%3C/text%3E%3C/svg%3E'
 
 export default function ProductPage() {
-  const { id } = useParams()
+  const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,13 +25,13 @@ export default function ProductPage() {
 
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!id) return
+      if (!slug) return
       
       try {
         setLoading(true)
         setError(null)
         
-        const response = await productApiService.getProductById(parseInt(id))
+        const response = await productApiService.getProductBySlug(slug)
         setProduct(response.data || null)
       } catch (err) {
         setError('Product not found')
@@ -42,16 +42,16 @@ export default function ProductPage() {
     }
 
     fetchProduct()
-  }, [id])
+  }, [slug])
 
   useEffect(() => {
     const fetchReviews = async () => {
-      if (!id) return
+      if (!product?.id) return
       
       try {
         setReviewsLoading(true)
         setReviewsError(null)
-        const response = await productReviewApiService.getProductReviews(parseInt(id))
+        const response = await productReviewApiService.getProductReviews(product.id)
         if (response.success && response.data) {
           setReviews(response.data.reviews)
           setReviewStats(response.data.stats)
@@ -85,18 +85,18 @@ export default function ProductPage() {
     }
 
     fetchReviews()
-  }, [id])
+  }, [product?.id])
   
   // Function to retry loading reviews
   const handleRetryReviews = async () => {
-    if (!id) return
+    if (!product?.id) return
     
     setIsRetryingReviews(true)
     setReviewsLoading(true)
     setReviewsError(null)
     
     try {
-      const response = await productReviewApiService.getProductReviews(parseInt(id))
+      const response = await productReviewApiService.getProductReviews(product.id)
       if (response.success && response.data) {
         setReviews(response.data.reviews)
         setReviewStats(response.data.stats)
@@ -186,7 +186,7 @@ export default function ProductPage() {
     },
     offers: {
       '@type': 'Offer',
-      url: `https://mayhemcreation.com/product/${product.id}`,
+      url: `https://mayhemcreation.com/product/${product.slug}`,
       priceCurrency: 'USD',
       price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
       availability: totalStock > 0 
@@ -211,7 +211,7 @@ export default function ProductPage() {
   const productDescription = product.description || 
     `${product.title} from Mayhem Creations. Premium custom embroidery services and high-quality apparel.${totalStock > 0 ? ' In stock now.' : ''}`
   const productImage = images.length > 0 ? images[0] : product.image
-  const productUrl = `/product/${product.id}` // Using ID for now, will update to slug later
+  const productUrl = `/product/${product.slug}`
 
   return (
     <main className="min-h-screen bg-gray-50">

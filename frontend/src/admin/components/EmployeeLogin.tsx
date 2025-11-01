@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle, Building2 } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, AlertCircle, Building2 } from 'lucide-react'
 import Button from '../../components/Button'
 import { loggingService } from '../../shared/loggingService'
 import { apiService } from '../services/apiService'
@@ -15,86 +15,6 @@ interface EmployeeUser {
   avatar?: string
 }
 
-// Demo accounts with secure passwords - Updated to match userSeeder data
-const demoAccounts: EmployeeUser[] = [
-  // Admin Users
-  {
-    id: 'admin-1',
-    email: 'admin@mayhemcreation.com',
-    firstName: 'John',
-    lastName: 'Admin',
-    role: 'admin',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'
-  },
-  {
-    id: 'admin-2',
-    email: 'shawn.denis@mayhemcreation.com',
-    firstName: 'Shawn',
-    lastName: 'Denis',
-    role: 'admin',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shawn'
-  },
-  // Manager Users
-  {
-    id: 'manager-1',
-    email: 'manager@mayhemcreation.com',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    role: 'manager',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=manager'
-  },
-  {
-    id: 'manager-2',
-    email: 'operations@mayhemcreation.com',
-    firstName: 'Michael',
-    lastName: 'Chen',
-    role: 'manager',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=operations'
-  },
-  // Designer Users
-  {
-    id: 'designer-1',
-    email: 'designer@mayhemcreation.com',
-    firstName: 'Emma',
-    lastName: 'Rodriguez',
-    role: 'designer',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=designer'
-  },
-  {
-    id: 'designer-2',
-    email: 'creative@mayhemcreation.com',
-    firstName: 'Alex',
-    lastName: 'Thompson',
-    role: 'designer',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=creative'
-  },
-  // Support Users
-  {
-    id: 'support-1',
-    email: 'support@mayhemcreation.com',
-    firstName: 'Lisa',
-    lastName: 'Williams',
-    role: 'support',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=support'
-  },
-  {
-    id: 'support-2',
-    email: 'help@mayhemcreation.com',
-    firstName: 'David',
-    lastName: 'Brown',
-    role: 'support',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=help'
-  },
-  // Moderator Users
-  {
-    id: 'moderator-1',
-    email: 'moderator@mayhemcreation.com',
-    firstName: 'Jennifer',
-    lastName: 'Davis',
-    role: 'moderator',
-    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=moderator'
-  }
-]
 
 interface EmployeeLoginProps {
   onLogin: (user: EmployeeUser) => void
@@ -112,7 +32,6 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
   const [error, setError] = useState('')
   const [errorCategory, setErrorCategory] = useState<'timeout' | 'network' | 'server' | 'rate_limit' | 'auth' | 'validation' | null>(null)
   const [retryCount, setRetryCount] = useState(0)
-  const [selectedDemo, setSelectedDemo] = useState<EmployeeUser | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,8 +42,23 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
       // Call the real API for authentication with employee role validation
       const response = await apiService.login(formData.email, formData.password, 'employee')
       
-      if (response.success && response.data) {
-        const { user: apiUser, sessionId } = response.data
+      if (response.success) {
+        // Login succeeded, but apiService.login doesn't return user data
+        // We need to get the user data from centralizedAuthService or storage
+        // Wait a moment for centralizedAuthService to process the login
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        // Get user data from centralized auth service
+        const currentAccount = MultiAccountStorageService.getCurrentAccountData()
+        
+        if (!currentAccount || !currentAccount.user) {
+          setError('Login successful but user data not found. Please try again.')
+          setIsLoading(false)
+          return
+        }
+        
+        const apiUser = currentAccount.user
+        const sessionId = currentAccount.session?.sessionId
         
         // Create employee user object
         const employeeUser: EmployeeUser = {
@@ -136,66 +70,44 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${apiUser.firstName.toLowerCase()}`
         }
 
-        // Store auth data using multi-account storage
-        MultiAccountStorageService.storeAccountAuthData('employee', {
-          user: {
-            id: apiUser.id,
-            email: apiUser.email,
-            firstName: apiUser.firstName,
-            lastName: apiUser.lastName,
-            role: apiUser.role,
-            isEmailVerified: apiUser.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            accountType: 'employee'
-          },
-          session: {
-            sessionId,
-            lastActivity: new Date().toISOString()
-          }
-        })
-
-        // Explicitly set as current account to ensure proper token management
-        MultiAccountStorageService.setCurrentAccount('employee')
+        // Auth data is already stored by centralizedAuthService.login()
+        // Just ensure the current account is set correctly
+        const currentAccountData = MultiAccountStorageService.getCurrentAccountData()
+        if (!currentAccountData || currentAccountData.user.accountType !== 'employee') {
+          MultiAccountStorageService.setCurrentAccount('employee')
+        }
 
         // Log successful login attempt
         const logRole = employeeUser.role === 'admin' ? 'admin' : 'seller'
         loggingService.logLoginAttempt(formData.email, true, logRole)
         
-        // Call onLogin and handle any errors from AdminAuthContext
-        try {
-          await onLogin(employeeUser)
-          
-          // Check for redirect parameter in URL (from session expiration)
-          const urlParams = new URLSearchParams(location.search)
-          const redirectPath = urlParams.get('redirect')
-          
-          if (redirectPath) {
-            // Decode and navigate to the original page
-            const decodedPath = decodeURIComponent(redirectPath)
-            navigate(decodedPath, { replace: true })
-          } else {
-            // Navigate based on role only if no redirect parameter
-            if (employeeUser.role === 'admin') {
-              navigate('/admin')
-            } else {
-              navigate('/seller')
-            }
-          }
-        } catch (loginError: any) {
-          console.error('❌ onLogin failed:', loginError)
-          // Error is already set in AdminAuthContext, just log it here
-          loggingService.logFailedLoginAttempt(formData.email, loginError?.message || 'Login callback failed')
-          setError(loginError?.message || 'Login failed. Please try again.')
-          // Don't navigate on error - stay on login page
+        // Auth data is already stored in MultiAccountStorageService
+        // AdminAuthContext will automatically pick up the user from centralizedAuthService subscription
+        // No need to call onLogin callback - it would cause errors since login function signature doesn't match
+        
+        // Small delay to ensure auth context picks up the stored data
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Check for redirect parameter in URL (from session expiration)
+        const urlParams = new URLSearchParams(location.search)
+        const redirectPath = urlParams.get('redirect')
+        
+        if (redirectPath) {
+          // Decode and navigate to the original page
+          const decodedPath = decodeURIComponent(redirectPath)
+          navigate(decodedPath, { replace: true })
+        } else {
+          // Navigate based on role only if no redirect parameter
+          const navPath = employeeUser.role === 'admin' ? '/admin' : '/seller'
+          navigate(navPath)
         }
       } else {
-        // Log failed login attempt
+        // Log failed login attempt - only if login actually failed
         loggingService.logFailedLoginAttempt(formData.email, response.message || 'Invalid credentials')
         setError(response.message || 'Login failed')
+        setIsLoading(false)
       }
     } catch (error: any) {
-      console.error('Login error:', error)
       
       // Enhanced error categorization with retry logic
       let errorMessage = 'Login failed. '
@@ -264,14 +176,6 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
     }
   }
 
-  const handleDemoLogin = (user: EmployeeUser) => {
-    setFormData({
-      email: user.email,
-      password: '' // Don't pre-fill password for security
-    })
-    setSelectedDemo(user)
-  }
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -313,68 +217,6 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* Demo Accounts Section */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Demo Accounts</h3>
-            <div className="space-y-2">
-              {demoAccounts.map((account) => (
-                <button
-                  key={account.id}
-                  onClick={() => handleDemoLogin(account)}
-                  className={`w-full flex items-center p-3 text-left border rounded-lg transition-colors ${
-                    selectedDemo?.id === account.id
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex-shrink-0">
-                    <img
-                      className="h-8 w-8 rounded-full"
-                      src={account.avatar}
-                      alt={account.firstName}
-                    />
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <div className="flex items-center">
-                      <p className="text-sm font-medium text-gray-900">
-                        {account.firstName} {account.lastName}
-                      </p>
-                      <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        account.role === 'admin'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {account.role === 'admin' ? (
-                          <>
-                            <Shield className="w-3 h-3 mr-1" />
-                            Admin
-                          </>
-                        ) : (
-                          <>
-                            <Store className="w-3 h-3 mr-1" />
-                            Seller
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500">{account.email}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-            
-            {/* Password Hints */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">Demo Account Passwords</h4>
-              <div className="text-xs text-blue-700 space-y-1">
-                <div><strong>Admin:</strong> SecureAdmin2024!</div>
-                <div><strong>Shawn Denis:</strong> SecureShawn2024!</div>
-                <div><strong>Manager:</strong> SecureManager2024!</div>
-                <div><strong>Designer:</strong> SecureCustomer2024!</div>
-              </div>
-            </div>
-          </div>
-
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
@@ -481,24 +323,6 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
             >
               ← Back to Store
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Demo Account Info */}
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-indigo-900 mb-2">Demo Account Credentials</h4>
-          <div className="text-xs text-indigo-800 space-y-1">
-            <div><strong>John Admin:</strong> admin@mayhemcreation.com / SecureAdmin2024!</div>
-            <div><strong>Shawn Denis:</strong> shawn.denis@mayhemcreation.com / SecureShawn2024!</div>
-            <div><strong>Sarah Johnson (Manager):</strong> manager@mayhemcreation.com / SecureManager2024!</div>
-            <div><strong>Michael Chen (Manager):</strong> operations@mayhemcreation.com / OpsPass123!</div>
-            <div><strong>Emma Rodriguez (Designer):</strong> designer@mayhemcreation.com / DesignerPass123!</div>
-            <div><strong>Alex Thompson (Designer):</strong> creative@mayhemcreation.com / CreativePass123!</div>
-            <div><strong>Lisa Williams (Support):</strong> support@mayhemcreation.com / SupportPass123!</div>
-            <div><strong>David Brown (Support):</strong> help@mayhemcreation.com / HelpPass123!</div>
-            <div><strong>Jennifer Davis (Moderator):</strong> moderator@mayhemcreation.com / ModeratorPass123!</div>
           </div>
         </div>
       </div>

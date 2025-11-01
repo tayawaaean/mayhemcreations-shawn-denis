@@ -1,5 +1,6 @@
 export type Product = {
   id: string
+  slug?: string
   title: string
   price: number
   description: string
@@ -169,6 +170,7 @@ declare global {
   readonly VITE_STRIPE_PUBLISHABLE_KEY: string
   readonly VITE_PAYPAL_CLIENT_ID: string
   readonly VITE_PAYPAL_ENVIRONMENT: string
+  readonly VITE_SITE_URL: string
   }
 }
 

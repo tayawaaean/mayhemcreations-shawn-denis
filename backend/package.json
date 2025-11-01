@@ -1,7 +1,7 @@
 {
   "name": "mayhem-creations-backend",
   "version": "1.0.0",
-  "description": "Backend API for Mayhem Creations e-commerce platform",
+  "description": "Backend API for Mayhem Creation e-commerce platform",
   "mai  n": "dist/server.js",
   "scripts": {
     "start": "node --env-file=.env dist/server.js",
@@ -49,7 +49,7 @@
     "typescript",
     "sequelize"
   ],
-  "author": "Mayhem Creations",
+  "author": "Mayhem Creation",
   "license": "MIT",
   "dependencies": {
     "@paypal/checkout-server-sdk": "^1.0.3",

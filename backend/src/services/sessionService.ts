@@ -88,8 +88,23 @@ export class SessionService {
       };
 
       // Store in express-session
+      // CRITICAL: express-session only saves if the session is modified
+      // Setting req.session.user marks the session as modified, so express-session will save it
+      // The cookie will be set automatically when the response is sent
       if (req.session) {
         (req.session as any).user = sessionData;
+        // Explicitly save the session to ensure cookie is set
+        // This ensures the session is saved before the response is sent
+        await new Promise<void>((resolve, reject) => {
+          req.session!.save((err) => {
+            if (err) {
+              logger.error('Error saving session:', err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
+        });
       }
 
       logger.info(`Session created for user: ${user.email}`, {
@@ -97,6 +112,7 @@ export class SessionService {
         sessionId,
         userAgent,
         ipAddress,
+        sessionCookieSet: !!req.session,
       });
 
       return sessionData;

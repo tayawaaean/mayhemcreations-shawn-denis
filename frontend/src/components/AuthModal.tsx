@@ -7,6 +7,9 @@ import MultiAccountStorageService from '../shared/multiAccountStorage'
 import { customerApiService } from '../shared/customerApiService'
 import { envConfig } from '../shared/envConfig'
 import { useToast } from '../shared/toastContext'
+import centralizedAuthService from '../shared/centralizedAuthService'
+import { useMultiAccount } from '../shared/multiAccountContext'
+import { useAuth } from '../ecommerce/context/AuthContext'
 
 interface User {
   id: number
@@ -28,56 +31,11 @@ interface AuthModalProps {
   onSuccess: (user: User) => void
 }
 
-// Demo customer accounts for testing - using actual seeded data
-const getDemoCustomers = () => {
-  return [
-    {
-      id: 1,
-      firstName: 'Robert',
-      lastName: 'Wilson',
-      email: 'customer1@example.com',
-      password: 'SecureCustomer2024!',
-      role: 'customer'
-    },
-    {
-      id: 2,
-      firstName: 'Maria',
-      lastName: 'Garcia',
-      email: 'customer2@example.com',
-      password: 'SecureCustomer2024!',
-      role: 'customer'
-    },
-    {
-      id: 3,
-      firstName: 'James',
-      lastName: 'Anderson',
-      email: 'customer3@example.com',
-      password: 'SecureCustomer2024!',
-      role: 'customer'
-    },
-    {
-      id: 4,
-      firstName: 'Sophie',
-      lastName: 'Taylor',
-      email: 'customer4@example.com',
-      password: 'SecureCustomer2024!',
-      role: 'customer'
-    },
-    {
-      id: 5,
-      firstName: 'Kevin',
-      lastName: 'Martinez',
-      email: 'customer5@example.com',
-      password: 'SecureCustomer2024!',
-      role: 'customer'
-    }
-  ]
-}
-
-const demoCustomers = getDemoCustomers()
 
 export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSuccess }: AuthModalProps) {
   const { showToast } = useToast()
+  const { login: multiAccountLogin } = useMultiAccount()
+  const { isLoggedIn, user: authUser } = useAuth()
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -90,7 +48,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
-  const [selectedDemo, setSelectedDemo] = useState<typeof demoCustomers[0] | null>(null)
   const [requiresEmailVerification, setRequiresEmailVerification] = useState(false)
   const [isResendingVerification, setIsResendingVerification] = useState(false)
   const [isSuccessMessage, setIsSuccessMessage] = useState(false)
@@ -259,14 +216,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           // Explicitly set as current account to ensure proper token management
           MultiAccountStorageService.setCurrentAccount('customer')
 
-          // Verify the data was stored correctly
-          const storedData = MultiAccountStorageService.getCurrentAccountData();
-          console.log('🔍 Verification - stored customer data:', {
-            hasStoredData: !!storedData,
-            sessionId: storedData?.session?.sessionId,
-            accountType: storedData?.user?.accountType
-          });
-
           // Convert to User format for context
           const userDataForContext: User = {
             id: userData.id,
@@ -342,8 +291,11 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
       )
 
       if (result.success && result.data) {
-        // Store auth data using multi-account storage
-        MultiAccountStorageService.storeAccountAuthData('customer', {
+        // Determine account type (always customer for OAuth)
+        const accountType = 'customer'
+        
+        // Store auth data in multi-account storage (session-based auth)
+        MultiAccountStorageService.storeAccountAuthData(accountType, {
           user: {
             id: result.data.user.id,
             email: result.data.user.email,
@@ -351,10 +303,10 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             firstName: result.data.user.firstName,
             lastName: result.data.user.lastName,
             isEmailVerified: result.data.user.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
+            lastLoginAt: result.data.user.lastLoginAt || new Date().toISOString(),
+            createdAt: result.data.user.createdAt || new Date().toISOString(),
             avatar: result.data.user.avatar,
-            accountType: 'customer'
+            accountType: accountType
           },
           session: {
             sessionId: result.data.sessionId,
@@ -362,7 +314,10 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           }
         })
 
-        // Convert to User format for context
+        // Set as current account
+        MultiAccountStorageService.setCurrentAccount(accountType)
+
+        // Convert to User format for context (with accountType for multiAccountContext)
         const userData: User = {
           id: result.data.user.id,
           firstName: result.data.user.firstName,
@@ -370,13 +325,77 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           email: result.data.user.email,
           role: result.data.user.role,
           isEmailVerified: result.data.user.isEmailVerified,
-          lastLoginAt: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
+          lastLoginAt: result.data.user.lastLoginAt || new Date().toISOString(),
+          createdAt: result.data.user.createdAt || new Date().toISOString(),
           avatar: result.data.user.avatar || `https://ui-avatars.com/api/?name=${result.data.user.firstName}+${result.data.user.lastName}&background=3b82f6&color=ffffff`
+        }
+
+        // Update multiAccountContext state (this will notify AuthContext)
+        // IMPORTANT: multiAccountLogin uses existing sessionId, but we need the NEW OAuth sessionId
+        // So we need to update the sessionId AFTER calling multiAccountLogin
+        
+        // Convert to multiAccount format
+        const multiUserData = {
+          ...userData,
+          accountType: 'customer' as const
+        }
+        
+        // Call multiAccountLogin which will update React context state
+        // This triggers AuthContext to update via its useEffect dependency on multiAccountContext
+        multiAccountLogin(multiUserData, 'customer')
+        
+        // CRITICAL: Ensure the NEW sessionId from OAuth is stored (multiAccountLogin may have preserved old one)
+        // The sessionId must match what the backend set in the express-session cookie
+        const finalStoredData = MultiAccountStorageService.getAccountAuthData('customer')
+        if (finalStoredData && finalStoredData.session.sessionId !== result.data.sessionId) {
+          finalStoredData.session.sessionId = result.data.sessionId
+          finalStoredData.session.lastActivity = new Date().toISOString()
+          MultiAccountStorageService.storeAccountAuthData('customer', finalStoredData)
+          
+          // Re-trigger multiAccountLogin with correct sessionId
+          multiAccountLogin(multiUserData, 'customer')
+        }
+
+        // Update centralized auth service state from storage
+        centralizedAuthService.refreshFromStorage()
+
+        // Dispatch storage event to notify all contexts of auth state change
+        // This ensures CartContext and other contexts know the user is now authenticated
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('storage'))
         }
 
         // Log successful login
         loggingService.logLoginAttempt(result.data.user.email, true, 'customer')
+
+        // Wait for contexts to update - use a simple check instead of polling
+        // The session cookie is set by express-session on the OAuth API response
+        // We just need to ensure React contexts have updated before proceeding
+        // Check storage data is valid (session cookie will be sent automatically by browser)
+        const verifyAuthReady = async (): Promise<boolean> => {
+          const currentAuthData = MultiAccountStorageService.getAccountAuthData('customer')
+          return !!(
+            currentAuthData && 
+            currentAuthData.user && 
+            currentAuthData.user.id === result.data.user.id &&
+            MultiAccountStorageService.isAccountAuthenticated('customer')
+          )
+        }
+        
+        // Poll until auth is ready, but with a reasonable timeout
+        let authReady = false
+        let attempts = 0
+        const maxAttempts = 20 // 2 seconds max (20 * 100ms)
+        
+        while (!authReady && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+          authReady = await verifyAuthReady()
+          attempts++
+        }
+        
+        if (!authReady) {
+          console.warn('⚠️ Auth context did not update within timeout, proceeding anyway')
+        }
 
         onSuccess(userData)
         onClose()
@@ -386,6 +405,10 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
     } catch (error: any) {
       console.error('❌ Google OAuth error:', error)
       setError(error.message || 'An error occurred during Google login')
+      
+      // Log failed attempt
+      const email = response?.credential ? 'unknown' : 'unknown'
+      loggingService.logFailedLoginAttempt(email, error.message || 'Google OAuth failed')
     } finally {
       setIsLoading(false)
     }
@@ -429,72 +452,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
     return { userData, sessionId };
   };
 
-  const handleDemoLogin = async (customer: typeof demoCustomers[0]) => {
-    setIsLoading(true)
-    setError('')
-    setSelectedDemo(customer)
-
-    try {
-      // Call the real API for authentication with customer role validation
-      const response = await customerApiService.login(customer.email, customer.password, 'customer')
-
-      if (response.success) {
-        // Store auth data using multi-account storage
-        if (response.data) {
-          const { userData, sessionId } = extractUserData(response);
-          
-          MultiAccountStorageService.storeAccountAuthData('customer', {
-            user: {
-              id: userData.id,
-              email: userData.email,
-              role: userData.role,
-              firstName: userData.firstName,
-              lastName: userData.lastName,
-              isEmailVerified: userData.isEmailVerified,
-              lastLoginAt: new Date().toISOString(),
-              createdAt: userData.createdAt || new Date().toISOString(),
-              avatar: userData.avatar,
-              accountType: 'customer'
-            },
-            session: {
-              sessionId: sessionId,
-              lastActivity: new Date().toISOString()
-            }
-          })
-
-          // Convert to User format for context
-          const userDataForContext: User = {
-            id: userData.id,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            email: userData.email,
-            role: userData.role,
-            isEmailVerified: userData.isEmailVerified,
-            lastLoginAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            avatar: `https://ui-avatars.com/api/?name=${userData.firstName}+${userData.lastName}&background=3b82f6&color=ffffff`
-          }
-
-          // Log successful login
-          loggingService.logLoginAttempt(customer.email, true, 'customer')
-
-          onSuccess(userDataForContext)
-        }
-        onClose()
-      } else {
-        setError(response.message || 'Demo login failed')
-      }
-    } catch (error: any) {
-      console.error('Demo login error:', error)
-      setError(error.message || 'An error occurred during demo login')
-      
-      // Log failed attempt
-      loggingService.logFailedLoginAttempt(customer.email, error.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   if (!isOpen) return null
 
   return (
@@ -523,39 +480,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
             className="mb-4"
             buttonText="Continue with Google"
           />
-
-          {/* Demo Accounts Section */}
-          <div className="mt-4">
-            <div className="text-center mb-3">
-              <span className="text-sm text-gray-500">Or try demo accounts</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {demoCustomers.map((customer) => (
-                <button
-                  key={customer.id}
-                  type="button"
-                  onClick={() => handleDemoLogin(customer)}
-                  disabled={isLoading}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-sm border rounded-md transition-colors ${
-                    selectedDemo?.id === customer.id
-                      ? 'border-accent bg-accent/5 text-accent'
-                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-gradient-to-br from-accent to-accent/80 rounded-full flex items-center justify-center text-white text-xs font-medium">
-                      {customer.firstName[0]}{customer.lastName[0]}
-                    </div>
-                    <div className="text-left">
-                      <div className="font-medium">{customer.firstName} {customer.lastName}</div>
-                      <div className="text-xs text-gray-500">{customer.email}</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400">Demo</div>
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Divider */}
           <div className="relative my-6">
@@ -762,46 +686,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
           </div>
           </form>
 
-          {/* Demo Account Credentials */}
-          {envConfig.hasDemoAccounts() && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Demo Account Credentials</h4>
-              <div className="space-y-2 text-xs text-gray-600">
-                {(() => {
-                  const demoAccounts = envConfig.getDemoAccounts()
-                  if (!demoAccounts) return null
-                  
-                  return (
-                    <>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Robert Wilson:</span>
-                        <span>{demoAccounts.customer}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Maria Garcia:</span>
-                        <span>{demoAccounts.customer}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium">James Anderson:</span>
-                        <span>{demoAccounts.customer}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Sophie Taylor:</span>
-                        <span>{demoAccounts.customer}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Kevin Martinez:</span>
-                        <span>{demoAccounts.customer}</span>
-                      </div>
-                    </>
-                  )
-                })()}
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <span className="text-gray-500">Password for all demo accounts: SecureCustomer2024!</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

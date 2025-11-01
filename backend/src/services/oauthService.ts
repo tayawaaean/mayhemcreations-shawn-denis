@@ -1,4 +1,5 @@
 import { OAuth2Client } from 'google-auth-library';
+import { Request, Response } from 'express';
 import { User, OAuthProvider } from '../models';
 import { SessionService } from './sessionService';
 import { logger } from '../utils/logger';
@@ -66,8 +67,17 @@ export class OAuthService {
 
   /**
    * Handle Google OAuth login/registration
+   * @param googleUserInfo - Google user information from token verification
+   * @param expectedRole - Expected user role ('customer' or 'employee')
+   * @param req - Express request object (required for session cookie setting)
+   * @param res - Express response object (optional, for session cookie setting)
    */
-  static async handleGoogleLogin(googleUserInfo: GoogleUserInfo, expectedRole: string = 'customer'): Promise<OAuthLoginResult> {
+  static async handleGoogleLogin(
+    googleUserInfo: GoogleUserInfo, 
+    expectedRole: string = 'customer',
+    req?: Request,
+    res?: Response
+  ): Promise<OAuthLoginResult> {
     try {
       // Validate email verification
       if (!googleUserInfo.verified_email) {
@@ -173,13 +183,21 @@ export class OAuthService {
         };
       }
 
-      // Create session
+      // Create session - CRITICAL: Must use real req object for express-session to set cookie
+      // Without the real req object, express-session can't set the session cookie
+      if (!req) {
+        return {
+          success: false,
+          message: 'Request object required for session creation'
+        };
+      }
+
       const sessionResult = await SessionService.createSession(
-        {} as any, // Mock request object
+        req, // Real request object - required for express-session cookie setting
         user,
         (user as any).role,
         'Google OAuth',
-        '127.0.0.1' // This should come from request in real implementation
+        req.ip || '127.0.0.1'
       );
 
       // Update user last login

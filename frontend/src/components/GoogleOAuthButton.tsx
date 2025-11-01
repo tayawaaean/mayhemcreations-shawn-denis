@@ -45,7 +45,6 @@ export default function GoogleOAuthButton({
       setIsLoading(true)
       
       await googleOAuthService.initialize((response: GoogleOAuthResponse) => {
-        console.log('🔐 Google OAuth success:', response)
         onSuccess(response)
       })
 

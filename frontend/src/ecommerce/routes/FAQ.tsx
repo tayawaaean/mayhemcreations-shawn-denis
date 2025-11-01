@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronDown, HelpCircle, Clock, Palette, Truck, Shield, CreditCard, MessageCircle } from 'lucide-react'
 import { faqApiService, FAQ as FAQType } from '../../shared/faqApiService'
+import SEO from '../../components/SEO'
 
 const categoryIcons: Record<string, any> = {
   'General': HelpCircle,
@@ -65,8 +66,30 @@ export default function FAQ() {
     groupedFAQs[category].sort((a, b) => a.sortOrder - b.sortOrder)
   })
 
+  // Build FAQPage structured data for SEO
+  const faqPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(faq => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer
+      }
+    }))
+  }
+
   return (
     <main className="min-h-screen">
+      <SEO
+        title="Frequently Asked Questions - Mayhem Creations"
+        description="Find answers to common questions about our custom embroidery services, ordering process, shipping, payment, and quality care. Get help with your embroidery projects."
+        url="/faq"
+        type="website"
+        structuredData={faqPageSchema}
+        canonicalUrl="/faq"
+      />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
         <div className="container">

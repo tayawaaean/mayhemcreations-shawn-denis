@@ -1,10 +1,40 @@
 import React from 'react'
 import { Award, Users, Clock, Heart, CheckCircle, Star, Quote, MapPin, Phone, Mail } from 'lucide-react'
 import Button from '../../components/Button'
+import SEO from '../../components/SEO'
+import { envConfig } from '../../shared/envConfig'
 
 export default function About() {
+  const socialLinks = envConfig.getSocialMediaLinksArray()
+
+  // Structured data for AboutPage
+  const aboutPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: 'About Mayhem Creations',
+    description: 'Learn about Mayhem Creations - crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
+    url: 'https://mayhemcreation.com/about',
+    mainEntity: {
+      '@type': 'Organization',
+      name: 'Mayhem Creations',
+      foundingDate: '2018',
+      description: 'Crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
+      url: 'https://mayhemcreation.com',
+      logo: 'https://mayhemcreation.com/logo.png',
+      sameAs: socialLinks
+    }
+  }
+
   return (
     <main className="min-h-screen">
+      <SEO
+        title="About Us - Mayhem Creations | Custom Embroidery Since 2018"
+        description="Learn about Mayhem Creations - crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality."
+        url="/about"
+        type="website"
+        structuredData={aboutPageSchema}
+        canonicalUrl="/about"
+      />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
         <div className="container">

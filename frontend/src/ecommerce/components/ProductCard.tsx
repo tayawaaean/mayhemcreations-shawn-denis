@@ -30,7 +30,7 @@ export default function ProductCard({ product }: { product: Product }) {
     >
       {/* Image Container */}
       <div className="relative aspect-square overflow-hidden bg-gray-100">
-        <Link to={`/product/${product.id}`} className="block">
+        <Link to={`/product/${product.slug}`} className="block">
           <ProductSlideshow
             images={images}
             alt={product.alt}
@@ -104,7 +104,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
       {/* Product Info */}
       <div className="p-4">
-        <Link to={`/product/${product.id}`}>
+        <Link to={`/product/${product.slug}`}>
           <h3 className="font-semibold text-gray-900 mb-2 hover:text-accent transition-colors">
             {product.title}
           </h3>
