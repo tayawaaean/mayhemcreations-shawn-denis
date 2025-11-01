@@ -230,13 +230,13 @@ export default function Customize() {
         // console.log('✅ Step 4 loaded with', customizationData.designs.length, 'designs')
         customizationData.designs.forEach((design, index) => {
           // console.log(`  Design ${index + 1}:`, {
-            id: design.id,
-            name: design.name,
-            hasStyles: !!design.selectedStyles,
-            coverage: design.selectedStyles?.coverage?.name || 'Not selected',
-            material: design.selectedStyles?.material?.name || 'Not selected',
-            border: design.selectedStyles?.border?.name || 'Not selected'
-          })
+          //   id: design.id,
+          //   name: design.name,
+          //   hasStyles: !!design.selectedStyles,
+          //   coverage: design.selectedStyles?.coverage?.name || 'Not selected',
+          //   material: design.selectedStyles?.material?.name || 'Not selected',
+          //   border: design.selectedStyles?.border?.name || 'Not selected'
+          // })
         })
       }
     }
@@ -853,14 +853,6 @@ export default function Customize() {
       return
     }
     
-    console.log('🛒 Starting add to cart process:', {
-      productId: product.id,
-      hasCustomization: !!customizationData,
-      designsCount: customizationData.designs.length,
-      hasLegacyDesign: !!customizationData.design,
-      mockupExists: !!customizationData.mockup
-    })
-    
     setIsAddingToCart(true)
     
     try {
@@ -881,7 +873,6 @@ export default function Customize() {
       
       if (!mockupBase64 && customizationData.design && productRef.current) {
         try {
-          console.log('🛒 No saved mockup found, capturing new mockup image...')
           // Ensure we're in final view for clean capture
           const wasInFinalView = showFinalView
           if (!wasInFinalView) {
@@ -898,20 +889,9 @@ export default function Customize() {
           if (!wasInFinalView) {
             setShowFinalView(false)
           }
-          console.log('🛒 New mockup captured successfully:', {
-            hasMockup: !!mockupBase64,
-            mockupLength: mockupBase64?.length,
-            mockupSizeKB: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
-          })
         } catch (error) {
           console.error('❌ Error capturing mockup:', error)
         }
-      } else if (mockupBase64) {
-        console.log('🛒 Using saved mockup from step 3:', {
-          hasMockup: !!mockupBase64,
-          mockupLength: mockupBase64?.length,
-          mockupSizeKB: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
-        })
       }
 
       // Find the matching variant based on selected color and size
@@ -922,29 +902,19 @@ export default function Customize() {
           const sizeMatch = !customizationData.size || variant.size?.toLowerCase() === customizationData.size.toLowerCase();
           return colorMatch && sizeMatch;
         });
-        
-        console.log('🎯 Found matching variant:', {
-          selectedColor: customizationData.color,
-          selectedSize: customizationData.size,
-          variantFound: !!selectedVariant,
-          variantId: selectedVariant?.id,
-          variantColor: selectedVariant?.color,
-          variantSize: selectedVariant?.size,
-          variantStock: selectedVariant?.stock
-        });
       }
 
       // Add customized item to cart with stock validation
       // console.log('🛒 Calling addToCart with:', {
-        productId: product.id.toString(),
-        quantity: customizationData.quantity,
-        customization: {
-          designsCount: customizationData.designs.length,
-          hasLegacyDesign: !!customizationData.design,
-          hasMockup: !!mockupBase64,
-          selectedVariantId: selectedVariant?.id
-        }
-      })
+      //   productId: product.id.toString(),
+      //   quantity: customizationData.quantity,
+      //   customization: {
+      //     designsCount: customizationData.designs.length,
+      //     hasLegacyDesign: !!customizationData.design,
+      //     hasMockup: !!mockupBase64,
+      //     selectedVariantId: selectedVariant?.id
+      //   }
+      // })
       
       const success = await addToCart(product.id.toString(), customizationData.quantity, {
         // Legacy single design support
@@ -969,11 +939,11 @@ export default function Customize() {
               });
               designTotalPrice += materialCosts.totalCost;
               // console.log('🔧 Customize: Adding material cost to design total:', {
-                designName: design.name,
-                dimensions: design.dimensions,
-                materialCost: materialCosts.totalCost,
-                currentTotal: designTotalPrice
-              });
+              //   designName: design.name,
+              //   dimensions: design.dimensions,
+              //   materialCost: materialCosts.totalCost,
+              //   currentTotal: designTotalPrice
+              // });
             } catch (error) {
               console.warn('Failed to calculate material costs for design:', design.name, error);
             }
@@ -1001,9 +971,9 @@ export default function Customize() {
           }
           
           // console.log('🛒 Customize: Design final total price:', {
-            designName: design.name,
-            totalPrice: designTotalPrice
-          });
+          //   designName: design.name,
+          //   totalPrice: designTotalPrice
+          // });
           
           return {
             id: design.id,
@@ -1101,11 +1071,6 @@ export default function Customize() {
       // Show the captured image in a modal
       setShowFinalDesignModal(true)
       setFinalDesignImage(mockupBase64)
-      
-      console.log('✅ High-quality design preview captured:', {
-        hasImage: !!mockupBase64,
-        imageSize: mockupBase64 ? Math.round(mockupBase64.length / 1024) : 0
-      })
     } catch (error) {
       console.error('❌ Error capturing design:', error)
       // Make sure to restore editing state and hide loading modal even on error

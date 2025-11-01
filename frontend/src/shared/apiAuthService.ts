@@ -66,7 +66,6 @@ class ApiAuthService {
     const { requireAuth = true, ...requestOptions } = options;
 
     try {
-      console.log('Making API request to:', endpoint);
       
       // Use axios client with automatic token refresh
       const response = await apiClient.request({
@@ -77,12 +76,11 @@ class ApiAuthService {
         ...requestOptions,
       });
 
-      console.log('API response status:', response.status);
-      console.log('API response data:', response.data);
+      
       
       return response.data;
     } catch (error: any) {
-      console.error('API request error:', error);
+      
       
       // Handle axios errors
       if (error.response) {

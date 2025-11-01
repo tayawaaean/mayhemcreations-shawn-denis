@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { PaymentLog } from '../types/paymentLogs'
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
+import { adminOrderApiService } from '../../shared/adminOrderApiService'
 import HelpModal from '../components/modals/HelpModal'
 import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
 import { formatDateOnly } from '../../utils/dateFormatter'
@@ -23,6 +24,17 @@ import { apiService, ErrorCategory } from '../services/apiService'
 const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
   const { orders } = state
+  const [ordersLoaded, setOrdersLoaded] = useState(false)
+  
+  // Orders are optional for PaymentManagement - only used for status updates
+  // The /admin/orders endpoint doesn't exist, so we skip fetching orders
+  // PaymentManagement can work without orders (payments are fetched separately)
+  useEffect(() => {
+    // Mark as loaded to prevent any attempts to fetch orders
+    if (!ordersLoaded) {
+      setOrdersLoaded(true)
+    }
+  }, [ordersLoaded])
   const [payments, setPayments] = useState<PaymentLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

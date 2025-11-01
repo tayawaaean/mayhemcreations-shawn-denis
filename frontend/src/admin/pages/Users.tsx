@@ -86,10 +86,8 @@ const UsersPage: React.FC = () => {
         
         if (response.success) {
           alert(`Successfully invalidated ${response.data?.invalidatedSessions || 0} sessions for ${userEmail}`)
-          console.log('✅ Logout all sessions successful:', response)
         } else {
           alert(`Failed to logout sessions: ${response.message}`)
-          console.error('❌ Logout all sessions failed:', response)
         }
       } catch (error) {
         console.error('Logout all sessions error:', error)

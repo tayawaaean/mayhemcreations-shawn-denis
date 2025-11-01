@@ -229,6 +229,7 @@ export default function Payment() {
         setLoading(true)
         
         // Fetch order details from the backend
+        // Axios interceptor will handle 401 errors by clearing auth and redirecting to login
         const response = await orderReviewApiService.getUserReviewOrders()
         
         if (response.success && response.data) {
@@ -325,10 +326,13 @@ export default function Payment() {
           })
           
         }
-      } catch (error) {
-        console.error('Error loading order data:', error)
-        showError('Failed to load order details')
-        navigate('/my-orders')
+      } catch (error: any) {
+        // Axios interceptor handles 401 errors centrally (clears auth, shows toast, redirects to login)
+        // Only handle non-401 errors here
+        if (error?.response?.status !== 401) {
+          showError('Failed to load order details')
+          navigate('/my-orders')
+        }
       } finally {
         setLoading(false)
       }

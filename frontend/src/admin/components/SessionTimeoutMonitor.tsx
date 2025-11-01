@@ -30,7 +30,6 @@ const SessionTimeoutMonitor: React.FC<SessionTimeoutMonitorProps> = ({
     setLastActivity(Date.now());
     setTimeRemaining(sessionTimeoutMinutes * 60);
     setShowWarning(false);
-    console.log('🔄 Session activity reset');
   }, [sessionTimeoutMinutes]);
 
   // Extend session (make a light API call to keep session alive)
@@ -46,7 +45,6 @@ const SessionTimeoutMonitor: React.FC<SessionTimeoutMonitorProps> = ({
 
   // Handle session timeout
   const handleTimeout = useCallback(async () => {
-    console.log('⏱️ Session timeout reached');
     setShowWarning(false);
     
     if (onTimeout) {

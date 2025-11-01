@@ -113,8 +113,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   // Cleanup corrupted data with user notification
   const cleanupCorruptedData = () => {
     try {
-      console.log('🧹 Cleaning up corrupted auth data...');
-      
       // Clear all auth-related data
       const keysToRemove = ['currentAccount'];
       const allKeys = Object.keys(localStorage);
@@ -137,8 +135,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       setUser(null);
       setIsLoggedIn(false);
       setIsLoading(false);
-      
-      console.log('✅ Corrupted data cleanup completed');
     } catch (cleanupError) {
       console.error('❌ Error during cleanup:', cleanupError);
       setError('Unable to recover from authentication error. Please clear your browser cache and try again.');
@@ -147,8 +143,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
 
   // Subscribe to centralized auth service with enhanced error handling
   useEffect(() => {
-    console.log('🔐 AdminAuthContext: Setting up auth subscription...');
-    
     // Check for corrupted data on initialization
     if (detectAndCleanupCorruptedData()) {
       cleanupCorruptedData();
@@ -158,8 +152,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
     try {
       const unsubscribe = centralizedAuthService.subscribe((authState) => {
         try {
-          console.log('🔐 AdminAuthContext: Auth state changed:', authState);
-          
           // Validate auth state structure with comprehensive checks
           if (!authState || typeof authState !== 'object') {
             console.error('⚠️ Invalid auth state received:', authState);
@@ -200,7 +192,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
             }
             
             const userRole = user.role;
-            console.log('🔐 AdminAuthContext: User role:', userRole);
             
             if (allowedRoles.includes(userRole)) {
               try {
@@ -209,20 +200,17 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
                 setIsLoggedIn(true);
                 setError(null);
                 setRetryAttempts(0);
-                console.log('✅ Admin user authenticated:', adminUser);
               } catch (conversionError) {
                 console.error('❌ Error converting user data:', conversionError);
                 setError('Failed to process user data. Please log in again.');
                 cleanupCorruptedData();
               }
             } else {
-              console.log('❌ User does not have admin/employee role:', userRole);
               setError('Access denied. Admin or employee role required.');
               setUser(null);
               setIsLoggedIn(false);
             }
           } else {
-            console.log('🔐 AdminAuthContext: No authenticated user');
             setUser(null);
             setIsLoggedIn(false);
             setError(null);
@@ -236,7 +224,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
           // Attempt recovery on error
           if (retryAttempts < 3) {
             setRetryAttempts(prev => prev + 1);
-            console.log(`Retry attempt ${retryAttempts + 1}/3`);
           } else {
             cleanupCorruptedData();
           }
@@ -247,7 +234,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
         }
       });
 
-      console.log('🔐 AdminAuthContext: Auth subscription set up successfully');
       return unsubscribe;
       
     } catch (setupError) {
@@ -263,14 +249,12 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    console.log('🔐 AdminAuthContext: Attempting login...');
     setError(null);
     setIsLoading(true);
     
     try {
       const result = await centralizedAuthService.login(email, password);
       if (result) {
-        console.log('✅ Login successful');
         setError(null);
         setRetryAttempts(0);
         return true;
@@ -304,7 +288,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   };
 
   const logout = async (): Promise<void> => {
-    console.log('🔐 AdminAuthContext: Logging out...');
     setError(null);
     
     try {
@@ -313,7 +296,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
       setIsLoggedIn(false);
       setError(null);
       setRetryAttempts(0);
-      console.log('✅ Logout successful');
     } catch (error: any) {
       console.error('❌ Logout error:', error);
       setError('Logout encountered an error, but you have been logged out locally.');
@@ -329,7 +311,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
   };
 
   const retryAuth = async (): Promise<void> => {
-    console.log('🔄 Retrying authentication...');
     setError(null);
     setIsLoading(true);
     
@@ -340,7 +321,6 @@ export const AdminAuthProvider: React.FC<AdminAuthProviderProps> = ({ children }
         setUser(null);
         setIsLoggedIn(false);
       } else {
-        console.log('✅ Authentication retry successful');
         setRetryAttempts(0);
       }
     } catch (error) {

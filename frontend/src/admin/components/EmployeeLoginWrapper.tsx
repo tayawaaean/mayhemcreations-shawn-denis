@@ -15,35 +15,44 @@ export default function EmployeeLoginWrapper() {
     const validateAndRedirect = async () => {
       // Only redirect if we haven't already redirected
       if (!hasRedirected.current) {
-        console.log('🔄 EmployeeLoginWrapper: Checking auth state...')
+        // Check for redirect parameter in URL (from session expiration)
+        const urlParams = new URLSearchParams(location.search)
+        const redirectPath = urlParams.get('redirect')
         
         // If we already have a user in state, redirect immediately
         if (!isLoading && isLoggedIn && user) {
-          console.log('🔄 EmployeeLoginWrapper: User already authenticated, redirecting to dashboard...', user)
           hasRedirected.current = true
           
-          if (user.role === 'admin') {
-            console.log('🔄 Redirecting admin to /admin')
-            navigate('/admin', { replace: true })
-          } else if (user.role === 'seller') {
-            console.log('🔄 Redirecting seller to /seller')
-            navigate('/seller', { replace: true })
+          if (redirectPath) {
+            // Decode and navigate to the original page
+            const decodedPath = decodeURIComponent(redirectPath)
+            navigate(decodedPath, { replace: true })
+          } else {
+            // Navigate based on role only if no redirect parameter
+            if (user.role === 'admin') {
+              navigate('/admin', { replace: true })
+            } else if (user.role === 'seller') {
+              navigate('/seller', { replace: true })
+            }
           }
         } else {
           // Only validate session if we don't have a user yet
-          console.log('🔄 EmployeeLoginWrapper: No user in state, validating session...')
           const isValid = await centralizedAuthService.validateSession()
           
           if (isValid && !isLoading && isLoggedIn && user) {
-            console.log('🔄 EmployeeLoginWrapper: User authenticated after validation, redirecting to dashboard...', user)
             hasRedirected.current = true
             
-            if (user.role === 'admin') {
-              console.log('🔄 Redirecting admin to /admin')
-              navigate('/admin', { replace: true })
-            } else if (user.role === 'seller') {
-              console.log('🔄 Redirecting seller to /seller')
-              navigate('/seller', { replace: true })
+            if (redirectPath) {
+              // Decode and navigate to the original page
+              const decodedPath = decodeURIComponent(redirectPath)
+              navigate(decodedPath, { replace: true })
+            } else {
+              // Navigate based on role only if no redirect parameter
+              if (user.role === 'admin') {
+                navigate('/admin', { replace: true })
+              } else if (user.role === 'seller') {
+                navigate('/seller', { replace: true })
+              }
             }
           }
         }

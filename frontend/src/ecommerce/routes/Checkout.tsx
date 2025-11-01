@@ -125,10 +125,6 @@ export default function Checkout() {
     
     // If pricingBreakdown exists (from cart or previous calculation), use it directly
     if (item.pricingBreakdown && item.pricingBreakdown.totalPrice) {
-      console.log('✅ Using existing pricingBreakdown for item:', {
-        productId: item.productId,
-        totalPrice: item.pricingBreakdown.totalPrice
-      });
       return Number(item.pricingBreakdown.totalPrice) || 0;
     }
     
@@ -146,23 +142,12 @@ export default function Checkout() {
     }
     
     if (!product) {
-      console.error('❌ Product not found for item:', {
-        productId: item.productId,
-        productIdType: typeof item.productId,
-        itemKeys: Object.keys(item),
-        hasProduct: !!item.product,
-        storedPrice: item.price,
-        pricingBreakdown: item.pricingBreakdown,
-        availableProductIds: products.slice(0, 3).map(p => ({ id: p.id, type: typeof p.id }))
-      });
       // Fallback: Use pricingBreakdown totalPrice if available
       if (item.pricingBreakdown && item.pricingBreakdown.totalPrice) {
-        console.warn('⚠️ Using pricingBreakdown totalPrice as fallback:', item.pricingBreakdown.totalPrice);
         return Number(item.pricingBreakdown.totalPrice) || 0;
       }
       // Fallback: Use stored price if available
       if (item.price && typeof item.price === 'number') {
-        console.warn('⚠️ Using stored price as fallback:', item.price);
         return item.price;
       }
       return 0;
@@ -189,7 +174,7 @@ export default function Checkout() {
               });
               itemPrice += materialCosts.totalCost;
             } catch (error) {
-              console.warn('Failed to calculate material costs for design:', design.name, error);
+              // Material cost calculation failed - continue with current price
             }
           }
           
@@ -271,17 +256,16 @@ export default function Checkout() {
   const calculateShippingRate = async () => {
     // console.log('🚚 Starting shipping calculation...')
     // console.log('👤 User Authentication Status:', {
-      isLoggedIn,
-      userId: user?.id,
-      userEmail: user?.email,
-      userRole: user?.role
-    })
+    //   isLoggedIn,
+    //   userId: user?.id,
+    //   userEmail: user?.email,
+    //   userRole: user?.role
+    // })
     // console.log('📦 Form Data:', formData)
     // console.log('📦 Cart Items:', items)
     
     // Check if user is authenticated
     if (!isLoggedIn) {
-      console.error('❌ User not authenticated! Shipping API requires authentication.')
       showError('Please log in to calculate shipping rates', 'Authentication Required')
       setIsCalculatingShipping(false)
       return
@@ -318,15 +302,7 @@ export default function Checkout() {
       
       // Validate address has required fields
       if (!shippingAddress.street1 || !shippingAddress.city || !shippingAddress.state || !shippingAddress.postalCode) {
-        console.error('❌ Missing required address fields:', {
-          hasFirstName: !!shippingAddress.firstName,
-          hasLastName: !!shippingAddress.lastName,
-          hasName: !!shippingAddress.name,
-          hasStreet: !!shippingAddress.street1,
-          hasCity: !!shippingAddress.city,
-          hasState: !!shippingAddress.state,
-          hasZip: !!shippingAddress.postalCode
-        })
+        // Address validation will be handled by the API
       }
       
       // console.log('📝 Full Name for ShipEngine:', shippingAddress.name)
@@ -355,23 +331,23 @@ export default function Checkout() {
       // console.log('📦 Total quantity:', cartItems.reduce((sum, item) => sum + item.quantity, 0))
 
       // console.log('🌐 Calling ShipEngine API with:', {
-        address: shippingAddress,
-        items: cartItems
-      })
+      //   address: shippingAddress,
+      //   items: cartItems
+      // })
 
       // Call backend API to get shipping rates
       const response = await calculateShippingRates(shippingAddress, cartItems)
 
       // console.log('✅ Shipping rates response:', response)
       // console.log('📊 Response structure:', {
-        success: response.success,
-        hasData: !!response.data,
-        dataKeys: response.data ? Object.keys(response.data) : [],
-        ratesCount: response.data?.rates?.length || 0,
-        hasRecommendedRate: !!response.data?.recommendedRate,
-        message: response.message,
-        error: response.error
-      })
+      //   success: response.success,
+      //   hasData: !!response.data,
+      //   dataKeys: response.data ? Object.keys(response.data) : [],
+      //   ratesCount: response.data?.rates?.length || 0,
+      //   hasRecommendedRate: !!response.data?.recommendedRate,
+      //   message: response.message,
+      //   error: response.error
+      // })
 
       if (response.success && response.data) {
         // console.log('✅ API call successful, processing rates...')
@@ -387,29 +363,15 @@ export default function Checkout() {
         }
 
         if (response.data.warning) {
-          console.warn('⚠️ API returned warning:', response.data.warning)
           // Show warning but don't block progress (we have rates)
           if (response.data.warning.includes('carriers unavailable')) {
             setShippingError(`Note: ${response.data.warning}. Showing available options.`)
           }
         }
       } else {
-        console.error('❌ API returned unsuccessful response:', {
-          success: response.success,
-          message: response.message,
-          error: response.error,
-          fullResponse: response
-        })
         throw new Error(response.message || response.error || 'Failed to calculate shipping rates')
       }
     } catch (error: any) {
-      console.error('❌ Shipping calculation error (FULL DETAILS):')
-      console.error('Error type:', typeof error)
-      console.error('Error instance:', error)
-      console.error('Error message:', error?.message)
-      console.error('Error details:', error?.errorDetails)
-      console.error('Error status code:', error?.statusCode)
-      
       // Build user-friendly error message
       let userMessage = error?.message || 'Failed to calculate shipping rates. Please try again.';
       
@@ -429,7 +391,6 @@ export default function Checkout() {
         showError(userMessage, 'Shipping Error');
       }
       
-      console.error('📝 Showing error to user:', userMessage)
       setShippingError(userMessage)
       
       // Clear shipping rates - force user to fix the issue
@@ -438,10 +399,7 @@ export default function Checkout() {
       
       // Keep user on Step 1 so they can fix the address
       setCurrentStep(1)
-      
-      console.error('❌ NO FALLBACK RATES - User must fix the error')
     } finally {
-      console.log('🚚 Shipping calculation complete, hiding loading screen')
       setIsCalculatingShipping(false)
     }
   }
@@ -471,13 +429,11 @@ export default function Checkout() {
     if (currentStep < steps.length) {
       // Calculate shipping rate when moving from step 1 (address) to step 2 (shipping selection)
       if (currentStep === 1) {
-        console.log('📦 Moving from step 1 to step 2, calculating shipping...')
         // Set loading state first and force a render before starting calculation
         setIsCalculatingShipping(true)
         // Small delay to ensure the loading modal renders before calculation starts
         await new Promise(resolve => setTimeout(resolve, 150))
         await calculateShippingRate()
-        console.log('📦 Shipping calculated, now moving to step 2')
       }
       // Validate shipping method selection when moving from step 2 to step 3
       if (currentStep === 2) {
@@ -485,7 +441,6 @@ export default function Checkout() {
           showWarning('Please select a shipping method before continuing', 'Select Shipping Method')
           return // Don't advance to next step
         }
-        console.log('📦 Shipping method selected, moving to review')
       }
       setCurrentStep(prev => prev + 1)
     }
@@ -537,12 +492,12 @@ export default function Checkout() {
                   });
                   embroideryPrice += materialCosts.totalCost;
                   // console.log('🔧 Checkout: Calculated material cost for design:', {
-                    designName: design.name,
-                    dimensions: design.dimensions,
-                    materialCost: materialCosts.totalCost
-                  });
+                  //   designName: design.name,
+                  //   dimensions: design.dimensions,
+                  //   materialCost: materialCosts.totalCost
+                  // });
                 } catch (error) {
-                  console.warn('Failed to calculate material costs for design:', design.name, error);
+                  // Material cost calculation failed - continue with current price
                 }
               }
               
@@ -594,11 +549,11 @@ export default function Checkout() {
           const totalPrice = baseProductPrice + embroideryPrice + embroideryOptionsPrice;
           
           // console.log(`📊 Checkout: Item ${index + 1} pricing:`, {
-            baseProductPrice,
-            embroideryPrice,
-            embroideryOptionsPrice,
-            totalPrice
-          });
+          //   baseProductPrice,
+          //   embroideryPrice,
+          //   embroideryOptionsPrice,
+          //   totalPrice
+          // });
           
           return {
             id: `${item.productId}-${Date.now()}-${index}`,
@@ -694,12 +649,10 @@ export default function Checkout() {
         showError(response.message || 'Failed to submit order', 'Submission Failed')
       }
     } catch (error) {
-      console.error('Order submission error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Order submission failed'
       setPaymentError(errorMessage)
       showError(errorMessage, 'Error')
     } finally {
-      console.log('📦 Order submission complete, hiding loading screen')
       setIsProcessing(false)
     }
   }
@@ -1109,7 +1062,6 @@ export default function Checkout() {
                           <button
                             onClick={() => {
                               setShippingError(null)
-                              console.log('🔄 User dismissed message')
                             }}
                             className={`mt-3 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors ${
                               shippingError.includes('Note:') || shippingError.includes('carriers unavailable')
@@ -1355,7 +1307,7 @@ export default function Checkout() {
                                         })
                                         materialCost = pricing.totalCost
                                       } catch (e) {
-                                        console.error('Error calculating material cost:', e)
+                                        // Error calculating material cost - continue with 0
                                       }
                                     }
 
@@ -1669,7 +1621,7 @@ export default function Checkout() {
                                       });
                                       materialCost = materialCosts.totalCost;
                                     } catch (error) {
-                                      console.warn('Failed to calculate material costs:', error);
+                                      // Material cost calculation failed - continue with 0
                                     }
                                   }
                                   

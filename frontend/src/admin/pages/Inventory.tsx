@@ -100,10 +100,6 @@ const Inventory: React.FC = () => {
     loadCategories()
   }, [])
 
-  // Debug effect to log when variantData changes
-  useEffect(() => {
-    console.log('Variant data changed:', variantData)
-  }, [variantData])
 
   const loadCategories = async () => {
     try {
@@ -113,7 +109,7 @@ const Inventory: React.FC = () => {
         setCategories(data.data)
       }
     } catch (error) {
-      console.error('Error loading categories:', error)
+      // Error loading categories - handled silently
     }
   }
 
@@ -180,7 +176,6 @@ const Inventory: React.FC = () => {
     try {
       // Load only variant inventory data
       const response = await variantApiService.getVariantInventoryStatus()
-      console.log('Variant inventory response:', response)
       
       if (response.success && response.data) {
         setVariantData(response.data)
@@ -188,8 +183,8 @@ const Inventory: React.FC = () => {
         throw new Error(response.message || 'Failed to load inventory data')
       }
     } catch (err) {
+      // Error loading inventory data - handled silently
       setError(err instanceof Error ? err.message : 'Failed to load inventory data')
-      console.error('Error loading inventory data:', err)
     } finally {
       setLoading(false)
     }
@@ -268,7 +263,7 @@ const Inventory: React.FC = () => {
       // Reload inventory data to get updated stock levels
       await loadInventoryData()
     } catch (error: any) {
-      console.error('❌ Error adjusting stock:', error)
+      // Error adjusting stock - handled silently
       
       // Extract error information from apiService
       const errorInfo = apiService.extractErrorInfo(error)
@@ -312,31 +307,13 @@ const Inventory: React.FC = () => {
 
 
   const handleAddVariant = async () => {
-    console.log('handleAddVariant called with:', newVariant)
     
     if (!newVariant.productId || !newVariant.color || !newVariant.size || !newVariant.sku) {
-      console.log('Validation failed:', {
-        productId: newVariant.productId,
-        color: newVariant.color,
-        size: newVariant.size,
-        sku: newVariant.sku
-      })
       setError('Please fill in all required fields')
       return
     }
 
     try {
-      console.log('Creating variant with data:', {
-        productId: Number(newVariant.productId),
-        name: `${newVariant.color} - ${newVariant.size}`,
-        color: newVariant.color,
-        colorHex: newVariant.colorHex,
-        size: newVariant.size,
-        sku: newVariant.sku,
-        stock: newVariant.stock,
-        isActive: true
-      })
-
       // Create variant via API
       const result = await variantApiService.createVariant({
         productId: Number(newVariant.productId),
@@ -348,8 +325,6 @@ const Inventory: React.FC = () => {
         stock: newVariant.stock,
         isActive: true
       })
-
-      console.log('Variant created successfully:', result)
 
       // Reload data to get updated variants
       await loadInventoryData()
@@ -370,7 +345,7 @@ const Inventory: React.FC = () => {
       setIsAddVariantOpen(false)
       setError(null) // Clear any previous errors
     } catch (error) {
-      console.error('Error creating variant:', error)
+      // Error creating variant - handled silently
       setError(`Failed to create variant: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }

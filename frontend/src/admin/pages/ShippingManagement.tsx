@@ -124,7 +124,7 @@ const ShippingManagement: React.FC = () => {
         }
       }
     } catch (err: any) {
-      console.error('Error loading configuration:', err)
+      // Error loading configuration - handled silently
     }
   }
   
@@ -143,15 +143,7 @@ const ShippingManagement: React.FC = () => {
         weight: manualWeight
       }]
       
-      console.log('Calculating rates with:', {
-        address: testAddress,
-        weight: manualWeight,
-        items: itemsWithManualWeight
-      })
-      
       const response = await ShipEngineApiService.calculateRates(testAddress, itemsWithManualWeight)
-      
-      console.log('Rate response:', response)
       
       if (response.success && response.data) {
         setShippingRates(response.data.rates)
@@ -166,7 +158,7 @@ const ShippingManagement: React.FC = () => {
         setError(response.message || 'Failed to calculate rates')
       }
     } catch (err: any) {
-      console.error('Rate calculation error:', err)
+      // Rate calculation error - handled silently
       setError(err.message || 'Error calculating shipping rates')
     } finally {
       setLoading(false)

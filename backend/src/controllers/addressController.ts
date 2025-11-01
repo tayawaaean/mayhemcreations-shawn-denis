@@ -386,6 +386,44 @@ export const setDefaultAddress = async (
 };
 
 /**
+ * Get default origin address (Public)
+ * @route GET /api/v1/addresses/public/origin
+ * @access Public (No authentication required)
+ */
+export const getPublicOriginAddress = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const address = await Address.getDefaultOrigin();
+
+    if (!address) {
+      res.status(404).json({
+        success: false,
+        message: 'No default origin address found',
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: address,
+      message: 'Default origin address retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    logger.error('Error retrieving public origin address:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve default origin address',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
  * Get default origin address
  * @route GET /api/v1/admin/addresses/default/origin
  * @access Private (Admin only)

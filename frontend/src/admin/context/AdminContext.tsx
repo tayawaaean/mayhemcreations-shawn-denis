@@ -224,16 +224,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        console.log('🔄 Fetching analytics data...')
         const response = await adminAnalyticsApiService.getDashboardAnalytics()
         
         if (response.success && response.data) {
-          console.log('📊 Analytics API Response:', response.data)
-          console.log('👥 Total Customers from API:', response.data.totalCustomers)
-          console.log('📦 Total Products from API:', response.data.totalProducts)
-          console.log('⚠️ Low Stock Variants from API:', response.data.lowStockVariants)
-          console.log('⚠️ Low Stock Count:', response.data.lowStockCount)
-          
           // Convert the API data to match the Analytics type
           const analyticsData: Analytics = {
             totalSales: response.data.totalSales || 0, // Sales from delivered orders
@@ -303,9 +296,6 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           }
           
           dispatch({ type: 'SET_ANALYTICS', payload: analyticsData })
-          console.log('✅ Analytics data loaded successfully')
-          console.log('⚠️ Final Low Stock Products:', analyticsData.lowStockProducts)
-          console.log('⚠️ Final Low Stock Count:', analyticsData.lowStockProducts.length)
         } else {
           console.error('❌ Failed to fetch analytics:', response.message)
         }
@@ -317,45 +307,29 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     fetchAnalytics()
   }, [])
 
-  // Fetch orders and customers data
+  // Fetch customers data on mount (used in dashboard)
+  // Orders are lazy-loaded only when needed (e.g., PaymentManagement page)
   useEffect(() => {
-    const fetchOrdersAndCustomers = async () => {
+    const fetchCustomers = async () => {
       try {
-        dispatch({ type: 'SET_LOADING', payload: true })
-        
-        // Fetch orders and customers in parallel
-        const [ordersResponse, customersResponse] = await Promise.allSettled([
-          adminOrderApiService.getOrders({ limit: 100 }),
+        const customersResponse = await Promise.allSettled([
           adminCustomerApiService.getCustomers({ limit: 100 })
         ])
 
-        // Handle orders
-        if (ordersResponse.status === 'fulfilled' && ordersResponse.value.success) {
-          const ordersData = ordersResponse.value.data
-          if (ordersData) {
-            const orders = ordersData.orders.map(order => adminOrderApiService.transformOrderData(order))
-            dispatch({ type: 'SET_ORDERS', payload: orders })
-          }
-        }
-
         // Handle customers
-        if (customersResponse.status === 'fulfilled' && customersResponse.value.success) {
-          const customersData = customersResponse.value.data
+        if (customersResponse[0].status === 'fulfilled' && customersResponse[0].value.success) {
+          const customersData = customersResponse[0].value.data
           if (customersData && customersData.customers && Array.isArray(customersData.customers)) {
             const customers = customersData.customers.map(customer => adminCustomerApiService.transformCustomerData(customer))
             dispatch({ type: 'SET_CUSTOMERS', payload: customers })
           }
         }
-
       } catch (error) {
-        console.error('❌ Error fetching orders and customers:', error)
-        dispatch({ type: 'SET_ERROR', payload: 'Failed to load orders and customers' })
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false })
+        // Error fetching customers - handled silently
       }
     }
 
-    fetchOrdersAndCustomers()
+    fetchCustomers()
   }, [])
 
   return (

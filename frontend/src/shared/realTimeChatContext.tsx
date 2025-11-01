@@ -84,7 +84,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!guestId) {
       guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       localStorage.setItem('mayhem_guest_id', guestId);
-      console.log('🆕 Created new guest ID:', guestId);
+      
     }
     return guestId;
   };
@@ -97,7 +97,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     // Only react to actual auth state changes (not initial mount)
     if (prevAuthState.current !== isLoggedIn) {
-      console.log(`🔄 Auth state changed: ${isLoggedIn ? 'Logged In' : 'Guest'} - Customer ID: ${customerId}`);
+      
       
       // Clear previous chat messages when switching between guest/authenticated
       setMessages([]);
@@ -105,7 +105,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // If chat is open, immediately join the new room
       if (isOpen && isConnected) {
         webSocketService.joinChatRoom(customerId);
-        console.log(`💬 Switched to chat room: ${customerId} ${isLoggedIn ? '(authenticated)' : '(guest)'}`);
+        
         
         // Add welcome message for the new state
         const welcomeMessage: ChatMessage = {
@@ -128,7 +128,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     if (isOpen && isConnected && customerId) {
       webSocketService.joinChatRoom(customerId);
-      console.log(`💬 Joined chat room: ${customerId} ${isLoggedIn ? '(authenticated)' : '(guest)'}`);
+      
       
       // Add welcome message only if no messages exist
       if (messages.length === 0) {
@@ -148,7 +148,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => {
       if (customerId) {
         webSocketService.leaveChatRoom(customerId);
-        console.log('💬 Left chat room for customer:', customerId);
+        
       }
     };
   }, [isOpen, isConnected, customerId]);
@@ -158,15 +158,15 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     if (!isConnected) return;
 
-    console.log(`🔌 WebSocket listeners active for customer: ${customerId}`);
+    
 
     // Listen for chat messages
     const unsubscribeMessage = subscribe('chat_message_received', (data) => {
-      console.log('💬 Received chat message:', data);
+      
       
       // Only accept messages for the current customer ID
       if (String(data.customerId) !== String(customerId)) {
-        console.log(`🚫 Ignoring message for different customer: ${data.customerId} (current: ${customerId})`);
+        
         return;
       }
       
@@ -193,7 +193,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // Update unread counter for admin messages when widget closed
       if (data.sender === 'admin' && !isOpen) {
-        console.log(`📬 Customer: New unread message from admin (total: ${unreadCount + 1})`);
+        
         setUnreadCount(c => c + 1);
         
         // Show browser notification for admin messages
@@ -210,7 +210,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Listen for admin typing status
     const unsubscribeTyping = subscribe('admin_typing', (data) => {
-      console.log('⌨️ Admin typing status:', data);
+      
       if (data.customerId === customerId) {
         setIsAdminTyping(data.isTyping);
       }
@@ -233,14 +233,14 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Listen for customer online status
     const unsubscribeConnection = subscribe('chat_connected', (data) => {
-      console.log('🟢 Customer connected:', data);
+      
       if (data.customerId === customerId) {
         setIsCustomerOnline(true);
       }
     });
 
     const unsubscribeDisconnection = subscribe('chat_disconnected', (data) => {
-      console.log('🔴 Customer disconnected:', data);
+      
       if (data.customerId === customerId) {
         setIsCustomerOnline(false);
       }
@@ -248,7 +248,7 @@ export const RealTimeChatProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     // Listen for admin status changes
     const unsubscribeAdminStatus = subscribe('admin_status_changed', (data) => {
-      console.log('👨‍💼 Admin status changed:', data);
+      
       setIsAdminOnline(data.isOnline);
     });
 

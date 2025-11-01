@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { createPaymentIntent } from '../shared/stripeService';
-import { loadStripe } from '@stripe/stripe-js';
+import { loadStripe, Stripe } from '@stripe/stripe-js';
 
-// Load Stripe
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
+// Lazy load Stripe - only when component mounts (not on module load)
+let stripePromise: Promise<Stripe | null> | null = null;
+
+const getStripePromise = (): Promise<Stripe | null> => {
+  if (!stripePromise) {
+    stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY!);
+  }
+  return stripePromise;
+};
 
 interface TestCard {
   number: string;
@@ -201,6 +208,26 @@ const PaymentForm: React.FC = () => {
   );
 };
 
+// Wrapper component to lazy load Stripe Elements - prevents loading on admin dashboard
+const StripeElementsWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [stripeInstance, setStripeInstance] = useState<Promise<Stripe | null> | null>(null);
+
+  useEffect(() => {
+    // Only load Stripe when this component mounts (prevents loading on admin dashboard)
+    setStripeInstance(getStripePromise());
+  }, []);
+
+  if (!stripeInstance) {
+    return <div className="p-6">Loading Stripe...</div>;
+  }
+
+  return (
+    <Elements stripe={stripeInstance}>
+      {children}
+    </Elements>
+  );
+};
+
 const StripeTestSuite: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -229,9 +256,9 @@ const StripeTestSuite: React.FC = () => {
         </div>
       </div>
 
-      <Elements stripe={stripePromise}>
+      <StripeElementsWrapper>
         <PaymentForm />
-      </Elements>
+      </StripeElementsWrapper>
 
       {/* Instructions */}
       <div className="mt-8 bg-blue-50 rounded-lg p-6">

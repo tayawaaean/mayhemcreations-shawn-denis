@@ -120,30 +120,13 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     ? orderReview.order_data 
     : JSON.parse(orderReview.order_data as string);
 
-  // console.log('🔍 Converting order review to order:', {
-    orderId: orderReview.id,
-    orderData: orderData,
-    total: orderReview.total,
-    adminPictureReplies: orderReview.admin_picture_replies,
-    adminPictureRepliesType: typeof orderReview.admin_picture_replies,
-    status: orderReview.status
-  });
+  
 
   // Debug picture replies and item IDs
   if (orderReview.admin_picture_replies) {
     const parsedReplies = Array.isArray(orderReview.admin_picture_replies) ? 
       orderReview.admin_picture_replies : 
       JSON.parse(orderReview.admin_picture_replies as string);
-    // console.log('🔍 Picture replies debug:', {
-      replies: parsedReplies,
-      itemIds: parsedReplies.map((r: any) => r.itemId),
-      orderItemIds: orderData.map((item: any) => ({ 
-        id: item.id, 
-        productId: item.productId,
-        productName: item.product?.title || item.productName,
-        productImage: item.product?.image
-      }))
-    });
   }
 
   const convertedItems = orderData.map((item: any) => {
@@ -157,42 +140,26 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
           product = products.find((p: any) => p.id === item.productId || p.id === numericId)
         }
         
-        console.log('🔍 Product lookup debug:', {
-          productId: item.productId,
-          numericId: numericId,
-          foundInBackend: !!product,
-          backendProductsCount: backendProducts.length,
-          productTitle: product?.title,
-          foundProductId: product?.id
-        });
+        
         
         return product
       })()
       let itemPrice = 0;
       
-      console.log('🔍 Processing item:', {
-        productId: item.productId,
-        productPrice: item.product?.price,
-        customization: item.customization,
-        embroideryData: item.customization?.embroideryData,
-        pricingBreakdown: item.pricingBreakdown,
-        hasDesigns: !!item.customization?.designs?.length
-      });
+      
       
       // PRIORITY 1: Use stored pricing breakdown if available (new format)
       if (item.pricingBreakdown && typeof item.pricingBreakdown === 'object') {
         itemPrice = Number(item.pricingBreakdown.totalPrice) || 0;
-        console.log('💰 Using stored pricingBreakdown:', itemPrice);
+        
       }
       // PRIORITY 2: For custom embroidery items, use the total price from customization
       else if (item.productId === 'custom-embroidery' && item.customization?.totalPrice) {
         itemPrice = Number(item.customization.totalPrice) || 0;
-        console.log('💰 Custom embroidery price:', itemPrice);
       }
       // PRIORITY 3: For custom embroidery items with legacy embroideryData structure
       else if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.totalPrice) {
         itemPrice = Number(item.customization.embroideryData.totalPrice) || 0;
-        console.log('💰 Custom embroidery price (legacy):', itemPrice);
       }
       // PRIORITY 4: For multiple designs with individual pricing (new format)
       else if (item.customization?.designs && item.customization.designs.length > 0) {
@@ -227,7 +194,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
           
           if (product?.price) {
             basePrice = Number(product.price);
-            console.log('💰 Found base price from products array:', { productId, basePrice, foundProduct: product.id });
           }
         }
         
@@ -258,7 +224,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
         });
         
         itemPrice = basePrice + totalCustomizationCost;
-        console.log('💰 Multi-design pricing:', { basePrice, totalCustomizationCost, total: itemPrice });
       }
       // PRIORITY 5: For regular products with customization, calculate total price including customization costs (legacy)
       else if (item.customization?.selectedStyles) {
@@ -317,7 +282,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
         if (selectedStyles.cutting) customizationCost += Number(selectedStyles.cutting.price) || 0;
         
         itemPrice = basePrice + customizationCost;
-        console.log('💰 Regular product with customization (legacy):', { basePrice, customizationCost, total: itemPrice });
       }
       // PRIORITY 6: For regular products without customization, use base price
       else {
@@ -349,7 +313,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
             itemPrice = Number(product.price);
           }
         }
-        console.log('💰 Regular product without customization:', itemPrice);
       }
       
       return {
@@ -376,83 +339,47 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
           }
           // For regular products - try multiple fallbacks
           if (item.product?.title) {
-            console.log('🔍 Using item.product.title:', item.product.title);
             return item.product.title;
           }
           if (item.productName) {
-            console.log('🔍 Using item.productName:', item.productName);
             return item.productName;
           }
           if (resolvedProduct?.title) {
-            console.log('🔍 Using resolvedProduct.title:', resolvedProduct.title);
             return (resolvedProduct as any).title as string;
           }
           // If we have a productId but no product data, try to fetch it
           if (item.productId && item.productId !== 'custom-embroidery') {
-            console.log('🔍 Falling back to Product #', item.productId);
             return `Product #${item.productId}`;
           }
-          console.log('🔍 Using Custom Product fallback');
           return 'Custom Product';
         })(),
         productImage: (() => {
-          // Debug logging for mockup data
-          console.log('🖼️ Order item productImage debug:', {
-            productId: item.productId,
-            hasCustomization: !!item.customization,
-            hasMockup: !!item.customization?.mockup,
-            mockupLength: item.customization?.mockup?.length,
-            hasDesigns: !!item.customization?.designs?.length,
-            hasEmbroideryData: !!item.customization?.embroideryData,
-            hasLegacyDesign: !!item.customization?.design,
-            designsData: item.customization?.designs ? {
-              count: item.customization.designs.length,
-              firstDesign: item.customization.designs[0] ? {
-                id: item.customization.designs[0].id,
-                name: item.customization.designs[0].name,
-                hasPreview: !!item.customization.designs[0].preview,
-                previewLength: item.customization.designs[0].preview?.length,
-                previewStart: item.customization.designs[0].preview?.substring(0, 50),
-                hasFile: !!item.customization.designs[0].file,
-                fileLength: item.customization.designs[0].file?.length,
-                fileStart: item.customization.designs[0].file?.substring(0, 50)
-              } : null
-            } : null
-          });
-
           // For custom embroidery items with multiple designs - show mockup or first design
           if (item.productId === 'custom-embroidery' && item.customization?.designs?.length > 0) {
             // Show mockup if available (final product preview)
             if (item.customization.mockup) {
-              console.log('🖼️ Using mockup for custom embroidery with designs');
               return item.customization.mockup;
             }
             // Otherwise show first design
-            console.log('🖼️ Using first design for custom embroidery (no mockup)');
             return item.customization.designs[0].preview || item.customization.designs[0].file;
           }
           // For custom embroidery items - show uploaded design (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.embroideryData?.designImage) {
-            console.log('🖼️ Using embroidery data design image (legacy)');
             return item.customization.embroideryData.designImage;
           }
           // For custom embroidery items with design preview (legacy)
           if (item.productId === 'custom-embroidery' && item.customization?.design?.preview) {
-            console.log('🖼️ Using legacy design preview');
             return item.customization.design.preview;
           }
           // For regular products with customization - show final product mockup
           if (item.customization?.mockup) {
-            console.log('🖼️ Using mockup for regular product with customization');
             return item.customization.mockup;
           }
           // For regular products without customization - show product image
           if (item.product?.image || resolvedProduct?.image) {
-            console.log('🖼️ Using base product image');
             return (item.product?.image ?? (resolvedProduct as any)?.image) as string;
           }
           // Default placeholder
-          console.log('🖼️ Using default placeholder image');
           return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSI0MCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZmlsbD0iIzZiNzI4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
         })(),
         quantity: item.quantity || 1,
@@ -466,20 +393,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
   const calculatedTotal = convertedItems.reduce((total: number, item: any) => {
     return total + (item.price * item.quantity);
   }, 0);
-
-  console.log('💰 Order pricing consistency check:', {
-    orderId: orderReview.id,
-    storedTotal: Number(orderReview.total) || 0,
-    calculatedTotal: calculatedTotal,
-    discrepancy: Math.abs((Number(orderReview.total) || 0) - calculatedTotal),
-    itemsBreakdown: convertedItems.map((item: any) => ({
-      productId: item.productId,
-      productName: item.productName,
-      price: item.price,
-      quantity: item.quantity,
-      subtotal: item.price * item.quantity
-    }))
-  });
 
   const convertedOrder = {
     id: orderReview.id,
@@ -528,18 +441,6 @@ const convertOrderReviewToOrder = (orderReview: OrderReview, backendProducts: an
     refundRequestedAt: (orderReview as any).refund_requested_at,
     originalOrderData: orderData // Store original order data for matching
   };
-
-  console.log('🔍 Final converted order:', {
-    orderId: convertedOrder.id,
-    status: convertedOrder.status,
-    trackingNumber: convertedOrder.trackingNumber,
-    shippingCarrier: convertedOrder.shippingCarrier,
-    shippedAt: convertedOrder.shippedAt,
-    deliveredAt: convertedOrder.deliveredAt,
-    hasAdminPictureReplies: !!convertedOrder.adminPictureReplies,
-    adminPictureRepliesLength: convertedOrder.adminPictureReplies?.length || 0,
-    adminPictureReplies: convertedOrder.adminPictureReplies
-  });
 
   return convertedOrder;
 };
@@ -764,17 +665,10 @@ const getProgressBarColor = (status: Order['status']): string => {
 
 // Helper function to find item by reply itemId
 const findItemForReply = (reply: PictureReply, order: Order): { productName: string; productImage: string; quantity: number } => {
-  console.log('🔍 Finding item for reply:', {
-    replyItemId: reply.itemId,
-    orderItems: order.items.map(item => ({ id: item.id, productId: item.productId })),
-    originalOrderData: order.originalOrderData?.map(item => ({ id: item.id, productId: item.productId }))
-  });
-
   // First try to find in converted items by exact ID match
   let item = order.items.find(item => item.id === reply.itemId);
   
   if (item) {
-    console.log('✅ Found item in converted items:', item);
     return {
       productName: item.productName,
       productImage: item.productImage,
@@ -786,7 +680,6 @@ const findItemForReply = (reply: PictureReply, order: Order): { productName: str
   item = order.items.find(item => item.productId === reply.itemId);
   
   if (item) {
-    console.log('✅ Found item by productId in converted items:', item);
     return {
       productName: item.productName,
       productImage: item.productImage,
@@ -804,7 +697,6 @@ const findItemForReply = (reply: PictureReply, order: Order): { productName: str
     }
     
     if (originalItem) {
-      console.log('✅ Found item in original order data:', originalItem);
       return {
         productName: (() => {
           // For custom embroidery items - show design name
@@ -842,8 +734,6 @@ const findItemForReply = (reply: PictureReply, order: Order): { productName: str
       };
     }
   }
-  
-  console.log('❌ Item not found for reply:', reply.itemId);
   
   // Fallback
   return {
@@ -935,7 +825,6 @@ export default function MyOrders() {
       if (stored) {
         const receivedArray = JSON.parse(stored)
         setReceivedOrders(new Set(receivedArray))
-        console.log('📦 Loaded received orders from localStorage:', receivedArray.length)
       }
     } catch (error) {
       console.error('Error loading received orders:', error)
@@ -956,8 +845,6 @@ export default function MyOrders() {
     // Update state and localStorage to match backend
     setReceivedOrders(backendReceivedIds)
     localStorage.setItem('receivedOrders', JSON.stringify(Array.from(backendReceivedIds)))
-    
-    console.log('✅ Synced received orders with backend:', Array.from(backendReceivedIds))
   }
 
   // Load backend products
@@ -966,7 +853,6 @@ export default function MyOrders() {
       const response = await productApiService.getProducts({ status: 'active', limit: 100 })
       if (response.success && response.data) {
         setBackendProducts(response.data)
-        console.log('📦 Loaded backend products:', response.data.length)
       }
     } catch (error) {
       console.error('Error loading backend products:', error)
@@ -997,13 +883,12 @@ export default function MyOrders() {
 
   // Load orders on component mount
   useEffect(() => {
-    if (isLoggedIn) {
-      // No need to load from localStorage - we sync with backend after loading orders
-      loadOrders()
-      loadBackendProducts()
-      // REMOVED: loadUserReviews() - using loadExistingReviews() instead (called from loadOrders)
-    }
-  }, [isLoggedIn])
+    // No need to load from localStorage - we sync with backend after loading orders
+    // Axios interceptor will handle 401 errors by clearing auth and redirecting to login
+    loadOrders()
+    loadBackendProducts()
+    // REMOVED: loadUserReviews() - using loadExistingReviews() instead (called from loadOrders)
+  }, [])
 
   // WebSocket event listeners for real-time updates
   useEffect(() => {
@@ -1011,7 +896,6 @@ export default function MyOrders() {
 
     // Listen for picture reply received
     const unsubscribePictureReply = subscribe('picture_reply_received', (data) => {
-      console.log('🔌 Real-time picture reply received:', data);
       setOrders(prev => prev.map(order => 
         order.id === data.orderId 
           ? { 
@@ -1025,7 +909,6 @@ export default function MyOrders() {
 
     // Listen for order status updates
     const unsubscribeStatusUpdate = subscribe('order_status_updated', (data) => {
-      console.log('🔌 Real-time order status update:', data);
       setOrders(prev => prev.map(order => 
         order.id === data.orderId 
           ? { 
@@ -1042,7 +925,6 @@ export default function MyOrders() {
 
     // Listen for confirmation submitted
     const unsubscribeConfirmation = subscribe('confirmation_submitted', (data) => {
-      console.log('🔌 Real-time confirmation submitted:', data);
       // Update the order with confirmation data
       setOrders(prev => prev.map(order => 
         order.id === data.orderId 
@@ -1059,7 +941,6 @@ export default function MyOrders() {
 
     // Listen for refund rejection
     const unsubscribeRefundRejected = subscribe('refund_rejected', (data) => {
-      console.log('🔌 Real-time refund rejection:', data);
       // Update the order with rejection data
       setOrders(prev => prev.map(order => 
         order.id === data.orderId 
@@ -1086,13 +967,11 @@ export default function MyOrders() {
   const loadOrders = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Loading user orders...')
+      // Axios interceptor will handle 401 errors centrally (clears auth, shows toast, redirects to login)
       const response = await orderReviewApiService.getUserReviewOrders()
-      console.log('📊 Orders API response:', response)
       
       if (response.success && response.data) {
         const convertedOrders = response.data.map((orderReview: OrderReview) => convertOrderReviewToOrder(orderReview, backendProducts))
-        console.log('✅ Orders loaded:', convertedOrders)
         setOrders(convertedOrders)
         
         // Sync received orders with backend status (backend is source of truth)
@@ -1103,12 +982,16 @@ export default function MyOrders() {
           setTimeout(() => loadExistingReviews(), 500)
         }
       } else {
-        console.log('❌ Failed to load orders:', response.message)
+        // Axios interceptor handles 401 errors - only handle other errors here
+        if ((response as any).status !== 401) {
+          setOrders([])
+        }
+      }
+    } catch (error: any) {
+      // Axios interceptor handles 401 errors centrally - only handle other errors here
+      if (error?.response?.status !== 401) {
         setOrders([])
       }
-    } catch (error) {
-      console.error('❌ Error loading orders:', error)
-      setOrders([])
     } finally {
       setLoading(false)
     }
@@ -1146,12 +1029,6 @@ export default function MyOrders() {
       if (baseProductPrice === 0 && (storedEmbroideryPrice > 0 || storedOptionsPrice > 0)) {
         // Calculate base price as: total - embroidery - options
         baseProductPrice = storedTotalPrice - storedEmbroideryPrice - storedOptionsPrice;
-        console.log('🔧 Calculated missing base product price:', {
-          total: storedTotalPrice,
-          embroidery: storedEmbroideryPrice,
-          options: storedOptionsPrice,
-          calculatedBase: baseProductPrice
-        });
         // If still not positive, fallback to catalog base price
         if (!(baseProductPrice > 0)) {
           const numericId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
@@ -1195,11 +1072,6 @@ export default function MyOrders() {
       
       if (catalogProduct?.price) {
         baseProduct = Number(catalogProduct.price) || 0
-        console.log('🔧 Retrieved base product price from catalog:', {
-          productId: item.productId,
-          catalogPrice: baseProduct,
-          catalogTitle: catalogProduct.title
-        })
       }
     }
     let totalEmbroideryPrice = 0;
@@ -1208,14 +1080,6 @@ export default function MyOrders() {
 
     // Handle multiple designs with individual embroidery options
     if (item.customization?.designs && item.customization.designs.length > 0) {
-      console.log('🔍 Multi-design pricing calculation:', {
-        designsCount: item.customization.designs.length,
-        designs: item.customization.designs.map((d: any) => ({
-          name: d.name,
-          dimensions: d.dimensions,
-          hasSelectedStyles: !!d.selectedStyles
-        }))
-      });
       item.customization.designs.forEach((design: any, index: number) => {
         let designOptions = 0;
         let designMaterialCost = 0;
@@ -1238,13 +1102,8 @@ export default function MyOrders() {
               patchHeight: design.dimensions.height
             });
             designMaterialCost = materialCosts.totalCost;
-            console.log('🔧 Calculated material cost for design:', {
-              designName,
-              dimensions: design.dimensions,
-              materialCost: designMaterialCost
-            });
           } catch (error) {
-            console.warn('Failed to calculate material costs for design:', designName, error);
+            // Failed to calculate material costs for design
           }
         }
         
@@ -1430,8 +1289,6 @@ export default function MyOrders() {
       // Get all user's reviews
       const response = await productReviewApiService.getMyReviews()
       
-      console.log('📝 Loading existing reviews:', response)
-      
       if (response.success && response.data) {
         response.data.forEach((review: any) => {
           // Create unique key: orderId-productId
@@ -1439,19 +1296,11 @@ export default function MyOrders() {
           const key = `${review.orderId}-${review.productId}`
           reviewedSet.add(key)
           reviewsMap.set(key, review) // Store full review data
-          console.log('✅ Marking as reviewed:', key, {
-            orderId: review.orderId,
-            productId: review.productId,
-            productTitle: review.productTitle,
-            status: review.status
-          })
         })
       }
-      
-      console.log('📊 Total reviewed items:', reviewedSet.size, Array.from(reviewedSet))
     } catch (error) {
       // Silently fail - reviews are optional
-      console.log('⚠️ Could not load existing reviews:', error)
+      // Could not load existing reviews
     }
     
     setReviewedItems(reviewedSet)
@@ -1530,32 +1379,12 @@ export default function MyOrders() {
   }
 
   const handleViewDetails = (order: Order) => {
-    console.log('🔍 Opening order details:', {
-      orderId: order.id,
-      status: order.status,
-      hasAdminPictureReplies: !!order.adminPictureReplies,
-      adminPictureRepliesLength: order.adminPictureReplies?.length || 0,
-      adminPictureReplies: order.adminPictureReplies,
-      items: order.items.map(item => ({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName
-      }))
-    });
-    
     setSelectedOrder(order)
     setShowOrderDetails(true)
     
     // Load existing picture confirmations if any
     if (order.adminPictureReplies && order.adminPictureReplies.length > 0) {
       const existingConfirmations: {[itemId: string]: {confirmed: boolean | null, notes: string}} = {};
-      
-      console.log('🔍 Loading existing confirmations:', {
-        orderId: order.id,
-        adminPictureReplies: order.adminPictureReplies,
-        customerConfirmations: order.customerConfirmations,
-        customerConfirmationsType: typeof order.customerConfirmations
-      });
       
       // Check if there are existing customer confirmations
       if (order.customerConfirmations && Array.isArray(order.customerConfirmations)) {
@@ -1565,9 +1394,6 @@ export default function MyOrders() {
             notes: conf.notes || ''
           };
         });
-        console.log('✅ Loaded existing confirmations:', existingConfirmations);
-      } else {
-        console.log('ℹ️ No existing confirmations found');
       }
       
       setPictureConfirmations(existingConfirmations);
@@ -1662,7 +1488,7 @@ export default function MyOrders() {
 
   // Handle proceed to checkout
   const handleProceedToCheckout = (order: Order) => {
-    console.log('Proceeding to payment for order:', order)
+    // Proceeding to payment for order
     // Navigate to new streamlined payment page with order ID
     navigate(`/payment?orderId=${order.id}`)
   }
@@ -1767,7 +1593,7 @@ export default function MyOrders() {
       )
 
       // Submit re-upload (you'll need to implement this API endpoint)
-      console.log('Re-uploading files:', reuploadData)
+      // Re-uploading files
       showInfo('Re-upload functionality will be implemented with backend API', 'Feature Coming Soon')
       
       // Close modal and reload orders
@@ -2154,30 +1980,9 @@ export default function MyOrders() {
                             {/* Show multiple designs if available */}
                             {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
                               (item.customization as any).designs.slice(0, 2).map((design: any, index: number) => {
-                                // Debug logging for order preview
-                                console.log('🔍 Order preview design data:', {
-                                  itemId: item.id,
-                                  itemName: item.productName,
-                                  designId: design.id,
-                                  designName: design.name,
-                                  hasPreview: !!design.preview,
-                                  previewLength: design.preview?.length,
-                                  previewStart: design.preview?.substring(0, 50),
-                                  hasFile: !!design.file,
-                                  fileLength: design.file?.length,
-                                  fileStart: design.file?.substring(0, 50)
-                                });
-                                
                                 // Check if it's a blob URL (temporary) or base64 (persistent)
                                 const imageSrc = design.preview || design.file;
                                 const isBlobUrl = imageSrc && imageSrc.startsWith('blob:');
-                                
-                                console.log('🖼️ Order preview using image source:', {
-                                  imageSrc: imageSrc?.substring(0, 50) + '...',
-                                  imageSrcLength: imageSrc?.length,
-                                  isBlobUrl: isBlobUrl,
-                                  isBase64: imageSrc && imageSrc.startsWith('data:image/')
-                                });
                                 
                                 return (
                                   <div key={design.id || index} className="relative">
@@ -2198,16 +2003,12 @@ export default function MyOrders() {
                                         alt={`Design ${index + 1}`}
                                         className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg border-2 border-white shadow-sm"
                                         onError={(e) => {
-                                          console.error('❌ Order preview image failed to load:', {
-                                            designName: design.name,
-                                            imageSrc: imageSrc?.substring(0, 50) + '...',
-                                            error: e
-                                          });
+                                          // Order preview image failed to load
                                           const target = e.target as HTMLImageElement;
                                           target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSIzMiIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
                                         }}
                                         onLoad={() => {
-                                          console.log('✅ Order preview image loaded successfully:', design.name);
+                                          // Image loaded successfully
                                         }}
                                       />
                                     )}
@@ -2853,29 +2654,9 @@ export default function MyOrders() {
                                   {/* Show multiple designs if available */}
                                   {(item.customization as any).designs && (item.customization as any).designs.length > 0 ? (
                                     (item.customization as any).designs.map((design: any, index: number) => {
-                                      // Debug logging
-                                      console.log('🔍 Design data for display:', {
-                                        designId: design.id,
-                                        designName: design.name,
-                                        hasPreview: !!design.preview,
-                                        previewLength: design.preview?.length,
-                                        previewStart: design.preview?.substring(0, 50),
-                                        hasFile: !!design.file,
-                                        fileLength: design.file?.length,
-                                        fileStart: design.file?.substring(0, 50),
-                                        designObject: design
-                                      });
-                                      
                                       // Check if it's a blob URL (temporary) or base64 (persistent)
                                       const imageSrc = design.preview || design.file;
                                       const isBlobUrl = imageSrc && imageSrc.startsWith('blob:');
-                                      
-                                      console.log('🖼️ Using image source:', {
-                                        imageSrc: imageSrc?.substring(0, 50) + '...',
-                                        imageSrcLength: imageSrc?.length,
-                                        isBlobUrl: isBlobUrl,
-                                        isBase64: imageSrc && imageSrc.startsWith('data:image/')
-                                      });
                                       
                                       // If it's a blob URL, show a placeholder with a note
                                       const displaySrc = isBlobUrl ? null : imageSrc;
@@ -2903,16 +2684,12 @@ export default function MyOrders() {
                                                 setEnlargedImageTitle(`${design.name || `Design ${index + 1}`}`);
                                               }}
                                               onError={(e) => {
-                                                console.error('❌ Image failed to load:', {
-                                                  designName: design.name,
-                                                  imageSrc: imageSrc?.substring(0, 50) + '...',
-                                                  error: e
-                                                });
+                                                // Image failed to load
                                                 const target = e.target as HTMLImageElement;
                                                 target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmM2Y0ZjYiLz48dGV4dCB4PSIzMiIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSI4IiBmaWxsPSIjNmI3MjgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
                                               }}
                                               onLoad={() => {
-                                                console.log('✅ Image loaded successfully:', design.name);
+                                                // Image loaded successfully
                                               }}
                                             />
                                           )}
@@ -3130,31 +2907,11 @@ export default function MyOrders() {
                             replyItemIdStr === itemIdStr || 
                             replyItemIdStr === productIdStr;
                           
-                          console.log('🔍 Item reply matching (exact):', {
-                            itemId: item.id,
-                            productId: item.productId,
-                            replyItemId: reply.itemId,
-                            matches,
-                            itemName: item.productName
-                          });
-                          
                           return matches;
                         }) || [];
                         
-                        console.log('🔍 Item replies found:', {
-                          itemId: item.id,
-                          itemName: item.productName,
-                          replyCount: itemReplies.length,
-                          replies: itemReplies
-                        });
-                        
                         // Skip if no replies for this item
                         if (itemReplies.length === 0) {
-                          console.log('🔍 No replies found for item:', {
-                            itemId: item.id,
-                            itemName: item.productName,
-                            productId: item.productId
-                          });
                           return null;
                         }
                         
@@ -3678,11 +3435,7 @@ export default function MyOrders() {
                           
                           // Validate numeric productId before sending
                           if (!productId || isNaN(productId) || productId <= 0) {
-                            console.error('❌ Invalid productId:', { 
-                              productId, 
-                              productIdStr,
-                              reviewItem
-                            });
+                            // Invalid productId
                             setReviewResultModal({
                               show: true,
                               success: false,
@@ -3693,14 +3446,7 @@ export default function MyOrders() {
                           }
                         }
 
-                        console.log('📝 Submitting review for specific item:', {
-                          productId,
-                          productName: reviewItem.productName,
-                          orderId: reviewOrderId,
-                          rating,
-                          hasComment: !!reviewText,
-                          hasImages: reviewImages.length > 0
-                        });
+                        // Submitting review for specific item
 
                         const response = await productReviewApiService.createReview({
                           productId: productId as any, // Type assertion since API interface expects number but accepts string for custom-embroidery

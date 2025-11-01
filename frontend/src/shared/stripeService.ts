@@ -35,23 +35,34 @@ class StripeService {
   private stripe: Stripe | null = null
   private elements: StripeElements | null = null
   private cardElement: StripeCardElement | null = null
+  private initializationPromise: Promise<void> | null = null
 
   constructor() {
-    this.initializeStripe()
+    // Don't initialize immediately - lazy load when needed
+    // This prevents Stripe from initializing on admin dashboard
   }
 
   private async initializeStripe(): Promise<void> {
-    try {
-      const config = paymentConfig.getStripeConfig()
-      this.stripe = await loadStripe(config.publishableKey)
-      
-      if (!this.stripe) {
-        throw new Error('Failed to load Stripe')
-      }
-    } catch (error) {
-      console.error('Failed to initialize Stripe:', error)
-      throw error
+    // Prevent multiple initializations
+    if (this.initializationPromise) {
+      return this.initializationPromise
     }
+
+    this.initializationPromise = (async () => {
+      try {
+        const config = paymentConfig.getStripeConfig()
+        this.stripe = await loadStripe(config.publishableKey)
+        
+        if (!this.stripe) {
+          throw new Error('Failed to load Stripe')
+        }
+      } catch (error) {
+        // Failed to initialize Stripe - silent in production
+        throw error
+      }
+    })()
+
+    return this.initializationPromise
   }
 
   public async createPaymentElement(containerId: string): Promise<StripeCardElement | null> {

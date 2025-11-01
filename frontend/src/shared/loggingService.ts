@@ -24,7 +24,7 @@ export interface LoggingConfig {
 
 class LoggingService {
   private config: LoggingConfig = {
-    enableConsoleLogging: true,
+    enableConsoleLogging: import.meta.env.DEV, // Only log to console in development
     enableLocalStorage: true,
     enableBackendLogging: false, // Will be enabled when backend is ready
     maxLocalLogs: 1000,
@@ -113,16 +113,36 @@ class LoggingService {
       sessionId: clientInfo.sessionId
     }
 
-    // Console logging
-    if (this.config.enableConsoleLogging) {
+    // Console logging - skip login/logout events to reduce noise and prevent session ID exposure
+    // Also sanitize sensitive data from console output
+    if (this.config.enableConsoleLogging && event !== 'logout' && event !== 'login_attempt' && event !== 'login_success' && event !== 'failed_login_attempt') {
       const logMethod = level === 'error' ? console.error : 
                        level === 'warn' ? console.warn : 
                        level === 'debug' ? console.debug : console.log
       
+      // Create sanitized log entry without session IDs
+      const sanitizedEntry = { ...logEntry }
+      delete sanitizedEntry.sessionId // Remove session ID from console output
+      
       logMethod(`[${level.toUpperCase()}] ${category.toUpperCase()}: ${event}`, {
-        ...logEntry,
+        ...sanitizedEntry,
         timestamp: logEntry.timestamp.toISOString()
       })
+    }
+
+    // Show toast notification for failed login attempts instead of console log
+    if (event === 'failed_login_attempt') {
+      if (typeof window !== 'undefined' && (window as any).__toast) {
+        try {
+          (window as any).__toast({
+            type: 'error',
+            message: 'Login failed. Please try again.',
+            durationMs: 4000
+          })
+        } catch (error) {
+          // Silent fallback if toast system not available
+        }
+      }
     }
 
     // Local storage

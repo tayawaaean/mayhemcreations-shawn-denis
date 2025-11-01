@@ -357,7 +357,8 @@ export class AuthController {
         include: [{ model: Role, as: 'role' }],
       }) as any; // Type assertion needed for included associations
 
-      logger.info('Login attempt', { email, userFound: !!user });
+      // Only log login attempts as debug (not shown in production)
+      logger.debug('Login attempt', { email, userFound: !!user });
 
       if (!user) {
         logger.warn('User not found for login', { email });
@@ -410,11 +411,11 @@ export class AuthController {
 
       // Verify password
       const isPasswordValid = await user.checkPassword(password);
-      logger.info('Password verification', { 
+      // Only log password verification as debug (not shown in production)
+      logger.debug('Password verification', { 
         email, 
         userId: user.id, 
         isPasswordValid,
-        userPasswordHash: user.password.substring(0, 20) + '...',
         needsRehash: user.needsPasswordRehash()
       });
       
@@ -449,7 +450,8 @@ export class AuthController {
 
       // Check if password needs rehashing for security updates
       if (user.needsPasswordRehash()) {
-        logger.info('Password needs rehashing for user', { email, userId: user.id });
+        // Log as warning since this is a security concern (will show in production)
+        logger.warn('Password needs rehashing for user', { email, userId: user.id });
         // Note: In a production system, you might want to rehash here
         // but that requires storing the plaintext password temporarily
         // For now, we'll just log it for monitoring
@@ -470,23 +472,7 @@ export class AuthController {
         req.ip
       );
 
-      // Debug: Log the session data
-      logger.debug('Session data created:', {
-        sessionId: sessionData.sessionId,
-        userId: sessionData.userId,
-        email: sessionData.email,
-        role: sessionData.role
-      });
-
-      // Debug: Log the session data to see if tokens are present
-      logger.info(`Session data created:`, {
-        sessionId: sessionData.sessionId,
-        userId: sessionData.userId,
-        email: sessionData.email,
-        role: sessionData.role
-      });
-
-      // Log successful login
+      // Log successful login (production-safe: only shows in dev, errors go to file in prod)
       logger.info(`User logged in: ${email}`, {
         userId: user.id,
         email: user.email,
@@ -515,14 +501,6 @@ export class AuthController {
           // The session cookie handles authentication automatically
         },
       };
-
-      // Debug: Log the response data to see what's being sent
-      logger.info(`Login response data:`, {
-        sessionId: responseData.data.sessionId,
-        userId: responseData.data.user.id,
-        email: responseData.data.user.email,
-        role: responseData.data.user.role
-      });
 
       res.json(responseData);
     } catch (error) {

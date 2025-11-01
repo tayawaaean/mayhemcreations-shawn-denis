@@ -72,6 +72,13 @@ class AdminOrderApiService {
       const data = response.data;
 
       if (!data?.success && response.status >= 400) {
+        // Suppress 404 errors for missing endpoints (expected in development)
+        if (response.status === 404) {
+          return {
+            success: false,
+            error: 'Endpoint not found',
+          };
+        }
         return {
           success: false,
           error: data?.message || `HTTP ${response.status}`,
@@ -83,8 +90,16 @@ class AdminOrderApiService {
         data: data?.data,
         message: data?.message,
       };
-    } catch (error) {
-      console.error('Order API request failed:', error);
+    } catch (error: any) {
+      // Order API request failed - handle silently (404s are expected if endpoint doesn't exist)
+      // Suppress axios 404 errors from console by returning structured error response
+      if (error?.response?.status === 404) {
+        // Silently handle 404 - endpoint may not exist yet
+        return {
+          success: false,
+          error: 'Endpoint not found',
+        };
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Network error',

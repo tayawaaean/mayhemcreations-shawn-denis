@@ -102,9 +102,7 @@ class AdminAnalyticsApiService {
    * Get product statistics
    */
   async getProductStats(): Promise<ApiResponse<ProductStats>> {
-    console.log('🔄 Calling /products/stats...')
     const response = await apiAuthService.get<ProductStats>('/products/stats', true);
-    console.log('📊 Product Stats Raw Response:', response)
     return response;
   }
 
@@ -112,9 +110,7 @@ class AdminAnalyticsApiService {
    * Get user statistics
    */
   async getUserStats(): Promise<ApiResponse<UserStats>> {
-    console.log('🔄 Calling /users/stats...')
     const response = await apiAuthService.get<UserStats>('/users/stats', true);
-    console.log('👥 User Stats Raw Response:', response)
     return response;
   }
 
@@ -122,9 +118,7 @@ class AdminAnalyticsApiService {
    * Get inventory status with low stock products
    */
   async getInventoryStatus(lowStockThreshold: number = 10): Promise<ApiResponse<VariantInventoryData>> {
-    console.log('🔄 Calling /variants/inventory/status...')
     const response = await apiAuthService.get<VariantInventoryData>(`/variants/inventory/status?lowStockThreshold=${lowStockThreshold}`, true);
-    console.log('📦 Variant Inventory Raw Response:', response)
     return response;
   }
 
@@ -139,9 +133,7 @@ class AdminAnalyticsApiService {
    * Get order statistics
    */
   async getOrderStats(): Promise<ApiResponse<OrderStats>> {
-    console.log('🔄 Calling /orders/admin/stats...')
     const response = await apiAuthService.get<OrderStats>('/orders/admin/stats', true);
-    console.log('📊 Order Stats Raw Response:', response)
     return response;
   }
 
@@ -150,8 +142,6 @@ class AdminAnalyticsApiService {
    */
   async getDashboardAnalytics(): Promise<ApiResponse<AnalyticsData>> {
     try {
-      console.log('🔄 Fetching dashboard analytics...')
-      
       // Fetch all required data in parallel
       const [productStatsResponse, userStatsResponse, inventoryResponse, orderStatsResponse] = await Promise.all([
         this.getProductStats(),
@@ -159,11 +149,6 @@ class AdminAnalyticsApiService {
         this.getInventoryStatus(10), // Low stock threshold of 10
         this.getOrderStats() // Get order statistics
       ]);
-
-      console.log('📊 Product Stats Response:', productStatsResponse)
-      console.log('👥 User Stats Response:', userStatsResponse)
-      console.log('📦 Variant Inventory Response:', inventoryResponse)
-      console.log('📊 Order Stats Response:', orderStatsResponse)
 
       // Check each response individually for better error reporting
       if (!productStatsResponse.success) {
@@ -184,29 +169,21 @@ class AdminAnalyticsApiService {
       // Handle user stats failure gracefully (might be auth issue)
       let totalCustomers = 0;
       if (!userStatsResponse.success) {
-        console.warn('⚠️ User Stats API failed (likely auth issue):', userStatsResponse.message)
-        console.log('🔄 Falling back to alternative customer count method...')
-        
         // Try to get customer count using the users endpoint with role filter
         try {
           const usersResponse = await apiAuthService.get<any>('/users?role=customer&limit=1000', true);
           if (usersResponse.success && usersResponse.data?.pagination) {
             totalCustomers = usersResponse.data.pagination.total;
-            console.log('✅ Got customer count from users endpoint:', totalCustomers)
           } else {
-            console.warn('⚠️ Users endpoint also failed, using fallback count of 0')
             totalCustomers = 0;
           }
         } catch (fallbackError) {
-          console.warn('⚠️ Fallback method also failed:', fallbackError)
           totalCustomers = 0;
         }
       } else {
         // Get customer count from usersByRole array
         const customerRole = userStatsResponse.data?.usersByRole?.find(role => role.roleName === 'customer')
         totalCustomers = customerRole?.count || 0
-        console.log('👥 Customer Role Data:', customerRole)
-        console.log('👥 Total Customers (filtered):', totalCustomers)
       }
 
       // Get low stock variants (limit to 5 for dashboard)
@@ -223,13 +200,6 @@ class AdminAnalyticsApiService {
         recentOrders: orderStatsResponse.data?.recentOrders || [],
         revenueChart: orderStatsResponse.data?.revenueChart || []
       };
-
-      console.log('✅ Final Analytics Data:', analyticsData)
-      console.log('⚠️ Low Stock Variants (first 5):', lowStockVariants)
-      console.log('📊 Total Orders:', analyticsData.totalOrders)
-      console.log('💰 Total Sales:', analyticsData.totalSales)
-      console.log('📈 Recent Orders:', analyticsData.recentOrders)
-      console.log('📊 Revenue Chart:', analyticsData.revenueChart)
 
       return {
         success: true,

@@ -65,13 +65,11 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        console.log('🔄 Loading customers from database...');
         setCustomersLoading(true);
         
         const response = await adminApiService.getAllCustomers();
         if (response.success && response.data) {
           setAllCustomers(response.data);
-          console.log(`✅ Loaded ${response.data.length} customers from database`);
           
           // Update customer directory with loaded data
           const customerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
@@ -101,8 +99,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     const loadExistingData = async () => {
       try {
-        console.log('🔄 Loading existing chat data...');
-        
         // Load recent messages
         const recentMessagesResponse = await messageApiService.getRecentMessages(100);
         if (recentMessagesResponse.success && recentMessagesResponse.data) {
@@ -120,7 +116,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }));
           
           setMessages(existingMessages);
-          console.log(`✅ Loaded ${existingMessages.length} existing messages`);
           
           // Update customer directory with loaded data
           const customerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
@@ -149,7 +144,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }));
           
           setThreads(existingThreads);
-          console.log(`✅ Loaded ${existingThreads.length} existing threads`);
           
           // Update customer directory with thread data
           const threadCustomerDirectoryUpdate: Record<string, { name?: string | null; email?: string | null }> = {};
@@ -173,13 +167,7 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     // Request notification permission for admin browser notifications
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          console.log('✅ Admin notification permission granted');
-        } else {
-          console.log('❌ Admin notification permission denied');
-        }
-      });
+      Notification.requestPermission();
     }
   }, []);
 
@@ -189,8 +177,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // Listen for chat messages
     const unsubscribeMessage = subscribe('chat_message_received', (data) => {
-      console.log('💬 Admin received chat message:', data);
-      
       // cache identity if provided
       if (data.customerId) {
         setCustomerDirectory(prev => ({
@@ -220,7 +206,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const exists = prev.some(msg => {
           // Check by ID (most reliable)
           if (String(msg.id) === String(newMessage.id)) {
-            console.log(`🚫 Duplicate blocked by ID: ${newMessage.id}`);
             return true;
           }
           
@@ -232,25 +217,16 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const nearTime = Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 2000;
           
           if (sameCustomer && sameSender && sameType && sameText && nearTime) {
-            console.log(`🚫 Duplicate blocked by content match: ${newMessage.id}`);
             return true;
           }
           
           // For attachments, also compare type
           if (sameCustomer && sameSender && sameType && newMessage.type !== 'text' && nearTime) {
-            console.log(`🚫 Duplicate attachment blocked: ${newMessage.id}`);
             return true;
           }
           
           return false;
         });
-        
-        if (!exists) {
-          console.log(`✅ Adding new message: ${newMessage.id} (${newMessage.type || 'text'}) isRead: ${newMessage.isRead}`);
-          if (newMessage.sender === 'user' && !newMessage.isRead) {
-            console.log(`📬 New unread message from customer ${newMessage.customerId}`);
-          }
-        }
         
         return exists ? prev : [...prev, newMessage];
       });
@@ -277,7 +253,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // Listen for user typing status
     const unsubscribeTyping = subscribe('user_typing', (data) => {
-      console.log('⌨️ User typing status:', data);
       setIsUserTyping(prev => ({
         ...prev,
         [data.customerId]: data.isTyping
@@ -300,7 +275,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     // Listen for customer connections
     const unsubscribeConnection = subscribe('chat_connected', (data) => {
-      console.log('🟢 Customer connected:', data);
       if (data.customerId) {
         setCustomerDirectory(prev => ({
           ...prev,
@@ -337,7 +311,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     const unsubscribeDisconnection = subscribe('chat_disconnected', (data) => {
-      console.log('🔴 Customer disconnected:', data);
       setOnlineCustomers(prev => prev.filter(id => id !== data.customerId));
     });
 
@@ -361,7 +334,6 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const onHistory = (data: any) => {
       if (String(data.customerId) !== String(selectedCustomer)) return;
-      console.log(`📜 Loading chat history for customer ${selectedCustomer} (${data.messages?.length || 0} messages)`);
       const history: AdminChatMessage[] = data.messages.map((m: any) => ({
         id: String(m.id),
         text: m.text ?? undefined,
@@ -406,19 +378,13 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               return false;
             });
             
-            if (isDuplicate) {
-              console.log(`🚫 History: Skipping duplicate ${m.type || 'text'} message: ${key}`);
-            } else {
-              console.log(`➕ History: Adding ${m.type || 'text'} message: ${key}`);
+            if (!isDuplicate) {
               map.set(key, m);
             }
-          } else {
-            console.log(`🔑 History: Message ${key} already exists by ID`);
           }
         });
         
         const result = Array.from(map.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-        console.log(`✅ Merged history: ${prev.length} existing + ${history.length} from history = ${result.length} total (${prev.length + history.length - result.length} duplicates removed)`);
         return result;
       });
       // Mark all user messages for this customer as read when opening
@@ -446,14 +412,11 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isRead: true
     };
 
-    console.log(`📤 Admin sending message: ${messageId}`);
-
     // Add message to local state immediately
     setMessages(prev => {
       // Check if already exists (shouldn't, but just in case)
       const exists = prev.some(m => String(m.id) === String(messageId));
       if (exists) {
-        console.log(`⚠️ Message ${messageId} already exists in state`);
         return prev;
       }
       return [...prev, newMessage];
@@ -500,13 +463,10 @@ export const AdminChatProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     };
     
-    console.log(`📤 Admin sending attachment: ${messageId} (${newMessage.type})`);
-    
     setMessages(prev => {
       // Check if already exists
       const exists = prev.some(m => String(m.id) === String(messageId));
       if (exists) {
-        console.log(`⚠️ Attachment ${messageId} already exists in state`);
         return prev;
       }
       return [...prev, newMessage];

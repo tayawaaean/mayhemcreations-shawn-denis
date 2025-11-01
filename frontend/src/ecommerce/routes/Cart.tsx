@@ -31,7 +31,6 @@ export default function Cart() {
   useEffect(() => {
     const loadCart = async () => {
       try {
-        console.log('🛒 Cart page loaded, refreshing cart from database...')
         setIsRefreshingCart(true)
         setCartRefreshError(null)
         await refreshCart()

@@ -79,10 +79,9 @@ const PendingReview: React.FC = () => {
       const response = await productApiService.getProducts({ status: 'active', limit: 100 })
       if (response.success && response.data) {
         setBackendProducts(response.data)
-        console.log('📦 Loaded backend products for admin:', response.data.length)
       }
     } catch (error) {
-      console.error('Error loading backend products:', error)
+      // Error loading backend products
     }
   }
 
@@ -98,7 +97,6 @@ const PendingReview: React.FC = () => {
 
     // Listen for design review updates
     const unsubscribeDesignReview = subscribe('design_review_updated', (data) => {
-      console.log('🔌 Real-time design review update:', data);
       setReviews(prev => prev.map(review => 
         review.id === data.orderId 
           ? { ...review, ...data.reviewData }
@@ -108,7 +106,6 @@ const PendingReview: React.FC = () => {
 
     // Listen for picture reply uploads
     const unsubscribePictureReply = subscribe('picture_reply_uploaded', (data) => {
-      console.log('🔌 Real-time picture reply upload:', data);
       setReviews(prev => prev.map(review => 
         review.id === data.orderId 
           ? { 
@@ -122,7 +119,6 @@ const PendingReview: React.FC = () => {
 
     // Listen for customer confirmations
     const unsubscribeConfirmation = subscribe('customer_confirmation_received', (data) => {
-      console.log('🔌 Real-time customer confirmation:', data);
       setReviews(prev => prev.map(review => 
         review.id === data.orderId 
           ? { 
@@ -136,7 +132,6 @@ const PendingReview: React.FC = () => {
 
     // Listen for order status changes
     const unsubscribeStatusChange = subscribe('order_status_changed', (data) => {
-      console.log('🔌 Real-time order status change:', data);
       setReviews(prev => prev.map(review => 
         review.id === data.orderId 
           ? { 
@@ -161,25 +156,12 @@ const PendingReview: React.FC = () => {
   const loadReviews = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Loading reviews...')
       const response = await orderReviewApiService.getAllReviewOrders()
-      console.log('📊 Reviews API response:', response)
       if (response.success && response.data) {
-        console.log('✅ Reviews loaded:', response.data)
-        // Debug the order_data structure
-        response.data.forEach((review, index) => {
-          console.log(`📦 Review ${index + 1} order_data:`, {
-            type: typeof review.order_data,
-            isArray: Array.isArray(review.order_data),
-            value: review.order_data
-          });
-        });
         setReviews(response.data)
-      } else {
-        console.log('❌ Failed to load reviews:', response.message)
       }
     } catch (error) {
-      console.error('❌ Error loading reviews:', error)
+      // Error loading reviews
     } finally {
       setLoading(false)
     }

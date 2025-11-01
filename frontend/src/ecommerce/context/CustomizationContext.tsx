@@ -569,13 +569,6 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
           }))
         }
         
-        console.log('📱 Loaded customization data from localStorage:', {
-          designsCount: loadedData.designs?.length || 0,
-          hasDesign: !!loadedData.design,
-          hasMockup: !!loadedData.mockup,
-          mockupSize: loadedData.mockup ? Math.round(loadedData.mockup.length / 1024) : 0
-        })
-        
         return loadedData
       }
     } catch (error) {
@@ -634,7 +627,6 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
         }
         
         localStorage.setItem(CUSTOMIZATION_STORAGE_KEY, dataString)
-        console.log('💾 Customization data saved to localStorage (' + dataSizeInMB.toFixed(2) + ' MB)')
       } catch (error: any) {
         if (error.name === 'QuotaExceededError') {
           console.error('❌ localStorage quota exceeded! This may affect authentication.')
@@ -659,7 +651,6 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
     // Clear localStorage when resetting
     try {
       localStorage.removeItem(CUSTOMIZATION_STORAGE_KEY)
-      console.log('🗑️ Customization data cleared from localStorage')
     } catch (error) {
       console.warn('Failed to clear customization data from localStorage:', error)
     }
@@ -775,16 +766,12 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Multi-embroidery methods
   const addDesign = async (file: File) => {
-    console.log('addDesign called with file:', file.name, 'Current designs:', customizationData.designs.length, 'Max designs:', customizationData.maxDesigns)
-    console.log('Current designs array:', customizationData.designs.map(d => d.name))
-    
     if (customizationData.designs.length >= customizationData.maxDesigns) {
       console.warn(`Maximum ${customizationData.maxDesigns} designs allowed`)
       return
     }
 
     const designId = `design_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    console.log('Creating new design with ID:', designId)
     
     try {
       // Convert file to base64 for persistent preview
@@ -817,14 +804,10 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const newDesignsArray = [...customizationData.designs, newDesign]
-      console.log('Setting new designs array with', newDesignsArray.length, 'designs:', newDesignsArray.map(d => d.name))
       
       setCustomizationData({
         designs: newDesignsArray
       })
-      
-      console.log('Design added successfully. New count should be:', newDesignsArray.length)
-      console.log('Current designs array after add:', newDesignsArray.map(d => ({ id: d.id, name: d.name })))
     } catch (error) {
       console.error('Error converting file to base64:', error)
       // Fallback to blob URL if base64 conversion fails
@@ -850,7 +833,6 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const newDesignsArray = [...customizationData.designs, newDesign]
-      console.log('Setting new designs array with fallback blob URL')
       
       setCustomizationData({
         designs: newDesignsArray

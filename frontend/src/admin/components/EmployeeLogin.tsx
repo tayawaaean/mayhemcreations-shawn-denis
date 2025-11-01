@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Shield, Store, AlertCircle, Building2 } from 'lucide-react'
 import Button from '../../components/Button'
 import { loggingService } from '../../shared/loggingService'
@@ -102,6 +102,7 @@ interface EmployeeLoginProps {
 
 export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -165,11 +166,21 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
         try {
           await onLogin(employeeUser)
           
-          // Navigate based on role only if onLogin succeeds
-          if (employeeUser.role === 'admin') {
-            navigate('/admin')
+          // Check for redirect parameter in URL (from session expiration)
+          const urlParams = new URLSearchParams(location.search)
+          const redirectPath = urlParams.get('redirect')
+          
+          if (redirectPath) {
+            // Decode and navigate to the original page
+            const decodedPath = decodeURIComponent(redirectPath)
+            navigate(decodedPath, { replace: true })
           } else {
-            navigate('/seller')
+            // Navigate based on role only if no redirect parameter
+            if (employeeUser.role === 'admin') {
+              navigate('/admin')
+            } else {
+              navigate('/seller')
+            }
           }
         } catch (loginError: any) {
           console.error('❌ onLogin failed:', loginError)
@@ -243,7 +254,6 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
       if (canRetry && retryCount < 2) {
         const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000)
         setTimeout(() => {
-          console.log(`Auto-retrying login (attempt ${retryCount + 1}/2)...`)
           setRetryCount(prev => prev + 1)
         }, backoffDelay)
       } else if (retryCount >= 2) {

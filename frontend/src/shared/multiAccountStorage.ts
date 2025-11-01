@@ -98,14 +98,8 @@ class MultiAccountStorageService {
       // Set as current account
       multiData.currentAccount = accountType;
 
-      console.log(`🔍 Storing ${accountType} account data:`, {
-        sessionId: authData.session.sessionId,
-        userId: authData.user.id,
-        email: authData.user.email
-      });
-
       this.setMultiAccountData(multiData);
-      console.log(`✅ Stored ${accountType} account data`);
+      
     } catch (error) {
       console.error('Error storing account auth data:', error);
     }
@@ -148,13 +142,8 @@ class MultiAccountStorageService {
       const multiData = this.getMultiAccountData();
       multiData.currentAccount = accountType;
       
-      console.log(`🔍 Setting current account to ${accountType}:`, {
-        currentData: multiData[accountType],
-        sessionId: multiData[accountType]?.session?.sessionId
-      });
-      
       this.setMultiAccountData(multiData);
-      console.log(`✅ Set current account to ${accountType}`);
+      
     } catch (error) {
       console.error('Error setting current account:', error);
     }
@@ -169,7 +158,6 @@ class MultiAccountStorageService {
       if (multiData[accountType]) {
         multiData.currentAccount = accountType;
         this.setMultiAccountData(multiData);
-        console.log(`✅ Switched to ${accountType} account`);
         return true;
       }
       return false;
@@ -269,7 +257,6 @@ class MultiAccountStorageService {
       delete multiData[accountType];
 
       this.setMultiAccountData(multiData);
-      console.log(`✅ Logged out from ${accountType} account`);
       return true;
     } catch (error) {
       console.error('Error logging out account:', error);
@@ -295,13 +282,75 @@ class MultiAccountStorageService {
 
   /**
    * Clear all account data (complete logout)
+   * Also clears any other auth-related keys that might exist
+   * Includes cart and other cached user data
    */
   static clearAllAccounts(): void {
     try {
+      // Clear main auth key
       localStorage.removeItem(this.AUTH_KEY);
-      console.log('✅ Cleared all account data');
+      
+      // Clear cart data (cart should be cleared when user logs out)
+      localStorage.removeItem('mayhem_cart_v1');
+      
+      // Clear any legacy or additional auth-related keys
+      const authKeys = [
+        'currentAccount',
+        'account_customer',
+        'account_employee',
+        'auth_token',
+        'auth_user',
+        'session_id',
+        'auth_session',
+        'user_data',
+        'auth_data',
+        'auth_manual_logout_at', // Clear logout flag
+        'auth_redirect_after_login', // Clear redirect
+      ];
+      
+      authKeys.forEach(key => {
+        try {
+          localStorage.removeItem(key);
+          // Also check sessionStorage
+          if (typeof window !== 'undefined' && window.sessionStorage) {
+            sessionStorage.removeItem(key);
+          }
+        } catch (e) {
+          // Silently ignore if key doesn't exist
+        }
+      });
+      
+      // Also clear any keys that contain 'auth' or 'session' in their name
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const allKeys = Object.keys(localStorage);
+        allKeys.forEach(key => {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey.includes('auth') || lowerKey.includes('session') || lowerKey.includes('account') || lowerKey.includes('cart')) {
+            try {
+              localStorage.removeItem(key);
+            } catch (e) {
+              // Silently ignore
+            }
+          }
+        });
+      }
+      
+      // Clear sessionStorage auth-related keys
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        const sessionKeys = Object.keys(sessionStorage);
+        sessionKeys.forEach(key => {
+          const lowerKey = key.toLowerCase();
+          if (lowerKey.includes('auth') || lowerKey.includes('session') || lowerKey.includes('account')) {
+            try {
+              sessionStorage.removeItem(key);
+            } catch (e) {
+              // Silently ignore
+            }
+          }
+        });
+      }
     } catch (error) {
-      console.error('Error clearing all accounts:', error);
+      // Silently fail - don't throw errors during cleanup
     }
   }
 
@@ -356,7 +405,6 @@ class MultiAccountStorageService {
       const oldData = localStorage.getItem(oldAuthKey);
       
       if (oldData) {
-        console.log('🔄 Found old auth data, migrating...');
         const parsed = JSON.parse(oldData);
         if (parsed.user && parsed.session) {
           // Determine account type based on role
@@ -365,7 +413,6 @@ class MultiAccountStorageService {
           // Check if we already have this account in multi-account storage
           const existingData = this.getMultiAccountData();
           if (existingData[accountType]) {
-            console.log(`⚠️ ${accountType} account already exists in multi-account storage, skipping migration`);
             // Still remove old data to prevent conflicts
             localStorage.removeItem(oldAuthKey);
             return;
@@ -379,10 +426,9 @@ class MultiAccountStorageService {
 
           // Remove old data
           localStorage.removeItem(oldAuthKey);
-          console.log(`✅ Migrated old ${accountType} account to multi-account storage`);
         }
       } else {
-        console.log('ℹ️ No old auth data found to migrate');
+        
       }
     } catch (error) {
       console.error('Error migrating from old storage:', error);

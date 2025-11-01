@@ -4,6 +4,7 @@
  */
 
 import { apiAuthService, ApiResponse } from './apiAuthService';
+import MultiAccountStorageService from './multiAccountStorage';
 
 export interface CartItem {
   id?: number;
@@ -63,8 +64,35 @@ export interface CartItem {
 class CartApiService {
   /**
    * Get user's cart items from database
+   * Only call this when user is logged in - will return 403 if not authenticated
    */
   async getCart(): Promise<ApiResponse<CartItem[]>> {
+    // Check authentication status before making API call to prevent 403 errors
+    // This prevents the API call from being made when user is not logged in
+    try {
+      const isAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
+      
+      if (!isAuthenticated) {
+        // Return error response without making API call - prevents 403 errors
+        // No console.error or API call - just return silently
+        return {
+          success: false,
+          message: 'Authentication required',
+          errors: ['AUTH_REQUIRED'],
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      // If check fails, assume not authenticated - return error without making API call
+      return {
+        success: false,
+        message: 'Authentication required',
+        errors: ['AUTH_REQUIRED'],
+        timestamp: new Date().toISOString(),
+      };
+    }
+    
+    // User is authenticated, proceed with API call
     return apiAuthService.get<CartItem[]>('/cart', true);
   }
 

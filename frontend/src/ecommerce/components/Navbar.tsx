@@ -383,9 +383,7 @@ export default function Navbar() {
   })
   const count = items.reduce((s, i) => s + i.quantity, 0)
   
-  // Debug logging
-  console.log('🛒 Navbar - Cart items:', items)
-  console.log('🛒 Navbar - Cart count:', count)
+  
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({
@@ -455,7 +453,7 @@ export default function Navbar() {
       setAuthMode(mode)
       setShowAuthModal(true)
       setMobileMenuOpen(false)
-      console.log('🔓 Opening auth modal from external trigger:', mode)
+      
     }
 
     window.addEventListener('openAuthModal', handleOpenAuthModal as EventListener)
@@ -661,10 +659,7 @@ export default function Navbar() {
             <Link 
               to="/cart" 
               className="relative p-2 text-gray-700 hover:text-accent transition-colors"
-              onClick={() => {
-                console.log('🛒 Cart icon clicked, refreshing cart...')
-                refreshCart()
-              }}
+              onClick={() => { refreshCart() }}
             >
               <ShoppingCart className="w-5 h-5" />
               {count > 0 && (
@@ -896,6 +891,17 @@ export default function Navbar() {
         onSuccess={(userData) => {
           login(userData)
           setShowAuthModal(false)
+          
+          // Check for redirect path after successful login (from session expiration)
+          const redirectPath = sessionStorage.getItem('auth_redirect_after_login')
+          if (redirectPath) {
+            // Clear the redirect path
+            sessionStorage.removeItem('auth_redirect_after_login')
+            // Navigate to the original page after a short delay to allow modal to close
+            setTimeout(() => {
+              window.location.href = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`
+            }, 300)
+          }
         }}
       />
     </header>

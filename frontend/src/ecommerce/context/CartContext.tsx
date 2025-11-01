@@ -30,7 +30,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 const LOCAL_KEY = 'mayhem_cart_v1'
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoggedIn } = useAuth()
+  const { user, isLoggedIn, isLoading: isAuthLoading } = useAuth()
   const { showError, showWarning, showInfo } = useAlertModal()
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
@@ -73,11 +73,27 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * Load cart from database
    */
   const loadCartFromDatabase = useCallback(async () => {
+    // Only load cart if user is logged in - don't call API when not logged in
+    if (!isLoggedIn || !user || !user.id) {
+      return
+    }
+    
+    // Skip cart loading for admin/seller users - they don't have carts
+    if (user.role && (user.role === 'admin' || user.role === 'seller')) {
+      return
+    }
+    
     try {
       setIsLoading(true)
       setCartLoadError(null) // Clear previous errors
       
       const response = await cartApiService.getCart()
+      
+      // Silently handle 401 errors (session expired) - axios interceptor handles cleanup
+      if (!response.success && (response as any).status === 401) {
+        setIsLoading(false)
+        return
+      }
       
       if (response.success && response.data) {
         // Transform backend cart items to frontend format
@@ -110,18 +126,35 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // Set error but don't throw - use localStorage as fallback
         const errorMsg = response.message || 'Failed to load cart from server'
+        const responseStatus = (response as any).status
+        
+        // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
+        // Don't show warnings for expected authentication/authorization errors
+        if (responseStatus === 401 || responseStatus === 403) {
+          setCartLoadError(null) // Clear error for expected auth errors
+          setIsLoading(false)
+          return
+        }
+        
         setCartLoadError(errorMsg)
+        // Only show warning for unexpected errors (not auth-related)
         showWarning(`Cart load issue: ${errorMsg}. Using cached data.`, 'Cart Sync Warning')
       }
     } catch (error: any) {
-      console.error('🛒 Error loading cart from database:', error)
+      // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
+      const isAuthError = error?.response?.status === 401 || error?.response?.status === 403
       
-      // Categorize error for user notification
+      if (isAuthError) {
+        // Expected auth errors - don't show warnings or set errors
+        setCartLoadError(null)
+        setIsLoading(false)
+        return
+      }
+      
+      // Categorize error for user notification (only for unexpected errors)
       let errorMessage = 'Failed to load cart from server. '
       
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        errorMessage = 'Authentication issue. Please sign in again to sync your cart.'
-      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
         errorMessage = 'Connection timeout while loading cart. Using cached data.'
       } else if (!navigator.onLine) {
         errorMessage = 'No internet connection. Showing cached cart items.'
@@ -153,13 +186,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn, showError, showWarning])
+  }, [isLoggedIn, user?.id, user?.role, showError, showWarning]) // Added user.id to ensure user is fully loaded
 
   /**
    * Sync cart with database
    */
   const syncWithDatabase = useCallback(async () => {
-    if (!isLoggedIn) return
+    // Skip cart sync for admin/seller users - they don't have carts
+    if (!isLoggedIn || !user || (user.role === 'admin' || user.role === 'seller')) {
+      return
+    }
 
     try {
       setIsSyncing(true)
@@ -206,19 +242,34 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         // Sync failed but don't throw - cart is still usable locally
         const errorMsg = response.message || 'Cart sync failed'
+        const responseStatus = (response as any).status
+        
+        // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
+        if (responseStatus === 401 || responseStatus === 403) {
+          setCartSyncError(null)
+          setIsSyncing(false)
+          return
+        }
+        
         setCartSyncError(errorMsg)
-        console.warn('⚠️ Cart sync failed:', errorMsg)
+        // Only show warning for unexpected sync errors
         showWarning(`Cart sync issue: ${errorMsg}. Your changes are saved locally but may not sync across devices.`, 'Cart Sync Warning')
       }
     } catch (error: any) {
-      console.error('Error syncing cart with database:', error)
+      // Silently handle 401/403 errors - they're expected for admin/seller users or expired sessions
+      const isAuthError = error?.response?.status === 401 || error?.response?.status === 403
       
-      // Categorize sync error for user notification
+      if (isAuthError) {
+        // Expected auth errors - don't show warnings or set errors
+        setCartSyncError(null)
+        setIsSyncing(false)
+        return
+      }
+      
+      // Categorize sync error for user notification (only for unexpected errors)
       let errorMessage = 'Failed to sync cart with server. '
       
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        errorMessage = 'Authentication expired. Your cart is saved locally. Please sign in again to sync.'
-      } else if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
         errorMessage = 'Sync timeout. Your cart is saved locally but may not sync across devices.'
       } else if (!navigator.onLine) {
         errorMessage = 'No internet. Your cart is saved locally and will sync when connection is restored.'
@@ -233,23 +284,45 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setIsSyncing(false)
     }
-  }, [isLoggedIn, items, showWarning, showInfo]) // Include items dependency to sync full data
+  }, [isLoggedIn, user?.role, items, showWarning, showInfo]) // Added user.role to dependencies
 
-  // Load cart from database when user logs in
+  // Load cart from database when user logs in (only for customers)
+  // Only run when explicitly logged in with a valid user ID - don't call API when not logged in
   useEffect(() => {
-    if (isLoggedIn && user && user.id && !isCleared && !hasSyncedRef.current) {
+    // Wait for auth to finish initializing - don't run while auth is loading
+    if (isAuthLoading) {
+      return
+    }
+    
+    // Don't run if user is not logged in or user data is not yet loaded
+    if (!isLoggedIn || !user || !user.id) {
+      // Clear cart when user logs out (only if we were previously logged in)
+      if (hasSyncedRef.current) {
+        setItems([])
+        setIsCleared(false)
+        hasSyncedRef.current = false // Reset sync flag when user logs out
+      }
+      return
+    }
+    
+    // Skip cart operations for admin/seller users - they don't have carts
+    if (user.role && (user.role === 'admin' || user.role === 'seller')) {
+      return // Admin/seller users don't have carts
+    }
+    
+    // Only load cart once per login session - use ref to prevent multiple calls
+    if (!isCleared && !hasSyncedRef.current) {
       hasSyncedRef.current = true // Mark as synced to prevent multiple syncs
       // First sync any localStorage items to database, then load from database
+      // Call functions directly without including in dependencies (they're stable callbacks)
       syncWithDatabase().then(() => {
         loadCartFromDatabase()
+      }).catch(() => {
+        // If sync fails, still try to load cart (might be empty)
+        loadCartFromDatabase()
       })
-    } else if (!isLoggedIn) {
-      // Clear cart when user logs out
-      setItems([])
-      setIsCleared(false)
-      hasSyncedRef.current = false // Reset sync flag when user logs out
     }
-  }, [isLoggedIn, user?.id, isCleared]) // Removed function dependencies to prevent infinite loop
+  }, [isLoggedIn, user?.id, user?.role, isCleared, isAuthLoading, syncWithDatabase, loadCartFromDatabase]) // Include all dependencies
 
   // Check localStorage usage on mount
   useEffect(() => {
@@ -426,11 +499,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const add = async (productId: string, qty = 1, customization?: CartItem['customization']): Promise<boolean> => {
-      qty,
-      hasCustomization: !!customization,
-      isLoggedIn,
-      currentItemsCount: items.length
-    })
+    // console.log('🛒 Adding to cart:', {
+    //   productId,
+    //   qty,
+    //   hasCustomization: !!customization,
+    //   isLoggedIn,
+    //   currentItemsCount: items.length
+    // })
 
     // Check if user is logged in before allowing add to cart
     if (!isLoggedIn) {
@@ -460,18 +535,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await cartApiService.addToCart(productId, qty, customization)
       
       if (response.success && response.data) {
-          productId: response.data.productId,
-          hasCustomization: !!response.data.customization,
-          hasMockup: !!response.data.customization?.mockup,
-          mockupSize: response.data.customization?.mockup ? Math.round(response.data.customization.mockup.length / 1024) : 0,
-          customizationKeys: response.data.customization ? Object.keys(response.data.customization) : []
-        })
-        
         // Update local state with database response
         const newItems = ((prev: CartItem[]) => {
-            hasCustomization: !!customization,
-            newItemData: response.data
-          })
           
           // For customized items, always add as new item (don't merge with existing)
           if (customization) {

@@ -32,9 +32,9 @@ class AddressApiServiceImpl implements AddressApiService {
 
   async getDefaultOriginAddress(): Promise<Address | null> {
     try {
-      return await this.makeRequest<Address>('/admin/addresses/default/origin');
+      // Use public endpoint - no authentication required
+      return await this.makeRequest<Address>('/addresses/public/origin');
     } catch (error) {
-      console.error('Failed to fetch default origin address:', error);
       return null;
     }
   }
@@ -43,7 +43,6 @@ class AddressApiServiceImpl implements AddressApiService {
     try {
       return await this.makeRequest<Address[]>('/admin/addresses');
     } catch (error) {
-      console.error('Failed to fetch addresses:', error);
       return [];
     }
   }
@@ -52,7 +51,6 @@ class AddressApiServiceImpl implements AddressApiService {
     try {
       return await this.makeRequest<Address[]>(`/admin/addresses?type=${type}`);
     } catch (error) {
-      console.error(`Failed to fetch ${type} addresses:`, error);
       return [];
     }
   }

@@ -97,7 +97,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   useEffect(() => {
     if (!user) {
       setNotifications([])
-      console.log('🧹 Cleared notifications - user logged out')
     }
   }, [user])
 
@@ -170,7 +169,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Listen for new orders submitted for review
     const unsubscribeNewOrder = subscribe('new_order_notification', (data: any) => {
-      console.log('🔔 New order notification received:', data)
       addNotification({
         type: 'order',
         title: 'New Order for Review',
@@ -187,7 +185,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Listen for paid orders
     const unsubscribePaidOrder = subscribe('order_paid_notification', (data: any) => {
-      console.log('🔔 Order paid notification received:', data)
       addNotification({
         type: 'payment',
         title: 'Order Payment Received',
@@ -204,7 +201,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
     // Listen for delivered orders
     const unsubscribeDeliveredOrder = subscribe('order_delivered_notification', (data: any) => {
-      console.log('🔔 Order delivered notification received:', data)
       addNotification({
         type: 'update',
         title: 'Order Delivered',
@@ -271,7 +267,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
           });
         
         setNotifications(cleanedNotifications);
-        console.log(`📦 Loaded ${cleanedNotifications.length} notifications for user ${user.id} (filtered from ${parsed.length})`);
         
         // Update localStorage with cleaned data if we filtered anything
         if (cleanedNotifications.length !== parsed.length) {
@@ -292,12 +287,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     const storageKey = `admin_notifications_${user.id}`;
     try {
       localStorage.setItem(storageKey, JSON.stringify(notifications));
-      console.log(`💾 Saved ${notifications.length} notifications for user ${user.id}`);
     } catch (error) {
       console.error('Error saving notifications to localStorage:', error);
       // If localStorage is full, try to clean up old notifications
       if (error instanceof Error && error.name === 'QuotaExceededError') {
-        console.log('🧹 localStorage quota exceeded, cleaning up old notifications...');
         const cleanedNotifications = notifications.filter(n => {
           const now = new Date();
           const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -305,7 +298,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         });
         try {
           localStorage.setItem(storageKey, JSON.stringify(cleanedNotifications));
-          console.log(`🧹 Cleaned up notifications, saved ${cleanedNotifications.length} notifications`);
         } catch (cleanupError) {
           console.error('Failed to save even after cleanup:', cleanupError);
         }

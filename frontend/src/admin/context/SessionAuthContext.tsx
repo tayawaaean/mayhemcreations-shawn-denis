@@ -25,20 +25,16 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
   // Check authentication status on mount and periodically
   const checkAuth = async () => {
     try {
-      console.log('🔐 Checking session authentication...');
       const response = await apiService.getProfile();
       
       if (response.success && response.data) {
-        console.log('✅ Session authenticated:', response.data);
         setUser(response.data.user);
         setIsAuthenticated(true);
       } else {
-        console.log('❌ Session not authenticated');
         setUser(null);
         setIsAuthenticated(false);
       }
     } catch (error) {
-      console.error('❌ Auth check failed:', error);
       setUser(null);
       setIsAuthenticated(false);
     }
@@ -60,7 +56,6 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
     if (!isAuthenticated) return;
 
     const interval = setInterval(async () => {
-      console.log('🔄 Periodic auth check...');
       await checkAuth();
     }, 5 * 60 * 1000); // 5 minutes
 
@@ -69,18 +64,15 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      console.log('🔐 Attempting login...');
       setIsLoading(true);
       
       // Use centralized auth service for login
       const success = await centralizedAuthService.login(email, password);
       
       if (success) {
-        console.log('✅ Login successful');
         // The centralized auth service will handle state updates
         return true;
       } else {
-        console.log('❌ Login failed');
         setUser(null);
         setIsAuthenticated(false);
         return false;
@@ -97,10 +89,9 @@ export const SessionAuthProvider: React.FC<SessionAuthProviderProps> = ({ childr
 
   const logout = async (): Promise<void> => {
     try {
-      console.log('🔐 Logging out...');
       await centralizedAuthService.logout();
     } catch (error) {
-      console.error('❌ Logout error:', error);
+      // Silent error handling - user is logged out locally regardless
     } finally {
       setUser(null);
       setIsAuthenticated(false);

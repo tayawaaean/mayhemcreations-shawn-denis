@@ -84,12 +84,6 @@ export const calculateShippingRates = async (
   address: ShippingAddress,
   items: CartItem[]
 ): Promise<ShippingRatesResponse> => {
-    console.log('🌐 shippingApiService: calculateShippingRates called')
-  console.log('📍 API_BASE_URL:', API_BASE_URL)
-  console.log('📍 Full URL:', `${API_BASE_URL}/shipping/shipengine/rates`)
-  console.log('📍 Address:', address)
-  console.log('📦 Items:', items)
-  
   try {
     const requestBody = {
       address: {
@@ -115,8 +109,6 @@ export const calculateShippingRates = async (
       })),
     }
     
-    console.log('📤 Request body:', JSON.stringify(requestBody, null, 2))
-    
     const response = await axios.post(
       `${API_BASE_URL}/shipping/shipengine/rates`,
       requestBody,
@@ -127,28 +119,13 @@ export const calculateShippingRates = async (
         },
       }
     );
-
-    console.log('✅ API Response Status:', response.status)
-    console.log('✅ API Response Data:', response.data)
     
     return response.data;
   } catch (error: any) {
-    console.error('❌❌❌ SHIPPING API ERROR - FULL DETAILS ❌❌❌');
-    console.error('Error type:', typeof error);
-    console.error('Error name:', error?.name);
-    console.error('Error message:', error?.message);
-    console.error('Error code:', error?.code);
-    console.error('Has response:', !!error?.response);
-    
     let errorMessage = 'Failed to calculate shipping rates. Please try again.';
     let errorDetails = null;
     
     if (error?.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response statusText:', error.response.statusText);
-      console.error('Response data:', error.response.data);
-      console.error('Response headers:', error.response.headers);
-      
       // Extract error message from response
       const responseData = error.response.data;
       
@@ -169,17 +146,7 @@ export const calculateShippingRates = async (
     
     if (error?.request && !error?.response) {
       errorMessage = 'Cannot connect to shipping service. Please check your internet connection.';
-      console.error('Request was made but no response:', error.request);
     }
-    
-    console.error('Error config:', {
-      url: error?.config?.url,
-      method: error?.config?.method,
-      baseURL: error?.config?.baseURL,
-      headers: error?.config?.headers
-    });
-    
-    console.error('❌ THROWING ERROR TO CALLER - NO FALLBACK RATES');
     
     // Throw error instead of returning fallback rates
     throw {

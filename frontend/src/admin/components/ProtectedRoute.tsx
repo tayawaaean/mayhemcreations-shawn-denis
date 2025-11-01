@@ -21,16 +21,10 @@ export default function ProtectedRoute({
   // Simple validation - just check if we have a user
   useEffect(() => {
     const validateSession = async () => {
-      console.log('🔐 ProtectedRoute: Checking auth state...')
       setIsValidating(true)
       
       // Simple check - if we have a user in state, we're good
       // Let axios interceptor handle token refresh automatically
-      if (isLoggedIn && user) {
-        console.log('🔐 ProtectedRoute: User authenticated, access granted')
-      } else {
-        console.log('🔐 ProtectedRoute: No user, will redirect to login')
-      }
       
       setIsValidating(false)
     }
@@ -54,18 +48,15 @@ export default function ProtectedRoute({
 
   // Only redirect if we're sure the user is not authenticated
   if (!isLoggedIn || !user) {
-    console.log('🔐 ProtectedRoute: User not authenticated, redirecting to:', fallbackPath)
     return <Navigate to={fallbackPath} state={{ from: location }} replace />
   }
 
   // Check role-based access
   if (requiredRole && user.role !== requiredRole) {
-    console.log('🔐 ProtectedRoute: Role mismatch, redirecting to appropriate dashboard')
     // Redirect to appropriate dashboard based on user role
     const redirectPath = user.role === 'admin' ? '/admin' : '/seller'
     return <Navigate to={redirectPath} replace />
   }
 
-  console.log('🔐 ProtectedRoute: Access granted for user:', user.role)
   return <>{children}</>
 }

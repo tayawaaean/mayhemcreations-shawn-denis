@@ -8,6 +8,10 @@ export interface Toast {
   title?: string
   message: string
   durationMs?: number
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 interface ToastContextValue {
@@ -20,22 +24,47 @@ const ToastContext = createContext<ToastContextValue | undefined>(undefined)
 
 export const useToast = (): ToastContextValue => {
   const ctx = useContext(ToastContext)
-  if (!ctx) throw new Error('useToast must be used within a ToastProvider')
-  return ctx
+  if (ctx) return ctx
+  // Fallback: allow usage outside provider by delegating to global bridge if available
+  const fallbackShow: ToastContextValue['showToast'] = (toast) => {
+    const global = (window as any)
+    if (global && typeof global.__toast === 'function') {
+      global.__toast(toast)
+    }
+  }
+  const noop = () => {}
+  return {
+    toasts: [],
+    showToast: fallbackShow,
+    removeToast: noop,
+  }
 }
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
+  // Cooldown map to de-duplicate repetitive toasts
+  const cooldownRef = React.useRef<Map<string, number>>(new Map())
+  const COOLDOWN_MS = 8000
+  const MAX_TOASTS = 3
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-    const durationMs = toast.durationMs ?? 5000
+    const key = `${toast.type}:${toast.title ?? ''}:${toast.message}`
+    const now = Date.now()
+    const last = cooldownRef.current.get(key) ?? 0
+    if (now - last < COOLDOWN_MS) return
+    cooldownRef.current.set(key, now)
+
+    const id = `toast_${now}_${Math.random().toString(36).slice(2, 9)}`
+    const durationMs = toast.durationMs ?? 4000
     const next: Toast = { id, ...toast, durationMs }
-    setToasts(prev => [next, ...prev])
+    setToasts(prev => {
+      const trimmed = prev.slice(0, MAX_TOASTS - 1)
+      return [next, ...trimmed]
+    })
     if (durationMs > 0) {
       setTimeout(() => removeToast(id), durationMs)
     }
@@ -63,12 +92,25 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           >
             {t.title && <div className="font-medium mb-0.5">{t.title}</div>}
             <div>{t.message}</div>
-            <button
-              onClick={() => removeToast(t.id)}
-              className="mt-2 text-xs underline opacity-70 hover:opacity-100"
-            >
-              Dismiss
-            </button>
+            <div className="mt-2 flex gap-2">
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action!.onClick()
+                    removeToast(t.id)
+                  }}
+                  className="text-xs font-medium px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  {t.action.label}
+                </button>
+              )}
+              <button
+                onClick={() => removeToast(t.id)}
+                className="text-xs underline opacity-70 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         ))}
       </div>

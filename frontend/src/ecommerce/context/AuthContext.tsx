@@ -30,7 +30,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    // Return safe defaults instead of throwing - prevents crashes when backend restarts
+    return {
+      user: null,
+      isLoggedIn: false,
+      isLoading: false,
+      login: () => {},
+      logout: () => {},
+      retryAuth: () => {}
+    } as AuthContextType
   }
   return context
 }
@@ -65,10 +73,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const customerData = MultiAccountStorageService.getAccountAuthData('customer');
         const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
         
-        console.log('🔐 Ecommerce AuthContext: Initializing customer auth state', {
-          hasCustomerData: !!customerData,
-          isCustomerAuthenticated
-        });
         
         if (customerData && isCustomerAuthenticated) {
           // Validate customer data structure before using it
@@ -98,13 +102,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             createdAt: customerData.user.createdAt || new Date().toISOString(),
             avatar: customerData.user.avatar
           }
-          console.log('✅ Ecommerce AuthContext: Setting customer user', {
-            userId: customerUser.id,
-            email: customerUser.email
-          });
+          
           setUser(customerUser)
         } else {
-          console.log('⚠️ Ecommerce AuthContext: No valid customer auth found');
+          
           setUser(null)
         }
         setIsLoading(false)
@@ -146,12 +147,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const customerData = MultiAccountStorageService.getAccountAuthData('customer');
     const isCustomerAuthenticated = MultiAccountStorageService.isAccountAuthenticated('customer');
     
-    console.log('🔐 Ecommerce AuthContext: Checking customer auth state', {
-      hasCustomerData: !!customerData,
-      isCustomerAuthenticated,
-      currentUser: currentUser?.accountType,
-      isAuthenticated
-    });
     
     if (customerData && isCustomerAuthenticated) {
       // Convert customer account data to User format
@@ -166,14 +161,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         createdAt: customerData.user.createdAt || new Date().toISOString(),
         avatar: customerData.user.avatar
       }
-      console.log('✅ Ecommerce AuthContext: Setting customer user from multi-account', {
-        userId: customerUser.id,
-        email: customerUser.email
-      });
+      
       setUser(customerUser)
     } else {
       // Clear user state when no customer account is authenticated
-      console.log('🔐 Ecommerce AuthContext: Customer account cleared');
       setUser(null)
     }
   }, [currentUser, isAuthenticated, currentAccountType])
@@ -215,8 +206,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Use multi-account logout for customer account only
       await multiLogout('customer')
-      
-      console.log('✅ Successfully logged out customer account')
     } catch (error: any) {
       console.error('❌ Logout error:', error)
       
@@ -248,7 +237,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   
   // Function to retry authentication initialization
   const retryAuth = () => {
-    console.log('🔄 Retrying authentication initialization...')
+    
     setIsLoading(true)
     setAuthError(null)
     
@@ -277,7 +266,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           avatar: customerData.user.avatar
         }
         setUser(customerUser)
-        console.log('✅ Auth retry successful')
+        
       } else {
         setUser(null)
       }

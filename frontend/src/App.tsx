@@ -37,13 +37,13 @@ import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
-    <MultiAccountProvider>
-      <AuthProvider>
-        <AlertModalProvider>
-          <CartProvider>
-            <RealTimeChatProvider>
-              <CustomizationProvider>
-                <ToastProvider>
+    <ToastProvider>
+      <MultiAccountProvider>
+        <AuthProvider>
+          <AlertModalProvider>
+            <CartProvider>
+              <RealTimeChatProvider>
+                <CustomizationProvider>
               <Routes>
             {/* Employee Login Route */}
             <Route path="/employee-login" element={<EmployeeApp />} />
@@ -162,12 +162,12 @@ export default function App() {
                     {/* 404 - Catch all route */}
                     <Route path="*" element={<NotFound />} />
             </Routes>
-                </ToastProvider>
-              </CustomizationProvider>
-            </RealTimeChatProvider>
-          </CartProvider>
-        </AlertModalProvider>
-      </AuthProvider>
-    </MultiAccountProvider>
+                </CustomizationProvider>
+              </RealTimeChatProvider>
+            </CartProvider>
+          </AlertModalProvider>
+        </AuthProvider>
+      </MultiAccountProvider>
+    </ToastProvider>
   )
 }

@@ -82,7 +82,7 @@ class CentralizedAuthService {
         isLoading: false,
         lastChecked: Date.now()
       };
-      console.log('🔐 Initialized auth state from multi-account storage:', this.authState.user);
+      
       this.notifyListeners(); // Notify listeners of the state change
     } else {
       this.clearAuthState();
@@ -121,18 +121,15 @@ class CentralizedAuthService {
    * This is the single source of truth for authentication validity
    */
   public async validateSession(): Promise<boolean> {
-    console.log('🔐 validateSession called, current state:', this.authState);
     
     // Prevent multiple simultaneous validations
     if (this.authState.isLoading) {
-      console.log('🔐 validateSession: Already loading, returning current state');
       return this.authState.isAuthenticated;
     }
 
     // Rate limiting - don't validate more than once every 30 seconds
     const timeSinceLastCheck = Date.now() - (this.authState.lastChecked || 0);
     if (timeSinceLastCheck < 30000) {
-      console.log('🔐 validateSession: Rate limited - checked recently, returning current state');
       return this.authState.isAuthenticated;
     }
 
@@ -140,15 +137,11 @@ class CentralizedAuthService {
     const currentAccount = MultiAccountStorageService.getCurrentAccountData();
     const isStoredAuthenticated = MultiAccountStorageService.isCurrentAccountAuthenticated();
     
-    console.log('🔐 validateSession: multi-account storage check:', {
-      hasCurrentAccount: !!currentAccount,
-      isStoredAuthenticated,
-      currentAuthState: this.authState
-    });
+    
 
     // If no stored data, not authenticated
     if (!currentAccount || !isStoredAuthenticated) {
-      console.log('🔐 validateSession: No valid stored data, not authenticated');
+      
       return false;
     }
 
@@ -157,18 +150,18 @@ class CentralizedAuthService {
     
     // If we have stored data but no current auth state, initialize it
     if (!this.authState.user && currentAccount.user) {
-      console.log('🔐 validateSession: Initializing auth state from multi-account storage');
+      
       this.initializeFromAccount(currentAccount);
       // After initialization, check if we're now authenticated
       if (this.authState.isAuthenticated) {
-        console.log('🔐 validateSession: Successfully initialized from multi-account storage');
+        
         return true;
       }
     }
 
     // Simple validation - just check if we have valid data
     // Let axios interceptor handle token refresh automatically
-    console.log('🔐 validateSession: Using stored data, letting axios handle refresh');
+    
     this.updateAuthState(currentAccount.user);
     return true;
   }
@@ -177,7 +170,7 @@ class CentralizedAuthService {
    * Refresh authentication (session-based - no token refresh needed)
    */
   private async refreshToken(): Promise<boolean> {
-    console.log('🔄 CentralizedAuthService: Session-based auth - no token refresh needed');
+    
     // For session-based auth, the session is automatically maintained by cookies
     // No token refresh is needed
     return true;
@@ -218,7 +211,7 @@ class CentralizedAuthService {
    * Only clears the in-memory auth state
    */
   private clearAuthState(): void {
-    console.log('🧹 Clearing authentication state');
+    
     this.authState = {
       user: null,
       isAuthenticated: false,
@@ -239,12 +232,11 @@ class CentralizedAuthService {
   public async login(email: string, password: string): Promise<boolean> {
     try {
       this.setLoading(true);
-      console.log('🔐 Attempting login...');
       
       const response = await apiClient.post('/auth/login', { email, password });
 
       if (response.data.success && response.data.data) {
-        console.log('✅ Login successful');
+        
         
         // Determine account type based on role
         const userRole = response.data.data.user.role?.name || response.data.data.user.role;
@@ -282,7 +274,6 @@ class CentralizedAuthService {
         
         return true;
       } else {
-        console.log('❌ Login failed:', response.data.message);
         this.clearAuthState();
         return false;
       }
@@ -298,7 +289,7 @@ class CentralizedAuthService {
    */
   public async logout(): Promise<void> {
     try {
-      console.log('🔐 Logging out from current account...');
+      
       
       // Log logout before clearing data
       if (this.authState.user) {
@@ -313,7 +304,7 @@ class CentralizedAuthService {
       try {
         await apiClient.post('/auth/logout');
       } catch (error) {
-        console.warn('Backend logout failed, but continuing with local cleanup:', error);
+        
       }
       
       // Logout from current account in multi-account storage
@@ -347,7 +338,6 @@ class CentralizedAuthService {
    * Force refresh of authentication state
    */
   public async forceRefresh(): Promise<boolean> {
-    console.log('🔄 Force refreshing authentication state...');
     return await this.validateSession();
   }
 }

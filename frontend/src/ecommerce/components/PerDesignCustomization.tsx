@@ -25,14 +25,11 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
 
   // Ensure activeDesignId is valid when component mounts or designs change
   React.useEffect(() => {
-    console.log('🎨 PerDesignCustomization mounted with', customizationData.designs.length, 'designs')
-    
     if (customizationData.designs.length > 0) {
       // If no active design or current active design is not in the list, select the first one
       const isActiveDesignValid = activeDesignId && customizationData.designs.some(d => d.id === activeDesignId)
       
       if (!isActiveDesignValid) {
-        console.log('⚠️ Active design ID is invalid, setting to first design:', customizationData.designs[0].id)
         setActiveDesignId(customizationData.designs[0].id)
       }
     } else {

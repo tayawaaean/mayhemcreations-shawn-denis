@@ -234,14 +234,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
         if (response.success && response.data) {
           const { userData, sessionId } = extractUserData(response);
           
-          console.log('🔐 Customer login successful, storing auth data...', {
-            sessionId: sessionId,
-            userId: userData.id,
-            email: userData.email,
-            role: userData.role,
-            fullResponse: response.data
-          });
-
           // Store auth data using multi-account storage
           // Note: For session-based auth, we only need sessionId
           // The actual authentication is handled by cookies
@@ -447,10 +439,6 @@ export default function AuthModal({ isOpen, onClose, mode, onModeChange, onSucce
       const response = await customerApiService.login(customer.email, customer.password, 'customer')
 
       if (response.success) {
-        console.log('🔍 Demo login response structure:', response);
-        console.log('🔍 Response.data structure:', response.data);
-        console.log('🔍 User data:', response.data?.user);
-        console.log('🔍 Session ID:', response.data?.sessionId);
         // Store auth data using multi-account storage
         if (response.data) {
           const { userData, sessionId } = extractUserData(response);

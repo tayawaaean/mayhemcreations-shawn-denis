@@ -55,7 +55,6 @@ export class MaterialPricingService {
           wasteFactor: typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) : material.wasteFactor
         }))
         this.setMaterials(materials)
-        console.log('Materials loaded from API:', materials)
       } else {
         console.warn('Failed to load materials from API or no data received, using default values')
         // Keep using the hardcoded default values
@@ -86,9 +85,6 @@ export class MaterialPricingService {
         { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
       ]
     } else {
-      console.log('Using loaded materials from API:', this.materials.length, 'materials')
-      console.log('First material from API:', this.materials[0])
-      
       // Check if the first material has valid width and length for area calculation
       const firstMaterial = this.materials[0]
       const width = typeof firstMaterial.width === 'string' ? parseFloat(firstMaterial.width) : firstMaterial.width
@@ -106,20 +102,6 @@ export class MaterialPricingService {
         ]
       }
     }
-    
-    console.log('Material cost calculation debug:', {
-      patchWidth,
-      patchHeight,
-      patchArea,
-      materialsCount: this.materials.length,
-      materials: this.materials.map(m => ({
-        name: m.name,
-        cost: m.cost,
-        width: m.width,
-        length: m.length,
-        wasteFactor: m.wasteFactor
-      }))
-    })
 
     // Helper function to calculate area-based cost for materials with width > 0
     const calculateAreaBasedCost = (material: MaterialCost) => {
@@ -128,27 +110,12 @@ export class MaterialPricingService {
       const cost = typeof material.cost === 'string' ? parseFloat(material.cost) : material.cost
       const wasteFactor = typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) : material.wasteFactor
       
-      console.log(`Area calculation for ${material.name}:`, {
-        width,
-        length,
-        cost,
-        wasteFactor,
-        patchArea,
-        widthValid: width > 0,
-        lengthValid: length > 0
-      })
-      
       if (width > 0 && length > 0) {
         // Calculate cost per square inch from the material sheet, then multiply by patch area
         const costPerSqIn = cost / (width * length)
         const result = patchArea * costPerSqIn * wasteFactor
-        console.log(`Area calculation result for ${material.name}:`, {
-          costPerSqIn,
-          result
-        })
         return result
       }
-      console.log(`Area calculation returning 0 for ${material.name} (width: ${width}, length: ${length})`)
       return 0
     }
 
@@ -175,25 +142,9 @@ export class MaterialPricingService {
 
     // Fabric Cost = Area-based calculation (width > 0)
     const fabricCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[0]))
-    console.log('Fabric calculation:', {
-      material: this.materials[0],
-      hasMaterial: !!this.materials[0],
-      costPerSqIn: this.materials[0] ? (typeof this.materials[0].cost === 'string' ? parseFloat(this.materials[0].cost) : this.materials[0].cost) / 
-                   ((typeof this.materials[0].width === 'string' ? parseFloat(this.materials[0].width) : this.materials[0].width) * 
-                    (typeof this.materials[0].length === 'string' ? parseFloat(this.materials[0].length) : this.materials[0].length)) : 'N/A',
-      result: fabricCost
-    })
 
     // Patch Attach Cost = Area-based calculation (width > 0)
     const patchAttachCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[1]))
-    console.log('Patch Attach calculation:', {
-      material: this.materials[1],
-      hasMaterial: !!this.materials[1],
-      costPerSqIn: this.materials[1] ? (typeof this.materials[1].cost === 'string' ? parseFloat(this.materials[1].cost) : this.materials[1].cost) / 
-                   ((typeof this.materials[1].width === 'string' ? parseFloat(this.materials[1].width) : this.materials[1].width) * 
-                    (typeof this.materials[1].length === 'string' ? parseFloat(this.materials[1].length) : this.materials[1].length)) : 'N/A',
-      result: patchAttachCost
-    })
 
     // Thread Cost = Length-based calculation (width = 0)
     const threadCost = this.roundToTwoDecimals(calculateLengthBasedCost(this.materials[2]))
@@ -203,25 +154,9 @@ export class MaterialPricingService {
 
     // Cut-Away Stabilizer Cost = Area-based calculation (width > 0)
     const cutAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[4]))
-    console.log('Cut-Away Stabilizer calculation:', {
-      material: this.materials[4],
-      hasMaterial: !!this.materials[4],
-      costPerSqIn: this.materials[4] ? (typeof this.materials[4].cost === 'string' ? parseFloat(this.materials[4].cost) : this.materials[4].cost) / 
-                   ((typeof this.materials[4].width === 'string' ? parseFloat(this.materials[4].width) : this.materials[4].width) * 
-                    (typeof this.materials[4].length === 'string' ? parseFloat(this.materials[4].length) : this.materials[4].length)) : 'N/A',
-      result: cutAwayStabilizerCost
-    })
 
     // Wash-Away Stabilizer Cost = Area-based calculation (width > 0)
     const washAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[5]))
-    console.log('Wash-Away Stabilizer calculation:', {
-      material: this.materials[5],
-      hasMaterial: !!this.materials[5],
-      costPerSqIn: this.materials[5] ? (typeof this.materials[5].cost === 'string' ? parseFloat(this.materials[5].cost) : this.materials[5].cost) / 
-                   ((typeof this.materials[5].width === 'string' ? parseFloat(this.materials[5].width) : this.materials[5].width) * 
-                    (typeof this.materials[5].length === 'string' ? parseFloat(this.materials[5].length) : this.materials[5].length)) : 'N/A',
-      result: washAwayStabilizerCost
-    })
 
     const totalCost = this.roundToTwoDecimals(
       fabricCost + 

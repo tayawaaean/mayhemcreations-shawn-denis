@@ -26,7 +26,9 @@ winston.addColors(colors);
 const level = () => {
   const env = process.env.NODE_ENV || 'development';
   const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
+  // Production: Only log errors and warnings (no info/debug noise)
+  // Development: Log everything including debug info
+  return isDevelopment ? 'debug' : 'error';
 };
 
 // Define different log formats

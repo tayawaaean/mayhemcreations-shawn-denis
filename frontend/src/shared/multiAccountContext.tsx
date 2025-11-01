@@ -137,12 +137,6 @@ export const MultiAccountProvider: React.FC<MultiAccountProviderProps> = ({ chil
         }
       };
 
-      console.log('🔍 MultiAccountContext login:', {
-        accountType,
-        sessionId: authData.session.sessionId,
-        hasExistingSessionId: !!existingData?.session?.sessionId
-      });
-
       MultiAccountStorageService.storeAccountAuthData(accountType, authData);
       
       // Update current user
@@ -152,8 +146,6 @@ export const MultiAccountProvider: React.FC<MultiAccountProviderProps> = ({ chil
       
       // Update available accounts
       updateAvailableAccounts();
-      
-      console.log(`✅ Logged in as ${accountType}: ${userData.email}`);
     } catch (error) {
       console.error('Error during login:', error);
     }

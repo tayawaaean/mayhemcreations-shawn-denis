@@ -13,12 +13,12 @@ export const useWebSocket = () => {
   useEffect(() => {
     const handleConnect = () => {
       setIsConnected(true);
-      showToast({ type: 'success', title: 'Connected', message: 'Realtime connection established', durationMs: 2500 });
+      // Silent success; avoid noisy global toasts
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
-      showToast({ type: 'warning', title: 'Disconnected', message: 'Realtime connection lost. Reconnecting…', durationMs: 3000 });
+      // Silent disconnect; UI components can reflect status locally
     };
 
     const handleConnectError = () => {

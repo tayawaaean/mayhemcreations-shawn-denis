@@ -34,6 +34,7 @@ import labelRoute from './routes/labelRoute';
 import contactRoute from './routes/contactRoute';
 import webhookRoute from './routes/webhookRoute';
 import { cleanIndexes } from './controllers/indexCleanupController';
+import { getPublicOriginAddress } from './controllers/addressController';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
@@ -174,6 +175,9 @@ app.use('/api/v1/shipments', require('./routes/shipmentRoute').default);
 app.use('/api/v1/refunds', refundRoute);
 app.use('/api/v1/labels', labelRoute);
 app.use('/api/v1/contact', contactRoute);
+
+// Public address endpoint (no authentication required)
+app.get('/api/v1/addresses/public/origin', getPublicOriginAddress);
 
 // Webhook routes (no authentication required)
 app.use('/api/v1/webhooks', webhookRoute);
