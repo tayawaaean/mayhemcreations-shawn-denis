@@ -12,7 +12,7 @@ async function migrateCartProductId() {
     const [results] = await sequelize.query(`
       SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT 
       FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = 'mayhem_creations' 
+      WHERE TABLE_SCHEMA = 'mayhem_creation' 
       AND TABLE_NAME = 'carts' 
       AND COLUMN_NAME = 'product_id'
     `);

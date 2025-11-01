@@ -6,6 +6,7 @@ import ProductSlideshow from '../components/ProductSlideshow'
 import { productApiService, Product } from '../../shared/productApiService'
 import { getAllProductImages } from '../../shared/imageUtils'
 import { productReviewApiService, ProductReview, ReviewStats } from '../../shared/productReviewApiService'
+import SEO from '../../components/SEO'
 
 // Placeholder for review images that fail to load
 const REVIEW_IMAGE_PLACEHOLDER = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"%3E%3Crect width="200" height="200" fill="%23f9fafb"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%23d1d5db"%3EImage Unavailable%3C/text%3E%3C/svg%3E'
@@ -171,8 +172,58 @@ export default function ProductPage() {
   // Calculate total stock from variants
   const totalStock = product.variants?.reduce((sum: number, variant: any) => sum + (variant.stock || 0), 0) || 0
 
+  // Build product structured data (JSON-LD) for SEO
+  const productSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.description || `${product.title} - Premium custom embroidery from Mayhem Creations`,
+    image: images.length > 0 ? images[0] : product.image,
+    sku: product.sku,
+    brand: {
+      '@type': 'Brand',
+      name: 'Mayhem Creations'
+    },
+    offers: {
+      '@type': 'Offer',
+      url: `https://mayhemcreation.com/product/${product.id}`,
+      priceCurrency: 'USD',
+      price: typeof product.price === 'string' ? parseFloat(product.price) : product.price,
+      availability: totalStock > 0 
+        ? 'https://schema.org/InStock' 
+        : 'https://schema.org/OutOfStock',
+      itemCondition: 'https://schema.org/NewCondition'
+    },
+    aggregateRating: reviewStats && reviewStats.totalReviews > 0 ? {
+      '@type': 'AggregateRating',
+      ratingValue: reviewStats.averageRating,
+      reviewCount: reviewStats.totalReviews
+    } : undefined
+  }
+
+  // Remove undefined aggregateRating if no reviews
+  if (!productSchema.aggregateRating) {
+    delete productSchema.aggregateRating
+  }
+
+  // Build SEO meta data
+  const productTitle = `${product.title} - Mayhem Creations`
+  const productDescription = product.description || 
+    `${product.title} from Mayhem Creations. Premium custom embroidery services and high-quality apparel.${totalStock > 0 ? ' In stock now.' : ''}`
+  const productImage = images.length > 0 ? images[0] : product.image
+  const productUrl = `/product/${product.id}` // Using ID for now, will update to slug later
+
   return (
     <main className="min-h-screen bg-gray-50">
+      <SEO
+        title={productTitle}
+        description={productDescription}
+        image={productImage}
+        url={productUrl}
+        type="product"
+        structuredData={productSchema}
+        canonicalUrl={productUrl}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <div className="mb-6">

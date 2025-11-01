@@ -6,7 +6,7 @@ const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creations <noreply@mayhemcreation.com>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creation <noreply@mayhemcreation.com>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Create nodemailer transporter
@@ -62,7 +62,7 @@ export class EmailService {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Email Verification - Mayhem Creations</title>
+          <title>Email Verification - Mayhem Creation</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -123,13 +123,13 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">🎨 Mayhem Creations</div>
-              <h1>Welcome to Mayhem Creations!</h1>
+              <div class="logo">🎨 Mayhem Creation</div>
+              <h1>Welcome to Mayhem Creation!</h1>
             </div>
             
             <p>Hi ${firstName},</p>
             
-            <p>Thank you for registering with Mayhem Creations! We're excited to have you join our community of creative individuals.</p>
+            <p>Thank you for registering with Mayhem Creation! We're excited to have you join our community of creative individuals.</p>
             
             <p>To complete your registration and start customizing amazing products, please verify your email address by clicking the button below:</p>
             
@@ -154,10 +154,10 @@ export class EmailService {
               <li>Access exclusive member benefits</li>
             </ul>
             
-            <p>If you didn't create an account with Mayhem Creations, please ignore this email.</p>
+            <p>If you didn't create an account with Mayhem Creation, please ignore this email.</p>
             
             <div class="footer">
-              <p>Best regards,<br>The Mayhem Creations Team</p>
+              <p>Best regards,<br>The Mayhem Creation Team</p>
               <p>This is an automated message. Please do not reply to this email.</p>
             </div>
           </div>
@@ -166,11 +166,11 @@ export class EmailService {
       `;
 
       const text = `
-        Welcome to Mayhem Creations!
+        Welcome to Mayhem Creation!
         
         Hi ${firstName},
         
-        Thank you for registering with Mayhem Creations! We're excited to have you join our community.
+        Thank you for registering with Mayhem Creation! We're excited to have you join our community.
         
         To complete your registration, please verify your email address by visiting this link:
         ${verificationUrl}
@@ -179,15 +179,15 @@ export class EmailService {
         
         Once verified, you'll be able to browse our products, create custom designs, and place orders.
         
-        If you didn't create an account with Mayhem Creations, please ignore this email.
+        If you didn't create an account with Mayhem Creation, please ignore this email.
         
         Best regards,
-        The Mayhem Creations Team
+        The Mayhem Creation Team
       `;
 
       const mailOptions: EmailOptions = {
         to: email,
-        subject: '🎨 Verify Your Email - Mayhem Creations',
+        subject: '🎨 Verify Your Email - Mayhem Creation',
         html,
         text,
       };
@@ -218,7 +218,7 @@ export class EmailService {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Password Reset - Mayhem Creations</title>
+          <title>Password Reset - Mayhem Creation</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -279,13 +279,13 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">🎨 Mayhem Creations</div>
+              <div class="logo">🎨 Mayhem Creation</div>
               <h1>Password Reset Request</h1>
             </div>
             
             <p>Hi ${firstName},</p>
             
-            <p>We received a request to reset your password for your Mayhem Creations account.</p>
+            <p>We received a request to reset your password for your Mayhem Creation account.</p>
             
             <p>To reset your password, please click the button below:</p>
             
@@ -305,7 +305,7 @@ export class EmailService {
             <p>If you didn't request a password reset, please ignore this email. Your password will remain unchanged.</p>
             
             <div class="footer">
-              <p>Best regards,<br>The Mayhem Creations Team</p>
+              <p>Best regards,<br>The Mayhem Creation Team</p>
               <p>This is an automated message. Please do not reply to this email.</p>
             </div>
           </div>
@@ -314,11 +314,11 @@ export class EmailService {
       `;
 
       const text = `
-        Password Reset Request - Mayhem Creations
+        Password Reset Request - Mayhem Creation
         
         Hi ${firstName},
         
-        We received a request to reset your password for your Mayhem Creations account.
+        We received a request to reset your password for your Mayhem Creation account.
         
         To reset your password, please visit this link:
         ${resetUrl}
@@ -328,12 +328,12 @@ export class EmailService {
         If you didn't request a password reset, please ignore this email.
         
         Best regards,
-        The Mayhem Creations Team
+        The Mayhem Creation Team
       `;
 
       const mailOptions: EmailOptions = {
         to: email,
-        subject: '🔐 Password Reset - Mayhem Creations',
+        subject: '🔐 Password Reset - Mayhem Creation',
         html,
         text,
       };
@@ -365,7 +365,7 @@ export class EmailService {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to Mayhem Creations!</title>
+          <title>Welcome to Mayhem Creation!</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -424,8 +424,8 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">🎨 Mayhem Creations</div>
-              <h1>Welcome to Mayhem Creations!</h1>
+              <div class="logo">🎨 Mayhem Creation</div>
+              <h1>Welcome to Mayhem Creation!</h1>
             </div>
             
             <p>Hi ${firstName},</p>
@@ -463,7 +463,7 @@ export class EmailService {
             <p>If you have any questions or need help getting started, don't hesitate to reach out to our support team.</p>
             
             <div class="footer">
-              <p>Happy creating!<br>The Mayhem Creations Team</p>
+              <p>Happy creating!<br>The Mayhem Creation Team</p>
               <p>This is an automated message. Please do not reply to this email.</p>
             </div>
           </div>
@@ -472,7 +472,7 @@ export class EmailService {
       `;
 
       const text = `
-        Welcome to Mayhem Creations!
+        Welcome to Mayhem Creation!
         
         Hi ${firstName},
         
@@ -491,12 +491,12 @@ export class EmailService {
         If you have any questions, don't hesitate to reach out to our support team.
         
         Happy creating!
-        The Mayhem Creations Team
+        The Mayhem Creation Team
       `;
 
       const mailOptions: EmailOptions = {
         to: email,
-        subject: '🎉 Welcome to Mayhem Creations!',
+        subject: '🎉 Welcome to Mayhem Creation!',
         html,
         text,
       };
@@ -517,7 +517,7 @@ export class EmailService {
     try {
       const testEmail = {
         to: EMAIL_USER,
-        subject: 'Test Email - Mayhem Creations',
+        subject: 'Test Email - Mayhem Creation',
         html: '<h1>Test Email</h1><p>This is a test email to verify the configuration.</p>',
         text: 'Test Email - This is a test email to verify the configuration.',
       };

@@ -1,6 +1,6 @@
-# Mayhem Creations Documentation Index
+# Mayhem Creation Documentation Index
 
-This directory contains all documentation for the Mayhem Creations application, organized by category.
+This directory contains all documentation for the Mayhem Creation application, organized by category.
 
 ## 📚 Documentation Structure
 

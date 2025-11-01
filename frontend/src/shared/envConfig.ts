@@ -76,7 +76,7 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
       })(),
       
       // App Configuration
-      appName: getEnvVar('VITE_REACT_APP_APP_NAME', 'Mayhem Creations'),
+      appName: getEnvVar('VITE_REACT_APP_APP_NAME', 'Mayhem Creation'),
       appDomain: getEnvVar('VITE_REACT_APP_APP_DOMAIN', 'localhost:3002'),
       appEnv: (getEnvVar('VITE_REACT_APP_APP_ENV', 'development') as 'development' | 'production'),
       

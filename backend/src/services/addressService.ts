@@ -52,9 +52,9 @@ export const getOriginAddress = async (): Promise<ShipEngineAddress> => {
   // Fallback to hardcoded address
   logger.warn('Using fallback origin address - no default address configured');
   return {
-    name: 'Mayhem Creations',
+    name: 'Mayhem Creation',
     phone: '614-715-4742',
-    company_name: 'Mayhem Creations',
+    company_name: 'Mayhem Creation',
     address_line1: '128 Persimmon Dr',
     city_locality: 'Newark',
     state_province: 'OH',

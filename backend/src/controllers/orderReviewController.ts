@@ -81,9 +81,93 @@ export const createOrderReviewsTable = async (req: Request, res: Response, next:
 };
 
 /**
- * Submit order for admin review
- * @route POST /api/v1/orders/submit-for-review
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/orders/submit-for-review:
+ *   post:
+ *     tags: [Orders]
+ *     summary: Submit order for admin review
+ *     description: Submits a custom order with items for admin review before processing. Customer can include notes and shipping preferences.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - items
+ *               - subtotal
+ *               - shipping
+ *               - tax
+ *               - total
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 description: Order items (cart items or custom items)
+ *                 items:
+ *                   type: object
+ *               subtotal:
+ *                 type: number
+ *                 format: float
+ *                 example: 99.99
+ *               shipping:
+ *                 type: number
+ *                 format: float
+ *                 example: 10.00
+ *               tax:
+ *                 type: number
+ *                 format: float
+ *                 example: 8.00
+ *               total:
+ *                 type: number
+ *                 format: float
+ *                 example: 117.99
+ *               shippingAddress:
+ *                 type: object
+ *                 description: Shipping address
+ *               shippingMethod:
+ *                 type: string
+ *                 example: standard
+ *               customerNotes:
+ *                 type: string
+ *                 description: Additional notes from customer
+ *     responses:
+ *       201:
+ *         description: Order submitted for review successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         status:
+ *                           type: string
+ *                           example: pending
+ *       400:
+ *         description: Invalid order data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const submitForReview = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -291,9 +375,59 @@ export const submitForReview = async (req: AuthenticatedRequest, res: Response, 
 };
 
 /**
- * Get user's submitted orders for review
- * @route GET /api/v1/orders/review-orders
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/orders/review-orders:
+ *   get:
+ *     tags: [Orders]
+ *     summary: Get user's submitted orders for review
+ *     description: Retrieves all orders submitted by the authenticated customer for admin review.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, needs-changes, pending-payment, approved-processing, picture-reply-pending, picture-reply-rejected, picture-reply-approved, ready-for-production, in-production, ready-for-checkout]
+ *         description: Filter by order status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -364,9 +498,70 @@ export const getUserReviewOrders = async (req: AuthenticatedRequest, res: Respon
 };
 
 /**
- * Get all orders for admin review
- * @route GET /api/v1/orders/admin/review-orders
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/orders/admin/review-orders:
+ *   get:
+ *     tags: [Orders, Admin]
+ *     summary: Get all orders for admin review
+ *     description: Retrieves all orders submitted for review. Admin-only endpoint for managing order reviews.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, needs-changes, pending-payment, approved-processing, picture-reply-pending, picture-reply-rejected, picture-reply-approved, ready-for-production, in-production, ready-for-checkout]
+ *         description: Filter by order status
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: integer
+ *         description: Filter by user ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Orders retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -438,9 +633,81 @@ export const getAllReviewOrders = async (req: AuthenticatedRequest, res: Respons
 };
 
 /**
- * Update order review status (Admin only)
- * @route PATCH /api/v1/orders/admin/review-orders/:id
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/orders/admin/review-orders/{id}:
+ *   patch:
+ *     tags: [Orders, Admin]
+ *     summary: Update order review status
+ *     description: Updates the status of an order review. Admin-only endpoint for approving, rejecting, or requesting changes.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order review ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, approved, rejected, needs-changes, pending-payment, approved-processing, picture-reply-pending, picture-reply-rejected, picture-reply-approved, ready-for-production, in-production, ready-for-checkout]
+ *                 example: approved
+ *                 description: New status for the order review
+ *               adminNotes:
+ *                 type: string
+ *                 description: Admin notes or comments
+ *     responses:
+ *       200:
+ *         description: Order review status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       400:
+ *         description: Invalid status or missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Order review not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const updateReviewStatus = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -711,9 +978,80 @@ export const updateReviewStatus = async (req: AuthenticatedRequest, res: Respons
 };
 
 /**
- * Upload picture reply for order review (Admin only)
- * @route POST /api/v1/orders/admin/review-orders/:id/picture-reply
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/orders/admin/review-orders/{id}/picture-reply:
+ *   post:
+ *     tags: [Orders, Admin]
+ *     summary: Upload picture reply for order review
+ *     description: Allows admin to upload picture replies showing the embroidered product for customer review. Admin-only endpoint.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order review ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - pictures
+ *             properties:
+ *               pictures:
+ *                 type: array
+ *                 description: Array of picture URLs or base64 encoded images
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *                 example: ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+ *     responses:
+ *       200:
+ *         description: Picture reply uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       400:
+ *         description: Invalid picture data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Order review not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const uploadPictureReply = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -807,9 +1145,82 @@ export const uploadPictureReply = async (req: AuthenticatedRequest, res: Respons
 };
 
 /**
- * Customer confirm picture replies
- * @route POST /api/v1/orders/review-orders/:id/confirm-pictures
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/orders/review-orders/{id}/confirm-pictures:
+ *   post:
+ *     tags: [Orders]
+ *     summary: Customer confirm picture replies
+ *     description: Allows customer to confirm or request changes to admin's picture replies showing the embroidered product.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order review ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - confirmations
+ *             properties:
+ *               confirmations:
+ *                 type: array
+ *                 description: Array of confirmation objects for each picture
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     pictureIndex:
+ *                       type: integer
+ *                       description: Index of the picture in admin's reply
+ *                     confirmed:
+ *                       type: boolean
+ *                       description: Whether customer confirmed this picture
+ *                     notes:
+ *                       type: string
+ *                       description: Optional notes or change requests
+ *     responses:
+ *       200:
+ *         description: Picture confirmations saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       400:
+ *         description: Invalid confirmation data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Order review not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -964,9 +1375,66 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
 };
 
 /**
- * Get order statistics for dashboard
- * @route GET /api/v1/orders/admin/stats
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/orders/admin/stats:
+ *   get:
+ *     tags: [Orders, Admin]
+ *     summary: Get order statistics for dashboard
+ *     description: Retrieves order statistics and analytics for the admin dashboard. Includes counts by status, totals, and trends.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for statistics range
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for statistics range
+ *     responses:
+ *       200:
+ *         description: Order statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         totalOrders:
+ *                           type: integer
+ *                         ordersByStatus:
+ *                           type: object
+ *                         totalRevenue:
+ *                           type: number
+ *                         averageOrderValue:
+ *                           type: number
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getOrderStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
@@ -1071,9 +1539,56 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
 };
 
 /**
- * Customer confirm order delivery (marks order as delivered)
- * @route POST /api/v1/orders/review-orders/:id/confirm-delivery
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/orders/review-orders/{id}/confirm-delivery:
+ *   post:
+ *     tags: [Orders]
+ *     summary: Customer confirm order delivery
+ *     description: Allows customer to confirm they have received their order, marking it as delivered.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Order review ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Order delivery confirmed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           example: delivered
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Order review not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const confirmOrderDelivery = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {

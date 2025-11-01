@@ -33,20 +33,20 @@ export const seedAddresses = async (): Promise<void> => {
       return;
     }
 
-    // Default origin address (Mayhem Creations warehouse)
+    // Default origin address (Mayhem Creation warehouse)
     await sequelize.query(`
       INSERT INTO addresses (
         name, type, is_default, contact_name, company_name, phone, email,
         address_line1, city, state, postal_code, country, residential_indicator, notes,
         created_at, updated_at
       ) VALUES (
-        'Mayhem Creations Warehouse',
+        'Mayhem Creation Warehouse',
         'origin',
         true,
-        'Mayhem Creations',
-        'Mayhem Creations',
+        'Mayhem Creation',
+        'Mayhem Creation',
         '614-715-4742',
-        'info@mayhemcreations.com',
+        'info@mayhemcreation.com',
         '128 Persimmon Dr',
         'Newark',
         'OH',
@@ -66,13 +66,13 @@ export const seedAddresses = async (): Promise<void> => {
         address_line1, city, state, postal_code, country, residential_indicator, notes,
         created_at, updated_at
       ) VALUES (
-        'Mayhem Creations Returns',
+        'Mayhem Creation Returns',
         'return',
         true,
-        'Mayhem Creations',
-        'Mayhem Creations',
+        'Mayhem Creation',
+        'Mayhem Creation',
         '614-715-4742',
-        'returns@mayhemcreations.com',
+        'returns@mayhemcreation.com',
         '128 Persimmon Dr',
         'Newark',
         'OH',
@@ -96,9 +96,9 @@ export const seedAddresses = async (): Promise<void> => {
         'warehouse',
         false,
         'Warehouse Manager',
-        'Mayhem Creations',
+        'Mayhem Creation',
         '614-715-4743',
-        'warehouse@mayhemcreations.com',
+        'warehouse@mayhemcreation.com',
         '128 Persimmon Dr',
         'Newark',
         'OH',

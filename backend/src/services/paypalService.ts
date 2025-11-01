@@ -193,11 +193,11 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
             }
           }
         },
-        description: data.description || 'Mayhem Creations Order',
+        description: data.description || 'Mayhem Creation Order',
         custom_id: data.metadata?.userId || undefined,
       }],
       application_context: {
-        brand_name: 'Mayhem Creations',
+        brand_name: 'Mayhem Creation',
         landing_page: 'BILLING',
         user_action: 'PAY_NOW',
         shipping_preference: 'SET_PROVIDED_ADDRESS', // Use the address we provide, don't allow changes

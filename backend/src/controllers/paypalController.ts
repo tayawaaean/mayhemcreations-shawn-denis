@@ -56,7 +56,7 @@ interface AuthenticatedRequest extends Request {
  *                 description: Payment currency
  *               description:
  *                 type: string
- *                 example: Mayhem Creations Order
+ *                 example: Mayhem Creation Order
  *                 description: Order description
  *               items:
  *                 type: array
@@ -216,7 +216,7 @@ export const createPayPalOrderHandler = async (
     const orderData: CreatePayPalOrderData = {
       amount,
       currency: currency || 'USD',
-      description: description || 'Mayhem Creations Order',
+      description: description || 'Mayhem Creation Order',
       customerEmail: customerInfo?.email || req.user?.email,
       customerName: customerInfo?.name || `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim(),
       customerPhone: customerInfo?.phone || metadata?.phone,

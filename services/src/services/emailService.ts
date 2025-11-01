@@ -25,7 +25,7 @@ export class EmailService {
   async sendEmail(notification: EmailNotification): Promise<boolean> {
     try {
       const result = await this.transporter.sendMail({
-        from: `"${process.env.ADMIN_NAME || 'Mayhem Creations'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.ADMIN_NAME || 'Mayhem Creation'}" <${process.env.SMTP_USER}>`,
         to: notification.to,
         subject: notification.subject,
         html: notification.html,
@@ -61,7 +61,7 @@ export class EmailService {
       timestamp: new Date().toISOString(),
       isGuest,
       adminName: process.env.ADMIN_NAME || 'Admin',
-      companyName: 'Mayhem Creations'
+      companyName: 'Mayhem Creation'
     });
 
     return this.sendEmail({
@@ -75,7 +75,7 @@ export class EmailService {
         timestamp: new Date().toISOString(),
         isGuest,
         adminName: process.env.ADMIN_NAME || 'Admin',
-        companyName: 'Mayhem Creations'
+        companyName: 'Mayhem Creation'
       })
     });
   }
@@ -92,7 +92,7 @@ export class EmailService {
 
     const customerName = this.getCustomerDisplayName(profile);
     
-    const subject = `New Message from Mayhem Creations Support`;
+    const subject = `New Message from Mayhem Creation Support`;
     const html = this.generateCustomerNotificationHTML({
       customerName,
       customerEmail: profile.email,
@@ -100,7 +100,7 @@ export class EmailService {
       timestamp: new Date().toISOString(),
       isGuest: profile.isGuest,
       adminName: process.env.ADMIN_NAME || 'Support Team',
-      companyName: 'Mayhem Creations'
+      companyName: 'Mayhem Creation'
     });
 
     return this.sendEmail({
@@ -114,7 +114,7 @@ export class EmailService {
         timestamp: new Date().toISOString(),
         isGuest: profile.isGuest,
         adminName: process.env.ADMIN_NAME || 'Support Team',
-        companyName: 'Mayhem Creations'
+        companyName: 'Mayhem Creation'
       })
     });
   }
@@ -284,13 +284,13 @@ If you need immediate assistance, please contact us directly.
 
     const customerName = this.getCustomerDisplayName(profile);
     
-    const subject = `Chat Conversation Summary - Mayhem Creations`;
+    const subject = `Chat Conversation Summary - Mayhem Creation`;
     const html = this.generateConversationSummaryHTML({
       customerName,
       customerEmail: profile.email,
       messages,
       isGuest: profile.isGuest,
-      companyName: 'Mayhem Creations'
+      companyName: 'Mayhem Creation'
     });
 
     return this.sendEmail({
@@ -302,7 +302,7 @@ If you need immediate assistance, please contact us directly.
         customerEmail: profile.email,
         messages,
         isGuest: profile.isGuest,
-        companyName: 'Mayhem Creations'
+        companyName: 'Mayhem Creation'
       })
     });
   }
@@ -325,7 +325,7 @@ If you need immediate assistance, please contact us directly.
       lastMessage,
       isGuest,
       adminName: process.env.ADMIN_NAME || 'Admin',
-      companyName: 'Mayhem Creations'
+      companyName: 'Mayhem Creation'
     });
 
     return this.sendEmail({
@@ -339,7 +339,7 @@ If you need immediate assistance, please contact us directly.
         lastMessage,
         isGuest,
         adminName: process.env.ADMIN_NAME || 'Admin',
-        companyName: 'Mayhem Creations'
+        companyName: 'Mayhem Creation'
       })
     });
   }
@@ -360,7 +360,7 @@ If you need immediate assistance, please contact us directly.
       customerEmail,
       isGuest,
       adminName: process.env.ADMIN_NAME || 'Admin',
-      companyName: 'Mayhem Creations'
+      companyName: 'Mayhem Creation'
     });
 
     return this.sendEmail({
@@ -372,7 +372,7 @@ If you need immediate assistance, please contact us directly.
         customerEmail,
         isGuest,
         adminName: process.env.ADMIN_NAME || 'Admin',
-        companyName: 'Mayhem Creations'
+        companyName: 'Mayhem Creation'
       })
     });
   }
@@ -686,7 +686,7 @@ Please respond promptly to maintain good customer service.
     billingAddress?: Address;
     estimatedDeliveryDate?: string;
   }): Promise<boolean> {
-    const subject = `Order Confirmation #${data.orderNumber} - Mayhem Creations`;
+    const subject = `Order Confirmation #${data.orderNumber} - Mayhem Creation`;
     const html = this.generateOrderConfirmationHTML(data);
     const text = this.generateOrderConfirmationText(data);
 
@@ -734,7 +734,7 @@ Please respond promptly to maintain good customer service.
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Order Confirmation - Mayhem Creations</title>
+        <title>Order Confirmation - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -822,8 +822,8 @@ Please respond promptly to maintain good customer service.
           
           <div class="footer">
             <p><strong>Need Help?</strong></p>
-            <p>Contact our support team at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Contact our support team at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -851,7 +851,7 @@ Please respond promptly to maintain good customer service.
     ).join('\n');
 
     return `
-Order Confirmed! - Mayhem Creations
+Order Confirmed! - Mayhem Creation
 
 Thank you for your order, ${data.customerName}!
 
@@ -880,9 +880,9 @@ ${data.estimatedDeliveryDate ? 'Estimated Delivery: ' + new Date(data.estimatedD
 
 View your order status: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
 
-Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -899,7 +899,7 @@ Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     orderItems: OrderItem[];
     shippingAddress: Address;
   }): Promise<boolean> {
-    const subject = `Your Order #${data.orderNumber} Has Shipped! - Mayhem Creations`;
+    const subject = `Your Order #${data.orderNumber} Has Shipped! - Mayhem Creation`;
     const html = this.generateShippingConfirmationHTML(data);
     const text = this.generateShippingConfirmationText(data);
 
@@ -939,7 +939,7 @@ Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your Order Has Shipped - Mayhem Creations</title>
+        <title>Your Order Has Shipped - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -997,8 +997,8 @@ Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
           
           <div class="footer">
             <p><strong>Questions about your order?</strong></p>
-            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1022,7 +1022,7 @@ Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     ).join('\n');
 
     return `
-Your Order Has Shipped! - Mayhem Creations
+Your Order Has Shipped! - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1047,9 +1047,9 @@ ${itemsList}
 
 View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
 
-Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1065,7 +1065,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     deliveryDate: string;
     orderItems: OrderItem[];
   }): Promise<boolean> {
-    const subject = `Your Order #${data.orderNumber} Has Been Delivered! - Mayhem Creations`;
+    const subject = `Your Order #${data.orderNumber} Has Been Delivered! - Mayhem Creation`;
     const html = this.generateDeliveryNotificationHTML(data);
     const text = this.generateDeliveryNotificationText(data);
 
@@ -1093,7 +1093,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Order Delivered - Mayhem Creations</title>
+        <title>Order Delivered - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1118,7 +1118,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
             
             <div class="success-box">
               <h3 style="margin: 0 0 10px 0; color: #4caf50;">🎉 Enjoy Your Purchase!</h3>
-              <p style="margin: 0;">We hope you love your new items from Mayhem Creations</p>
+              <p style="margin: 0;">We hope you love your new items from Mayhem Creation</p>
             </div>
             
             <p>We'd love to hear about your experience! Your feedback helps us improve and assists other customers in making informed decisions.</p>
@@ -1135,9 +1135,9 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
           </div>
           
           <div class="footer">
-            <p><strong>Thank you for choosing Mayhem Creations!</strong></p>
-            <p>Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p><strong>Thank you for choosing Mayhem Creation!</strong></p>
+            <p>Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1156,13 +1156,13 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     orderItems: OrderItem[];
   }): string {
     return `
-Order Delivered Successfully! - Mayhem Creations
+Order Delivered Successfully! - Mayhem Creation
 
 Hi ${data.customerName},
 
 Your order #${data.orderNumber} has been successfully delivered on ${new Date(data.deliveryDate).toLocaleDateString()}.
 
-We hope you love your new items from Mayhem Creations!
+We hope you love your new items from Mayhem Creation!
 
 We'd love to hear about your experience. Your feedback helps us improve and assists other customers.
 
@@ -1171,10 +1171,10 @@ View order: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data
 
 Issues with your order? Contact our support team within 7 days of delivery.
 
-Thank you for choosing Mayhem Creations!
-Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Thank you for choosing Mayhem Creation!
+Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1189,7 +1189,7 @@ Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
     orderId: string | number;
     refundInfo: RefundInfo;
   }): Promise<boolean> {
-    const subject = `Refund Processed for Order #${data.orderNumber} - Mayhem Creations`;
+    const subject = `Refund Processed for Order #${data.orderNumber} - Mayhem Creation`;
     const html = this.generateRefundConfirmationHTML(data);
     const text = this.generateRefundConfirmationText(data);
 
@@ -1226,7 +1226,7 @@ Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Refund Processed - Mayhem Creations</title>
+        <title>Refund Processed - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1277,8 +1277,8 @@ Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
           
           <div class="footer">
             <p><strong>Questions about your refund?</strong></p>
-            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1302,7 +1302,7 @@ Contact us: ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
       : 'Full order refund';
 
     return `
-Refund Processed - Mayhem Creations
+Refund Processed - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1323,9 +1323,9 @@ The refund will appear in your ${data.refundInfo.refundMethod} within 5-10 busin
 
 View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
 
-Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1342,7 +1342,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     refundAmount: number;
     requestedReason: string;
   }): Promise<boolean> {
-    const subject = `Refund Request Update for Order #${data.orderNumber} - Mayhem Creations`;
+    const subject = `Refund Request Update for Order #${data.orderNumber} - Mayhem Creation`;
     const html = this.generateRefundRejectionHTML(data);
     const text = this.generateRefundRejectionText(data);
 
@@ -1371,7 +1371,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Refund Request Update - Mayhem Creations</title>
+        <title>Refund Request Update - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1425,8 +1425,8 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
           
           <div class="footer">
             <p><strong>Questions or concerns?</strong></p>
-            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1446,7 +1446,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     requestedReason: string;
   }): string {
     return `
-Refund Request Update - Mayhem Creations
+Refund Request Update - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1470,9 +1470,9 @@ Our customer support team is here to assist you. Reply to this email or contact 
 
 View your orders: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders
 
-Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1488,7 +1488,7 @@ Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhe
     paymentInfo: PaymentInfo;
     orderTotal: number;
   }): Promise<boolean> {
-    const subject = `Payment Receipt for Order #${data.orderNumber} - Mayhem Creations`;
+    const subject = `Payment Receipt for Order #${data.orderNumber} - Mayhem Creation`;
     const html = this.generatePaymentReceiptHTML(data);
     const text = this.generatePaymentReceiptText(data);
 
@@ -1516,7 +1516,7 @@ Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhe
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Payment Receipt - Mayhem Creations</title>
+        <title>Payment Receipt - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1567,8 +1567,8 @@ Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhe
           
           <div class="footer">
             <p><strong>Questions about your payment?</strong></p>
-            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1587,7 +1587,7 @@ Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhe
     orderTotal: number;
   }): string {
     return `
-Payment Receipt - Mayhem Creations
+Payment Receipt - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1607,9 +1607,9 @@ Keep this receipt for your records. You can also view your order and payment det
 
 View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
 
-Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1625,7 +1625,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     orderItems: OrderItem[];
     reviewUrl?: string;
   }): Promise<boolean> {
-    const subject = `How was your experience? Share your review - Mayhem Creations`;
+    const subject = `How was your experience? Share your review - Mayhem Creation`;
     const html = this.generateReviewRequestHTML(data);
     const text = this.generateReviewRequestText(data);
 
@@ -1663,7 +1663,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Share Your Review - Mayhem Creations</title>
+        <title>Share Your Review - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1707,8 +1707,8 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
           
           <div class="footer">
             <p><strong>Thank you for being a valued customer!</strong></p>
-            <p>Mayhem Creations Team</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p>Mayhem Creation Team</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1731,7 +1731,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.c
     ).join('\n');
 
     return `
-Share Your Experience - Mayhem Creations
+Share Your Experience - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1750,9 +1750,9 @@ As a token of our appreciation, you'll receive a 10% discount code for your next
 Your review takes just 2 minutes and helps us serve you better!
 
 Thank you for being a valued customer!
-Mayhem Creations Team
+Mayhem Creation Team
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -1767,7 +1767,7 @@ Mayhem Creations Team
     newsletterContent: string;
     unsubscribeUrl?: string;
   }): Promise<boolean> {
-    const subject = `${data.newsletterTitle} - Mayhem Creations`;
+    const subject = `${data.newsletterTitle} - Mayhem Creation`;
     const html = this.generateNewsletterHTML(data);
     const text = this.generateNewsletterText(data);
 
@@ -1794,7 +1794,7 @@ Mayhem Creations Team
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${data.newsletterTitle} - Mayhem Creations</title>
+        <title>${data.newsletterTitle} - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1823,8 +1823,8 @@ Mayhem Creations Team
           </div>
           
           <div class="footer">
-            <p><strong>Mayhem Creations</strong></p>
-            <p>© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p><strong>Mayhem Creation</strong></p>
+            <p>© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             ${data.unsubscribeUrl ? `<p style="margin-top: 15px;"><a href="${data.unsubscribeUrl}" style="color: #666; text-decoration: underline;">Unsubscribe from newsletters</a></p>` : ''}
           </div>
         </div>
@@ -1846,7 +1846,7 @@ Mayhem Creations Team
     const textContent = data.newsletterContent.replace(/<[^>]*>/g, '');
     
     return `
-${data.newsletterTitle} - Mayhem Creations
+${data.newsletterTitle} - Mayhem Creation
 
 Hi ${data.recipientName},
 
@@ -1854,7 +1854,7 @@ ${textContent}
 
 Shop now: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/products
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
 ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
     `.trim();
   }
@@ -1871,7 +1871,7 @@ ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
     actionRequired: boolean;
     actionUrl?: string;
   }): Promise<boolean> {
-    const subject = `Account ${data.updateType} - Mayhem Creations`;
+    const subject = `Account ${data.updateType} - Mayhem Creation`;
     const html = this.generateAccountUpdateHTML(data);
     const text = this.generateAccountUpdateText(data);
 
@@ -1899,7 +1899,7 @@ ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Account ${data.updateType} - Mayhem Creations</title>
+        <title>Account ${data.updateType} - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -1939,14 +1939,14 @@ ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
             
             <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #666;">
               <p style="margin: 0;"><strong>🔒 Security Note</strong></p>
-              <p style="margin: 5px 0 0 0;">If you didn't make this change, please contact our support team immediately at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}</p>
+              <p style="margin: 5px 0 0 0;">If you didn't make this change, please contact our support team immediately at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}</p>
             </div>
           </div>
           
           <div class="footer">
-            <p><strong>Mayhem Creations Security Team</strong></p>
+            <p><strong>Mayhem Creation Security Team</strong></p>
             <p>This is an automated security notification.</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -1965,7 +1965,7 @@ ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
     actionUrl?: string;
   }): string {
     return `
-Account ${data.updateType} - Mayhem Creations
+Account ${data.updateType} - Mayhem Creation
 
 Hi ${data.customerName},
 
@@ -1976,12 +1976,12 @@ ${data.actionRequired ? 'ACTION REQUIRED:\nPlease take action to secure your acc
 ${data.actionUrl ? (data.actionRequired ? 'Take action: ' : 'View details: ') + data.actionUrl + '\n' : ''}
 
 SECURITY NOTE:
-If you didn't make this change, please contact our support team immediately at ${process.env.ADMIN_EMAIL || 'support@mayhemcreations.com'}
+If you didn't make this change, please contact our support team immediately at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
-Mayhem Creations Security Team
+Mayhem Creation Security Team
 This is an automated security notification.
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 }

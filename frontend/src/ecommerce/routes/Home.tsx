@@ -5,12 +5,39 @@ import { products } from '../../data/products'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw } from 'lucide-react'
 import Button from '../../components/Button'
+import SEO from '../../components/SEO'
 
 export default function Home() {
   const featured = products.slice(0, 4)
 
+  // Structured data for Organization
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Mayhem Creations',
+    url: 'https://mayhemcreation.com',
+    logo: 'https://mayhemcreation.com/logo.png',
+    description: 'Premium custom embroidery services and high-quality apparel. Create unique designs for your business or personal use.',
+    sameAs: [
+      // Add social media links when available
+    ],
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'Customer Service',
+      email: 'support@mayhemcreation.com'
+    }
+  }
+
   return (
     <main>
+      <SEO
+        title="Mayhem Creations - Premium Custom Embroidery & Apparel"
+        description="Premium custom embroidery services and high-quality apparel. Create unique designs for your business or personal use with professional embroidery services."
+        url="/"
+        type="website"
+        structuredData={organizationSchema}
+        canonicalUrl="/"
+      />
       <Hero />
       
       {/* Featured Products Section */}

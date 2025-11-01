@@ -11,7 +11,7 @@ const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587');
 const EMAIL_USER = process.env.EMAIL_USER || '';
 const EMAIL_PASS = process.env.EMAIL_PASS || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creations <info.mayhem.creation@gmail.com>';
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Mayhem Creation <info.mayhem.creation@gmail.com>';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'info.mayhem.creation@gmail.com';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -102,7 +102,7 @@ export class EmailNotificationService {
     estimatedDeliveryDate?: string;
   }): Promise<boolean> {
     try {
-      const subject = `Order Confirmation #${data.orderNumber} - Mayhem Creations`;
+      const subject = `Order Confirmation #${data.orderNumber} - Mayhem Creation`;
       const html = this.generateOrderConfirmationHTML(data);
       const text = this.generateOrderConfirmationText(data);
 
@@ -155,7 +155,7 @@ export class EmailNotificationService {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Order Confirmation - Mayhem Creations</title>
+        <title>Order Confirmation - Mayhem Creation</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -244,7 +244,7 @@ export class EmailNotificationService {
           <div class="footer">
             <p><strong>Need Help?</strong></p>
             <p>Contact our support team at ${ADMIN_EMAIL}</p>
-            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+            <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
           </div>
         </div>
       </body>
@@ -272,7 +272,7 @@ export class EmailNotificationService {
     ).join('\n');
 
     return `
-Order Confirmed! - Mayhem Creations
+Order Confirmed! - Mayhem Creation
 
 Thank you for your order, ${data.customerName}!
 
@@ -303,7 +303,7 @@ View your order status: ${FRONTEND_URL}/my-orders
 
 Need help? Contact us at ${ADMIN_EMAIL}
 
-© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.
+© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
     `.trim();
   }
 
@@ -321,7 +321,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     shippingAddress: Address;
   }): Promise<boolean> {
     try {
-      const subject = `Your Order #${data.orderNumber} Has Shipped! - Mayhem Creations`;
+      const subject = `Your Order #${data.orderNumber} Has Shipped! - Mayhem Creation`;
       
       const itemsList = data.orderItems.map(item => `
         <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; align-items: center;">
@@ -340,7 +340,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Your Order Has Shipped - Mayhem Creations</title>
+          <title>Your Order Has Shipped - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -399,7 +399,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
             <div class="footer">
               <p><strong>Questions about your order?</strong></p>
               <p>Contact us at ${ADMIN_EMAIL}</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -434,7 +434,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     orderItems: OrderItem[];
   }): Promise<boolean> {
     try {
-      const subject = `Your Order #${data.orderNumber} Has Been Delivered! - Mayhem Creations`;
+      const subject = `Your Order #${data.orderNumber} Has Been Delivered! - Mayhem Creation`;
       
       const html = `
         <!DOCTYPE html>
@@ -442,7 +442,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Order Delivered - Mayhem Creations</title>
+          <title>Order Delivered - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -467,7 +467,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
               
               <div class="success-box">
                 <h3 style="margin: 0 0 10px 0; color: #4caf50;">Enjoy Your Purchase!</h3>
-                <p style="margin: 0;">We hope you love your new items from Mayhem Creations</p>
+                <p style="margin: 0;">We hope you love your new items from Mayhem Creation</p>
               </div>
               
               <p>We'd love to hear about your experience! Your feedback helps us improve and assists other customers in making informed decisions.</p>
@@ -484,9 +484,9 @@ Need help? Contact us at ${ADMIN_EMAIL}
             </div>
             
             <div class="footer">
-              <p><strong>Thank you for choosing Mayhem Creations!</strong></p>
+              <p><strong>Thank you for choosing Mayhem Creation!</strong></p>
               <p>Contact us: ${ADMIN_EMAIL}</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -521,7 +521,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     orderTotal: number;
   }): Promise<boolean> {
     try {
-      const subject = `Payment Receipt for Order #${data.orderNumber} - Mayhem Creations`;
+      const subject = `Payment Receipt for Order #${data.orderNumber} - Mayhem Creation`;
       
       const html = `
         <!DOCTYPE html>
@@ -529,7 +529,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Payment Receipt - Mayhem Creations</title>
+          <title>Payment Receipt - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -581,7 +581,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
             <div class="footer">
               <p><strong>Questions about your payment?</strong></p>
               <p>Contact us at ${ADMIN_EMAIL}</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -615,7 +615,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     refundInfo: RefundInfo;
   }): Promise<boolean> {
     try {
-      const subject = `Refund Processed for Order #${data.orderNumber} - Mayhem Creations`;
+      const subject = `Refund Processed for Order #${data.orderNumber} - Mayhem Creation`;
       
       const refundedItemsHTML = data.refundInfo.itemsRefunded && data.refundInfo.itemsRefunded.length > 0 
         ? data.refundInfo.itemsRefunded.map(item => `
@@ -633,7 +633,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Refund Processed - Mayhem Creations</title>
+          <title>Refund Processed - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -685,7 +685,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
             <div class="footer">
               <p><strong>Questions about your refund?</strong></p>
               <p>Contact us at ${ADMIN_EMAIL}</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -721,7 +721,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     requestedReason: string;
   }): Promise<boolean> {
     try {
-      const subject = `Refund Request Update for Order #${data.orderNumber} - Mayhem Creations`;
+      const subject = `Refund Request Update for Order #${data.orderNumber} - Mayhem Creation`;
       
       const html = `
         <!DOCTYPE html>
@@ -729,7 +729,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Refund Request Update - Mayhem Creations</title>
+          <title>Refund Request Update - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -784,7 +784,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
             <div class="footer">
               <p><strong>Questions or concerns?</strong></p>
               <p>Contact us at ${ADMIN_EMAIL}</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -818,7 +818,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
     orderItems: OrderItem[];
   }): Promise<boolean> {
     try {
-      const subject = `How was your experience? Share your review - Mayhem Creations`;
+      const subject = `How was your experience? Share your review - Mayhem Creation`;
       
       const productsList = data.orderItems.slice(0, 3).map(item => `
         <div style="padding: 15px; border-bottom: 1px solid #eee; text-align: center;">
@@ -836,7 +836,7 @@ Need help? Contact us at ${ADMIN_EMAIL}
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Share Your Review - Mayhem Creations</title>
+          <title>Share Your Review - Mayhem Creation</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
             .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
@@ -875,8 +875,8 @@ Need help? Contact us at ${ADMIN_EMAIL}
             
             <div class="footer">
               <p><strong>Thank you for being a valued customer!</strong></p>
-              <p>Mayhem Creations Team</p>
-              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creations. All rights reserved.</p>
+              <p>Mayhem Creation Team</p>
+              <p style="margin-top: 15px;">© ${new Date().getFullYear()} Mayhem Creation. All rights reserved.</p>
             </div>
           </div>
         </body>

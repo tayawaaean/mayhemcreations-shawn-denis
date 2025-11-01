@@ -23,9 +23,93 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Create a new refund request (Customer)
- * @route POST /api/v1/refunds/request
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/refunds/request:
+ *   post:
+ *     tags: [Refunds]
+ *     summary: Create a new refund request
+ *     description: Allows customers to create a refund request for an order. Requires order ID and reason.
+ *     security:
+ *       - sessionAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - orderId
+ *               - reason
+ *             properties:
+ *               orderId:
+ *                 type: integer
+ *                 example: 123
+ *                 description: Order ID to request refund for
+ *               reason:
+ *                 type: string
+ *                 enum: [damaged_defective, wrong_item, not_as_described, changed_mind, duplicate_order, shipping_delay, quality_issues, other]
+ *                 example: damaged_defective
+ *                 description: Reason for refund request
+ *               description:
+ *                 type: string
+ *                 description: Additional details about the refund request
+ *               refundType:
+ *                 type: string
+ *                 enum: [full, partial]
+ *                 example: full
+ *                 description: Type of refund (full or partial)
+ *               refundAmount:
+ *                 type: number
+ *                 format: float
+ *                 example: 99.99
+ *                 description: Partial refund amount (if refundType is partial)
+ *               refundItems:
+ *                 type: array
+ *                 description: Items to refund (if partial refund)
+ *                 items:
+ *                   type: integer
+ *               imagesUrls:
+ *                 type: array
+ *                 description: Image URLs supporting the refund request
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *     responses:
+ *       201:
+ *         description: Refund request created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         status:
+ *                           type: string
+ *                           example: pending
+ *       400:
+ *         description: Invalid request data or missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const createRefundRequest = async (
   req: AuthenticatedRequest,
@@ -124,9 +208,59 @@ export const createRefundRequest = async (
 };
 
 /**
- * Get all refund requests for logged-in user (Customer)
- * @route GET /api/v1/refunds/user
- * @access Private (Customer only)
+ * @swagger
+ * /api/v1/refunds/user:
+ *   get:
+ *     tags: [Refunds]
+ *     summary: Get user's refund requests
+ *     description: Retrieves all refund requests created by the authenticated customer.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, cancelled, processing, completed]
+ *         description: Filter by refund status
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Refund requests retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getUserRefunds = async (
   req: AuthenticatedRequest,
@@ -172,9 +306,58 @@ export const getUserRefunds = async (
 };
 
 /**
- * Get specific refund request by ID
- * @route GET /api/v1/refunds/:id
- * @access Private (Customer or Admin)
+ * @swagger
+ * /api/v1/refunds/{id}:
+ *   get:
+ *     tags: [Refunds]
+ *     summary: Get refund request by ID
+ *     description: Retrieves a specific refund request by ID. Customers can only view their own refunds, admins can view all.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Refund request ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Refund request retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Access denied (customer trying to view another customer's refund)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Refund request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getRefundById = async (
   req: AuthenticatedRequest,
@@ -246,9 +429,68 @@ export const getRefundById = async (
 };
 
 /**
- * Cancel a refund request (Customer or Admin)
- * @route POST /api/v1/refunds/:id/cancel
- * @access Private
+ * @swagger
+ * /api/v1/refunds/{id}/cancel:
+ *   post:
+ *     tags: [Refunds]
+ *     summary: Cancel refund request
+ *     description: Allows customer to cancel their own refund request if it's still pending.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Refund request ID
+ *         example: 1
+ *     responses:
+ *       200:
+ *         description: Refund request cancelled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           example: cancelled
+ *       400:
+ *         description: Cannot cancel refund (not pending or already processed)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Access denied (customer trying to cancel another customer's refund)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Refund request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const cancelRefund = async (
   req: AuthenticatedRequest,
@@ -294,9 +536,70 @@ export const cancelRefund = async (
 };
 
 /**
- * Get all refund requests (Admin)
- * @route GET /api/v1/refunds/admin/all
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/refunds/admin/all:
+ *   get:
+ *     tags: [Refunds, Admin]
+ *     summary: Get all refund requests
+ *     description: Retrieves all refund requests. Admin-only endpoint for managing refunds.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, cancelled, processing, completed]
+ *         description: Filter by refund status
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: integer
+ *         description: Filter by user ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Refund requests retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getAllRefunds = async (
   req: AuthenticatedRequest,
@@ -379,9 +682,66 @@ export const getAllRefunds = async (
 };
 
 /**
- * Get refund statistics (Admin)
- * @route GET /api/v1/refunds/admin/stats
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/refunds/admin/stats:
+ *   get:
+ *     tags: [Refunds, Admin]
+ *     summary: Get refund statistics
+ *     description: Retrieves refund statistics and analytics for the admin dashboard.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for statistics range
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for statistics range
+ *     responses:
+ *       200:
+ *         description: Refund statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         totalRefunds:
+ *                           type: integer
+ *                         refundsByStatus:
+ *                           type: object
+ *                         totalRefundAmount:
+ *                           type: number
+ *                         averageRefundAmount:
+ *                           type: number
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const getRefundStats = async (
   req: AuthenticatedRequest,
@@ -418,9 +778,81 @@ export const getRefundStats = async (
 };
 
 /**
- * Update refund status to under review (Admin)
- * @route PUT /api/v1/refunds/:id/review
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/refunds/{id}/review:
+ *   put:
+ *     tags: [Refunds, Admin]
+ *     summary: Review refund request
+ *     description: Allows admin to review and update refund request details before approval or rejection.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Refund request ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminNotes:
+ *                 type: string
+ *                 description: Admin notes or comments
+ *               refundAmount:
+ *                 type: number
+ *                 format: float
+ *                 description: Adjusted refund amount
+ *               processingNotes:
+ *                 type: string
+ *                 description: Notes for processing the refund
+ *     responses:
+ *       200:
+ *         description: Refund request reviewed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *       400:
+ *         description: Invalid request data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Refund request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const reviewRefund = async (
   req: AuthenticatedRequest,
@@ -473,9 +905,85 @@ export const reviewRefund = async (
 };
 
 /**
- * Approve a refund request (Admin)
- * @route POST /api/v1/refunds/:id/approve
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/refunds/{id}/approve:
+ *   post:
+ *     tags: [Refunds, Admin]
+ *     summary: Approve refund request
+ *     description: Approves a refund request and initiates the refund process through the payment gateway. Admin-only endpoint.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Refund request ID
+ *         example: 1
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               adminNotes:
+ *                 type: string
+ *                 description: Admin notes for approval
+ *               refundAmount:
+ *                 type: number
+ *                 format: float
+ *                 description: Override refund amount (if different from request)
+ *     responses:
+ *       200:
+ *         description: Refund approved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           example: approved
+ *                         refundId:
+ *                           type: string
+ *                           description: Payment gateway refund ID
+ *       400:
+ *         description: Cannot approve refund (invalid status or missing payment)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Refund request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const approveRefund = async (
   req: AuthenticatedRequest,
@@ -565,9 +1073,84 @@ export const approveRefund = async (
 };
 
 /**
- * Reject a refund request (Admin)
- * @route POST /api/v1/refunds/:id/reject
- * @access Private (Admin only)
+ * @swagger
+ * /api/v1/refunds/{id}/reject:
+ *   post:
+ *     tags: [Refunds, Admin]
+ *     summary: Reject refund request
+ *     description: Rejects a refund request with optional admin notes explaining the rejection reason. Admin-only endpoint.
+ *     security:
+ *       - sessionAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Refund request ID
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rejectionReason
+ *             properties:
+ *               rejectionReason:
+ *                 type: string
+ *                 description: Reason for rejecting the refund request
+ *                 example: Item does not meet refund policy requirements
+ *               adminNotes:
+ *                 type: string
+ *                 description: Additional admin notes
+ *     responses:
+ *       200:
+ *         description: Refund request rejected successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         status:
+ *                           type: string
+ *                           example: rejected
+ *       400:
+ *         description: Missing rejection reason or invalid request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       403:
+ *         description: Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Refund request not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 export const rejectRefund = async (
   req: AuthenticatedRequest,

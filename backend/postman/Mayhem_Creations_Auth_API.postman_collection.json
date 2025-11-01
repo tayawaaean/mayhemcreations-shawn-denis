@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Mayhem Creations Auth API",
-    "description": "Authentication API endpoints for Mayhem Creations e-commerce platform",
+    "name": "Mayhem Creation Auth API",
+    "description": "Authentication API endpoints for Mayhem Creation e-commerce platform",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": "1.0.0"
   },

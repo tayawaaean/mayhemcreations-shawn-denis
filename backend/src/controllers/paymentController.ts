@@ -56,7 +56,7 @@ interface AuthenticatedRequest extends Request {
  *                 description: Payment currency
  *               description:
  *                 type: string
- *                 example: Mayhem Creations Order
+ *                 example: Mayhem Creation Order
  *                 description: Payment description
  *               metadata:
  *                 type: object
@@ -186,7 +186,7 @@ export const createPaymentIntentHandler = async (
         userId: userId.toString(),
         ...metadata,
       },
-      description: description || 'Mayhem Creations Order',
+      description: description || 'Mayhem Creation Order',
     };
 
     const paymentIntent = await createPaymentIntent(paymentData);

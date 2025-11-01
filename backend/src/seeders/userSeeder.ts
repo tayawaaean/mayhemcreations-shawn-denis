@@ -42,7 +42,7 @@ export const userData = [
     isPhoneVerified: true,
     isActive: true,
     profile: {
-      bio: 'Founder and CEO of Mayhem Creations. Passionate about custom embroidery and unique designs.',
+      bio: 'Founder and CEO of Mayhem Creation. Passionate about custom embroidery and unique designs.',
       avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shawn',
       preferences: {
         theme: 'light',

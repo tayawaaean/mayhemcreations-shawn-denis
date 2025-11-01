@@ -25,7 +25,7 @@ export const paypalConfig = {
   cancelUrl: process.env.PAYPAL_CANCEL_URL || 'http://localhost:5001/payment/cancel',
   
   // Branding settings
-  brandName: process.env.PAYPAL_BRAND_NAME || 'Mayhem Creations',
+  brandName: process.env.PAYPAL_BRAND_NAME || 'Mayhem Creation',
   localeCode: 'en-US',
   
   // Payment experience settings

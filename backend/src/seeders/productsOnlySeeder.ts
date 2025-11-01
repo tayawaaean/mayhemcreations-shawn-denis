@@ -250,7 +250,7 @@ const roleData = [
 // Sample user data
 const userData = [
   {
-    email: 'admin@mayhemcreations.com',
+    email: 'admin@mayhemcreation.com',
     password: '$2b$10$rQZ8K9vL8mN7oP6qR5sTtOeW3xY2zA1bC4dF7gH0jK3lM6nP9qS2tU5vX8yA', // hashed 'admin123'
     firstName: 'Admin',
     lastName: 'User',
@@ -259,7 +259,7 @@ const userData = [
     emailVerified: true
   },
   {
-    email: 'employee@mayhemcreations.com',
+    email: 'employee@mayhemcreation.com',
     password: '$2b$10$rQZ8K9vL8mN7oP6qR5sTtOeW3xY2zA1bC4dF7gH0jK3lM6nP9qS2tU5vX8yA', // hashed 'employee123'
     firstName: 'Employee',
     lastName: 'User',
@@ -268,7 +268,7 @@ const userData = [
     emailVerified: true
   },
   {
-    email: 'seller@mayhemcreations.com',
+    email: 'seller@mayhemcreation.com',
     password: '$2b$10$rQZ8K9vL8mN7oP6qR5sTtOeW3xY2zA1bC4dF7gH0jK3lM6nP9qS2tU5vX8yA', // hashed 'seller123'
     firstName: 'Seller',
     lastName: 'User',

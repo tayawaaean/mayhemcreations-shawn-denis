@@ -40,7 +40,7 @@ export async function authenticateAsAdmin(): Promise<SeederAuthContext> {
 
     // Find or create admin user
     let adminUser = await User.findOne({
-      where: { email: 'admin@mayhemcreations.com' },
+      where: { email: 'admin@mayhemcreation.com' },
       include: [{ model: Role, as: 'role' }],
     });
 
@@ -49,7 +49,7 @@ export async function authenticateAsAdmin(): Promise<SeederAuthContext> {
       const hashedPassword = await bcrypt.hash('admin123!', 12);
       
       adminUser = await User.create({
-        email: 'admin@mayhemcreations.com',
+        email: 'admin@mayhemcreation.com',
         password: hashedPassword,
         firstName: 'System',
         lastName: 'Administrator',

@@ -4,7 +4,7 @@ import { Express, Request, Response, NextFunction } from 'express';
 import { sessionAuthenticate, requireRole } from '../middlewares/auth';
 
 /**
- * Swagger Configuration for Mayhem Creations API
+ * Swagger Configuration for Mayhem Creation API
  * Generates OpenAPI 3.0 documentation from JSDoc comments
  */
 
@@ -12,10 +12,10 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Mayhem Creations API',
+      title: 'Mayhem Creation API',
       version: '1.0.0',
       description: `
-        # Mayhem Creations E-commerce API
+        # Mayhem Creation E-commerce API
         
         A comprehensive e-commerce API built with Express.js, TypeScript, and MariaDB.
         
@@ -42,7 +42,7 @@ const options: swaggerJsdoc.Options = {
         All errors follow a consistent format with appropriate HTTP status codes.
       `,
       contact: {
-        name: 'Mayhem Creations Support',
+        name: 'Mayhem Creation Support',
         email: 'support@mayhemcreation.com',
         url: 'https://mayhemcreation.com/support'
       },
@@ -312,6 +312,14 @@ const options: swaggerJsdoc.Options = {
       {
         name: 'Analytics',
         description: 'Business analytics and reporting'
+      },
+      {
+        name: 'Refunds',
+        description: 'Refund request management'
+      },
+      {
+        name: 'Contact',
+        description: 'Contact form submissions'
       }
     ]
   },
@@ -477,7 +485,7 @@ export const setupSwagger = (app: Express): void => {
       .swagger-ui .scheme-container { background: #f9fafb; padding: 20px; border-radius: 8px; }
       .swagger-ui .info .title::after { content: " (Protected)"; color: #ef4444; font-size: 0.8em; margin-left: 10px; }
     `,
-    customSiteTitle: 'Mayhem Creations API Documentation',
+    customSiteTitle: 'Mayhem Creation API Documentation',
     customfavIcon: '/favicon.ico',
     swaggerOptions: {
       persistAuthorization: true,

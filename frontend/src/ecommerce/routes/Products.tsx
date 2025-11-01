@@ -6,6 +6,7 @@ import CollapsibleDropdown, { DropdownItem } from '../../components/CollapsibleD
 import { useSearchParams } from 'react-router-dom'
 import { categoryApiService, Category } from '../../shared/categoryApiService'
 import { productApiService, Product } from '../../shared/productApiService'
+import SEO from '../../components/SEO'
 
 // Placeholder image for products with missing or invalid images
 const PLACEHOLDER_IMAGE = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"%3E%3Crect width="400" height="400" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="18" fill="%239ca3af"%3ENo Image Available%3C/text%3E%3C/svg%3E'
@@ -273,9 +274,43 @@ export default function Products() {
       }
     })
 
+  // Build page title and description based on filters
+  const categoryName = categories.find(cat => cat.slug === selectedCategory)?.name || 
+                      categories.find(cat => cat.children?.some(child => child.slug === selectedSubcategory))?.name
+  const subcategoryName = categories
+    .flatMap(cat => cat.children || [])
+    .find(child => child.slug === selectedSubcategory)?.name
+
+  const pageTitle = subcategoryName 
+    ? `${subcategoryName} - Mayhem Creations`
+    : categoryName
+    ? `${categoryName} - Mayhem Creations`
+    : 'All Products - Mayhem Creations'
+  
+  const pageDescription = subcategoryName
+    ? `Browse our ${subcategoryName} collection. Premium custom embroidery services and high-quality apparel.`
+    : categoryName
+    ? `Browse our ${categoryName} collection. Premium custom embroidery services and high-quality apparel.`
+    : 'Browse our complete product catalog. Premium custom embroidery services and high-quality apparel for your business or personal use.'
+
+  // Structured data for CollectionPage (Product Listing)
+  const collectionSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: pageTitle,
+    description: pageDescription,
+    url: `https://mayhemcreation.com/products${selectedCategory ? `?category=${selectedCategory}` : ''}${selectedSubcategory ? `&subcategory=${selectedSubcategory}` : ''}`
+  }
+
   if (loading) {
     return (
       <main className="py-8">
+        <SEO
+          title={pageTitle}
+          description={pageDescription}
+          url="/products"
+          canonicalUrl="/products"
+        />
         <div className="container">
           <div className="text-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
@@ -288,6 +323,14 @@ export default function Products() {
 
   return (
     <main className="py-8">
+      <SEO
+        title={pageTitle}
+        description={pageDescription}
+        url="/products"
+        type="website"
+        structuredData={collectionSchema}
+        canonicalUrl="/products"
+      />
       <div className="container">
         {/* Header */}
         <div className="mb-8">

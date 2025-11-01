@@ -23,7 +23,7 @@ if (Test-Path $envFile) {
 }
 
 # Default values if not found in .env
-if (-not $dbName) { $dbName = "mayhem_creations" }
+if (-not $dbName) { $dbName = "mayhem_creation" }
 if (-not $dbUser) { $dbUser = "postgres" }
 if (-not $dbHost) { $dbHost = "localhost" }
 if (-not $dbPort) { $dbPort = "5432" }

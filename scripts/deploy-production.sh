@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Production Deployment Script for Mayhem Creations
+# Production Deployment Script for Mayhem Creation
 # This script automates the deployment process using PM2
 
 set -e  # Exit on any error
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_NAME="mayhemcreations"
+APP_NAME="mayhemcreation"
 BACKEND_DIR="./backend"
 SERVICES_DIR="./services"
 FRONTEND_DIR="./frontend"

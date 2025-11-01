@@ -30,9 +30,103 @@ const transporter = nodemailer.createTransport({
 // Contact controller for handling contact form submissions
 export class ContactController {
   /**
-   * Submit a contact form inquiry
-   * POST /api/v1/contact
-   * Public endpoint - no authentication required
+   * @swagger
+   * /api/v1/contact:
+   *   post:
+   *     tags: [Contact]
+   *     summary: Submit contact form inquiry
+   *     description: Allows users to submit a contact form inquiry. Sends email notifications to admin and confirmation to customer.
+   *     security: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - name
+   *               - email
+   *               - projectType
+   *               - message
+   *             properties:
+   *               name:
+   *                 type: string
+   *                 example: John Doe
+   *                 description: Contact name
+   *               email:
+   *                 type: string
+   *                 format: email
+   *                 example: john@example.com
+   *                 description: Contact email address
+   *               phone:
+   *                 type: string
+   *                 example: +15551234567
+   *                 description: Contact phone number (optional)
+   *               company:
+   *                 type: string
+   *                 example: Acme Corp
+   *                 description: Company name (optional)
+   *               projectType:
+   *                 type: string
+   *                 example: custom-embroidery
+   *                 description: Type of project inquiry
+   *               quantity:
+   *                 type: integer
+   *                 example: 50
+   *                 description: Estimated quantity (optional)
+   *               message:
+   *                 type: string
+   *                 example: I'm interested in custom embroidery for my company.
+   *                 description: Inquiry message
+   *           examples:
+   *             basicInquiry:
+   *               summary: Basic contact form
+   *               value:
+   *                 name: John Doe
+   *                 email: john@example.com
+   *                 projectType: custom-embroidery
+   *                 message: I need custom embroidery services
+   *             detailedInquiry:
+   *               summary: Detailed inquiry with company info
+   *               value:
+   *                 name: Jane Smith
+   *                 email: jane@company.com
+   *                 phone: +15559876543
+   *                 company: ABC Corp
+   *                 projectType: bulk-order
+   *                 quantity: 100
+   *                 message: We need 100 custom embroidered shirts
+   *     responses:
+   *       201:
+   *         description: Contact form submitted successfully
+   *         content:
+   *           application/json:
+   *             schema:
+   *               allOf:
+   *                 - $ref: '#/components/schemas/SuccessResponse'
+   *                 - type: object
+   *                   properties:
+   *                     data:
+   *                       type: object
+   *                       properties:
+   *                         id:
+   *                           type: integer
+   *                         name:
+   *                           type: string
+   *                         email:
+   *                           type: string
+   *       400:
+   *         description: Missing required fields
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
+   *       500:
+   *         description: Internal server error
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Error'
    */
   static async submitContact(req: Request, res: Response): Promise<void> {
     try {
@@ -285,7 +379,7 @@ export class ContactController {
           <div class="container">
             <div class="header">
               <h1 style="margin: 0;">New Contact Form Submission</h1>
-              <p style="margin: 10px 0 0 0;">Mayhem Creations</p>
+              <p style="margin: 10px 0 0 0;">Mayhem Creation</p>
             </div>
             
             <p>You have received a new contact form submission. Details below:</p>
@@ -330,7 +424,7 @@ export class ContactController {
             </div>
             
             <div class="footer">
-              <p>This is an automated notification from the Mayhem Creations contact form.</p>
+              <p>This is an automated notification from the Mayhem Creation contact form.</p>
               <p>Submission ID: ${contact.id}</p>
             </div>
           </div>
@@ -339,7 +433,7 @@ export class ContactController {
       `;
 
       const text = `
-New Contact Form Submission - Mayhem Creations
+New Contact Form Submission - Mayhem Creation
 
 Name: ${contact.name}
 Email: ${contact.email}
@@ -355,7 +449,7 @@ Submitted: ${new Date(contact.createdAt).toLocaleString()}
 Submission ID: ${contact.id}
 
 ---
-This is an automated notification from the Mayhem Creations contact form.
+This is an automated notification from the Mayhem Creation contact form.
       `.trim();
 
       await transporter.sendMail({
@@ -380,7 +474,7 @@ This is an automated notification from the Mayhem Creations contact form.
    */
   private static async sendCustomerConfirmation(contact: Contact): Promise<boolean> {
     try {
-      const subject = 'Thank You for Contacting Mayhem Creations';
+      const subject = 'Thank You for Contacting Mayhem Creation';
       
       const html = `
         <!DOCTYPE html>
@@ -402,13 +496,13 @@ This is an automated notification from the Mayhem Creations contact form.
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">🎨 Mayhem Creations</div>
+              <div class="logo">🎨 Mayhem Creation</div>
               <h1>Thank You for Reaching Out!</h1>
             </div>
             
             <p>Hi ${contact.name},</p>
             
-            <p>Thank you for contacting Mayhem Creations! We've received your inquiry about <strong>${contact.projectType}</strong> and will get back to you within 24 hours.</p>
+            <p>Thank you for contacting Mayhem Creation! We've received your inquiry about <strong>${contact.projectType}</strong> and will get back to you within 24 hours.</p>
             
             <div class="info-box">
               <h3 style="margin: 0 0 10px 0;">What happens next?</h3>
@@ -426,7 +520,7 @@ This is an automated notification from the Mayhem Creations contact form.
             </div>
             
             <div class="footer">
-              <p>Best regards,<br>The Mayhem Creations Team</p>
+              <p>Best regards,<br>The Mayhem Creation Team</p>
               <p>📞 Phone: 614-715-4742</p>
               <p>📧 Email: ${ADMIN_EMAIL}</p>
               <p style="margin-top: 15px;">This is an automated confirmation email.</p>
@@ -437,11 +531,11 @@ This is an automated notification from the Mayhem Creations contact form.
       `;
 
       const text = `
-Thank You for Reaching Out! - Mayhem Creations
+Thank You for Reaching Out! - Mayhem Creation
 
 Hi ${contact.name},
 
-Thank you for contacting Mayhem Creations! We've received your inquiry about ${contact.projectType} and will get back to you within 24 hours.
+Thank you for contacting Mayhem Creation! We've received your inquiry about ${contact.projectType} and will get back to you within 24 hours.
 
 What happens next?
 - Our team will review your inquiry
@@ -453,7 +547,7 @@ In the meantime, feel free to explore our product catalog or learn more about ou
 Visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/products
 
 Best regards,
-The Mayhem Creations Team
+The Mayhem Creation Team
 
 Phone: 614-715-4742
 Email: ${ADMIN_EMAIL}

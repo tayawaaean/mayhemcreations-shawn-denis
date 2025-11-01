@@ -300,7 +300,7 @@ export default function MyReviews() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-1">
                           <h5 className="text-sm sm:text-base font-semibold text-blue-900">
-                            Response from Mayhem Creations
+                            Response from Mayhem Creation
                           </h5>
                           {review.adminRespondedAt && (
                             <span className="text-xs text-blue-700">

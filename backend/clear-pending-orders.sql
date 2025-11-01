@@ -1,7 +1,7 @@
 -- Clear pending orders table
 -- Run this script in your MySQL/MariaDB database management tool
 
-USE mayhem_creations;
+USE mayhem_creation;
 
 -- Clear all order reviews
 DELETE FROM order_reviews;

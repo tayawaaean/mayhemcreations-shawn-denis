@@ -71,7 +71,7 @@ export const mockProducts: AdminProduct[] = [
       { id: 'var-1-6', color: 'Black', colorHex: '#000000', size: 'L', stock: 28, sku: 'MC-TEE-001-BK-L' }
     ],
     seo: {
-      metaTitle: 'Embroidered Classic Tee - Mayhem Creations',
+      metaTitle: 'Embroidered Classic Tee - Mayhem Creation',
       metaDescription: 'Premium cotton t-shirt with custom embroidery. Available in multiple colors and sizes.',
       slug: 'embroidered-classic-tee'
     },
@@ -100,7 +100,7 @@ export const mockProducts: AdminProduct[] = [
       { id: 'var-2-5', color: 'Navy', colorHex: '#1E3A8A', size: 'L', stock: 10, sku: 'MC-HOOD-001-NV-L' }
     ],
     seo: {
-      metaTitle: 'Crewneck Hoodie - Mayhem Creations',
+      metaTitle: 'Crewneck Hoodie - Mayhem Creation',
       metaDescription: 'Comfortable crewneck hoodie with custom embroidery. Perfect for casual wear.',
       slug: 'crewneck-hoodie'
     },
@@ -127,7 +127,7 @@ export const mockProducts: AdminProduct[] = [
       { id: 'var-3-3', color: 'White', colorHex: '#FFFFFF', size: 'One Size', stock: 28, sku: 'MC-CAP-001-WH-OS' }
     ],
     seo: {
-      metaTitle: 'Embroidered Cap - Mayhem Creations',
+      metaTitle: 'Embroidered Cap - Mayhem Creation',
       metaDescription: 'High-quality embroidered cap with custom design. Available in multiple colors.',
       slug: 'embroidered-cap'
     },
