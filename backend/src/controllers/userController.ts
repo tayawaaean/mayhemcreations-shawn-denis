@@ -807,27 +807,23 @@ export class UserController {
         }
       });
 
-      // Get users by role
-      const usersByRole = await User.findAll({
-        attributes: [
-          'roleId',
-          [sequelize.fn('COUNT', sequelize.col('User.id')), 'count']
-        ],
-        include: [
-          {
-            model: Role,
-            as: 'role',
-            attributes: ['name', 'displayName']
-          }
-        ],
-        group: ['roleId', 'Role.id'],
-        raw: false
-      });
+      // Get users by role using raw SQL query for proper grouping
+      // Sequelize's findAll with group has issues with table aliases, so we use raw SQL
+      const [usersByRoleResult] = await sequelize.query(`
+        SELECT 
+          u.role_id,
+          COUNT(u.id) as count,
+          r.name as role_name,
+          r.display_name as role_display_name
+        FROM users u
+        LEFT JOIN roles r ON u.role_id = r.id
+        GROUP BY u.role_id, r.id, r.name, r.display_name
+      `);
 
-      const formattedUsersByRole = usersByRole.map((item: any) => ({
-        roleName: item.role.name,
-        roleDisplayName: item.role.displayName,
-        count: parseInt(item.dataValues.count)
+      const formattedUsersByRole = (usersByRoleResult as any[]).map((row: any) => ({
+        roleName: row.role_name || 'Unknown',
+        roleDisplayName: row.role_display_name || 'Unknown Role',
+        count: parseInt(String(row.count)) || 0
       }));
 
       res.json({
@@ -842,9 +838,18 @@ export class UserController {
         timestamp: new Date().toISOString()
       });
 
-    } catch (error) {
-      logger.error('Get user stats error:', error);
-      next(error);
+    } catch (error: any) {
+      logger.error('Get user stats error:', {
+        message: error?.message,
+        stack: error?.stack,
+        error: error
+      });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get user statistics',
+        error: process.env.NODE_ENV === 'development' ? error?.message : undefined,
+        timestamp: new Date().toISOString()
+      });
     }
   }
 }
