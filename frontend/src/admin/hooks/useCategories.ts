@@ -18,6 +18,7 @@ export interface UseCategoriesReturn {
   createCategory: (categoryData: CategoryCreateData) => Promise<Category | null>;
   updateCategory: (id: number, categoryData: CategoryUpdateData) => Promise<Category | null>;
   deleteCategory: (id: number, force?: boolean) => Promise<boolean>;
+  bulkDeleteCategories: (ids: number[], force?: boolean) => Promise<{ success: boolean; deletedCount?: number; message?: string }>;
   fetchStats: () => Promise<void>;
   searchCategories: (query: string) => Promise<Category[]>;
   getRootCategories: () => Promise<Category[]>;
@@ -194,6 +195,37 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
     }
   }, []);
 
+  // Bulk delete categories
+  const bulkDeleteCategories = useCallback(async (ids: number[], force: boolean = false): Promise<{ success: boolean; deletedCount?: number; message?: string }> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await categoryApiService.bulkDeleteCategories(ids, force);
+      
+      if (response.success) {
+        setCategories(prev => prev.filter(cat => !ids.includes(cat.id)));
+        return {
+          success: true,
+          deletedCount: response.data?.deletedCount || ids.length,
+          message: response.message
+        };
+      } else {
+        throw new Error(response.message || 'Failed to bulk delete categories');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to bulk delete categories';
+      setError(errorMessage);
+      console.error('Error bulk deleting categories:', err);
+      return {
+        success: false,
+        message: errorMessage
+      };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch category statistics with throttling
   const fetchStats = useCallback(async () => {
     const now = Date.now();
@@ -351,6 +383,7 @@ export const useCategories = (initialFilters?: CategoryFilters): UseCategoriesRe
     createCategory,
     updateCategory,
     deleteCategory,
+    bulkDeleteCategories,
     fetchStats,
     searchCategories,
     getRootCategories,

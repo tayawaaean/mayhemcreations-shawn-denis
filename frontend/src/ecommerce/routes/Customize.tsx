@@ -1215,6 +1215,18 @@ export default function Customize() {
                 {showFinalView ? 'How It Will Look' : 'Product Preview'}
               </h3>
               
+              {/* Info Message about Product Color */}
+              {getAvailableColors().length > 0 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start">
+                    <Info className="w-5 h-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> The product image shown is for reference only. The actual product color will be based on your selected color option.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               {/* Product Image with Design Overlay */}
               <div className="flex justify-center items-center">
                 <div className="relative max-w-2xl w-full" ref={productRef}>
@@ -1565,7 +1577,15 @@ export default function Customize() {
                    {/* Color Selection */}
                    {getAvailableColors().length > 0 && (
                      <div>
-                       <h4 className="text-md font-medium text-gray-900 mb-4">Select Color</h4>
+                       <h4 className="text-md font-medium text-gray-900 mb-2">Select Color</h4>
+                       <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                         <div className="flex items-start">
+                           <Info className="w-4 h-4 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+                           <p className="text-xs sm:text-sm text-amber-800">
+                             The product image shown is for reference only. Your final product will be in the color you select below.
+                           </p>
+                         </div>
+                       </div>
                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                          {getAvailableColors().map((color: string) => (
                            <button

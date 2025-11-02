@@ -525,10 +525,10 @@ const handlePaymentIntentSucceeded = async (paymentIntent: any) => {
                 subtotal: item.subtotal,
                 imageUrl: item.imageUrl
               })),
-              subtotal: subtotal || order.subtotal,
-              tax: tax || order.tax,
-              shippingCost: shipping || order.shipping,
-              orderTotal: total || order.total,
+              subtotal: subtotal !== null && subtotal !== undefined ? Number(subtotal) : (order.subtotal ? Number(order.subtotal) : 0),
+              tax: 0, // Tax is included in shipping, so set to 0
+              shippingCost: shipping !== null && shipping !== undefined ? Number(shipping) : (order.shipping ? Number(order.shipping) : 0),
+              orderTotal: total !== null && total !== undefined ? Number(total) : (order.total ? Number(order.total) : 0),
               shippingAddress: {
                 firstName: shippingDetails.firstName,
                 lastName: shippingDetails.lastName,
@@ -954,10 +954,10 @@ const handleCheckoutSessionCompleted = async (session: any) => {
                 subtotal: item.subtotal,
                 imageUrl: item.imageUrl
               })),
-              subtotal: subtotal || order.subtotal,
-              tax: tax || order.tax,
-              shippingCost: shipping || order.shipping,
-              orderTotal: total || order.total,
+              subtotal: subtotal !== null && subtotal !== undefined ? Number(subtotal) : (order.subtotal ? Number(order.subtotal) : 0),
+              tax: 0, // Tax is included in shipping, so set to 0
+              shippingCost: shipping !== null && shipping !== undefined ? Number(shipping) : (order.shipping ? Number(order.shipping) : 0),
+              orderTotal: total !== null && total !== undefined ? Number(total) : (order.total ? Number(order.total) : 0),
               shippingAddress: {
                 firstName: shippingDetails.firstName,
                 lastName: shippingDetails.lastName,

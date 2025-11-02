@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAdmin } from '../context/AdminContext'
+import { adminAnalyticsApiService } from '../../shared/adminAnalyticsApiService'
 import { 
   BarChart3, 
   TrendingUp, 
@@ -13,13 +14,15 @@ import {
   Filter
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
+import { downloadJSON } from '../../shared/exportUtils'
 
 const Analytics: React.FC = () => {
-  const { state } = useAdmin()
+  const { state, dispatch } = useAdmin()
   const { analytics } = state
   const [selectedPeriod, setSelectedPeriod] = useState('7d')
   const [selectedMetric, setSelectedMetric] = useState('revenue')
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const periodOptions = [
     { value: '7d', label: 'Last 7 days' },
@@ -46,6 +49,123 @@ const Analytics: React.FC = () => {
     return new Intl.NumberFormat('en-US').format(num)
   }
 
+  // Fetch analytics data based on selected period
+  const fetchAnalytics = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await adminAnalyticsApiService.getDashboardAnalytics(selectedPeriod)
+      
+      if (response.success && response.data) {
+        // Convert the API data to match the Analytics type
+        const analyticsData = {
+          totalSales: response.data.totalSales || 0,
+          totalOrders: response.data.totalOrders || 0,
+          totalProducts: response.data.totalProducts,
+          totalCustomers: response.data.totalCustomers,
+          salesGrowth: 0, // Will be calculated if needed
+          ordersGrowth: 0, // Will be calculated if needed
+          customersGrowth: 0, // Will be calculated if needed
+          revenueChart: (response.data.revenueChart || []).map((item: any) => ({
+            date: item.date,
+            revenue: parseFloat(item.revenue) || 0
+          })),
+          topProducts: [], // Removed as requested
+          recentOrders: (response.data.recentOrders || []).map((order: any) => ({
+            id: order.order_number || order.id.toString(),
+            orderNumber: order.order_number || `ORD-${order.id}`,
+            customer: {
+              name: `${order.first_name || ''} ${order.last_name || ''}`.trim() || order.email,
+              email: order.email
+            },
+            total: parseFloat(order.total) || 0,
+            status: order.status || 'processing',
+            date: order.updated_at
+          })),
+          lowStockProducts: response.data.lowStockVariants.map((variant: any) => ({
+            id: variant.id.toString(),
+            title: variant.product?.title || variant.name || 'Unknown Product',
+            slug: variant.product?.slug || '',
+            sku: variant.sku,
+            price: variant.price || variant.product?.price || 0,
+            status: 'active' as 'active' | 'draft' | 'archived',
+            featured: false,
+            stock: variant.stock,
+            image: variant.image || variant.product?.image || '',
+            alt: variant.product?.title || variant.name || '',
+            description: '',
+            shortDescription: '',
+            images: [variant.image || variant.product?.image || ''].filter(Boolean),
+            primaryImage: variant.image || variant.product?.image || '',
+            category: variant.product?.category?.name || 'Uncategorized',
+            subcategory: '',
+            variants: [{
+              id: variant.id.toString(),
+              name: variant.name,
+              color: variant.color || 'Default',
+              colorHex: variant.colorHex || '#000000',
+              size: variant.size || 'One Size',
+              sku: variant.sku,
+              stock: variant.stock,
+              price: variant.price || variant.product?.price || 0,
+              weight: variant.weight || 0,
+              dimensions: variant.dimensions || '',
+              isActive: variant.isActive
+            }],
+            tags: [],
+            metaTitle: '',
+            metaDescription: '',
+            seo: {
+              metaTitle: '',
+              metaDescription: '',
+              slug: variant.product?.slug || ''
+            },
+            createdAt: new Date(variant.createdAt),
+            updatedAt: new Date(variant.updatedAt)
+          }))
+        }
+        
+        dispatch({ type: 'SET_ANALYTICS', payload: analyticsData })
+      }
+    } catch (error) {
+      console.error('Error fetching analytics:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedPeriod, dispatch])
+
+  // Fetch analytics when period changes
+  useEffect(() => {
+    fetchAnalytics()
+  }, [fetchAnalytics])
+
+  // Export function to download analytics data as JSON
+  const handleExport = () => {
+    try {
+      // Prepare analytics data for export
+      const exportData = {
+        summary: {
+          totalSales: analytics.totalSales,
+          totalOrders: analytics.totalOrders,
+          totalProducts: analytics.totalProducts,
+          totalCustomers: analytics.totalCustomers,
+          salesGrowth: analytics.salesGrowth,
+          ordersGrowth: analytics.ordersGrowth,
+          customersGrowth: analytics.customersGrowth,
+        },
+        revenueChart: analytics.revenueChart,
+        recentOrders: analytics.recentOrders,
+        lowStockProducts: analytics.lowStockProducts,
+        exportedAt: new Date().toISOString(),
+        period: selectedPeriod,
+        metric: selectedMetric,
+      }
+      
+      downloadJSON([exportData], `analytics-${new Date().toISOString().split('T')[0]}`)
+    } catch (error) {
+      console.error('Error exporting analytics:', error)
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Page header */}
@@ -68,7 +188,10 @@ const Analytics: React.FC = () => {
             <Filter className="h-4 w-4 mr-2" />
             Filters
           </button>
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+          <button 
+            onClick={handleExport}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+          >
             <Download className="h-4 w-4 mr-2" />
             Export
           </button>
@@ -82,8 +205,12 @@ const Analytics: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
             <select
               value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) => {
+                setSelectedPeriod(e.target.value)
+                // Analytics will refetch automatically via useEffect
+              }}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {periodOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -202,28 +329,57 @@ const Analytics: React.FC = () => {
         {/* Revenue Chart */}
         <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Revenue Trend</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {selectedMetric === 'revenue' ? 'Revenue Trend' :
+               selectedMetric === 'orders' ? 'Orders Trend' :
+               selectedMetric === 'customers' ? 'Customers Trend' :
+               'Products Trend'}
+            </h3>
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-500">Last 7 days</span>
+              <span className="text-sm text-gray-500">
+                {periodOptions.find(p => p.value === selectedPeriod)?.label || 'Last 7 days'}
+              </span>
             </div>
           </div>
           <div className="h-64">
-            <div className="h-full flex items-end space-x-2">
-              {analytics.revenueChart.map((item, index) => (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div 
-                    className="w-full bg-blue-500 rounded-t"
-                    style={{ 
-                      height: `${(item.revenue / Math.max(...analytics.revenueChart.map(i => i.revenue))) * 200}px` 
-                    }}
-                  ></div>
-                  <span className="text-xs text-gray-500 mt-2">
-                    {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-gray-500">Loading chart data...</div>
+              </div>
+            ) : analytics.revenueChart.length === 0 ? (
+              <div className="h-full flex items-center justify-center">
+                <div className="text-gray-500">No data available for selected period</div>
+              </div>
+            ) : (
+              <div className="h-full flex items-end space-x-2">
+                {analytics.revenueChart.map((item, index) => {
+                  const maxValue = Math.max(...analytics.revenueChart.map(i => i.revenue), 1)
+                  const height = maxValue > 0 ? (item.revenue / maxValue) * 200 : 0
+                  
+                  // Format date based on period
+                  const dateFormat = selectedPeriod === '1y' 
+                    ? { month: 'short', year: 'numeric' }
+                    : { month: 'short', day: 'numeric' }
+                  
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div 
+                        className="w-full bg-blue-500 rounded-t transition-all"
+                        style={{ height: `${height}px` }}
+                        title={`${formatCurrency(item.revenue)}`}
+                      ></div>
+                      <span className="text-xs text-gray-500 mt-2 text-center">
+                        {selectedPeriod === '1y' 
+                          ? new Date(item.date + '-01').toLocaleDateString('en-US', dateFormat)
+                          : new Date(item.date).toLocaleDateString('en-US', dateFormat)
+                        }
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 

@@ -406,6 +406,7 @@ export default function Payment() {
         const itemPrice = pricing.totalPrice
         
         // Determine product name and description
+        // IMPORTANT: Truncate to avoid Stripe URL length limits (2048 chars)
         let productName = 'Custom Product'
         let productDescription = `Qty ${item.quantity}`
         
@@ -416,7 +417,7 @@ export default function Payment() {
             productDescription = `${dimensions.width}" × ${dimensions.height}" - Qty ${item.quantity}`
           }
         } else if (product) {
-          productName = product.title
+          productName = product.title || product.name || 'Custom Product'
           if (item.customization) {
             productDescription = `Customized - Qty ${item.quantity}`
           }
@@ -424,13 +425,20 @@ export default function Payment() {
           productName = item.productName
         }
         
+        // Truncate product name to 50 chars (very aggressive to prevent URL overflow)
+        const truncatedProductName = productName.length > 50 ? productName.substring(0, 47) + '...' : productName
+        
+        // Truncate description to 100 chars (very aggressive)
+        const truncatedDescription = productDescription.length > 100 ? productDescription.substring(0, 97) + '...' : productDescription
+        
         return {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: productName,
-              description: productDescription,
-              images: product?.image ? [product.image] : undefined,
+              name: truncatedProductName,
+              description: truncatedDescription,
+              // Don't include images - they significantly increase URL size
+              images: undefined,
             },
             unit_amount: Math.round(itemPrice * 100), // Stripe expects amount in cents
           },
@@ -463,12 +471,10 @@ export default function Payment() {
         shippingCost: orderData.shipping,
         taxAmount: orderData.tax,
         metadata: {
+          // Only include essential metadata to prevent URL length issues
           orderId: String(orderData.id),
-          customerEmail: orderData.shippingAddress.email,
-          subtotal: String(getCorrectSubtotal(orderData).toFixed(2)),
-          shipping: String(orderData.shipping.toFixed(2)),
-          tax: String(orderData.tax.toFixed(2)),
           total: String(getCorrectOrderTotal(orderData).toFixed(2)),
+          userId: user?.id ? String(user.id) : '',
         },
       })
 
@@ -1149,11 +1155,6 @@ export default function Payment() {
                 
                 <div className="text-xs text-gray-500 ml-4">
                   {orderData.shippingMethod.serviceName} • {orderData.shippingMethod.carrier}
-                </div>
-                
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax (8%):</span>
-                  <span className="font-medium">${orderData.tax.toFixed(2)}</span>
                 </div>
                 
                 <div className="border-t-2 border-gray-300 pt-3">

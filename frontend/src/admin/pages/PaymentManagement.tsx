@@ -17,9 +17,10 @@ import { PaymentLog } from '../types/paymentLogs'
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import { adminOrderApiService } from '../../shared/adminOrderApiService'
 import HelpModal from '../components/modals/HelpModal'
-import { PaymentConfirmationModal, RefundModal } from '../components/modals/PaymentModals'
+import { PaymentConfirmationModal } from '../components/modals/PaymentModals'
 import { formatDateOnly } from '../../utils/dateFormatter'
 import { apiService, ErrorCategory } from '../services/apiService'
+import { downloadCSV } from '../../shared/exportUtils'
 
 const PaymentManagement: React.FC = () => {
   const { state, dispatch } = useAdmin()
@@ -43,7 +44,6 @@ const PaymentManagement: React.FC = () => {
   const [selectedProvider, setSelectedProvider] = useState('all')
   const [selectedPayments, setSelectedPayments] = useState<string[]>([])
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false)
-  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<PaymentLog | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -146,14 +146,34 @@ const PaymentManagement: React.FC = () => {
     }
   }
 
+  // Export function to download payments as CSV
+  const handleExport = () => {
+    try {
+      const headers = [
+        { key: 'orderNumber' as keyof PaymentLog, label: 'Order Number' },
+        { key: 'customerName' as keyof PaymentLog, label: 'Customer Name' },
+        { key: 'customerEmail' as keyof PaymentLog, label: 'Customer Email' },
+        { key: 'amount' as keyof PaymentLog, label: 'Amount' },
+        { key: 'currency' as keyof PaymentLog, label: 'Currency' },
+        { key: 'provider' as keyof PaymentLog, label: 'Provider' },
+        { key: 'paymentMethod' as keyof PaymentLog, label: 'Payment Method' },
+        { key: 'status' as keyof PaymentLog, label: 'Status' },
+        { key: 'transactionId' as keyof PaymentLog, label: 'Transaction ID' },
+        { key: 'fees' as keyof PaymentLog, label: 'Fees' },
+        { key: 'netAmount' as keyof PaymentLog, label: 'Net Amount' },
+        { key: 'createdAt' as keyof PaymentLog, label: 'Created At' },
+      ]
+      
+      downloadCSV(filteredPayments, headers, `payments-${new Date().toISOString().split('T')[0]}`)
+    } catch (error) {
+      console.error('Error exporting payments:', error)
+      setError('Failed to export payments. Please try again.')
+    }
+  }
+
   const handleConfirmPayment = (payment: PaymentLog) => {
     setSelectedPayment(payment)
     setIsConfirmationModalOpen(true)
-  }
-
-  const handleRefundPayment = (payment: PaymentLog) => {
-    setSelectedPayment(payment)
-    setIsRefundModalOpen(true)
   }
 
   const confirmPayment = (paymentId: string) => {
@@ -176,43 +196,6 @@ const PaymentManagement: React.FC = () => {
     }
 
     setIsConfirmationModalOpen(false)
-    setSelectedPayment(null)
-  }
-
-  const processRefund = (paymentId: string, refundAmount: number, reason: string) => {
-    setPayments(prevPayments => 
-      prevPayments.map(payment => 
-        payment.id === paymentId 
-          ? { 
-              ...payment, 
-              status: 'refunded', 
-              refundedAt: new Date().toISOString(),
-              refundAmount: refundAmount,
-              refunds: [...(payment.refunds || []), {
-                id: `refund_${Date.now()}`,
-                paymentId: paymentId,
-                amount: refundAmount,
-                reason: reason,
-                status: 'completed',
-                createdAt: new Date().toISOString(),
-                processedAt: new Date().toISOString()
-              }]
-            }
-          : payment
-      )
-    )
-
-    // Update corresponding order status to cancelled
-    const payment = payments.find(p => p.id === paymentId)
-    if (payment) {
-      const order = orders.find(o => o.id === payment.orderId)
-      if (order) {
-        const updatedOrder = { ...order, status: 'cancelled' as any, updatedAt: new Date() }
-        dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder })
-      }
-    }
-
-    setIsRefundModalOpen(false)
     setSelectedPayment(null)
   }
 
@@ -298,7 +281,7 @@ const PaymentManagement: React.FC = () => {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Payment Management</h1>
           <p className="mt-2 text-sm sm:text-base text-gray-600 break-words">
-            Manage payments, confirm transactions, and handle refunds
+            Manage payments and confirm transactions. Use Refund Management for refund processing.
           </p>
         </div>
         <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -461,7 +444,12 @@ const PaymentManagement: React.FC = () => {
             </span>
             <div className="flex space-x-2">
               <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Bulk Confirm</button>
-              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Export</button>
+              <button 
+                onClick={handleExport}
+                className="text-xs sm:text-sm text-blue-700 hover:text-blue-800"
+              >
+                Export
+              </button>
             </div>
           </div>
         </div>
@@ -575,14 +563,6 @@ const PaymentManagement: React.FC = () => {
                       >
                         <CheckCircle className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => handleRefundPayment(payment)}
-                        disabled={payment.status !== 'completed'}
-                        className="text-orange-600 hover:text-orange-900 p-1 rounded hover:bg-orange-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Process Refund"
-                      >
-                        <DollarSign className="h-4 w-4" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -615,13 +595,6 @@ const PaymentManagement: React.FC = () => {
                           className="text-green-600 hover:text-green-900 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <CheckCircle className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleRefundPayment(payment)}
-                          disabled={payment.status !== 'completed'}
-                          className="text-orange-600 hover:text-orange-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <DollarSign className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -734,23 +707,13 @@ const PaymentManagement: React.FC = () => {
         payment={selectedPayment}
       />
 
-      <RefundModal
-        isOpen={isRefundModalOpen}
-        onClose={() => {
-          setIsRefundModalOpen(false)
-          setSelectedPayment(null)
-        }}
-        onRefund={processRefund}
-        payment={selectedPayment}
-      />
-
       {/* Help Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} title="How to use: Payment Management">
         <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-700">
           <li>Search by order number, customer name, email, or transaction ID.</li>
           <li>Filter by Status and Provider to narrow results.</li>
           <li>Click the checkmark to confirm pending payments (updates order to processing).</li>
-          <li>Click the dollar sign to process refunds for completed payments.</li>
+          <li>To process refunds, use the Refund Management section instead.</li>
           <li>Use bulk actions to process multiple payments at once.</li>
         </ol>
       </HelpModal>

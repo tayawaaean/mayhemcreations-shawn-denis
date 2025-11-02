@@ -154,6 +154,18 @@ class ProductReviewApiService {
       throw new Error(error.message || 'Failed to mark review as helpful');
     }
   }
+
+  /**
+   * Get overall review statistics (all approved reviews)
+   */
+  async getOverallReviewStats(): Promise<ApiResponse<ReviewStats>> {
+    try {
+      const response = await apiAuthService.get<ReviewStats>('/reviews/stats', false);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to fetch review statistics');
+    }
+  }
 }
 
 // Export singleton instance

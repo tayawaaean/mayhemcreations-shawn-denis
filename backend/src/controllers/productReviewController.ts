@@ -532,6 +532,59 @@ export const getProductReviews = async (
 };
 
 /**
+ * Get overall review statistics (all approved reviews across all products)
+ * @route GET /api/v1/reviews/stats
+ * @access Public
+ */
+export const getOverallReviewStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<Response | void> => {
+  try {
+    // Get all approved reviews to calculate overall stats
+    const [reviews] = await sequelize.query(`
+      SELECT rating
+      FROM product_reviews
+      WHERE status = 'approved'
+    `);
+
+    const reviewArray = reviews as any[];
+    
+    // Calculate overall statistics
+    const stats = {
+      totalReviews: reviewArray.length,
+      averageRating: reviewArray.length > 0 
+        ? (reviewArray.reduce((sum, r) => sum + r.rating, 0) / reviewArray.length).toFixed(1)
+        : '0',
+      ratingDistribution: {
+        5: reviewArray.filter(r => r.rating === 5).length,
+        4: reviewArray.filter(r => r.rating === 4).length,
+        3: reviewArray.filter(r => r.rating === 3).length,
+        2: reviewArray.filter(r => r.rating === 2).length,
+        1: reviewArray.filter(r => r.rating === 1).length,
+      }
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: stats,
+      message: 'Overall review statistics retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error: any) {
+    logger.error('Error getting overall review stats:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get review statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
  * Get all reviews (Admin only)
  * @route GET /api/v1/reviews/admin/all
  * @access Private (Admin only)

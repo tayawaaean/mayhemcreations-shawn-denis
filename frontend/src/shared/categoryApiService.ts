@@ -108,6 +108,13 @@ class CategoryApiService {
   }
 
   /**
+   * Bulk delete categories (Admin only)
+   */
+  async bulkDeleteCategories(ids: number[], force: boolean = false): Promise<ApiResponse<{ deletedCount: number }>> {
+    return apiAuthService.delete<{ deletedCount: number }>(`/categories/bulk?force=${force}`, true, { ids }); // Auth required
+  }
+
+  /**
    * Get category statistics
    */
   async getCategoryStats(): Promise<ApiResponse<CategoryStats>> {

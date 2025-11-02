@@ -130,24 +130,25 @@ class AdminAnalyticsApiService {
   }
 
   /**
-   * Get order statistics
+   * Get order statistics with optional period filter
    */
-  async getOrderStats(): Promise<ApiResponse<OrderStats>> {
-    const response = await apiAuthService.get<OrderStats>('/orders/admin/stats', true);
+  async getOrderStats(period?: string): Promise<ApiResponse<OrderStats>> {
+    const url = period ? `/orders/admin/stats?period=${period}` : '/orders/admin/stats';
+    const response = await apiAuthService.get<OrderStats>(url, true);
     return response;
   }
 
   /**
-   * Get comprehensive analytics data for dashboard
+   * Get comprehensive analytics data for dashboard with optional period filter
    */
-  async getDashboardAnalytics(): Promise<ApiResponse<AnalyticsData>> {
+  async getDashboardAnalytics(period?: string): Promise<ApiResponse<AnalyticsData>> {
     try {
       // Fetch all required data in parallel
       const [productStatsResponse, userStatsResponse, inventoryResponse, orderStatsResponse] = await Promise.all([
         this.getProductStats(),
         this.getUserStats(),
         this.getInventoryStatus(10), // Low stock threshold of 10
-        this.getOrderStats() // Get order statistics
+        this.getOrderStats(period) // Get order statistics with period filter
       ]);
 
       // Check each response individually for better error reporting

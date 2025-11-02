@@ -1,16 +1,42 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Hero from '../components/Hero'
 import ProductGrid from '../components/ProductGrid'
-import { products } from '../../data/products'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Truck, Shield, RotateCcw } from 'lucide-react'
 import Button from '../../components/Button'
 import SEO from '../../components/SEO'
 import { envConfig } from '../../shared/envConfig'
+import { productApiService, Product } from '../../shared/productApiService'
 
 export default function Home() {
-  const featured = products.slice(0, 4)
+  const [featured, setFeatured] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const socialLinks = envConfig.getSocialMediaLinksArray()
+
+  // Fetch featured products from API
+  useEffect(() => {
+    const fetchFeaturedProducts = async () => {
+      try {
+        setLoading(true)
+        const response = await productApiService.getProducts({
+          featured: true,
+          status: 'active',
+          limit: 4,
+          sortBy: 'createdAt',
+          sortOrder: 'DESC'
+        })
+        if (response.success && response.data) {
+          setFeatured(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching featured products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFeaturedProducts()
+  }, [])
 
   // Structured data for Organization
   const organizationSchema = {
@@ -51,7 +77,18 @@ export default function Home() {
               Discover our most popular embroidered products, carefully crafted with attention to detail and quality.
             </p>
           </div>
-          <ProductGrid products={featured} />
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              <p className="mt-4 text-gray-600">Loading featured products...</p>
+            </div>
+          ) : featured.length > 0 ? (
+            <ProductGrid products={featured} />
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No featured products available at the moment.</p>
+            </div>
+          )}
           <div className="text-center mt-12">
             <Link to="/products">
               <Button variant="outline" size="lg" className="group">

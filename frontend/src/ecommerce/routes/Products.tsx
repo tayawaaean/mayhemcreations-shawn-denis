@@ -270,6 +270,10 @@ export default function Products() {
         case 'stock-high':
           return (b.stock || 0) - (a.stock || 0)
         case 'featured':
+          // Prioritize featured products first, then sort by ID (newest first)
+          if (a.featured && !b.featured) return -1
+          if (!a.featured && b.featured) return 1
+          return parseInt(b.id) - parseInt(a.id)
         default:
           return parseInt(b.id) - parseInt(a.id)
       }

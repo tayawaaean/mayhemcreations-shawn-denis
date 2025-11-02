@@ -5,6 +5,7 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  bulkDeleteCategories,
   getCategoryStats
 } from '../controllers/categoryController';
 import { sessionAuthenticate, requireRole } from '../middlewares/auth';
@@ -43,6 +44,13 @@ router.get('/:id', getCategoryById);
  * @access Private (Admin only)
  */
 router.post('/', sessionAuthenticate, requireRole(['admin']), createCategory);
+
+/**
+ * @route DELETE /api/v1/categories/bulk
+ * @desc Bulk delete categories
+ * @access Private (Admin only)
+ */
+router.delete('/bulk', sessionAuthenticate, requireRole(['admin']), bulkDeleteCategories);
 
 /**
  * @route PUT /api/v1/categories/:id

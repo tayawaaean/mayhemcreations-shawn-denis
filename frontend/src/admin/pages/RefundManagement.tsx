@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Search, Filter, Download, CheckCircle, XCircle, Clock, RotateCcw, Eye, User, Calendar, DollarSign, AlertCircle, RefreshCw, Package, Image as ImageIcon } from 'lucide-react'
 import { RefundApiService, RefundRequest, RefundStats } from '../../shared/refundApiService'
 import { useAlertModal } from '../../ecommerce/context/AlertModalContext'
+import { downloadCSV } from '../../shared/exportUtils'
 
 const RefundManagement: React.FC = () => {
   const { showSuccess, showError, showWarning, showConfirm } = useAlertModal()
@@ -252,6 +253,34 @@ const RefundManagement: React.FC = () => {
     }
   }
 
+  // Export function to download refund requests as CSV
+  const handleExport = () => {
+    try {
+      const headers = [
+        { key: 'orderNumber' as keyof RefundRequest, label: 'Order Number' },
+        { key: 'customerName' as keyof RefundRequest, label: 'Customer Name' },
+        { key: 'customerEmail' as keyof RefundRequest, label: 'Customer Email' },
+        { key: 'refundAmount' as keyof RefundRequest, label: 'Refund Amount' },
+        { key: 'originalAmount' as keyof RefundRequest, label: 'Original Amount' },
+        { key: 'currency' as keyof RefundRequest, label: 'Currency' },
+        { key: 'refundType' as keyof RefundRequest, label: 'Refund Type' },
+        { key: 'reason' as keyof RefundRequest, label: 'Reason' },
+        { key: 'status' as keyof RefundRequest, label: 'Status' },
+        { key: 'refundMethod' as keyof RefundRequest, label: 'Refund Method' },
+        { key: 'requestedAt' as keyof RefundRequest, label: 'Requested At' },
+        { key: 'reviewedAt' as keyof RefundRequest, label: 'Reviewed At' },
+        { key: 'processedAt' as keyof RefundRequest, label: 'Processed At' },
+        { key: 'completedAt' as keyof RefundRequest, label: 'Completed At' },
+      ]
+      
+      downloadCSV(filteredRequests, headers, `refund-requests-${new Date().toISOString().split('T')[0]}`)
+      showSuccess('Refund requests exported successfully!')
+    } catch (error) {
+      console.error('Error exporting refund requests:', error)
+      showError('Failed to export refund requests. Please try again.')
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -269,7 +298,10 @@ const RefundManagement: React.FC = () => {
             <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
-          <button className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs sm:text-sm">
+          <button 
+            onClick={handleExport}
+            className="flex-1 sm:flex-none flex items-center justify-center px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs sm:text-sm"
+          >
             <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
           </button>

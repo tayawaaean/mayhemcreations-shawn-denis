@@ -18,6 +18,7 @@ import HelpModal from '../components/modals/HelpModal'
 import { CustomerDetailModal, EditCustomerModal } from '../components/modals/CustomerModals'
 import { useUsers } from '../hooks/useUsers'
 import { User as ApiUser, apiService } from '../services/apiService'
+import { downloadCSV } from '../../shared/exportUtils'
 
 const Customers: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -78,6 +79,27 @@ const Customers: React.FC = () => {
       month: 'short',
       day: 'numeric'
     }).format(new Date(dateString))
+  }
+
+  // Export function to download customers as CSV
+  const handleExport = () => {
+    try {
+      const headers = [
+        { key: 'firstName' as keyof ApiUser, label: 'First Name' },
+        { key: 'lastName' as keyof ApiUser, label: 'Last Name' },
+        { key: 'email' as keyof ApiUser, label: 'Email' },
+        { key: 'phone' as keyof ApiUser, label: 'Phone' },
+        { key: 'isEmailVerified' as keyof ApiUser, label: 'Email Verified' },
+        { key: 'isPhoneVerified' as keyof ApiUser, label: 'Phone Verified' },
+        { key: 'isActive' as keyof ApiUser, label: 'Active' },
+        { key: 'createdAt' as keyof ApiUser, label: 'Created At' },
+        { key: 'lastLoginAt' as keyof ApiUser, label: 'Last Login' },
+      ]
+      
+      downloadCSV(customers, headers, `customers-${new Date().toISOString().split('T')[0]}`)
+    } catch (error) {
+      console.error('Error exporting customers:', error)
+    }
   }
 
   const handleViewCustomer = (customer: ApiUser) => {
@@ -265,7 +287,12 @@ const Customers: React.FC = () => {
             </span>
             <div className="flex space-x-2">
               <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Send Email</button>
-              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800">Export</button>
+              <button 
+                onClick={handleExport}
+                className="text-xs sm:text-sm text-blue-700 hover:text-blue-800"
+              >
+                Export
+              </button>
             </div>
           </div>
         </div>

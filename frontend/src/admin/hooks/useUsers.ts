@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService, User, UserListResponse, UserStats } from '../services/apiService';
+import { useAdminAuth } from '../context/AdminAuthContext';
 
 interface UseUsersParams {
   page?: number;
@@ -30,6 +31,7 @@ interface UseUsersReturn {
 }
 
 export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
+  const { user: authUser } = useAdminAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -41,6 +43,9 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
+  
+  // Check if user has permission to view stats (admin or manager only)
+  const canViewStats = authUser?.role === 'admin' || authUser?.role === 'manager';
 
   const fetchUsers = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -67,16 +72,31 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
   }, [params]);
 
   const fetchStats = useCallback(async () => {
+    // Only fetch stats if user has admin or manager role
+    if (!canViewStats) {
+      return; // Skip fetching stats for users without permission
+    }
+    
     try {
       const response = await apiService.getUserStats();
       
       if (response.success && response.data) {
         setStats(response.data);
+      } else {
+        // Only log non-permission errors - 403 (Forbidden) is expected for non-admin/manager users
+        if (response.error && !response.error.includes('403') && !response.error.includes('Forbidden')) {
+          console.warn('Failed to fetch user stats:', response.message || response.error);
+        }
+        // Silently fail for permission errors - user may not have access to stats
       }
-    } catch (err) {
-      console.error('Failed to fetch user stats:', err);
+    } catch (err: any) {
+      // Only log if it's not a permission error (403)
+      if (err?.response?.status !== 403 && err?.status !== 403) {
+        console.error('Failed to fetch user stats:', err);
+      }
+      // Silently fail for permission errors - user may not have admin/manager role
     }
-  }, []);
+  }, [canViewStats]);
 
   const refetch = useCallback(async () => {
     isFetchingRef.current = false; // Reset the ref to allow refetch

@@ -76,7 +76,7 @@ const Inventory: React.FC = () => {
   
   // Size options for apparel
   const apparelSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
-  const accessorySizes = ['One Size', 'Small', 'Medium', 'Large']
+  const oneSize = ['One Size']
 
   // Toast notification functions
   const showToast = (message: string, type: Toast['type'], action?: Toast['action']) => {
@@ -156,11 +156,28 @@ const Inventory: React.FC = () => {
     const selectedProduct = products.find(p => p.id.toString() === newVariant.productId)
     if (!selectedProduct) return []
     
-    // Check if product has sizing (apparel)
+    // If product has sizing: show only apparel sizes (no "One Size")
+    // If product doesn't have sizing: show only "One Size"
     if (selectedProduct.hasSizing) {
       return apparelSizes
     } else {
-      return accessorySizes
+      return oneSize
+    }
+  }
+
+  // Get size options for edit variant based on selected product
+  const getEditSizeOptions = () => {
+    if (!editVariant.productId) return []
+    
+    const selectedProduct = products.find(p => p.id.toString() === editVariant.productId)
+    if (!selectedProduct) return []
+    
+    // If product has sizing: show only apparel sizes (no "One Size")
+    // If product doesn't have sizing: show only "One Size"
+    if (selectedProduct.hasSizing) {
+      return apparelSizes
+    } else {
+      return oneSize
     }
   }
 
@@ -1104,7 +1121,7 @@ const Inventory: React.FC = () => {
                 </label>
                 <select
                   value={editVariant.productId}
-                  onChange={(e) => setEditVariant(prev => ({ ...prev, productId: e.target.value }))}
+                  onChange={(e) => setEditVariant(prev => ({ ...prev, productId: e.target.value, size: '' }))}
                   required
                   disabled={!editVariant.categoryId}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -1154,14 +1171,20 @@ const Inventory: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Size *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={editVariant.size}
                     onChange={(e) => setEditVariant(prev => ({ ...prev, size: e.target.value }))}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., S, M, L, XL"
-                  />
+                    disabled={!editVariant.productId}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!editVariant.productId ? 'Select a product first' : 'Select a size'}
+                    </option>
+                    {getEditSizeOptions().map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

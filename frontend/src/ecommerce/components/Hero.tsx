@@ -1,10 +1,38 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Button from '../../components/Button'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Star } from 'lucide-react'
+import { productReviewApiService, ReviewStats } from '../../shared/productReviewApiService'
 
 export default function Hero() {
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null)
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+
+  // Fetch overall review statistics
+  useEffect(() => {
+    const fetchReviewStats = async () => {
+      try {
+        setReviewsLoading(true)
+        const response = await productReviewApiService.getOverallReviewStats()
+        if (response.success && response.data) {
+          setReviewStats(response.data)
+        }
+      } catch (error) {
+        console.error('Error fetching review statistics:', error)
+        // Set default values on error
+        setReviewStats({
+          totalReviews: 500,
+          averageRating: '4.9',
+          ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+        })
+      } finally {
+        setReviewsLoading(false)
+      }
+    }
+
+    fetchReviewStats()
+  }, [])
 
   return (
     <section className="bg-gradient-to-br from-gray-50 to-white py-16 lg:py-24">
@@ -31,7 +59,15 @@ export default function Hero() {
                 <Star className="w-4 h-4 text-yellow-400 fill-current" />
                 <Star className="w-4 h-4 text-yellow-400 fill-current" />
                 <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="ml-2 font-medium">4.9/5 (500+ reviews)</span>
+                {reviewsLoading ? (
+                  <span className="ml-2 font-medium">Loading...</span>
+                ) : reviewStats ? (
+                  <span className="ml-2 font-medium">
+                    {reviewStats.averageRating}/5 ({reviewStats.totalReviews > 0 ? `${reviewStats.totalReviews}+` : 'No'} reviews)
+                  </span>
+                ) : (
+                  <span className="ml-2 font-medium">4.9/5 (500+ reviews)</span>
+                )}
               </div>
             </div>
 

@@ -26,6 +26,7 @@ const Categories: React.FC = () => {
     createCategory,
     updateCategory,
     deleteCategory,
+    bulkDeleteCategories,
     searchCategories
   } = useCategories({
     includeChildren: true,
@@ -37,6 +38,7 @@ const Categories: React.FC = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
@@ -155,6 +157,34 @@ const Categories: React.FC = () => {
         status: category.status === 'active' ? 'inactive' as const : 'active' as const
       }
       await updateCategory(categoryId, { status: updatedCategory.status })
+    }
+  }
+
+  const handleBulkDelete = async (force: boolean = false) => {
+    if (selectedCategories.length === 0) return
+    
+    try {
+      const result = await bulkDeleteCategories(selectedCategories, force)
+      
+      if (result.success) {
+        setSelectedCategories([])
+        setIsBulkDeleteModalOpen(false)
+      } else {
+        // Handle error - show message to user
+        alert(result.message || 'Failed to delete categories')
+      }
+    } catch (error) {
+      console.error('Error bulk deleting categories:', error)
+      alert('Failed to delete categories')
+    }
+  }
+
+  const handleSelectAllFiltered = () => {
+    if (selectedCategories.length === filteredCategories.length && 
+        filteredCategories.every(cat => selectedCategories.includes(cat.id))) {
+      setSelectedCategories([])
+    } else {
+      setSelectedCategories(filteredCategories.map(c => c.id))
     }
   }
 
@@ -355,9 +385,12 @@ const Categories: React.FC = () => {
               {selectedCategories.length} categor{selectedCategories.length > 1 ? 'ies' : 'y'} selected
             </span>
             <div className="flex flex-wrap gap-2">
-              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Bulk Edit</button>
-              <button className="text-xs sm:text-sm text-blue-700 hover:text-blue-800 px-2 py-1 hover:bg-blue-100 rounded">Change Status</button>
-              <button className="text-xs sm:text-sm text-red-700 hover:text-red-800 px-2 py-1 hover:bg-red-100 rounded">Delete</button>
+              <button 
+                onClick={() => setIsBulkDeleteModalOpen(true)}
+                className="text-xs sm:text-sm text-red-700 hover:text-red-800 px-3 py-1.5 hover:bg-red-100 rounded font-medium"
+              >
+                Delete Selected
+              </button>
             </div>
           </div>
         </div>
@@ -372,8 +405,8 @@ const Categories: React.FC = () => {
                 <th className="px-3 py-3 text-left w-12">
                   <input
                     type="checkbox"
-                    checked={selectedCategories.length === categories.length && categories.length > 0}
-                    onChange={handleSelectAll}
+                    checked={selectedCategories.length === filteredCategories.length && filteredCategories.length > 0 && filteredCategories.every(cat => selectedCategories.includes(cat.id))}
+                    onChange={handleSelectAllFiltered}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
@@ -579,6 +612,68 @@ const Categories: React.FC = () => {
         onConfirm={handleConfirmDelete}
         category={selectedCategory}
       />
+
+      {/* Bulk Delete Modal */}
+      {isBulkDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Bulk Delete Categories</h2>
+              <button
+                onClick={() => setIsBulkDeleteModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <span className="text-2xl">&times;</span>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Are you sure you want to delete <strong>{selectedCategories.length}</strong> categor{selectedCategories.length > 1 ? 'ies' : 'y'}?
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-800 font-medium mb-2">⚠️ Warning</p>
+                  <p className="text-sm text-red-700">
+                    This action cannot be undone. Categories with children will not be deleted unless you enable force delete.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="forceDelete"
+                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">
+                    Force delete (also delete child categories)
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsBulkDeleteModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const forceDelete = (document.getElementById('forceDelete') as HTMLInputElement)?.checked || false
+                    handleBulkDelete(forceDelete)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete {selectedCategories.length} Categor{selectedCategories.length > 1 ? 'ies' : 'y'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { PaymentLog, PaymentLogStats, PaymentProvider, PaymentStatus, PaymentMet
 import { adminPaymentApiService } from '../../shared/adminPaymentApiService'
 import { formatDateOnly, formatDateTime } from '../../utils/dateFormatter'
 import { apiService, ErrorCategory } from '../services/apiService'
+import { downloadCSV } from '../../shared/exportUtils'
 
 const PaymentLogs: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')
@@ -189,6 +190,32 @@ const PaymentLogs: React.FC = () => {
     return <Minus className="w-4 h-4 text-gray-500" />
   }
 
+  // Export function to download payment logs as CSV
+  const handleExport = () => {
+    try {
+      const headers = [
+        { key: 'orderNumber' as keyof PaymentLog, label: 'Order Number' },
+        { key: 'customerName' as keyof PaymentLog, label: 'Customer Name' },
+        { key: 'customerEmail' as keyof PaymentLog, label: 'Customer Email' },
+        { key: 'amount' as keyof PaymentLog, label: 'Amount' },
+        { key: 'currency' as keyof PaymentLog, label: 'Currency' },
+        { key: 'provider' as keyof PaymentLog, label: 'Provider' },
+        { key: 'paymentMethod' as keyof PaymentLog, label: 'Payment Method' },
+        { key: 'status' as keyof PaymentLog, label: 'Status' },
+        { key: 'transactionId' as keyof PaymentLog, label: 'Transaction ID' },
+        { key: 'fees' as keyof PaymentLog, label: 'Fees' },
+        { key: 'netAmount' as keyof PaymentLog, label: 'Net Amount' },
+        { key: 'createdAt' as keyof PaymentLog, label: 'Created At' },
+        { key: 'processedAt' as keyof PaymentLog, label: 'Processed At' },
+      ]
+      
+      downloadCSV(filteredLogs, headers, `payment-logs-${new Date().toISOString().split('T')[0]}`)
+    } catch (error) {
+      console.error('Error exporting payment logs:', error)
+      setError('Failed to export payment logs. Please try again.')
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -200,7 +227,10 @@ const PaymentLogs: React.FC = () => {
           </p>
         </div>
         <div className="flex space-x-2 sm:space-x-3 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+          <button 
+            onClick={handleExport}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-gray-300 rounded-md shadow-sm text-xs sm:text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
             <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
           </button>

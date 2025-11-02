@@ -407,10 +407,9 @@ const Products: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>
-                        <span className="font-medium">${product.price}</span>
-                        {product.salePrice && (
-                          <span className="text-green-600 ml-2">${product.salePrice}</span>
-                        )}
+                        <span className="font-medium">
+                          ${typeof product.price === 'number' ? product.price.toFixed(2) : Number(product.price || 0).toFixed(2)}
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -495,12 +494,9 @@ const Products: React.FC = () => {
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs text-gray-500">Price</p>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium text-gray-900">${product.price}</span>
-                            {product.salePrice && (
-                              <span className="text-xs sm:text-sm text-green-600">${product.salePrice}</span>
-                            )}
-                          </div>
+                          <span className="text-sm font-medium text-gray-900">
+                            ${typeof product.price === 'number' ? product.price.toFixed(2) : Number(product.price || 0).toFixed(2)}
+                          </span>
                         </div>
                         <div className="col-span-2">
                           <p className="text-xs text-gray-500 mb-1">Status</p>

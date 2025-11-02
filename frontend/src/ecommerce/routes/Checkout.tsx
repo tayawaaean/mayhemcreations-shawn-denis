@@ -28,25 +28,98 @@ export default function Checkout() {
   const { items, clear } = useCart()
   const { showError, showSuccess, showWarning } = useAlertModal()
   const { user, isLoggedIn } = useAuth()
+  
+  // Store fetched products from API to avoid using mock data
+  const [fetchedProducts, setFetchedProducts] = useState<any[]>([])
+  const [productsLoading, setProductsLoading] = useState(false)
 
-  // Helper function to find product by ID (handles different ID formats)
+  // Fetch products from API on mount to get actual product data from database
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true)
+        // Get unique product IDs from cart items (excluding custom embroidery)
+        const productIds = items
+          .filter(item => item.productId !== 'custom-embroidery')
+          .map(item => item.productId)
+          .filter((id, index, self) => self.indexOf(id) === index) // Get unique IDs
+        
+        if (productIds.length > 0) {
+          // Fetch each product from API
+          const productPromises = productIds.map(async (productId) => {
+            try {
+              const numericId = typeof productId === 'string' && !isNaN(Number(productId)) 
+                ? Number(productId) 
+                : productId
+              
+              if (typeof numericId === 'number') {
+                const response = await productApiService.getProductById(numericId)
+                if (response.success && response.data) {
+                  return response.data
+                }
+              }
+              return null
+            } catch (error) {
+              console.warn(`Failed to fetch product ${productId}:`, error)
+              return null
+            }
+          })
+          
+          const fetchedProductsArray = (await Promise.all(productPromises)).filter(Boolean)
+          setFetchedProducts(fetchedProductsArray)
+        }
+      } catch (error) {
+        console.error('Error fetching products for checkout:', error)
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+
+    if (items.length > 0) {
+      fetchProducts()
+    }
+  }, [items])
+
+  // Helper function to find product by ID - prioritize API data, then cart item, then mock data
   const findProductById = (productId: string | number) => {
-    let product = null
+    // PRIORITY 1: Try to find in fetched API products first
+    let product = fetchedProducts.find(p => {
+      const pId = typeof p.id === 'string' ? p.id : String(p.id)
+      const searchId = typeof productId === 'string' ? productId : String(productId)
+      return pId === searchId || String(p.id) === String(productId)
+    })
     
-    // Try direct match first
-    product = products.find(p => p.id === productId)
-    
-    // If not found, try numeric conversion
+    // PRIORITY 2: If not found in API products, try to find in cart item's product data
     if (!product) {
-      const numericId = typeof productId === 'string' && !isNaN(Number(productId)) ? Number(productId) : productId
-      product = products.find(p => p.id === numericId)
+      const cartItem = items.find(item => String(item.productId) === String(productId))
+      if (cartItem?.product) {
+        product = cartItem.product
+      }
     }
     
-    // If still not found, try mapping numeric IDs to mayhem IDs
-    if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
-      const numId = Number(productId)
-      const mayhemId = `mayhem-${String(numId).padStart(3, '0')}` // Convert 9 to "mayhem-009"
-      product = products.find(p => p.id === mayhemId)
+    // PRIORITY 3: Fallback to mock data only if API and cart item don't have it
+    if (!product) {
+      product = products.find(p => {
+        const pId = typeof p.id === 'string' ? p.id : String(p.id)
+        const searchId = typeof productId === 'string' ? productId : String(productId)
+        return pId === searchId || String(p.id) === String(productId)
+      })
+      
+      // Try numeric conversion
+      if (!product) {
+        const numericId = typeof productId === 'string' && !isNaN(Number(productId)) ? Number(productId) : productId
+        product = products.find(p => {
+          const pIdNum = typeof p.id === 'number' ? p.id : (typeof p.id === 'string' && !isNaN(Number(p.id)) ? Number(p.id) : null)
+          return pIdNum === numericId || String(p.id) === String(numericId)
+        })
+      }
+      
+      // Try mapping numeric IDs to mayhem IDs
+      if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+        const numId = Number(productId)
+        const mayhemId = `mayhem-${String(numId).padStart(3, '0')}`
+        product = products.find(p => p.id === mayhemId)
+      }
     }
     
     return product
@@ -674,7 +747,6 @@ export default function Checkout() {
             <div className="space-y-2 text-sm text-gray-500">
               <p>Subtotal: ${completedOrderTotals.subtotal.toFixed(2)}</p>
               <p>Shipping: ${completedOrderTotals.shipping.toFixed(2)} {completedOrderTotals.shippingServiceName && `(${completedOrderTotals.shippingServiceName})`}</p>
-              <p>Tax: ${completedOrderTotals.tax.toFixed(2)}</p>
               <p className="font-semibold text-gray-900">Total: ${completedOrderTotals.total.toFixed(2)}</p>
               {completedOrderTotals.estimatedDeliveryDays && (
                 <p>Estimated delivery: {completedOrderTotals.estimatedDeliveryDays} business days after approval</p>
@@ -1411,7 +1483,20 @@ export default function Checkout() {
                       {items.map((item, index) => {
                         // Handle custom embroidery items specially
                         const isCustomEmbroidery = item.productId === 'custom-embroidery'
-                        const product = isCustomEmbroidery ? null : findProductById(item.productId)
+                        
+                        // PRIORITY: Use product data from API (fetchedProducts), then cart item, then mock data
+                        // This ensures we show the correct product info from database, not mock data
+                        let product = null
+                        
+                        if (!isCustomEmbroidery) {
+                          // First try to get from fetched API products
+                          product = findProductById(item.productId)
+                          
+                          // If still not found, try cart item's product data
+                          if (!product && item.product) {
+                            product = item.product
+                          }
+                        }
                         
                         // Skip only if it's NOT custom embroidery AND product not found
                         if (!product && !isCustomEmbroidery) {
@@ -1422,8 +1507,10 @@ export default function Checkout() {
                           )
                         }
                         
-                        // Determine display values
-                        const displayTitle = isCustomEmbroidery ? 'Custom Embroidery' : product?.title || 'Unknown Product'
+                        // Determine display values - use actual product data from database/API
+                        const displayTitle = isCustomEmbroidery 
+                          ? 'Custom Embroidery' 
+                          : (product?.title || product?.name || item.productName || 'Unknown Product')
                         
                     return (
                       <div key={index} className="border-2 border-gray-300 rounded-lg p-3 sm:p-4 bg-gradient-to-br from-white to-gray-50 shadow-md">
@@ -1699,15 +1786,6 @@ export default function Checkout() {
                         {selectedShippingRate.serviceName} • {selectedShippingRate.carrier}
                       </div>
                     )}
-                    <div className="flex justify-between text-sm sm:text-base">
-                      <span className="text-gray-600">Tax:</span>
-                      <span className="font-medium whitespace-nowrap ml-2">
-                        ${calculateTax().toFixed(2)}
-                        {selectedShippingRate?.taxAmount && selectedShippingRate.taxAmount > 0 && (
-                          <span className="text-xs text-gray-500 ml-1">(calculated by ShipEngine)</span>
-                        )}
-                      </span>
-                    </div>
                     <div className="flex justify-between text-lg sm:text-xl font-bold pt-2 border-t">
                       <span className="text-gray-900">Order Total:</span>
                       <span className="text-accent whitespace-nowrap ml-2">${calculateTotal().toFixed(2)}</span>
@@ -1873,11 +1951,6 @@ export default function Checkout() {
                     <span className="break-words">{shippingError}</span>
                   </div>
                 )}
-                
-                <div className="flex justify-between text-sm sm:text-base">
-                  <span className="text-gray-600">Tax:</span>
-                  <span className="font-medium">${calculateTax().toFixed(2)}</span>
-                </div>
                 
                 <div className="border-t-2 border-gray-300 pt-3 sm:pt-4">
                   <div className="flex justify-between text-base sm:text-lg font-bold">

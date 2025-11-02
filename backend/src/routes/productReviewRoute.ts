@@ -12,7 +12,8 @@ import {
   updateReviewStatus,
   deleteReview,
   getMyReviews,
-  markReviewHelpful
+  markReviewHelpful,
+  getOverallReviewStats
 } from '../controllers/productReviewController';
 
 const router = express.Router();
@@ -37,6 +38,13 @@ router.get('/my-reviews', sessionAuthenticate, getMyReviews);
  * @access  Public
  */
 router.get('/product/:productId', getProductReviews);
+
+/**
+ * @route   GET /api/v1/reviews/stats
+ * @desc    Get overall review statistics (all approved reviews)
+ * @access  Public
+ */
+router.get('/stats', getOverallReviewStats);
 
 /**
  * @route   GET /api/v1/reviews/admin/all

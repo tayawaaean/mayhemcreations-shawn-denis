@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import type { Product } from '../../types'
 import { Link } from 'react-router-dom'
-import { Heart, Eye, Star } from 'lucide-react'
+import { Eye, Star } from 'lucide-react'
 import Button from '../../components/Button'
 import ProductSlideshow from './ProductSlideshow'
 import { getAllProductImages } from '../../shared/imageUtils'
@@ -60,27 +60,42 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
           
           {/* Other Badges */}
-          {product.badges && product.badges.length > 0 && (
-            <>
-              {product.badges.map((badge: string, index: number) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
-                >
-                  {badge}
-                </span>
-              ))}
-            </>
-          )}
+          {(() => {
+            // Safely handle badges - ensure it's an array
+            let badges: string[] = []
+            if (product.badges) {
+              if (Array.isArray(product.badges)) {
+                badges = product.badges
+              } else if (typeof product.badges === 'string') {
+                // Try to parse if it's a JSON string
+                try {
+                  const parsed = JSON.parse(product.badges)
+                  badges = Array.isArray(parsed) ? parsed : []
+                } catch {
+                  badges = []
+                }
+              }
+            }
+            
+            return badges.length > 0 ? (
+              <>
+                {badges.map((badge: string, index: number) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 text-xs font-medium bg-accent text-white rounded-full"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </>
+            ) : null
+          })()}
         </div>
 
         {/* Quick Actions */}
         <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-opacity duration-200 ${
           isHovered ? 'opacity-100' : 'opacity-0'
         }`}>
-          <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
-            <Heart className="w-4 h-4 text-gray-600" />
-          </button>
           <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
             <Eye className="w-4 h-4 text-gray-600" />
           </button>
@@ -129,14 +144,16 @@ export default function ProductCard({ product }: { product: Product }) {
               ))}
             </div>
             <span className="text-xs text-gray-600">
-              {product.averageRating?.toFixed(1)} ({product.totalReviews})
+              {typeof product.averageRating === 'number' 
+                ? product.averageRating.toFixed(1) 
+                : Number(product.averageRating || 0).toFixed(1)} ({product.totalReviews})
             </span>
           </div>
         )}
 
         <div className="flex items-center justify-between">
           <div className="text-lg font-bold text-gray-900">
-            ${product.price.toFixed(2)}
+            ${typeof product.price === 'number' ? product.price.toFixed(2) : Number(product.price || 0).toFixed(2)}
           </div>
           <div className="text-sm text-gray-500">
             Free shipping

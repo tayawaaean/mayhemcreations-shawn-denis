@@ -101,8 +101,32 @@ export const createPaymentIntent = async (data: CreatePaymentIntentData): Promis
  */
 export const createCheckoutSession = async (data: CreateCheckoutSessionData): Promise<CheckoutSessionResult> => {
   try {
-    // Start with product line items
-    const allLineItems = [...data.lineItems];
+    // Truncate line item names and descriptions very aggressively to prevent URL length issues
+    // Stripe encodes all session data into the URL, so we need to be very conservative
+    const processedLineItems = data.lineItems.map(item => ({
+      ...item,
+      price_data: {
+        ...item.price_data,
+        product_data: {
+          ...item.price_data.product_data,
+          // Limit name to 50 chars (very aggressive to prevent URL overflow)
+          name: item.price_data.product_data.name.length > 50 
+            ? item.price_data.product_data.name.substring(0, 47) + '...'
+            : item.price_data.product_data.name,
+          // Limit description to 100 chars (very aggressive)
+          description: item.price_data.product_data.description 
+            ? (item.price_data.product_data.description.length > 100
+                ? item.price_data.product_data.description.substring(0, 97) + '...'
+                : item.price_data.product_data.description)
+            : undefined,
+          // Remove images entirely - they significantly increase URL size and aren't essential
+          images: undefined,
+        },
+      },
+    }));
+
+    // Start with processed product line items
+    const allLineItems = [...processedLineItems];
 
     // Add shipping as a line item if provided
     if (data.shippingCost && data.shippingCost > 0) {
@@ -112,6 +136,7 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
           product_data: {
             name: 'Shipping',
             description: 'Standard shipping',
+            images: undefined,
           },
           unit_amount: Math.round(data.shippingCost * 100), // Convert to cents
         },
@@ -126,7 +151,8 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
           currency: 'usd',
           product_data: {
             name: 'Tax',
-            description: 'Sales tax (8%)',
+            description: 'Sales tax',
+            images: undefined,
           },
           unit_amount: Math.round(data.taxAmount * 100), // Convert to cents
         },
@@ -134,13 +160,32 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       });
     }
 
+    // Truncate metadata values very aggressively to prevent URL length issues
+    // Only keep essential metadata - remove non-critical fields
+    const truncatedMetadata: Record<string, string> = {};
+    if (data.metadata) {
+      // Only include essential metadata fields (orderId, total, userId)
+      const essentialKeys = ['orderId', 'total', 'userId'];
+      for (const [key, value] of Object.entries(data.metadata)) {
+        if (essentialKeys.includes(key)) {
+          // Limit each metadata value to 50 chars (very aggressive)
+          truncatedMetadata[key] = value.length > 50 ? value.substring(0, 47) + '...' : value;
+        }
+        // Skip other metadata fields to reduce URL size
+      }
+    }
+
+    // Truncate URLs if they're too long (though they should already be reasonable)
+    const successUrl = data.successUrl.length > 500 ? data.successUrl.substring(0, 500) : data.successUrl;
+    const cancelUrl = data.cancelUrl.length > 500 ? data.cancelUrl.substring(0, 500) : data.cancelUrl;
+
     const sessionData: any = {
       payment_method_types: stripeConfig.paymentMethodTypes,
       line_items: allLineItems,
       mode: 'payment',
-      success_url: data.successUrl,
-      cancel_url: data.cancelUrl,
-      metadata: data.metadata || {},
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: truncatedMetadata,
       billing_address_collection: 'required',
       shipping_address_collection: {
         allowed_countries: ['US'], // US only
@@ -200,20 +245,9 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       sessionData.customer_email = data.customerInfo.email;
     }
 
-    // Store additional info in metadata for reference
-    if (data.shippingAddress && data.customerInfo) {
-      sessionData.metadata = {
-        ...sessionData.metadata,
-        shipping_name: data.customerInfo.name,
-        shipping_line1: data.shippingAddress.line1,
-        shipping_line2: data.shippingAddress.line2 || '',
-        shipping_city: data.shippingAddress.city,
-        shipping_state: data.shippingAddress.state,
-        shipping_postal_code: data.shippingAddress.postal_code,
-        shipping_country: data.shippingAddress.country,
-        customer_phone: data.customerInfo.phone || '',
-      };
-    }
+    // Don't store shipping address in metadata - it's already in customer.shipping
+    // This significantly reduces URL size
+    // Only keep minimal essential metadata
 
     const session = await stripe.checkout.sessions.create(sessionData);
 

@@ -3,6 +3,7 @@ import { X, AlertTriangle, Upload, Image as ImageIcon, Star } from 'lucide-react
 import { AdminProduct } from '../../hooks/useProducts'
 import { categoryApiService, Category } from '../../../shared/categoryApiService'
 import { ProductCreateData } from '../../../shared/productApiService'
+import { InfoTooltip } from '../InfoTooltip'
 
 interface AddProductModalProps {
   isOpen: boolean
@@ -236,8 +237,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Product Title *
+                  <InfoTooltip text="The main name of your product that customers will see. This should be clear, descriptive, and include key features or characteristics." />
                 </label>
                 <input
                   type="text"
@@ -252,8 +254,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Slug *
+                  <InfoTooltip text="A URL-friendly version of the product name used in the product page URL. Use lowercase letters, numbers, and hyphens only. Example: 'custom-embroidered-hat'." />
                 </label>
                 <input
                   type="text"
@@ -268,8 +271,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   SKU *
+                  <InfoTooltip text="Stock Keeping Unit - A unique identifier for inventory management. This helps track products in your inventory system. Format: alphanumeric code (e.g., 'HAT-001' or 'TSHIRT-XL-RED')." />
                 </label>
                 <input
                   type="text"
@@ -284,8 +288,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Category *
+                  <InfoTooltip text="The main product category helps organize products in your store. Categories appear in navigation menus and help customers find products more easily." />
                 </label>
                 <select
                   value={formData.categoryId}
@@ -303,8 +308,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Subcategory
+                  <InfoTooltip text="Optional subcategory for further product organization. Subcategories allow for more specific product grouping within a main category (e.g., 'T-Shirts' under 'Apparel')." />
                 </label>
                 <select
                   value={formData.subcategoryId}
@@ -321,8 +327,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Price *
+                  <InfoTooltip text="The selling price of the product in your store's currency. Enter the price as a number (e.g., 29.99 for $29.99). This is what customers will pay." />
                 </label>
                 <input
                   type="number"
@@ -339,8 +346,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
 
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Status
+                  <InfoTooltip text="Product visibility status: Draft (not visible to customers, still being worked on), Active (visible and purchasable in the store), Inactive (hidden from customers but preserved in system)." />
                 </label>
                 <select
                   value={formData.status}
@@ -361,8 +369,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
-                <label htmlFor="featured" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="featured" className="ml-2 block text-sm text-gray-700 flex items-center gap-2">
                   Featured Product
+                  <InfoTooltip text="Featured products are highlighted and displayed prominently on your storefront, homepage, or featured sections to draw customer attention to special items." />
                 </label>
               </div>
 
@@ -374,15 +383,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   onChange={(e) => setFormData({ ...formData, hasSizing: e.target.checked })}
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
-                <label htmlFor="hasSizing" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="hasSizing" className="ml-2 block text-sm text-gray-700 flex items-center gap-2">
                   Has Sizing (Apparel products with multiple sizes)
+                  <InfoTooltip text="Enable this if your product comes in multiple sizes (e.g., S, M, L, XL). When enabled, customers will be able to select their preferred size when adding the product to cart." />
                 </label>
               </div>
 
               {/* Multiple Image Upload Section */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Product Images * (PNG, JPG, etc.) - Up to 10 images
+                  <InfoTooltip text="Upload multiple product images to showcase your product from different angles. The first image (primary) is the main thumbnail shown in product listings. You can upload up to 10 images, each max 5MB. Supported formats: PNG, JPG, GIF." />
                 </label>
                 
                 {/* Upload Area */}
@@ -443,30 +454,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
                   type="file"
                   accept="image/*"
                   multiple
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="hidden"
                   onChange={handleFileChange}
                 />
-                
-                {/* Debug: Test button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    console.log('Test button clicked')
-                    
-                    if (fileInputRef.current) {
-                      console.log('Test: Input ref found, triggering click')
-                      fileInputRef.current.value = ''
-                      fileInputRef.current.click()
-                    } else {
-                      console.error('Test: File input ref not found')
-                    }
-                  }}
-                  className="mt-2 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
-                >
-                  Test File Upload
-                </button>
                 
                 {/* Image Previews */}
                 {imagePreviews.length > 0 && (
@@ -531,8 +521,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Alt Text *
+                  <InfoTooltip text="Alternative text description for product images. This is important for accessibility (screen readers) and SEO. Describe what the image shows (e.g., 'Red custom embroidered baseball cap with logo on front')." />
                 </label>
                 <input
                   type="text"
@@ -547,8 +538,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Description *
+                  <InfoTooltip text="Detailed product description that appears on the product page. Include key features, materials, customization options, care instructions, and any other relevant information that helps customers make a purchase decision." />
                 </label>
                 <textarea
                   value={formData.description}
@@ -823,8 +815,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
           <form onSubmit={handleSubmit} className="p-6 space-y-6 flex-1 overflow-y-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Product Title *
+                  <InfoTooltip text="The main name of your product that customers will see. This should be clear, descriptive, and include key features or characteristics." />
                 </label>
                 <input
                   type="text"
@@ -839,8 +832,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Slug *
+                  <InfoTooltip text="A URL-friendly version of the product name used in the product page URL. Use lowercase letters, numbers, and hyphens only. Example: 'custom-embroidered-hat'." />
                 </label>
                 <input
                   type="text"
@@ -855,8 +849,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   SKU *
+                  <InfoTooltip text="Stock Keeping Unit - A unique identifier for inventory management. This helps track products in your inventory system. Format: alphanumeric code (e.g., 'HAT-001' or 'TSHIRT-XL-RED')." />
                 </label>
                 <input
                   type="text"
@@ -871,8 +866,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Category *
+                  <InfoTooltip text="The main product category helps organize products in your store. Categories appear in navigation menus and help customers find products more easily." />
                 </label>
                 <select
                   value={formData.categoryId}
@@ -890,8 +886,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Subcategory
+                  <InfoTooltip text="Optional subcategory for further product organization. Subcategories allow for more specific product grouping within a main category (e.g., 'T-Shirts' under 'Apparel')." />
                 </label>
                 <select
                   value={formData.subcategoryId}
@@ -908,8 +905,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Price *
+                  <InfoTooltip text="The selling price of the product in your store's currency. Enter the price as a number (e.g., 29.99 for $29.99). This is what customers will pay." />
                 </label>
                 <input
                   type="number"
@@ -926,8 +924,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
 
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Status
+                  <InfoTooltip text="Product visibility status: Draft (not visible to customers, still being worked on), Active (visible and purchasable in the store), Inactive (hidden from customers but preserved in system)." />
                 </label>
                 <select
                   value={formData.status}
@@ -948,8 +947,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
                   onChange={(e) => setFormData({ ...formData, featured: e.target.checked })}
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
-                <label htmlFor="featured-edit" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="featured-edit" className="ml-2 block text-sm text-gray-700 flex items-center gap-2">
                   Featured Product
+                  <InfoTooltip text="Featured products are highlighted and displayed prominently on your storefront, homepage, or featured sections to draw customer attention to special items." />
                 </label>
               </div>
 
@@ -961,15 +961,17 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
                   onChange={(e) => setFormData({ ...formData, hasSizing: e.target.checked })}
                   className="h-4 w-4 text-gray-900 focus:ring-gray-900 border-gray-300 rounded"
                 />
-                <label htmlFor="hasSizing-edit" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="hasSizing-edit" className="ml-2 block text-sm text-gray-700 flex items-center gap-2">
                   Has Sizing (Apparel products with multiple sizes)
+                  <InfoTooltip text="Enable this if your product comes in multiple sizes (e.g., S, M, L, XL). When enabled, customers will be able to select their preferred size when adding the product to cart." />
                 </label>
               </div>
 
               {/* Multiple Image Upload Section */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Product Images * (PNG, JPG, etc.) - Up to 10 images
+                  <InfoTooltip text="Upload multiple product images to showcase your product from different angles. The first image (primary) is the main thumbnail shown in product listings. You can upload up to 10 images, each max 5MB. Supported formats: PNG, JPG, GIF." />
                 </label>
                 
                 {/* Upload Area */}
@@ -1069,8 +1071,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Alt Text *
+                  <InfoTooltip text="Alternative text description for product images. This is important for accessibility (screen readers) and SEO. Describe what the image shows (e.g., 'Red custom embroidered baseball cap with logo on front')." />
                 </label>
                 <input
                   type="text"
@@ -1085,8 +1088,9 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                   Description *
+                  <InfoTooltip text="Detailed product description that appears on the product page. Include key features, materials, customization options, care instructions, and any other relevant information that helps customers make a purchase decision." />
                 </label>
                 <textarea
                   value={formData.description}

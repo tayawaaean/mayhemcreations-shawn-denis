@@ -169,9 +169,10 @@ class ApiAuthService {
   /**
    * Make DELETE request
    */
-  async delete<T = any>(endpoint: string, requireAuth: boolean = true): Promise<ApiResponse<T>> {
+  async delete<T = any>(endpoint: string, requireAuth: boolean = true, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
+      body: data ? JSON.stringify(data) : undefined,
       requireAuth,
     });
   }

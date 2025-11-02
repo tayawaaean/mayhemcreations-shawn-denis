@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { X, DollarSign, Palette, Scissors, Circle, ArrowUp, Layers, Sparkles, Square } from 'lucide-react'
 import { EmbroideryOption } from '../../types'
 import ImageUpload from '../ImageUpload'
+import { InfoTooltip } from '../InfoTooltip'
 
 // Embroidery type options with icons and descriptions
 const embroideryTypes = [
@@ -60,8 +61,9 @@ const TypeSelect: React.FC<{
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
         Type *
+        <InfoTooltip text="Select the embroidery type category. Options include: Coverage (full coverage designs), Material (special material options), Thread (premium thread colors), Border (border and edging designs), Upgrade (premium upgrades), or Cutting (custom cutting and shaping)." />
       </label>
       <div
         onClick={() => setIsOpen(!isOpen)}
@@ -215,18 +217,19 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Add New Embroidery Option</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Name *
+              <InfoTooltip text="Enter a descriptive name for this embroidery option that customers will see. Examples: 'Premium Thread', 'Full Coverage Design', 'Custom Border'." />
             </label>
             <input
               type="text"
@@ -248,8 +251,9 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Image
+              <InfoTooltip text="Optional image to visually represent this embroidery option. This helps customers understand what the option looks like. Supported formats: PNG, JPG, GIF. Maximum file size: 5MB." />
             </label>
             <ImageUpload
               value={formData.image || ''}
@@ -260,8 +264,9 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Price *
+              <InfoTooltip text="The additional cost for this embroidery option. This price will be added to the base product price when customers select this option during customization. Enter as a decimal number (e.g., 5.99)." />
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -280,8 +285,9 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Description
+              <InfoTooltip text="Optional detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
             </label>
             <textarea
               name="description"
@@ -376,18 +382,19 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Edit Embroidery Option</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Name *
+              <InfoTooltip text="Enter a descriptive name for this embroidery option that customers will see. Examples: 'Premium Thread', 'Full Coverage Design', 'Custom Border'." />
             </label>
             <input
               type="text"
@@ -409,8 +416,9 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Image
+              <InfoTooltip text="Optional image to visually represent this embroidery option. This helps customers understand what the option looks like. Supported formats: PNG, JPG, GIF. Maximum file size: 5MB." />
             </label>
             <ImageUpload
               value={formData.image || ''}
@@ -421,8 +429,9 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Price *
+              <InfoTooltip text="The additional cost for this embroidery option. This price will be added to the base product price when customers select this option during customization. Enter as a decimal number (e.g., 5.99)." />
             </label>
             <div className="relative">
               <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -441,8 +450,9 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Description
+              <InfoTooltip text="Optional detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
             </label>
             <textarea
               name="description"

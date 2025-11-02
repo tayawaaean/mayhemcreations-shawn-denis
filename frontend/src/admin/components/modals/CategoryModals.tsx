@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Image as ImageIcon, Upload } from 'lucide-react'
 import { Category } from '../../types'
+import { InfoTooltip } from '../InfoTooltip'
 
 interface AddCategoryModalProps {
   isOpen: boolean
@@ -156,18 +157,19 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Add New Category</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Name *
+              <InfoTooltip text="The category name that will be displayed to customers in your store's navigation and product listings. Choose a clear, descriptive name (e.g., 'T-Shirts', 'Caps', 'Accessories')." />
             </label>
             <input
               type="text"
@@ -181,8 +183,9 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Slug *
+              <InfoTooltip text="A URL-friendly version of the category name used in category page URLs. Use lowercase letters, numbers, and hyphens only. This is automatically generated from the name but can be customized (e.g., 't-shirts', 'baseball-caps')." />
             </label>
             <input
               type="text"
@@ -325,8 +328,9 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               onChange={handleStatusChange}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
-            <label htmlFor="status" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="status" className="ml-2 block text-sm text-gray-900 flex items-center gap-2">
               Active
+              <InfoTooltip text="Check this box to make the category visible to customers. Active categories appear in navigation menus and category listings. Unchecked categories are hidden but can be reactivated later." />
             </label>
           </div>
 
@@ -488,18 +492,19 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm sm:max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Edit Category</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 flex-1 overflow-y-auto">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Name *
+              <InfoTooltip text="The category name that will be displayed to customers in your store's navigation and product listings. Choose a clear, descriptive name (e.g., 'T-Shirts', 'Caps', 'Accessories')." />
             </label>
             <input
               type="text"
@@ -513,8 +518,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Slug *
+              <InfoTooltip text="A URL-friendly version of the category name used in category page URLs. Use lowercase letters, numbers, and hyphens only. This is automatically generated from the name but can be customized (e.g., 't-shirts', 'baseball-caps')." />
             </label>
             <input
               type="text"
@@ -528,8 +534,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Description
+              <InfoTooltip text="Optional description of the category that can appear on category pages to help customers understand what types of products are included in this category." />
             </label>
             <textarea
               name="description"
@@ -542,8 +549,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Parent Category
+              <InfoTooltip text="Optional parent category to create a hierarchical structure. If selected, this category becomes a subcategory. Leave empty to create a top-level category. For example, 'T-Shirts' could be a subcategory under 'Apparel'." />
             </label>
             <select
               name="parentId"
@@ -559,8 +567,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
               Sort Order
+              <InfoTooltip text="A number that determines the display order of categories in navigation menus and category listings. Lower numbers appear first. For example, 1 appears before 2, and 2 appears before 10." />
             </label>
             <input
               type="number"
@@ -575,8 +584,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
 
           {/* Image Upload Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
               Category Image (PNG, JPG, etc.)
+              <InfoTooltip text="Optional image to represent this category. This image may be displayed in category listings, navigation menus, or on category pages. Maximum file size: 5MB. Supported formats: PNG, JPG, GIF." />
             </label>
             <div 
               className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors cursor-pointer"
@@ -657,8 +667,9 @@ export const EditCategoryModal: React.FC<EditCategoryModalProps> = ({
               onChange={handleStatusChange}
               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
-            <label htmlFor="status-edit" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="status-edit" className="ml-2 block text-sm text-gray-900 flex items-center gap-2">
               Active
+              <InfoTooltip text="Check this box to make the category visible to customers. Active categories appear in navigation menus and category listings. Unchecked categories are hidden but can be reactivated later." />
             </label>
           </div>
 

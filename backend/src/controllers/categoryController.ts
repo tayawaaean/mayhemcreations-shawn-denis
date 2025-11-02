@@ -487,6 +487,93 @@ export const deleteCategory = async (req: Request, res: Response): Promise<void>
 };
 
 /**
+ * Bulk delete categories
+ */
+export const bulkDeleteCategories = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { ids } = req.body;
+    const { force = 'false' } = req.query;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Category IDs array is required'
+      });
+      return;
+    }
+
+    // Validate all category IDs are numbers
+    const categoryIds = ids.map(id => parseInt(String(id))).filter(id => !isNaN(id));
+    
+    if (categoryIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid category IDs provided'
+      });
+      return;
+    }
+
+    // Find all categories to delete
+    const categories = await Category.findAll({
+      where: { id: categoryIds }
+    });
+
+    if (categories.length === 0) {
+      res.status(404).json({
+        success: false,
+        message: 'No categories found with the provided IDs'
+      });
+      return;
+    }
+
+    // Check for categories with children
+    const categoriesWithChildren: number[] = [];
+    
+    for (const category of categories) {
+      const childrenCount = await Category.count({
+        where: { parentId: category.id }
+      });
+
+      if (childrenCount > 0) {
+        categoriesWithChildren.push(category.id);
+      }
+    }
+
+    // If any categories have children and force is not true, return error
+    if (categoriesWithChildren.length > 0 && force !== 'true') {
+      res.status(400).json({
+        success: false,
+        message: 'Some categories have children. Use force=true to delete with children.',
+        categoriesWithChildren,
+        categoriesWithChildrenCount: categoriesWithChildren.length
+      });
+      return;
+    }
+
+    // Delete all categories
+    const deletedCount = await Category.destroy({
+      where: { id: categoryIds }
+    });
+
+    logger.info(`Bulk deleted ${deletedCount} categories (IDs: ${categoryIds.join(', ')})`);
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletedCount} categor${deletedCount === 1 ? 'y' : 'ies'}`,
+      deletedCount
+    });
+
+  } catch (error) {
+    logger.error('Error bulk deleting categories:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk delete categories',
+      error: process.env.NODE_ENV === 'development' ? error : undefined
+    });
+  }
+};
+
+/**
  * Get category statistics
  */
 export const getCategoryStats = async (req: Request, res: Response): Promise<void> => {

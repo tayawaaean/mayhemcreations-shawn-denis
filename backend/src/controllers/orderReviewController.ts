@@ -1438,14 +1438,50 @@ export const confirmPictureReplies = async (req: AuthenticatedRequest, res: Resp
  */
 export const getOrderStats = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> => {
   try {
-    // Get total orders count
+    // Get period from query parameter (defaults to '7d')
+    const period = req.query.period as string || '7d';
+    
+    // Calculate date range based on period
+    let daysInterval = 7;
+    let dateFormat = '%Y-%m-%d'; // Daily format
+    let intervalString = 'DAY';
+    
+    switch (period) {
+      case '7d':
+        daysInterval = 7;
+        dateFormat = '%Y-%m-%d';
+        intervalString = 'DAY';
+        break;
+      case '30d':
+        daysInterval = 30;
+        dateFormat = '%Y-%m-%d';
+        intervalString = 'DAY';
+        break;
+      case '90d':
+        daysInterval = 90;
+        dateFormat = '%Y-%m-%d';
+        intervalString = 'DAY';
+        break;
+      case '1y':
+        daysInterval = 365;
+        dateFormat = '%Y-%m'; // Monthly format for year view
+        intervalString = 'MONTH';
+        break;
+      default:
+        daysInterval = 7;
+        dateFormat = '%Y-%m-%d';
+        intervalString = 'DAY';
+    }
+    
+    // Get total orders count for the selected period
     const [totalOrdersResult] = await sequelize.query(`
       SELECT COUNT(*) as total_orders
       FROM order_reviews
+      WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ${daysInterval} ${intervalString})
     `);
     const totalOrders = (totalOrdersResult[0] as any).total_orders || 0;
 
-    // Get total sales from delivered orders, excluding refunded orders
+    // Get total sales from delivered orders for the selected period, excluding refunded orders
     // For partially refunded orders, subtract the refunded amount from total
     const [totalSalesResult] = await sequelize.query(`
       SELECT COALESCE(
@@ -1461,6 +1497,7 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
       FROM order_reviews
       WHERE status = 'delivered'
         AND payment_status NOT IN ('pending', 'failed', 'cancelled')
+        AND updated_at >= DATE_SUB(NOW(), INTERVAL ${daysInterval} ${intervalString})
     `);
     const totalSales = parseFloat((totalSalesResult[0] as any).total_sales) || 0;
 
@@ -1473,7 +1510,7 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
       GROUP BY status
     `);
 
-    // Get recent paid orders (last 10)
+    // Get recent paid orders for the selected period (last 10)
     const [recentOrdersResult] = await sequelize.query(`
       SELECT 
         or_table.id,
@@ -1488,14 +1525,24 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
       FROM order_reviews or_table
       JOIN users u ON or_table.user_id = u.id
       WHERE or_table.payment_status = 'completed'
+        AND or_table.updated_at >= DATE_SUB(NOW(), INTERVAL ${daysInterval} ${intervalString})
       ORDER BY or_table.updated_at DESC
       LIMIT 10
     `);
 
-    // Get revenue chart data (last 7 days), excluding refunded orders
+    // Get revenue chart data for the selected period, excluding refunded orders
+    // Validate period and interval to prevent SQL injection (only allow controlled values)
+    const validIntervals = ['DAY', 'MONTH'];
+    if (!validIntervals.includes(intervalString)) {
+      intervalString = 'DAY';
+    }
+    
+    // Use safe date format (controlled enum value)
+    const dateFormatSql = period === '1y' ? '%Y-%m' : '%Y-%m-%d';
+    
     const [revenueChartResult] = await sequelize.query(`
       SELECT 
-        DATE(updated_at) as date,
+        DATE_FORMAT(updated_at, '${dateFormatSql}') as date,
         COALESCE(
           SUM(
             CASE 
@@ -1509,8 +1556,8 @@ export const getOrderStats = async (req: AuthenticatedRequest, res: Response, ne
       FROM order_reviews
       WHERE status = 'delivered'
         AND payment_status NOT IN ('pending', 'failed', 'cancelled')
-        AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-      GROUP BY DATE(updated_at)
+        AND updated_at >= DATE_SUB(NOW(), INTERVAL ${daysInterval} ${intervalString})
+      GROUP BY DATE_FORMAT(updated_at, '${dateFormatSql}')
       ORDER BY date ASC
     `);
 

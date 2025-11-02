@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, DollarSign, Package, Alert
 import Button from '../../components/Button'
 import { materialCostApiService, MaterialCost } from '../../shared/materialCostApiService'
 import { MaterialPricingService, InputParameters, CostBreakdown } from '../../shared/materialPricingService'
+import { InfoTooltip } from '../components/InfoTooltip'
 
 export default function MaterialCosts() {
   const [materialCosts, setMaterialCosts] = useState<MaterialCost[]>([])
@@ -484,8 +485,9 @@ export default function MaterialCosts() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       Material Name *
+                      <InfoTooltip text="Enter a descriptive name for the material used in production (e.g., 'Cotton Fabric', 'Embroidery Thread', 'Stabilizer', 'Bobbin'). This helps identify materials when calculating production costs." />
                     </label>
                     <input
                       type="text"
@@ -498,8 +500,9 @@ export default function MaterialCosts() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       Cost per Unit ($) *
+                      <InfoTooltip text="Enter the cost per unit of this material in dollars. This is the price you pay to purchase one unit of the material. For example, if fabric costs $5.00 per yard, enter 5.00." />
                     </label>
                     <input
                       type="number"
@@ -515,8 +518,9 @@ export default function MaterialCosts() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                         Width (inches) *
+                        <InfoTooltip text="Enter the width of one unit of this material in inches. For example, if fabric comes in 60-inch width rolls, enter 60. This is used to calculate how much material is needed for a specific design size." />
                       </label>
                       <input
                         type="number"
@@ -530,8 +534,9 @@ export default function MaterialCosts() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                         Length (inches) *
+                        <InfoTooltip text="Enter the length of one unit of this material in inches. For example, if you buy fabric by the yard (36 inches), enter 36. This is used to calculate how much material is needed for a specific design size." />
                       </label>
                       <input
                         type="number"
@@ -547,8 +552,9 @@ export default function MaterialCosts() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       Waste Factor
+                      <InfoTooltip text="A multiplier that accounts for material waste during production (default: 1.0). For example, 1.1 means 10% waste, 1.2 means 20% waste. This ensures cost calculations include realistic material usage including cutting waste, errors, and production inefficiencies. Range: 1.0 to 10.0." />
                     </label>
                     <input
                       type="number"
@@ -570,8 +576,9 @@ export default function MaterialCosts() {
                       onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                       className="h-4 w-4 text-accent focus:ring-accent border-gray-300 rounded"
                     />
-                    <label htmlFor="isActive" className="ml-2 text-sm text-gray-700">
+                    <label htmlFor="isActive" className="ml-2 text-sm text-gray-700 flex items-center gap-2">
                       Active
+                      <InfoTooltip text="Check this box to include this material in cost calculations. Active materials are used when calculating production costs for embroidery designs. Inactive materials are hidden from calculations but preserved in the system." />
                     </label>
                   </div>
 
