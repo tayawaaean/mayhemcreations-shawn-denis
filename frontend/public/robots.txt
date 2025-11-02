@@ -1,0 +1,35 @@
+# Mayhem Creations - Robots.txt
+# This file tells search engines which pages to crawl and index
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /seller/
+Disallow: /employee-login
+Disallow: /api/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-checkout
+Disallow: /payment
+Disallow: /profile
+Disallow: /my-orders
+Disallow: /studio
+Disallow: /customize/
+Disallow: /verify-email
+Disallow: /payment-success
+Disallow: /payment-cancel
+
+# Allow product pages (even with IDs for now, will update when slugs are implemented)
+Allow: /product/
+
+# Allow category pages
+Allow: /products
+
+# Allow static pages
+Allow: /about
+Allow: /faq
+Allow: /contact
+
+# Sitemap location (dynamically generated from backend)
+Sitemap: https://mayhemcreation.com/api/v1/sitemap.xml
+

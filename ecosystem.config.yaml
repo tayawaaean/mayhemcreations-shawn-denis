@@ -7,8 +7,8 @@ apps:
   - name: mayhem-backend
     script: dist/server.js
     cwd: ./backend
-    instances: 2
-    exec_mode: cluster
+    instances: 1  # Set to 1 until database/Redis session store is configured (MemoryStore is per-instance)
+    exec_mode: fork  # Use 'fork' mode for single instance (cluster requires 2+ instances)
     node_args: "--env-file=.env"
     env:
       NODE_ENV: production
@@ -78,23 +78,8 @@ apps:
     # Process title
     instance_var: INSTANCE_ID
 
-# Global PM2 Configuration
-deploy:
-  production:
-    user: mayhem
-    host: mayhemcreation.com
-    ref: origin/main
-    repo: https://github.com/your-username/mayhemcreations-shawn-denis.git
-    path: /var/www/mayhemcreation
-    'pre-deploy-local': ''
-    'post-deploy': |
-      cd backend && npm ci --production
-      cd ../services && npm ci --production
-      cd ../backend && npm run build
-      cd ../services && npm run build
-      pm2 reload ecosystem.config.yaml --env production
-      pm2 save
-    'pre-setup': ''
+# Note: Deployment is handled via scripts/deploy-production.sh or deploy-production.ps1
+# PM2's built-in deploy feature is not used, so the deploy section is removed
 
 # PM2 Monitoring and Management
 pm2:

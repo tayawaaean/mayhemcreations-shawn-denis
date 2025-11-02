@@ -183,75 +183,6 @@ sudo systemctl restart mariadb
 
 Create `/var/www/mayhem-creation/backend/.env`:
 
-```bash
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=mayhem_creation
-DB_USER=mayhem_user
-DB_PASSWORD=strong_password_here
-
-# Server Configuration
-PORT=5001
-NODE_ENV=production
-FRONTEND_URL=https://mayhemcreation.com
-
-# Session Configuration
-SESSION_SECRET=generate_strong_random_string_here_min_32_chars
-SESSION_NAME=mayhem.sid
-
-# JWT Configuration
-JWT_SECRET=generate_strong_random_string_here_min_32_chars
-JWT_EXPIRES_IN=7d
-
-# Email Configuration
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASS=your_app_password_here
-EMAIL_FROM=Mayhem Creation <noreply@mayhemcreation.com>
-
-# Stripe Configuration (Production)
-STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key_here
-STRIPE_PUBLISHABLE_KEY=pk_live_your_stripe_publishable_key_here
-STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-STRIPE_SUCCESS_URL=https://mayhemcreation.com/payment/success
-STRIPE_CANCEL_URL=https://mayhemcreation.com/payment/cancel
-
-# PayPal Configuration (Production)
-PAYPAL_CLIENT_ID=your_paypal_client_id_here
-PAYPAL_CLIENT_SECRET=your_paypal_client_secret_here
-PAYPAL_ENVIRONMENT=production
-PAYPAL_WEBHOOK_ID_LIVE=your_live_webhook_id_here
-PAYPAL_BRAND_NAME=Mayhem Creation
-PAYPAL_SUCCESS_URL=https://mayhemcreation.com/payment/success
-PAYPAL_CANCEL_URL=https://mayhemcreation.com/payment/cancel
-
-# ShipStation / ShipEngine Configuration
-SHIPSTATION_API_KEY=your_shipstation_or_shipengine_api_key_here
-SHIPSTATION_API_SECRET=your_shipstation_api_secret_here
-SHIPSTATION_BASE_URL=https://ssapi.shipstation.com
-
-# OAuth Configuration
-GOOGLE_CLIENT_ID=your_google_client_id_here
-GOOGLE_CLIENT_SECRET=your_google_client_secret_here
-
-# Security Configuration
-BCRYPT_ROUNDS=12
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# Logging Configuration
-LOG_LEVEL=info
-LOG_FILE=/var/log/mayhem-creation/combined.log
-ERROR_LOG_FILE=/var/log/mayhem-creation/error.log
-
-# CORS Configuration (comma-separated allowed origins)
-CORS_ALLOWLIST=https://mayhemcreation.com,https://www.mayhemcreation.com
-
-# Redis (Optional - for session store in production)
-REDIS_URL=redis://localhost:6379
-```
 
 **Important**: 
 - Generate strong secrets: `openssl rand -hex 32`
@@ -349,13 +280,13 @@ ls -la /var/www/mayhem-creation/frontend/dist
 
 ```bash
 # Copy your nginx.conf to Nginx sites-available
-sudo cp /var/www/mayhem-creation/nginx.conf /etc/nginx/sites-available/mayhem-creation
+sudo cp /var/www/mayhem-creation/nginx.conf /etc/nginx/sites-available/mayhemcreation.com
 
 # Update SSL certificate paths if different
-sudo nano /etc/nginx/sites-available/mayhem-creation
+sudo nano /etc/nginx/sites-available/mayhemcreation.com
 
 # Create symbolic link
-sudo ln -s /etc/nginx/sites-available/mayhem-creation /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/mayhemcreation.com /etc/nginx/sites-enabled/mayhemcreation.com
 
 # Remove default site (optional)
 sudo rm /etc/nginx/sites-enabled/default
@@ -363,7 +294,7 @@ sudo rm /etc/nginx/sites-enabled/default
 
 ### 2. Update Nginx Configuration Paths
 
-Edit `/etc/nginx/sites-available/mayhem-creation` and ensure:
+Edit `/etc/nginx/sites-available/mayhemcreation.com` and ensure:
 
 ```nginx
 # Update frontend root path
