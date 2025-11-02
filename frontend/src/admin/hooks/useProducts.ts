@@ -75,7 +75,34 @@ export const useProducts = () => {
       setLoading(true)
       setError(null)
       
+      console.log('🔍 DEBUG useProducts.createProduct: Sending request:', {
+        title: productData.title,
+        categoryId: productData.categoryId,
+        categoryIdType: typeof productData.categoryId,
+        subcategoryId: productData.subcategoryId,
+        hasImages: !!productData.images,
+        imagesCount: productData.images?.length
+      })
+      
       const response = await productApiService.createProduct(productData)
+      
+      console.log('🔍 DEBUG useProducts.createProduct: Response received:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataId: response.data?.id,
+        dataTitle: response.data?.title,
+        message: response.message,
+        errors: response.errors,
+        fullResponse: response
+      })
+      
+      // Check if the response indicates failure
+      if (!response.success) {
+        console.error('❌ DEBUG useProducts.createProduct: Response indicates failure:', response)
+        const error = new Error(response.message || 'Failed to create product')
+        ;(error as any).response = { data: response, status: 400 }
+        throw error
+      }
       
       // Add the new product to the local state
       // Ensure all required fields are present, using productData as fallback
@@ -102,9 +129,21 @@ export const useProducts = () => {
         updatedAt: response.data?.updatedAt || new Date().toISOString()
       }
       
+      console.log('🔍 DEBUG useProducts.createProduct: Adding to local state:', {
+        newProductId: newProduct.id,
+        newProductTitle: newProduct.title,
+        newProductCategoryId: newProduct.categoryId
+      })
+      
       setProducts(prev => [newProduct, ...prev])
       return response
-    } catch (err) {
+    } catch (err: any) {
+      console.error('❌ DEBUG useProducts.createProduct: Error caught:', {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status,
+        error: err
+      })
       setError(err instanceof Error ? err.message : 'Failed to create product')
       throw err
     } finally {

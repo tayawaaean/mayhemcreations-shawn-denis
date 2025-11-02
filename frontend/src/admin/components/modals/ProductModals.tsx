@@ -174,7 +174,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           imageFiles.map(file => convertToBase64(file))
         )
         
-        onSave({
+        const productPayload = {
           ...formData,
           price: parseFloat(formData.price),
           images: base64Images,
@@ -183,7 +183,22 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
           categoryId: formData.categoryId,
           subcategoryId: formData.subcategoryId || undefined,
           weight: formData.weight ? parseFloat(formData.weight) : undefined
+        }
+        
+        console.log('🔍 DEBUG: Product payload being sent:', {
+          title: productPayload.title,
+          slug: productPayload.slug,
+          categoryId: productPayload.categoryId,
+          categoryIdType: typeof productPayload.categoryId,
+          subcategoryId: productPayload.subcategoryId,
+          subcategoryIdType: typeof productPayload.subcategoryId,
+          hasImage: !!productPayload.image,
+          imagesCount: productPayload.images?.length,
+          price: productPayload.price,
+          status: productPayload.status
         })
+        
+        onSave(productPayload)
         
         // Reset form
         setFormData({

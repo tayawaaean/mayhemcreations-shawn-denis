@@ -385,11 +385,50 @@ export const getProductBySlug = async (req: Request, res: Response): Promise<voi
 
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
   const productData = req.body;
+  
+  // Debug logging - log incoming request
+  logger.info('🔍 DEBUG: Product creation request received:', {
+    title: productData?.title,
+    slug: productData?.slug,
+    categoryId: productData?.categoryId,
+    categoryIdType: typeof productData?.categoryId,
+    subcategoryId: productData?.subcategoryId,
+    subcategoryIdType: typeof productData?.subcategoryId,
+    hasImage: !!productData?.image,
+    hasImages: !!productData?.images,
+    imagesCount: productData?.images?.length,
+    price: productData?.price,
+    alt: productData?.alt,
+    status: productData?.status
+  });
+  
   try {
 
     // Validate required fields
     // Check categoryId is valid (not 0, null, or undefined)
+    logger.info('🔍 DEBUG: Validating required fields...', {
+      hasTitle: !!productData.title,
+      hasSlug: !!productData.slug,
+      hasDescription: !!productData.description,
+      hasPrice: !!productData.price,
+      hasAlt: !!productData.alt,
+      categoryId: productData.categoryId,
+      categoryIdIsZero: productData.categoryId === 0,
+      categoryIdType: typeof productData.categoryId
+    });
+    
     if (!productData.title || !productData.slug || !productData.description || !productData.price || !productData.alt || !productData.categoryId || productData.categoryId === 0) {
+      logger.error('🔍 DEBUG: Validation failed - missing required fields', {
+        missing: {
+          title: !productData.title,
+          slug: !productData.slug,
+          description: !productData.description,
+          price: !productData.price,
+          alt: !productData.alt,
+          categoryId: !productData.categoryId || productData.categoryId === 0
+        },
+        providedCategoryId: productData.categoryId
+      });
       res.status(400).json({
         success: false,
         message: 'Missing required fields: title, slug, description, price, alt, categoryId',
@@ -397,6 +436,8 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       });
       return;
     }
+    
+    logger.info('🔍 DEBUG: Required fields validation passed');
 
     // Handle multiple images
     let processedImageData = productData.image; // For backward compatibility
@@ -440,9 +481,22 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     // Validate and convert categoryId
+    logger.info('🔍 DEBUG: Converting categoryId...', {
+      original: productData.categoryId,
+      originalType: typeof productData.categoryId
+    });
+    
     const categoryId = parseInt(String(productData.categoryId), 10);
+    logger.info('🔍 DEBUG: categoryId after parseInt:', { categoryId, isNaN: isNaN(categoryId), isZeroOrLess: categoryId <= 0 });
+    
     if (isNaN(categoryId) || categoryId <= 0) {
-      logger.error('Invalid categoryId provided:', { categoryId: productData.categoryId, type: typeof productData.categoryId });
+      logger.error('🔍 DEBUG: Invalid categoryId provided:', { 
+        original: productData.categoryId, 
+        parsed: categoryId,
+        type: typeof productData.categoryId,
+        isNaN: isNaN(categoryId),
+        isZeroOrLess: categoryId <= 0
+      });
       res.status(400).json({
         success: false,
         message: `Invalid category ID: ${productData.categoryId}`
@@ -494,6 +548,16 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     // Explicitly map fields to prevent accepting unexpected data
+    logger.info('🔍 DEBUG: Creating product with data:', {
+      title: productData.title,
+      slug: productData.slug,
+      categoryId: categoryId,
+      subcategoryId: subcategoryId,
+      hasImage: !!processedImageData,
+      imagesCount: imagesArray.length,
+      price: productData.price
+    });
+    
     const product = await Product.create({
       title: productData.title,
       slug: productData.slug,
@@ -520,6 +584,13 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       stock: productData.stock,
       materials: productData.materials,
       careInstructions: productData.careInstructions
+    });
+    
+    logger.info('🔍 DEBUG: Product created in database:', {
+      productId: product.id,
+      title: product.title,
+      slug: product.slug,
+      categoryId: product.categoryId
     });
 
     // Fetch the created product with associations
@@ -596,11 +667,19 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       message: 'Product created successfully. Image data excluded from response due to size.'
     };
 
+    logger.info('🔍 DEBUG: Sending success response:', {
+      responseDataId: responseData.id,
+      responseDataTitle: responseData.title,
+      hasCategory: !!responseData.category
+    });
+    
     res.status(201).json({
       success: true,
       data: responseData,
       message: 'Product created successfully'
     });
+    
+    logger.info('🔍 DEBUG: Response sent successfully');
 
   } catch (error: any) {
     // Check for foreign key constraint errors specifically
