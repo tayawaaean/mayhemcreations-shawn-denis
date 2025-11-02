@@ -78,12 +78,28 @@ export const useProducts = () => {
       const response = await productApiService.createProduct(productData)
       
       // Add the new product to the local state
+      // Ensure all required fields are present, using productData as fallback
       const newProduct = {
-        ...response.data,
+        id: response.data?.id || 0,
+        title: response.data?.title || productData.title,
+        slug: response.data?.slug || productData.slug,
+        description: response.data?.description || productData.description,
+        price: response.data?.price || productData.price,
+        sku: response.data?.sku || productData.sku || '',
+        alt: response.data?.alt || productData.alt,
+        categoryId: response.data?.categoryId || productData.categoryId,
+        subcategoryId: response.data?.subcategoryId || productData.subcategoryId,
+        status: response.data?.status || productData.status || 'draft',
+        featured: response.data?.featured ?? productData.featured ?? false,
         costPrice: productData.costPrice || 0,
         salePrice: productData.salePrice || (response.data?.price || productData.price),
         variants: productData.variants || [],
-        images: productData.images || [response.data?.image || productData.image]
+        images: productData.images || [response.data?.image || productData.image],
+        image: productData.image || response.data?.image,
+        category: response.data?.category,
+        subcategory: response.data?.subcategory,
+        createdAt: response.data?.createdAt || new Date().toISOString(),
+        updatedAt: response.data?.updatedAt || new Date().toISOString()
       }
       
       setProducts(prev => [newProduct, ...prev])

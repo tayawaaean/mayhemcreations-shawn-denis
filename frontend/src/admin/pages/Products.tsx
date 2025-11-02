@@ -63,7 +63,8 @@ const Products: React.FC = () => {
   const showErrorToast = (message: string, action?: Toast['action']) => showToast('error', message, action)
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    // Safely check for title and sku before calling toLowerCase
+    const matchesSearch = (product.title?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
                          (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesCategory = selectedCategory === 'all' || product.category?.slug === selectedCategory
     const matchesStatus = selectedStatus === 'all' || product.status === selectedStatus

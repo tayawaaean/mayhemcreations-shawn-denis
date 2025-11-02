@@ -154,7 +154,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ isOpen, onClos
     if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required'
     if (imageFiles.length === 0) newErrors.images = 'At least one image is required'
     if (!formData.alt.trim()) newErrors.alt = 'Alt text is required'
-    if (!formData.categoryId) newErrors.categoryId = 'Category is required'
+    if (!formData.categoryId || formData.categoryId === 0) newErrors.categoryId = 'Category is required'
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required'
     
     setErrors(newErrors)
@@ -746,7 +746,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({ isOpen, onCl
     if (!formData.price || parseFloat(formData.price) <= 0) newErrors.price = 'Valid price is required'
     if (imagePreviews.length === 0) newErrors.images = 'At least one image is required'
     if (!formData.alt.trim()) newErrors.alt = 'Alt text is required'
-    if (!formData.categoryId) newErrors.categoryId = 'Category is required'
+    if (!formData.categoryId || formData.categoryId === 0) newErrors.categoryId = 'Category is required'
     if (!formData.sku.trim()) newErrors.sku = 'SKU is required'
     
     setErrors(newErrors)

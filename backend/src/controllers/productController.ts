@@ -384,14 +384,16 @@ export const getProductBySlug = async (req: Request, res: Response): Promise<voi
 };
 
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
+  const productData = req.body;
   try {
-    const productData = req.body;
 
     // Validate required fields
-    if (!productData.title || !productData.slug || !productData.description || !productData.price || !productData.alt || !productData.categoryId) {
+    // Check categoryId is valid (not 0, null, or undefined)
+    if (!productData.title || !productData.slug || !productData.description || !productData.price || !productData.alt || !productData.categoryId || productData.categoryId === 0) {
       res.status(400).json({
         success: false,
-        message: 'Missing required fields: title, slug, description, price, alt, categoryId'
+        message: 'Missing required fields: title, slug, description, price, alt, categoryId',
+        providedCategoryId: productData.categoryId
       });
       return;
     }
@@ -437,65 +439,242 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Validate category exists
-    const category = await Category.findByPk(productData.categoryId);
-    if (!category) {
+    // Validate and convert categoryId
+    const categoryId = parseInt(String(productData.categoryId), 10);
+    if (isNaN(categoryId) || categoryId <= 0) {
+      logger.error('Invalid categoryId provided:', { categoryId: productData.categoryId, type: typeof productData.categoryId });
       res.status(400).json({
         success: false,
-        message: 'Category not found'
+        message: `Invalid category ID: ${productData.categoryId}`
       });
       return;
     }
 
+    // Validate category exists
+    const category = await Category.findByPk(categoryId);
+    if (!category) {
+      logger.error('Category not found:', { categoryId, provided: productData.categoryId });
+      
+      // Check if any categories exist at all
+      const categoryCount = await Category.count();
+      logger.warn(`Category lookup failed. Total categories in database: ${categoryCount}`);
+      
+      res.status(400).json({
+        success: false,
+        message: `Category not found with ID: ${categoryId}`
+      });
+      return;
+    }
+    
+    logger.info(`Category validation passed: ${category.name} (ID: ${category.id})`);
+
     // Validate subcategory if provided
+    let subcategoryId: number | undefined = undefined;
     if (productData.subcategoryId) {
-      const subcategory = await Category.findByPk(productData.subcategoryId);
-      if (!subcategory) {
+      const parsedSubcategoryId = parseInt(String(productData.subcategoryId), 10);
+      if (isNaN(parsedSubcategoryId) || parsedSubcategoryId <= 0) {
+        logger.error('Invalid subcategoryId provided:', { subcategoryId: productData.subcategoryId });
         res.status(400).json({
           success: false,
-          message: 'Subcategory not found'
+          message: `Invalid subcategory ID: ${productData.subcategoryId}`
         });
         return;
       }
+      
+      const subcategory = await Category.findByPk(parsedSubcategoryId);
+      if (!subcategory) {
+        logger.error('Subcategory not found:', { subcategoryId: parsedSubcategoryId });
+        res.status(400).json({
+          success: false,
+          message: `Subcategory not found with ID: ${parsedSubcategoryId}`
+        });
+        return;
+      }
+      subcategoryId = parsedSubcategoryId;
     }
 
+    // Explicitly map fields to prevent accepting unexpected data
     const product = await Product.create({
-      ...productData,
+      title: productData.title,
+      slug: productData.slug,
+      description: productData.description,
+      price: productData.price,
+      alt: productData.alt,
+      categoryId: categoryId,
+      subcategoryId: subcategoryId,
+      status: productData.status || 'draft',
+      featured: productData.featured || false,
+      sku: productData.sku,
+      weight: productData.weight,
+      dimensions: productData.dimensions,
+      hasSizing: productData.hasSizing || false,
       image: processedImageData,
       images: imagesArray,
-      primaryImageIndex: primaryImageIndex
+      primaryImageIndex: primaryImageIndex,
+      // Optional fields that may be present but not required
+      badges: productData.badges,
+      availableColors: productData.availableColors,
+      availableSizes: productData.availableSizes,
+      averageRating: productData.averageRating,
+      totalReviews: productData.totalReviews,
+      stock: productData.stock,
+      materials: productData.materials,
+      careInstructions: productData.careInstructions
     });
 
     // Fetch the created product with associations
-    const createdProduct = await Product.findByPk(product.id, {
-      include: [
-        {
-          model: Category,
-          as: 'category',
-          attributes: ['id', 'name', 'slug']
-        },
-        {
-          model: Category,
-          as: 'subcategory',
-          attributes: ['id', 'name', 'slug']
-        }
-      ]
-    });
+    // Note: Excluding large image data from response to avoid response size issues
+    // The frontend already has the image data from the request
+    let createdProduct;
+    try {
+      createdProduct = await Product.findByPk(product.id, {
+        include: [
+          {
+            model: Category,
+            as: 'category',
+            attributes: ['id', 'name', 'slug'],
+            required: false
+          },
+          {
+            model: Category,
+            as: 'subcategory',
+            attributes: ['id', 'name', 'slug'],
+            required: false
+          }
+        ]
+      });
+    } catch (fetchError: any) {
+      // If fetching with associations fails, try without associations
+      logger.warn('Failed to fetch product with associations, fetching without:', fetchError?.message);
+      createdProduct = await Product.findByPk(product.id);
+    }
 
     logger.info(`Created product: ${product.title} (ID: ${product.id})`);
 
+    // Prepare response data - exclude large base64 images to prevent response size issues
+    // The frontend already has the image data, so we don't need to send it back
+    // Use null-safe access to prevent undefined errors
+    const responseData = createdProduct ? {
+      id: createdProduct.id || product.id,
+      title: createdProduct.title || product.title || '',
+      slug: createdProduct.slug || product.slug || '',
+      description: createdProduct.description || product.description || '',
+      price: createdProduct.price || product.price || 0,
+      sku: createdProduct.sku || product.sku || null,
+      status: createdProduct.status || product.status || 'draft',
+      featured: createdProduct.featured ?? product.featured ?? false,
+      alt: createdProduct.alt || product.alt || '',
+      categoryId: createdProduct.categoryId || product.categoryId,
+      subcategoryId: createdProduct.subcategoryId ?? product.subcategoryId ?? null,
+      weight: createdProduct.weight ?? product.weight ?? null,
+      dimensions: createdProduct.dimensions || product.dimensions || null,
+      hasSizing: createdProduct.hasSizing ?? product.hasSizing ?? false,
+      primaryImageIndex: createdProduct.primaryImageIndex ?? product.primaryImageIndex ?? 0,
+      // Exclude large image data - frontend already has it
+      image: '[omitted - image data too large for response]',
+      images: (createdProduct.images && Array.isArray(createdProduct.images)) 
+        ? `[${createdProduct.images.length} images omitted]` 
+        : (product.images && Array.isArray(product.images))
+          ? `[${product.images.length} images omitted]`
+          : null,
+      category: createdProduct.category ? {
+        id: createdProduct.category.id || null,
+        name: createdProduct.category.name || null,
+        slug: createdProduct.category.slug || null
+      } : null,
+      subcategory: createdProduct.subcategory ? {
+        id: createdProduct.subcategory.id || null,
+        name: createdProduct.subcategory.name || null,
+        slug: createdProduct.subcategory.slug || null
+      } : null,
+      createdAt: createdProduct.createdAt || product.createdAt || new Date().toISOString(),
+      updatedAt: createdProduct.updatedAt || product.updatedAt || new Date().toISOString()
+    } : {
+      id: product.id,
+      title: product.title || '',
+      slug: product.slug || '',
+      message: 'Product created successfully. Image data excluded from response due to size.'
+    };
+
     res.status(201).json({
       success: true,
-      data: createdProduct,
+      data: responseData,
       message: 'Product created successfully'
     });
 
-  } catch (error) {
-    logger.error('Error creating product:', error);
+  } catch (error: any) {
+    // Check for foreign key constraint errors specifically
+    const isForeignKeyError = error?.message?.includes('foreign key constraint') || 
+                              error?.message?.includes('FOREIGN KEY') ||
+                              error?.code === 'ER_NO_REFERENCED_ROW_2' ||
+                              error?.sqlState === '23000';
+    
+    if (isForeignKeyError) {
+      logger.error('Foreign key constraint error creating product:', {
+        message: error?.message,
+        categoryId: productData?.categoryId,
+        subcategoryId: productData?.subcategoryId,
+        error: error
+      });
+      
+      // Provide a more helpful error message
+      let errorMessage = 'Invalid category or subcategory. Please select a valid category.';
+      if (error?.message?.includes('category_id')) {
+        errorMessage = `The selected category (ID: ${productData?.categoryId}) does not exist. Please select a valid category.`;
+      } else if (error?.message?.includes('subcategory_id')) {
+        errorMessage = `The selected subcategory (ID: ${productData?.subcategoryId}) does not exist. Please select a valid subcategory.`;
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      });
+      return;
+    }
+    
+    logger.error('Error creating product:', {
+      message: error?.message,
+      stack: error?.stack,
+      error: error,
+      productData: {
+        title: productData?.title,
+        slug: productData?.slug,
+        categoryId: productData?.categoryId,
+        subcategoryId: productData?.subcategoryId,
+        hasImage: !!productData?.image,
+        hasImages: !!productData?.images,
+        imageLength: productData?.image?.length || 0,
+        imagesCount: productData?.images?.length || 0
+      }
+    });
+    
+    // If product was created but response failed, return success with minimal data
+    if (error?.message?.includes('response') || error?.code === 'ECONNRESET' || error?.code === 'EPIPE') {
+      logger.warn('Response error after product creation - product may have been created');
+      try {
+        const product = await Product.findOne({ where: { slug: productData?.slug } });
+        if (product) {
+          res.status(201).json({
+            success: true,
+            data: {
+              id: product.id,
+              title: product.title,
+              slug: product.slug
+            },
+            message: 'Product created successfully (response truncated)'
+          });
+          return;
+        }
+      } catch (lookupError) {
+        // Fall through to error response
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to create product',
-      error: process.env.NODE_ENV === 'development' ? error : undefined
+      error: process.env.NODE_ENV === 'development' ? error?.message : undefined
     });
   }
 };
@@ -580,12 +759,38 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
       }
     }
 
-    await product.update({
-      ...updateData,
+    // Explicitly map fields to prevent accepting unexpected data
+    // Only update fields that are provided in updateData
+    const updateFields: any = {
       image: processedImageData,
       images: imagesArray,
       primaryImageIndex: primaryImageIndex
-    });
+    };
+
+    // Map allowed fields explicitly
+    if (updateData.title !== undefined) updateFields.title = updateData.title;
+    if (updateData.slug !== undefined) updateFields.slug = updateData.slug;
+    if (updateData.description !== undefined) updateFields.description = updateData.description;
+    if (updateData.price !== undefined) updateFields.price = updateData.price;
+    if (updateData.alt !== undefined) updateFields.alt = updateData.alt;
+    if (updateData.categoryId !== undefined) updateFields.categoryId = updateData.categoryId;
+    if (updateData.subcategoryId !== undefined) updateFields.subcategoryId = updateData.subcategoryId || null;
+    if (updateData.status !== undefined) updateFields.status = updateData.status;
+    if (updateData.featured !== undefined) updateFields.featured = updateData.featured;
+    if (updateData.sku !== undefined) updateFields.sku = updateData.sku;
+    if (updateData.weight !== undefined) updateFields.weight = updateData.weight;
+    if (updateData.dimensions !== undefined) updateFields.dimensions = updateData.dimensions;
+    if (updateData.hasSizing !== undefined) updateFields.hasSizing = updateData.hasSizing;
+    if (updateData.badges !== undefined) updateFields.badges = updateData.badges;
+    if (updateData.availableColors !== undefined) updateFields.availableColors = updateData.availableColors;
+    if (updateData.availableSizes !== undefined) updateFields.availableSizes = updateData.availableSizes;
+    if (updateData.averageRating !== undefined) updateFields.averageRating = updateData.averageRating;
+    if (updateData.totalReviews !== undefined) updateFields.totalReviews = updateData.totalReviews;
+    if (updateData.stock !== undefined) updateFields.stock = updateData.stock;
+    if (updateData.materials !== undefined) updateFields.materials = updateData.materials;
+    if (updateData.careInstructions !== undefined) updateFields.careInstructions = updateData.careInstructions;
+
+    await product.update(updateFields);
 
     // Emit WebSocket event for product status changes
     const webSocketService = getWebSocketService();
