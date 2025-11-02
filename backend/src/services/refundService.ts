@@ -811,6 +811,20 @@ export class RefundService {
         };
       }
 
+      // Validate capture ID format (PayPal capture IDs typically start with specific prefixes)
+      // Note: This is a soft validation - PayPal API will reject invalid IDs
+      if (typeof captureId !== 'string' || captureId.trim().length === 0) {
+        logger.error('Invalid PayPal capture ID format:', {
+          refundId: refund.id,
+          captureId: captureId,
+          captureIdType: typeof captureId
+        });
+        return {
+          success: false,
+          message: 'MANUAL_REFUND_REQUIRED: Invalid PayPal capture ID format. Please provide a valid capture ID from PayPal dashboard.'
+        };
+      }
+
       logger.info('Processing PayPal refund with capture ID:', {
         refundId: refund.id,
         orderId: refund.orderId,
@@ -819,21 +833,94 @@ export class RefundService {
         isManual: !!manualCaptureId
       });
 
-      // Create PayPal refund request using the actual PayPal capture ID
-      // Note: PayPal SDK structure may have changed - using generic approach
-      const request = new paypal.orders.OrdersGetRequest(captureId);
-      // TODO: Update PayPal SDK integration for refund functionality
-
-      // Execute refund via PayPal API
-      const paypalRefund = await paypalClient.execute(request);
+      // Create PayPal refund request using CapturesRefundRequest
+      // This is the correct API for refunding a PayPal capture
+      const request = new paypal.payments.CapturesRefundRequest(captureId);
       
-      logger.info(`PayPal refund created: ${paypalRefund.result.id} for refund request ${refund.id}`);
+      // Ensure refundAmount is a number (it might come from database as string or decimal)
+      const refundAmount = typeof refund.refundAmount === 'number' 
+        ? refund.refundAmount 
+        : parseFloat(String(refund.refundAmount || 0));
+      
+      // Validate refund amount
+      if (isNaN(refundAmount) || refundAmount <= 0) {
+        logger.error('Invalid refund amount:', {
+          refundId: refund.id,
+          refundAmount: refund.refundAmount,
+          refundAmountType: typeof refund.refundAmount,
+          parsedAmount: refundAmount
+        });
+        return {
+          success: false,
+          message: `Invalid refund amount: ${refund.refundAmount}. Please check the refund amount and try again.`
+        };
+      }
+      
+      // Set request body with refund details
+      // Use unique invoice_id to avoid duplicate invoice ID errors
+      // Format: ORDER-{orderNumber}-REFUND-{refundId} to ensure uniqueness
+      const uniqueInvoiceId = `ORDER-${refund.orderNumber}-REFUND-${refund.id}`;
+      
+      // Execute refund via PayPal API
+      try {
+        request.requestBody({
+          amount: {
+            value: refundAmount.toFixed(2),
+            currency_code: refund.currency || 'USD'
+          },
+          note_to_payer: `Refund for order ${refund.orderNumber}`,
+          invoice_id: uniqueInvoiceId // Unique invoice ID combining order number and refund ID
+        });
 
-      return {
-        success: true,
-        refundId: paypalRefund.result.id,
-        response: paypalRefund.result
-      };
+        const paypalRefund = await paypalClient.execute(request);
+        
+        logger.info(`PayPal refund created: ${paypalRefund.result.id} for refund request ${refund.id}`);
+
+        return {
+          success: true,
+          refundId: paypalRefund.result.id,
+          response: paypalRefund.result
+        };
+      } catch (invoiceError: any) {
+        // Handle DUPLICATE_INVOICE_ID errors by retrying without invoice_id
+        const invoiceErrorName = invoiceError?.name || invoiceError?.details?.[0]?.issue || '';
+        const invoiceErrorMessage = invoiceError?.message || '';
+        const duplicateInvoiceIssue = invoiceError?.details?.[0]?.issue === 'DUPLICATE_INVOICE_ID';
+        
+        if ((invoiceErrorName === 'UNPROCESSABLE_ENTITY' || invoiceErrorMessage.includes('DUPLICATE_INVOICE_ID')) && duplicateInvoiceIssue) {
+          logger.warn('PayPal DUPLICATE_INVOICE_ID error, retrying without invoice_id:', {
+            refundId: refund.id,
+            orderId: refund.orderId,
+            orderNumber: refund.orderNumber,
+            captureId: captureId,
+            invoiceId: uniqueInvoiceId
+          });
+          
+          // Try again without invoice_id (it's optional in PayPal API, but SDK requires it, so we'll use a timestamp-based one)
+          const timestampedInvoiceId = `ORDER-${refund.orderNumber}-REFUND-${refund.id}-${Date.now()}`;
+          const retryRequest = new paypal.payments.CapturesRefundRequest(captureId);
+          retryRequest.requestBody({
+            amount: {
+              value: refundAmount.toFixed(2),
+              currency_code: refund.currency || 'USD'
+            },
+            note_to_payer: `Refund for order ${refund.orderNumber}`,
+            invoice_id: timestampedInvoiceId // Use timestamped invoice ID to ensure uniqueness
+          });
+          
+          const retryRefund = await paypalClient.execute(retryRequest);
+          logger.info(`PayPal refund created (retry with timestamped invoice_id): ${retryRefund.result.id} for refund request ${refund.id}`);
+          
+          return {
+            success: true,
+            refundId: retryRefund.result.id,
+            response: retryRefund.result
+          };
+        }
+        
+        // If it's not a duplicate invoice ID error, rethrow to be handled by outer catch
+        throw invoiceError;
+      }
     } catch (error: any) {
       // Log full error details for debugging
       logger.error('PayPal refund error:', error?.message ? error : JSON.stringify(error));
@@ -843,21 +930,33 @@ export class RefundService {
       const errorMessage = error?.message || '';
       
       // Handle RESOURCE_NOT_FOUND errors (invalid capture ID)
-      if (errorName === 'RESOURCE_NOT_FOUND' || errorMessage.includes('RESOURCE_NOT_FOUND')) {
+      if (errorName === 'RESOURCE_NOT_FOUND' || errorMessage.includes('RESOURCE_NOT_FOUND') || errorMessage.includes('INVALID_RESOURCE_ID')) {
+        // Log detailed error information for debugging
+        logger.error('PayPal RESOURCE_NOT_FOUND error details:', {
+          refundId: refund.id,
+          orderId: refund.orderId,
+          orderNumber: refund.orderNumber,
+          captureId: manualCaptureId || 'from database',
+          error: error,
+          paypalEnvironment: process.env.PAYPAL_ENVIRONMENT || 'sandbox'
+        });
+        
         return {
           success: false,
           message: 'MANUAL_REFUND_REQUIRED: PayPal capture ID is invalid or does not exist. This usually happens when:\n\n' +
             '1. The transaction was made in a different PayPal environment (sandbox vs. live)\n' +
-            '2. The capture ID is incorrect\n' +
-            '3. The transaction was already refunded\n\n' +
+            '2. The capture ID is incorrect or missing\n' +
+            '3. The transaction was already refunded\n' +
+            '4. The capture ID format is invalid\n\n' +
             'SOLUTION:\n' +
-            '1. Log into your PayPal dashboard (sandbox or live depending on your environment)\n' +
-            '2. Search for the transaction by order number or customer email\n' +
-            '3. Find the correct Capture ID in the transaction details\n' +
-            '4. Either:\n' +
+            '1. Verify you are using the correct PayPal environment (' + (process.env.PAYPAL_ENVIRONMENT || 'sandbox') + ')\n' +
+            '2. Log into your PayPal dashboard (sandbox.paypal.com for sandbox, paypal.com for live)\n' +
+            '3. Search for the transaction by order number: ' + refund.orderNumber + '\n' +
+            '4. Find the correct Capture ID in the transaction details (look for "Capture ID" or "Transaction ID")\n' +
+            '5. Either:\n' +
             '   a) Process the refund manually in PayPal, then mark this request as completed\n' +
-            '   b) Copy the correct Capture ID and provide it when approving this refund request\n\n' +
-            `PayPal Error: ${errorMessage}`,
+            '   b) Copy the correct Capture ID and provide it manually when approving this refund request\n\n' +
+            `PayPal Error: ${errorMessage || JSON.stringify(error)}`,
           response: error
         };
       }
