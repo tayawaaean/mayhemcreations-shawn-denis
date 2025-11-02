@@ -22,23 +22,49 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2025-08-27.basil',
 });
 
-// PayPal SDK configuration
-import paypal from '@paypal/checkout-server-sdk';
+// PayPal API Configuration
+// Migrated from deprecated @paypal/checkout-server-sdk to REST API calls
+function getPayPalBaseUrl(): string {
+  return process.env.PAYPAL_ENVIRONMENT === 'production'
+    ? 'https://api-m.paypal.com'
+    : 'https://api-m.sandbox.paypal.com';
+}
 
-// Initialize PayPal client
-// Use PAYPAL_ENVIRONMENT (standard) instead of PAYPAL_MODE for consistency
-// PAYPAL_ENVIRONMENT='production' = live environment, anything else = sandbox
-const paypalEnvironment = process.env.PAYPAL_ENVIRONMENT === 'production'
-  ? new paypal.core.LiveEnvironment(
-      process.env.PAYPAL_CLIENT_ID || '',
-      process.env.PAYPAL_CLIENT_SECRET || ''
-    )
-  : new paypal.core.SandboxEnvironment(
-      process.env.PAYPAL_CLIENT_ID || '',
-      process.env.PAYPAL_CLIENT_SECRET || ''
+/**
+ * Get PayPal OAuth access token
+ * Used for authenticating REST API calls
+ */
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID || '';
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal credentials not configured');
+  }
+
+  const baseUrl = getPayPalBaseUrl();
+  
+  try {
+    const response = await axios.post(
+      `${baseUrl}/v1/oauth2/token`,
+      'grant_type=client_credentials',
+      {
+        auth: {
+          username: clientId,
+          password: clientSecret,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
     );
 
-const paypalClient = new paypal.core.PayPalHttpClient(paypalEnvironment);
+    return response.data.access_token;
+  } catch (error: any) {
+    logger.error('Error getting PayPal access token:', error);
+    throw new Error(`Failed to get PayPal access token: ${error.message}`);
+  }
+}
 
 export class RefundService {
   /**
@@ -833,10 +859,6 @@ export class RefundService {
         isManual: !!manualCaptureId
       });
 
-      // Create PayPal refund request using CapturesRefundRequest
-      // This is the correct API for refunding a PayPal capture
-      const request = new paypal.payments.CapturesRefundRequest(captureId);
-      
       // Ensure refundAmount is a number (it might come from database as string or decimal)
       const refundAmount = typeof refund.refundAmount === 'number' 
         ? refund.refundAmount 
@@ -856,39 +878,56 @@ export class RefundService {
         };
       }
       
-      // Set request body with refund details
       // Use unique invoice_id to avoid duplicate invoice ID errors
       // Format: ORDER-{orderNumber}-REFUND-{refundId} to ensure uniqueness
       const uniqueInvoiceId = `ORDER-${refund.orderNumber}-REFUND-${refund.id}`;
       
-      // Execute refund via PayPal API
+      // Prepare refund request body
+      const refundRequestBody = {
+        amount: {
+          value: refundAmount.toFixed(2),
+          currency_code: refund.currency || 'USD'
+        },
+        note_to_payer: `Refund for order ${refund.orderNumber}`,
+        invoice_id: uniqueInvoiceId // Unique invoice ID combining order number and refund ID
+      };
+      
+      // Execute refund via PayPal REST API
       try {
-        request.requestBody({
-          amount: {
-            value: refundAmount.toFixed(2),
-            currency_code: refund.currency || 'USD'
-          },
-          note_to_payer: `Refund for order ${refund.orderNumber}`,
-          invoice_id: uniqueInvoiceId // Unique invoice ID combining order number and refund ID
-        });
-
-        const paypalRefund = await paypalClient.execute(request);
+        const accessToken = await getPayPalAccessToken();
+        const baseUrl = getPayPalBaseUrl();
         
-        logger.info(`PayPal refund created: ${paypalRefund.result.id} for refund request ${refund.id}`);
+        const response = await axios.post(
+          `${baseUrl}/v2/payments/captures/${captureId}/refund`,
+          refundRequestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation',
+            },
+          }
+        );
+        
+        const paypalRefund = response.data;
+        
+        logger.info(`PayPal refund created: ${paypalRefund.id} for refund request ${refund.id}`);
 
         return {
           success: true,
-          refundId: paypalRefund.result.id,
-          response: paypalRefund.result
+          refundId: paypalRefund.id,
+          response: paypalRefund
         };
       } catch (invoiceError: any) {
-        // Handle DUPLICATE_INVOICE_ID errors by retrying without invoice_id
-        const invoiceErrorName = invoiceError?.name || invoiceError?.details?.[0]?.issue || '';
-        const invoiceErrorMessage = invoiceError?.message || '';
-        const duplicateInvoiceIssue = invoiceError?.details?.[0]?.issue === 'DUPLICATE_INVOICE_ID';
+        // Handle DUPLICATE_INVOICE_ID errors by retrying with timestamped invoice_id
+        const errorDetails = invoiceError?.response?.data || {};
+        const invoiceErrorName = errorDetails.name || errorDetails.error || '';
+        const invoiceErrorMessage = invoiceError?.response?.data?.message || invoiceError?.message || '';
+        const duplicateInvoiceIssue = errorDetails.issue === 'DUPLICATE_INVOICE_ID' || 
+                                     invoiceErrorMessage.includes('DUPLICATE_INVOICE_ID');
         
         if ((invoiceErrorName === 'UNPROCESSABLE_ENTITY' || invoiceErrorMessage.includes('DUPLICATE_INVOICE_ID')) && duplicateInvoiceIssue) {
-          logger.warn('PayPal DUPLICATE_INVOICE_ID error, retrying without invoice_id:', {
+          logger.warn('PayPal DUPLICATE_INVOICE_ID error, retrying with timestamped invoice_id:', {
             refundId: refund.id,
             orderId: refund.orderId,
             orderNumber: refund.orderNumber,
@@ -896,26 +935,45 @@ export class RefundService {
             invoiceId: uniqueInvoiceId
           });
           
-          // Try again without invoice_id (it's optional in PayPal API, but SDK requires it, so we'll use a timestamp-based one)
+          // Try again with timestamped invoice ID to ensure uniqueness
           const timestampedInvoiceId = `ORDER-${refund.orderNumber}-REFUND-${refund.id}-${Date.now()}`;
-          const retryRequest = new paypal.payments.CapturesRefundRequest(captureId);
-          retryRequest.requestBody({
+          const retryRequestBody = {
             amount: {
               value: refundAmount.toFixed(2),
               currency_code: refund.currency || 'USD'
             },
             note_to_payer: `Refund for order ${refund.orderNumber}`,
-            invoice_id: timestampedInvoiceId // Use timestamped invoice ID to ensure uniqueness
-          });
-          
-          const retryRefund = await paypalClient.execute(retryRequest);
-          logger.info(`PayPal refund created (retry with timestamped invoice_id): ${retryRefund.result.id} for refund request ${refund.id}`);
-          
-          return {
-            success: true,
-            refundId: retryRefund.result.id,
-            response: retryRefund.result
+            invoice_id: timestampedInvoiceId
           };
+          
+          try {
+            const accessToken = await getPayPalAccessToken();
+            const baseUrl = getPayPalBaseUrl();
+            
+            const retryResponse = await axios.post(
+              `${baseUrl}/v2/payments/captures/${captureId}/refund`,
+              retryRequestBody,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Prefer': 'return=representation',
+                },
+              }
+            );
+            
+            const retryRefund = retryResponse.data;
+            logger.info(`PayPal refund created (retry with timestamped invoice_id): ${retryRefund.id} for refund request ${refund.id}`);
+            
+            return {
+              success: true,
+              refundId: retryRefund.id,
+              response: retryRefund
+            };
+          } catch (retryError: any) {
+            // If retry also fails, throw the original error
+            throw invoiceError;
+          }
         }
         
         // If it's not a duplicate invoice ID error, rethrow to be handled by outer catch
@@ -923,21 +981,29 @@ export class RefundService {
       }
     } catch (error: any) {
       // Log full error details for debugging
-      logger.error('PayPal refund error:', error?.message ? error : JSON.stringify(error));
+      const errorResponse = error?.response?.data || {};
+      const errorName = errorResponse.name || errorResponse.error || error?.name || '';
+      const errorMessage = errorResponse.message || error?.message || '';
+      const errorDetails = errorResponse.details || [];
       
-      // Check if error is from PayPal API (contains statusCode or name)
-      const errorName = error?.name || error?.details?.[0]?.issue || '';
-      const errorMessage = error?.message || '';
+      logger.error('PayPal refund error:', {
+        errorName,
+        errorMessage,
+        errorDetails,
+        statusCode: error?.response?.status,
+        fullError: error
+      });
       
       // Handle RESOURCE_NOT_FOUND errors (invalid capture ID)
-      if (errorName === 'RESOURCE_NOT_FOUND' || errorMessage.includes('RESOURCE_NOT_FOUND') || errorMessage.includes('INVALID_RESOURCE_ID')) {
+      const resourceNotFoundIssue = errorDetails.find((d: any) => d.issue === 'RESOURCE_NOT_FOUND' || d.issue === 'INVALID_RESOURCE_ID');
+      if (errorName === 'RESOURCE_NOT_FOUND' || resourceNotFoundIssue || errorMessage.includes('RESOURCE_NOT_FOUND') || errorMessage.includes('INVALID_RESOURCE_ID')) {
         // Log detailed error information for debugging
         logger.error('PayPal RESOURCE_NOT_FOUND error details:', {
           refundId: refund.id,
           orderId: refund.orderId,
           orderNumber: refund.orderNumber,
           captureId: manualCaptureId || 'from database',
-          error: error,
+          error: errorResponse,
           paypalEnvironment: process.env.PAYPAL_ENVIRONMENT || 'sandbox'
         });
         

@@ -1,13 +1,24 @@
 /**
  * PayPal Service - Real PayPal API Integration
- * Handles PayPal payment operations with PayPal Checkout Server SDK
+ * Handles PayPal payment operations using PayPal REST API directly
+ * Migrated from deprecated @paypal/checkout-server-sdk to REST API calls
  */
 
-import paypal from '@paypal/checkout-server-sdk';
+import axios from 'axios';
 import { logger } from '../utils/logger';
 
-// PayPal Environment Configuration
-function paypalEnvironment() {
+// PayPal API Configuration
+function getPayPalBaseUrl(): string {
+  return process.env.PAYPAL_ENVIRONMENT === 'production'
+    ? 'https://api-m.paypal.com'
+    : 'https://api-m.sandbox.paypal.com';
+}
+
+/**
+ * Get PayPal OAuth access token
+ * Used for authenticating REST API calls
+ */
+async function getPayPalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID || '';
   const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
 
@@ -15,15 +26,28 @@ function paypalEnvironment() {
     throw new Error('PayPal credentials not configured');
   }
 
-  if (process.env.PAYPAL_ENVIRONMENT === 'production') {
-    return new paypal.core.LiveEnvironment(clientId, clientSecret);
-  }
-  return new paypal.core.SandboxEnvironment(clientId, clientSecret);
-}
+  const baseUrl = getPayPalBaseUrl();
+  
+  try {
+    const response = await axios.post(
+      `${baseUrl}/v1/oauth2/token`,
+      'grant_type=client_credentials',
+      {
+        auth: {
+          username: clientId,
+          password: clientSecret,
+        },
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
 
-// PayPal Client
-function paypalClient() {
-  return new paypal.core.PayPalHttpClient(paypalEnvironment());
+    return response.data.access_token;
+  } catch (error: any) {
+    logger.error('Error getting PayPal access token:', error);
+    throw new Error(`Failed to get PayPal access token: ${error.message}`);
+  }
 }
 
 export interface CreatePayPalOrderData {
@@ -148,10 +172,6 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
       total: formatPayPalAmount(totalAmount)
     });
 
-    // Create PayPal Order Request
-    const request = new paypal.orders.OrdersCreateRequest();
-    request.prefer("return=representation");
-    
     // Split customer name into first and last name
     const nameParts = (data.customerName || 'Customer').trim().split(' ');
     const firstName = nameParts[0] || 'Customer';
@@ -232,8 +252,6 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
       requestBody.purchase_units[0].shipping = shippingData;
     }
 
-    request.requestBody(requestBody);
-
     // Log the complete request for debugging
     logger.info('📦 Creating PayPal Order with request:', {
       shippingPreference: requestBody.application_context.shipping_preference,
@@ -248,9 +266,23 @@ export const createPayPalOrder = async (data: CreatePayPalOrderData): Promise<Pa
       }
     });
 
-    // Execute PayPal API Request
-    const response = await paypalClient().execute(request);
-    const order = response.result;
+    // Execute PayPal API Request using REST API
+    const accessToken = await getPayPalAccessToken();
+    const baseUrl = getPayPalBaseUrl();
+    
+    const response = await axios.post(
+      `${baseUrl}/v2/checkout/orders`,
+      requestBody,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'return=representation',
+        },
+      }
+    );
+    
+    const order = response.data;
     
     logger.info('PayPal Order created successfully', {
       orderId: order.id,
@@ -304,14 +336,23 @@ export const capturePayPalOrder = async (data: CapturePayPalOrderData): Promise<
       };
     }
 
-    // Create PayPal Capture Request
-    const request = new paypal.orders.OrdersCaptureRequest(data.orderId);
-    // Request body is optional for capture, use type assertion
-    (request as any).requestBody({});
-
-    // Execute PayPal API Request
-    const response = await paypalClient().execute(request);
-    const capture = response.result;
+    // Execute PayPal Capture Request using REST API
+    const accessToken = await getPayPalAccessToken();
+    const baseUrl = getPayPalBaseUrl();
+    
+    const response = await axios.post(
+      `${baseUrl}/v2/checkout/orders/${data.orderId}/capture`,
+      {},
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Prefer': 'return=representation',
+        },
+      }
+    );
+    
+    const capture = response.data;
     
     logger.info('PayPal Order captured successfully', {
       orderId: data.orderId,
@@ -407,12 +448,21 @@ export interface PayPalOrderDetailsResult {
  */
 export const retrievePayPalOrder = async (orderId: string): Promise<PayPalOrderDetailsResult> => {
   try {
-    // Create PayPal Get Order Request
-    const request = new paypal.orders.OrdersGetRequest(orderId);
-
-    // Execute PayPal API Request
-    const response = await paypalClient().execute(request);
-    const order = response.result;
+    // Execute PayPal Get Order Request using REST API
+    const accessToken = await getPayPalAccessToken();
+    const baseUrl = getPayPalBaseUrl();
+    
+    const response = await axios.get(
+      `${baseUrl}/v2/checkout/orders/${orderId}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+    
+    const order = response.data;
     
     logger.info('PayPal Order retrieved successfully', { 
       orderId: order.id,
@@ -498,15 +548,9 @@ export const verifyPayPalWebhookSignature = async (
 
     // Use PayPal REST API directly to verify webhook signature
     // Reference: https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
-    // The checkout-server-sdk doesn't include webhook verification, so we use REST API directly
-    
-    // Get access token for REST API call using axios
-    const axios = await import('axios');
     
     // Get the PayPal base URL based on environment
-    const baseUrl = process.env.PAYPAL_ENVIRONMENT === 'production' 
-      ? 'https://api-m.paypal.com'
-      : 'https://api-m.sandbox.paypal.com';
+    const baseUrl = getPayPalBaseUrl();
     
     // Prepare verification request body
     const verificationPayload = {
@@ -520,29 +564,10 @@ export const verifyPayPalWebhookSignature = async (
     };
 
     // Get OAuth token for the API call
-    // We'll need to use PayPal's OAuth endpoint to get a token
-    const clientId = process.env.PAYPAL_CLIENT_ID || '';
-    const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
-    
-    // Get OAuth token
-    const tokenResponse = await axios.default.post(
-      `${baseUrl}/v1/oauth2/token`,
-      'grant_type=client_credentials',
-      {
-        auth: {
-          username: clientId,
-          password: clientSecret,
-        },
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
-
-    const accessToken = tokenResponse.data.access_token;
+    const accessToken = await getPayPalAccessToken();
 
     // Call PayPal's Verify Webhook Signature endpoint
-    const verifyResponse = await axios.default.post(
+    const verifyResponse = await axios.post(
       `${baseUrl}/v1/notifications/verify-webhook-signature`,
       verificationPayload,
       {
