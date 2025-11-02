@@ -1,60 +1,44 @@
 import 'dotenv/config'
 import { Sequelize } from 'sequelize'
-import { Umzug, SequelizeStorage } from 'umzug'
+const { Umzug, SequelizeStorage } = require('umzug')
 import { sequelize } from '../config/database'
 
 const umzug = new Umzug({
   migrations: {
     glob: 'src/migrations/*.ts',
-    resolve: ({ name, path: migrationPath, context }) => {
-      try {
-        // With ts-node register, we can use require() with .ts files
-        // Clear the require cache to ensure fresh load
-        if (migrationPath && require.cache[migrationPath]) {
-          delete require.cache[migrationPath]
-        }
-        
-        // Use require() for CommonJS (ts-node handles .ts files)
-        const migration = require(migrationPath!)
-        
-        // Handle both CommonJS (module.exports) and ES6 (export) formats
-        const upFn = migration.up || migration.default?.up
-        const downFn = migration.down || migration.default?.down
-        
-        if (!upFn || typeof upFn !== 'function') {
-          throw new Error(`Migration ${name} does not export an 'up' function`)
-        }
-        
-        return {
-          name,
-          up: async () => {
-            await upFn(context.getQueryInterface(), Sequelize)
-          },
-          down: async () => {
-            if (downFn && typeof downFn === 'function') {
-              await downFn(context.getQueryInterface(), Sequelize)
-            } else {
-              console.warn(`Migration ${name} does not have a 'down' function, skipping rollback`)
-            }
-          },
-        }
-      } catch (error: any) {
-        console.error(`❌ Error loading migration ${name} from ${migrationPath}:`, error.message || error)
-        if (error.stack) {
-          console.error(error.stack)
-        }
-        throw error
+    resolve: ({ name, path: migrationPath, context }: any) => {
+      // Clear require cache for fresh load
+      if (migrationPath && require.cache[migrationPath]) {
+        delete require.cache[migrationPath]
+      }
+      
+      // Use require() - ts-node handles TypeScript files with CommonJS
+      const migration = require(migrationPath!)
+      
+      // Handle both CommonJS (module.exports) and ES6 (export) formats
+      const upFn = migration.up || migration.default?.up
+      const downFn = migration.down || migration.default?.down
+      
+      if (!upFn || typeof upFn !== 'function') {
+        throw new Error(`Migration ${name} does not export an 'up' function`)
+      }
+      
+      return {
+        name,
+        up: async () => {
+          await upFn(context.getQueryInterface(), Sequelize)
+        },
+        down: async () => {
+          if (downFn && typeof downFn === 'function') {
+            await downFn(context.getQueryInterface(), Sequelize)
+          }
+        },
       }
     },
   },
   context: sequelize,
   storage: new SequelizeStorage({ sequelize, tableName: 'migrations_meta' }),
-  logger: {
-    info: (message: string) => console.log(`ℹ️  ${message}`),
-    warn: (message: string) => console.warn(`⚠️  ${message}`),
-    error: (message: string) => console.error(`❌ ${message}`),
-    debug: (message: string) => console.log(`🔍 ${message}`),
-  },
+  logger: console,
 })
 
 const cmd = process.argv[2]
@@ -68,7 +52,7 @@ const cmd = process.argv[2]
         console.log('No pending migrations to run.')
       } else {
         console.log(`✅ Successfully ran ${migrations.length} migration(s):`)
-        migrations.forEach(m => console.log(`  - ${m.name}`))
+        migrations.forEach((m: { name: string }) => console.log(`  - ${m.name}`))
       }
     } else if (cmd === 'down') {
       console.log('Rolling back migrations...')
@@ -79,7 +63,7 @@ const cmd = process.argv[2]
       if (pending.length === 0) {
         console.log('  No pending migrations.')
       } else {
-        pending.forEach(m => console.log(`  - ${m.name}`))
+        pending.forEach((m: { name: string }) => console.log(`  - ${m.name}`))
       }
     } else if (cmd === 'executed') {
       const executed = await umzug.executed()
@@ -87,7 +71,7 @@ const cmd = process.argv[2]
       if (executed.length === 0) {
         console.log('  No executed migrations.')
       } else {
-        executed.forEach(m => console.log(`  - ${m.name}`))
+        executed.forEach((m: { name: string }) => console.log(`  - ${m.name}`))
       }
     } else {
       console.log('Usage: npm run migrate:up | migrate:down | migrate:status')

@@ -47,11 +47,34 @@ const syncDatabase = async (force: boolean = false): Promise<void> => {
     // Import models to ensure they're registered
     await import('../models');
     
-    // Avoid alter sync in production; use migrations instead
-    const isDev = process.env.NODE_ENV === 'development';
-    if (isDev) {
-      await sequelize.sync({ force: false, alter: true });
+    // Disable foreign key checks temporarily to avoid constraint errors during table creation
+    // This is especially important when creating tables in a fresh database where order matters
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    
+    try {
+      // Use force: true to drop and recreate all tables (for db:reset)
+      // Use alter: true to modify existing tables without dropping (for development)
+      const isDev = process.env.NODE_ENV === 'development';
+      if (force) {
+        // Force mode: drop all tables and recreate (used by db:reset)
+        await sequelize.sync({ force: true });
+      } else if (isDev) {
+        // Development mode: alter existing tables
+        await sequelize.sync({ force: false, alter: true });
+      }
+      // Production mode: do nothing (use migrations instead)
+      
+      // Re-enable foreign key checks
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
       console.log('✅ Database synchronized successfully.');
+    } catch (error) {
+      // Ensure foreign key checks are re-enabled even if sync fails
+      try {
+        await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+      } catch (e) {
+        // Ignore error if query fails
+      }
+      throw error;
     }
   } catch (error) {
     console.error('❌ Error synchronizing database:', error);

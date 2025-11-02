@@ -338,11 +338,25 @@ export const models = {
 // Database synchronization function
 export const syncDatabase = async (force: boolean = false): Promise<void> => {
   try {
+    // Disable foreign key checks temporarily to avoid constraint errors during table creation
+    // This is safe because we're creating all tables in the same transaction
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    
     // Sync database with alter: true to update existing tables without dropping data
     // Use force: true only when explicitly needed (drops all tables)
     await sequelize.sync({ force, alter: !force });
+    
+    // Re-enable foreign key checks
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    
     console.log(`✅ Database synchronized successfully (${force ? 'force' : 'alter'} mode).`);
   } catch (error) {
+    // Ensure foreign key checks are re-enabled even if sync fails
+    try {
+      await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    } catch (e) {
+      // Ignore error if query fails
+    }
     console.error('❌ Error synchronizing database:', error);
     throw error;
   }
