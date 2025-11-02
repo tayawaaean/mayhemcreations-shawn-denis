@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { Product, Category, Variant } from '../models';
 import { logger } from '../utils/logger';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
+import { sequelize } from '../config/database';
 import { getWebSocketService } from '../services/websocketService';
 
 export interface ProductFilters {
@@ -505,17 +506,66 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     // Validate category exists
+    logger.info('🔍 DEBUG: Attempting to find category by PK:', {
+      categoryId,
+      categoryIdType: typeof categoryId,
+      categoryIdValue: categoryId
+    });
+    
+    // Try direct query first to see if it's a model issue
+    // Note: Table name is 'Categories' (capital C) as defined in the model
+    const directQuery = await sequelize.query(
+      'SELECT * FROM Categories WHERE id = :categoryId',
+      {
+        replacements: { categoryId },
+        type: QueryTypes.SELECT
+      }
+    );
+    
+    logger.info('🔍 DEBUG: Direct SQL query result:', {
+      categoryId,
+      directQueryResult: directQuery,
+      resultCount: Array.isArray(directQuery) ? directQuery.length : 0
+    });
+    
     const category = await Category.findByPk(categoryId);
+    
+    logger.info('🔍 DEBUG: Category.findByPk result:', {
+      categoryId,
+      found: !!category,
+      categoryData: category ? {
+        id: category.id,
+        name: category.name,
+        slug: category.slug
+      } : null
+    });
+    
     if (!category) {
-      logger.error('Category not found:', { categoryId, provided: productData.categoryId });
+      logger.error('🔍 DEBUG: Category not found:', { 
+        categoryId, 
+        provided: productData.categoryId,
+        categoryIdType: typeof categoryId,
+        directQueryFound: Array.isArray(directQuery) && directQuery.length > 0
+      });
       
-      // Check if any categories exist at all
+      // Check if any categories exist at all and list them for debugging
       const categoryCount = await Category.count();
-      logger.warn(`Category lookup failed. Total categories in database: ${categoryCount}`);
+      const allCategories = await Category.findAll({
+        attributes: ['id', 'name', 'slug'],
+        limit: 50 // Limit to prevent huge logs
+      });
+      
+      logger.error('🔍 DEBUG: Category lookup failed. Available categories:', {
+        totalCategories: categoryCount,
+        requestedId: categoryId,
+        availableIds: allCategories.map(c => ({ id: c.id, name: c.name, slug: c.slug })),
+        directQueryResult: directQuery
+      });
       
       res.status(400).json({
         success: false,
-        message: `Category not found with ID: ${categoryId}`
+        message: `The selected category (ID: ${categoryId}) does not exist. Please select a valid category.`,
+        availableCategories: allCategories.map(c => ({ id: c.id, name: c.name }))
       });
       return;
     }
@@ -537,10 +587,26 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       
       const subcategory = await Category.findByPk(parsedSubcategoryId);
       if (!subcategory) {
-        logger.error('Subcategory not found:', { subcategoryId: parsedSubcategoryId });
+        logger.error('🔍 DEBUG: Subcategory not found:', { 
+          subcategoryId: parsedSubcategoryId,
+          subcategoryIdType: typeof parsedSubcategoryId
+        });
+        
+        // List available categories for debugging
+        const allCategories = await Category.findAll({
+          attributes: ['id', 'name', 'slug'],
+          limit: 50
+        });
+        
+        logger.error('🔍 DEBUG: Subcategory lookup failed. Available categories:', {
+          requestedSubcategoryId: parsedSubcategoryId,
+          availableIds: allCategories.map(c => ({ id: c.id, name: c.name, slug: c.slug }))
+        });
+        
         res.status(400).json({
           success: false,
-          message: `Subcategory not found with ID: ${parsedSubcategoryId}`
+          message: `The selected subcategory (ID: ${parsedSubcategoryId}) does not exist. Please select a valid subcategory.`,
+          availableCategories: allCategories.map(c => ({ id: c.id, name: c.name }))
         });
         return;
       }

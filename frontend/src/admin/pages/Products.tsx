@@ -107,11 +107,20 @@ const Products: React.FC = () => {
       // Extract error information using apiService
       const errorInfo = apiService.extractErrorInfo(error)
       
+      // Check if the error response contains available categories (category/subcategory not found)
+      const availableCategories = error?.response?.data?.availableCategories || 
+                                   errorInfo.response?.data?.availableCategories;
+      
       // Specific error messages based on error type
       let errorMessage = `Failed to create product: ${errorInfo.message}`
       
-      if (errorInfo.category === 'validation') {
-        errorMessage = 'Validation error: Please check all required fields are filled correctly.'
+      // If category/subcategory not found, include available categories in the message
+      if (availableCategories && Array.isArray(availableCategories) && availableCategories.length > 0) {
+        const categoryList = availableCategories.map((c: any) => `${c.name} (ID: ${c.id})`).join(', ');
+        errorMessage = `${errorInfo.message}\n\nAvailable categories: ${categoryList}`
+        console.error('🔍 DEBUG: Available categories from error response:', availableCategories)
+      } else if (errorInfo.category === 'validation') {
+        errorMessage = `Validation error: ${errorInfo.message || 'Please check all required fields are filled correctly.'}`
       } else if (errorInfo.category === 'network') {
         errorMessage = 'Network error: Unable to reach the server. Please check your connection.'
       } else if (errorInfo.category === 'timeout') {

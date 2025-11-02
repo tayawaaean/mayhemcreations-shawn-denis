@@ -60,10 +60,17 @@ if [[ "$PROJECT" == "frontend" || "$PROJECT" == "services" || "$PROJECT" == "bac
 fi
 cd ..
 
+if [[ "$PROJECT" == "frontend" ]]; then
+    sudo systemctl restart nginx
+fi
+
 # === PM2 RESTART ===
-echo "Restarting PM2 apps..."
-pm2 delete "$PM2_CONFIG" || true
-pm2 start "$PM2_CONFIG"
-pm2 save
+if [[ "$PROJECT" == "services" || "$PROJECT" == "backend" ]]; then
+    echo "Restarting PM2 apps..."
+    pm2 delete "$PM2_CONFIG" || true
+    pm2 start "$PM2_CONFIG"
+    pm2 save
+fi
+
 
 echo "✅ Deployment complete for $PROJECT"
