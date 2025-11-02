@@ -132,9 +132,6 @@ Thumbs.db
 *.sqlite
 *.db
 
-# Uploads
-uploads/
-public/uploads/
 
 # Build outputs
 dist/
