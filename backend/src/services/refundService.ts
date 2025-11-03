@@ -35,14 +35,34 @@ function getPayPalBaseUrl(): string {
  * Used for authenticating REST API calls
  */
 async function getPayPalAccessToken(): Promise<string> {
-  const clientId = process.env.PAYPAL_CLIENT_ID || '';
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
+  // Trim whitespace from credentials to prevent auth issues
+  const clientId = (process.env.PAYPAL_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
+  const environment = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
+  const baseUrl = getPayPalBaseUrl();
 
+  // Validate credentials are provided
   if (!clientId || !clientSecret) {
-    throw new Error('PayPal credentials not configured');
+    const missingCreds = [];
+    if (!clientId) missingCreds.push('PAYPAL_CLIENT_ID');
+    if (!clientSecret) missingCreds.push('PAYPAL_CLIENT_SECRET');
+    
+    logger.error('PayPal credentials not configured', {
+      missing: missingCreds,
+      environment: environment,
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+    });
+    throw new Error(`PayPal credentials not configured: Missing ${missingCreds.join(', ')}`);
   }
 
-  const baseUrl = getPayPalBaseUrl();
+  // Log environment for debugging (without exposing credentials)
+  logger.info('Requesting PayPal access token', {
+    environment: environment,
+    baseUrl: baseUrl,
+    clientIdLength: clientId.length,
+    clientSecretLength: clientSecret.length,
+  });
   
   try {
     const response = await axios.post(
@@ -55,14 +75,67 @@ async function getPayPalAccessToken(): Promise<string> {
         },
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
         },
       }
     );
 
+    // Validate response contains access token
+    if (!response.data?.access_token) {
+      logger.error('PayPal access token response missing access_token field', {
+        responseKeys: Object.keys(response.data || {}),
+        status: response.status,
+      });
+      throw new Error('Invalid PayPal access token response: missing access_token');
+    }
+
+    logger.info('PayPal access token retrieved successfully', {
+      environment: environment,
+      tokenLength: response.data.access_token?.length || 0,
+    });
+
     return response.data.access_token;
   } catch (error: any) {
-    logger.error('Error getting PayPal access token:', error);
-    throw new Error(`Failed to get PayPal access token: ${error.message}`);
+    // Enhanced error logging for 401 authentication errors
+    const errorStatus = error.response?.status;
+    const errorData = error.response?.data;
+    
+    if (errorStatus === 401) {
+      logger.error('PayPal authentication failed (401 Unauthorized)', {
+        environment: environment,
+        baseUrl: baseUrl,
+        clientIdPrefix: clientId.substring(0, 8) + '...',
+        clientIdLength: clientId.length,
+        clientSecretLength: clientSecret.length,
+        errorMessage: errorData?.error_description || error.message,
+        errorDetails: errorData,
+      });
+      
+      // Provide helpful error message based on common causes
+      let helpfulMessage = 'PayPal authentication failed. ';
+      
+      if (environment === 'sandbox' && clientId.startsWith('AQkquBDf1zctJ')) {
+        helpfulMessage += 'Detected production credentials used with sandbox environment. ';
+      } else if (environment === 'production' && !clientId.startsWith('AQkquBDf1zctJ')) {
+        helpfulMessage += 'Detected sandbox credentials used with production environment. ';
+      }
+      
+      helpfulMessage += 'Please verify: 1) PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are correct, 2) PAYPAL_ENVIRONMENT matches your credentials (sandbox/production), 3) Credentials are active and not revoked in PayPal dashboard.';
+      
+      throw new Error(helpfulMessage);
+    }
+    
+    // Log other errors with details
+    logger.error('Error getting PayPal access token', {
+      status: errorStatus,
+      statusText: error.response?.statusText,
+      errorMessage: error.message,
+      errorData: errorData,
+      environment: environment,
+      baseUrl: baseUrl,
+    });
+    
+    throw new Error(`Failed to get PayPal access token: ${error.message || 'Unknown error'}`);
   }
 }
 
