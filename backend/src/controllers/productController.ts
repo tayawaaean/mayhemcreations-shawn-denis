@@ -387,8 +387,8 @@ export const getProductBySlug = async (req: Request, res: Response): Promise<voi
 export const createProduct = async (req: Request, res: Response): Promise<void> => {
   const productData = req.body;
   
-  // Debug logging - log incoming request
-  logger.info('🔍 DEBUG: Product creation request received:', {
+  // Debug logging - log incoming request (use error level for production visibility)
+  logger.error('🔍 DEBUG: Product creation request received:', {
     title: productData?.title,
     slug: productData?.slug,
     categoryId: productData?.categoryId,
@@ -506,7 +506,8 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     // Validate category exists
-    logger.info('🔍 DEBUG: Attempting to find category by PK:', {
+    // Use error level so it shows in production logs
+    logger.error('🔍 DEBUG: Attempting to find category by PK:', {
       categoryId,
       categoryIdType: typeof categoryId,
       categoryIdValue: categoryId
@@ -522,22 +523,24 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       }
     );
     
-    logger.info('🔍 DEBUG: Direct SQL query result:', {
+    logger.error('🔍 DEBUG: Direct SQL query result:', {
       categoryId,
       directQueryResult: directQuery,
-      resultCount: Array.isArray(directQuery) ? directQuery.length : 0
+      resultCount: Array.isArray(directQuery) ? directQuery.length : 0,
+      foundInDB: Array.isArray(directQuery) && directQuery.length > 0
     });
     
     const category = await Category.findByPk(categoryId);
     
-    logger.info('🔍 DEBUG: Category.findByPk result:', {
+    logger.error('🔍 DEBUG: Category.findByPk result:', {
       categoryId,
       found: !!category,
       categoryData: category ? {
         id: category.id,
         name: category.name,
         slug: category.slug
-      } : null
+      } : null,
+      directQueryFound: Array.isArray(directQuery) && directQuery.length > 0
     });
     
     if (!category) {

@@ -136,7 +136,7 @@ Product.init(
       allowNull: false,
       field: 'category_id',
       references: {
-        model: 'categories',
+        model: 'Categories', // Must match the actual table name (capital C)
         key: 'id',
       },
     },
@@ -145,7 +145,7 @@ Product.init(
       allowNull: true,
       field: 'subcategory_id',
       references: {
-        model: 'categories',
+        model: 'Categories', // Must match the actual table name (capital C)
         key: 'id',
       },
     },
