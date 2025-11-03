@@ -262,7 +262,7 @@ export default function EmployeeLogin({ onLogin }: EmployeeLoginProps) {
                   onChange={handleInputChange}
                   required
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="admin@mayhemcreation.com"
+                  placeholder="Email"
                 />
               </div>
             </div>
