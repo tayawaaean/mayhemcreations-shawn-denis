@@ -32,6 +32,9 @@ import VerifyEmail from './pages/VerifyEmail'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentCancel from './pages/PaymentCancel'
 import OrderTracking from './components/OrderTracking'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import Cookies from './pages/Cookies'
 import StripeTestSuite from './components/StripeTestSuite'
 import NotFound from './pages/NotFound'
 
@@ -115,6 +118,21 @@ export default function App() {
             <Route path="/track-order" element={
               <EcommerceLayout>
                 <OrderTracking />
+              </EcommerceLayout>
+            } />
+            <Route path="/privacy" element={
+              <EcommerceLayout>
+                <Privacy />
+              </EcommerceLayout>
+            } />
+            <Route path="/terms" element={
+              <EcommerceLayout>
+                <Terms />
+              </EcommerceLayout>
+            } />
+            <Route path="/cookies" element={
+              <EcommerceLayout>
+                <Cookies />
               </EcommerceLayout>
             } />
             <Route path="/my-orders" element={

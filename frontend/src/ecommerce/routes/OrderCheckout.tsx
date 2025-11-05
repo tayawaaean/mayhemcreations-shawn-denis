@@ -312,8 +312,8 @@ export default function OrderCheckout() {
     if (selectedShippingRate) {
       return selectedShippingRate.totalCost
     }
-    // Fallback: Free shipping over $50, otherwise $9.99
-    return calculateSubtotal() > 50 ? 0 : 9.99
+    // Fallback: flat standard shipping
+    return 9.99
   }
   const calculateTotal = () => calculateSubtotal() + calculateTax() + calculateShipping()
   
@@ -1556,11 +1556,11 @@ export default function OrderCheckout() {
                       />
                       <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">
                         I agree to the{' '}
-                        <a href="#" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <a href="/terms" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
                           Terms of Service
                         </a>
                         {' '}and{' '}
-                        <a href="#" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
+                        <a href="/privacy" className="text-accent hover:underline" onClick={(e) => e.stopPropagation()}>
                           Privacy Policy
                         </a>
                       </label>

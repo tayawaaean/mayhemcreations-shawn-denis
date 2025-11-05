@@ -131,9 +131,13 @@ export default function FAQ() {
                 {sortedCategories.map((categoryName, categoryIndex) => {
                   const categoryFAQs = groupedFAQs[categoryName]
                   const IconComponent = categoryIcons[categoryName] || HelpCircle
+                  const categoryId = categoryName
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)/g, '')
                   
                   return (
-                    <div key={categoryIndex} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div id={categoryId} key={categoryIndex} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="bg-gray-50 px-8 py-6 border-b border-gray-200">
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">

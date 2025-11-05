@@ -176,8 +176,8 @@ export default function Home() {
               <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">
                 <Truck className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Free Shipping</h3>
-              <p className="text-gray-600">Free shipping on orders over $50. Fast and reliable delivery.</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Fast Shipping</h3>
+              <p className="text-gray-600">Reliable delivery options tailored to your needs.</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-accent rounded-full flex items-center justify-center mx-auto mb-4">

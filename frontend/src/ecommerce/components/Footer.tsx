@@ -93,10 +93,10 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Customer Service</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="text-gray-400 hover:text-accent transition-colors">Shipping Info</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-accent transition-colors">Returns & Exchanges</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-accent transition-colors">Size Guide</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-accent transition-colors">Care Instructions</a></li>
+              <li><Link to="/faq#ordering-shipping" className="text-gray-400 hover:text-accent transition-colors">Shipping Info</Link></li>
+              <li><Link to="/faq#general" className="text-gray-400 hover:text-accent transition-colors">General FAQs</Link></li>
+              <li><Link to="/faq#design-artwork" className="text-gray-400 hover:text-accent transition-colors">Design & Artwork</Link></li>
+              <li><Link to="/faq#quality-care" className="text-gray-400 hover:text-accent transition-colors">Care Instructions</Link></li>
             </ul>
           </div>
 
@@ -167,9 +167,9 @@ export default function Footer() {
               © {new Date().getFullYear()} Mayhem Creation. All rights reserved.
             </div>
             <div className="flex space-x-6 text-sm">
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">Privacy Policy</a>
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">Terms of Service</a>
-              <a href="#" className="text-gray-400 hover:text-accent transition-colors">Cookie Policy</a>
+              <Link to="/privacy" className="text-gray-400 hover:text-accent transition-colors">Privacy Policy</Link>
+              <Link to="/terms" className="text-gray-400 hover:text-accent transition-colors">Terms of Service</Link>
+              <Link to="/cookies" className="text-gray-400 hover:text-accent transition-colors">Cookie Policy</Link>
             </div>
           </div>
         </div>

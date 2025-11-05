@@ -356,10 +356,7 @@ export default function ProductPage() {
                   <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
                   Durable materials
                 </li>
-                <li className="flex items-center">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full mr-3"></span>
-                  Free shipping on orders over $50
-                </li>
+                
               </ul>
             </div>
 

@@ -96,9 +96,9 @@ export default function ProductCard({ product }: { product: Product }) {
         <div className={`absolute top-3 right-3 flex flex-col gap-2 transition-opacity duration-200 ${
           isHovered ? 'opacity-100' : 'opacity-0'
         }`}>
-          <button className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
+          <Link to={`/product/${product.slug}`} className="p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors">
             <Eye className="w-4 h-4 text-gray-600" />
-          </button>
+          </Link>
         </div>
 
         {/* Quick Customize */}
@@ -155,9 +155,7 @@ export default function ProductCard({ product }: { product: Product }) {
           <div className="text-lg font-bold text-gray-900">
             ${typeof product.price === 'number' ? product.price.toFixed(2) : Number(product.price || 0).toFixed(2)}
           </div>
-          <div className="text-sm text-gray-500">
-            Free shipping
-          </div>
+          {/* Removed free shipping messaging */}
         </div>
       </div>
     </article>

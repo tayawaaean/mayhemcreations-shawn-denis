@@ -45,7 +45,7 @@ class AutoReplyService {
       {
         id: 'shipping',
         title: 'Shipping',
-        content: 'We offer free shipping on orders over $50. Standard shipping takes 3-5 business days. Express shipping is available for rush deliveries.',
+        content: 'Standard shipping typically takes 3-5 business days. Express options are available for rush deliveries.',
         isActive: true,
         category: 'Shipping',
         order: 4
