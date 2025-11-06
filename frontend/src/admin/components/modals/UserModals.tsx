@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Mail, User as UserIcon, Shield } from 'lucide-react'
 import { User as ApiUser } from '../../services/apiService'
+import { formatDateTime } from '../../../utils/dateFormatter'
 
 interface UserDetailModalProps {
   isOpen: boolean
@@ -49,9 +50,19 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({ isOpen, onClos
                 <Mail className="h-4 w-4 mr-2 text-gray-400" />
                 {user.email}
               </div>
+              {user.phone && (
+                <div className="flex items-center text-gray-700">
+                  <UserIcon className="h-4 w-4 mr-2 text-gray-400" />
+                  {user.phone}
+                </div>
+              )}
               <div className="flex items-center text-gray-700">
                 <Shield className="h-4 w-4 mr-2 text-gray-400" />
-                Last login: {user.lastLogin.toLocaleString()}
+                Last login: {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : 'Never logged in'}
+              </div>
+              <div className="flex items-center text-gray-700 text-sm">
+                <span className="text-gray-500">Created:</span>
+                <span className="ml-2">{formatDateTime(user.createdAt)}</span>
               </div>
             </div>
           </div>
@@ -216,24 +227,40 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({ isOpen, onClose, o
 interface AddUserModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (user: Omit<AdminUser, 'id' | 'lastLogin'>) => void
+  onSave: (user: Partial<ApiUser>) => void
 }
 
 export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
-    role: 'staff' as AdminUser['role'],
-    status: 'active' as AdminUser['status']
+    phone: '',
+    password: '',
+    roleId: 0,
+    isActive: true
   })
 
   if (!isOpen) return null
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const { password, ...rest } = formData
-    // Note: Passwords are never stored in localStorage for security
-    onSave({ ...rest })
+    // Transform form data to match ApiUser structure
+    const userData: Partial<ApiUser> = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      phone: formData.phone || undefined,
+      isActive: formData.isActive,
+      role: {
+        id: formData.roleId,
+        name: '',
+        displayName: '',
+        permissions: []
+      }
+    }
+    // Note: Password handling would need to be done server-side
+    onSave(userData)
     onClose()
   }
 
@@ -249,15 +276,28 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onS
             </button>
           </div>
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="pl-9 pr-3 py-2 border border-gray-300 rounded-md w-full focus:ring-blue-500 focus:border-blue-500"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  required
                 />
               </div>
             </div>
@@ -273,23 +313,31 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onS
                 />
               </div>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as AdminUser['role'] })}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role ID</label>
+                <input
+                  type="number"
+                  value={formData.roleId}
+                  onChange={(e) => setFormData({ ...formData, roleId: parseInt(e.target.value) || 0 })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                </select>
+                  required
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as AdminUser['status'] })}
+                  value={formData.isActive ? 'active' : 'inactive'}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.value === 'active' })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="active">Active</option>

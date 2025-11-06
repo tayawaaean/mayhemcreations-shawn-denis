@@ -63,20 +63,16 @@ const UsersPage: React.FC = () => {
     if (success) {
       setIsUserEditOpen(false)
       setSelectedUser(null)
+      refetch() // Refresh the user list after update
     }
   }
 
-  const handleSaveUser = (updated: AdminUser) => {
-    dispatch({ type: 'UPDATE_USER', payload: updated })
-  }
-
-  const handleAddUser = (data: Omit<AdminUser, 'id' | 'lastLogin'>) => {
-    const newUser: AdminUser = {
-      id: `user-${Date.now()}`,
-      lastLogin: new Date(),
-      ...data
-    }
-    dispatch({ type: 'ADD_USER', payload: newUser })
+  const handleAddUser = async (userData: Partial<ApiUser>) => {
+    // Note: Add user functionality would need to be implemented in the API service
+    // For now, this is a placeholder that shows the structure
+    console.log('Add user functionality needs to be implemented', userData)
+    setIsUserAddOpen(false)
+    refetch() // Refresh the user list
   }
 
   const handleLogoutAllSessions = async (userId: number, userEmail: string) => {
@@ -457,7 +453,7 @@ const UsersPage: React.FC = () => {
       </HelpModal>
 
       <UserDetailModal isOpen={isUserDetailOpen} onClose={() => { setIsUserDetailOpen(false); setSelectedUser(null) }} user={selectedUser} />
-      <EditUserModal isOpen={isUserEditOpen} onClose={() => { setIsUserEditOpen(false); setSelectedUser(null) }} onSave={handleSaveUser} user={selectedUser} />
+      <EditUserModal isOpen={isUserEditOpen} onClose={() => { setIsUserEditOpen(false); setSelectedUser(null) }} onSave={handleUpdateUser} user={selectedUser} />
       <AddUserModal isOpen={isUserAddOpen} onClose={() => setIsUserAddOpen(false)} onSave={handleAddUser} />
     </div>
   )

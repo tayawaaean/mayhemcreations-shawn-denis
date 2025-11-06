@@ -7,8 +7,7 @@ import {
   deleteMaterialCost,
   toggleMaterialCostStatus
 } from '../controllers/materialCostController'
-import { authenticate } from '../middlewares/auth'
-import { authorize } from '../middlewares/auth'
+import { sessionAuthenticate, requireRole } from '../middlewares/auth'
 
 const router = Router()
 
@@ -17,9 +16,9 @@ router.get('/', getMaterialCosts)
 router.get('/:id', getMaterialCostById)
 
 // Admin routes (require authentication and admin role)
-router.post('/', authenticate, authorize('admin'), createMaterialCost)
-router.put('/:id', authenticate, authorize('admin'), updateMaterialCost)
-router.delete('/:id', authenticate, authorize('admin'), deleteMaterialCost)
-router.patch('/:id/toggle-status', authenticate, authorize('admin'), toggleMaterialCostStatus)
+router.post('/', sessionAuthenticate, requireRole(['admin']), createMaterialCost)
+router.put('/:id', sessionAuthenticate, requireRole(['admin']), updateMaterialCost)
+router.delete('/:id', sessionAuthenticate, requireRole(['admin']), deleteMaterialCost)
+router.patch('/:id/toggle-status', sessionAuthenticate, requireRole(['admin']), toggleMaterialCostStatus)
 
 export default router
