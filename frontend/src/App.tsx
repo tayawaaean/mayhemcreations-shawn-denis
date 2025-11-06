@@ -37,6 +37,7 @@ import Terms from './pages/Terms'
 import Cookies from './pages/Cookies'
 import StripeTestSuite from './components/StripeTestSuite'
 import NotFound from './pages/NotFound'
+import ScrollToTop from './components/ScrollToTop'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
             <CartProvider>
               <RealTimeChatProvider>
                 <CustomizationProvider>
+              <ScrollToTop />
               <Routes>
             {/* Employee Login Route */}
             <Route path="/employee-login" element={<EmployeeApp />} />
