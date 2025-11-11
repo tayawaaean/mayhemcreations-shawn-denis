@@ -39,6 +39,7 @@ import { getPublicOriginAddress } from './controllers/addressController';
 
 // Import middlewares
 import { errorHandler, notFound } from './middlewares/errorHandler';
+import { webhookBodyParser } from './middlewares/webhookMiddleware';
 
 // Import Swagger documentation
 import { setupSwagger } from './docs/swagger';
@@ -77,9 +78,14 @@ app.use(cors({
 // Compression middleware
 app.use(compression());
 
+// Webhook body parser - MUST be before body parsing middleware
+// This captures the raw body for webhook signature verification
+app.use(webhookBodyParser);
+
 // Body parsing middleware (exclude webhook routes for raw body handling)
 app.use((req, res, next) => {
-  if (req.path.includes('/webhook')) {
+  // Skip JSON parsing if raw body was already captured by webhook middleware
+  if (req.path.includes('/webhook') || req.path.includes('/webhooks') || (req as any).rawBody) {
     return next(); // Skip JSON parsing for webhook routes
   }
   express.json({ limit: '10mb' })(req, res, next);

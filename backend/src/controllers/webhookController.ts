@@ -12,7 +12,7 @@ import { EmailNotificationService } from '../services/emailNotificationService';
 
 /**
  * @swagger
- * /api/v1/webhooks/stripe:
+ * /api/v1:
  *   post:
  *     tags: [Webhooks]
  *     summary: Stripe webhook endpoint
@@ -129,13 +129,56 @@ export const handleStripeWebhook = async (
 ): Promise<void> => {
   try {
     const signature = req.headers['stripe-signature'] as string;
-    const payload = req.rawBody; // Use rawBody instead of parsed body
+    
+    // Debug logging for webhook payload
+    logger.info('Stripe webhook received', {
+      path: req.path,
+      method: req.method,
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      hasRawBody: !!req.rawBody,
+      rawBodyType: typeof req.rawBody,
+      rawBodyLength: req.rawBody ? req.rawBody.length : 0,
+      hasBody: !!req.body,
+      bodyType: typeof req.body,
+      signature: signature ? 'present' : 'missing',
+    });
 
     if (!signature) {
+      logger.error('Missing Stripe signature in webhook request', {
+        headers: Object.keys(req.headers),
+        path: req.path,
+      });
       res.status(400).json({
         success: false,
         message: 'Missing Stripe signature',
         code: 'MISSING_SIGNATURE',
+      });
+      return;
+    }
+
+    // Get payload - prefer rawBody, fallback to body if rawBody is not available
+    let payload: string;
+    if (req.rawBody) {
+      payload = typeof req.rawBody === 'string' ? req.rawBody : JSON.stringify(req.rawBody);
+    } else if (req.body) {
+      // If rawBody is not available, try to reconstruct from parsed body
+      // This is a fallback but not ideal for signature verification
+      logger.warn('rawBody not available, attempting to use parsed body (signature verification may fail)', {
+        bodyType: typeof req.body,
+      });
+      payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    } else {
+      logger.error('No webhook payload was provided', {
+        hasRawBody: !!req.rawBody,
+        hasBody: !!req.body,
+        contentType: req.headers['content-type'],
+        contentLength: req.headers['content-length'],
+      });
+      res.status(400).json({
+        success: false,
+        message: 'No webhook payload was provided',
+        code: 'MISSING_PAYLOAD',
       });
       return;
     }
@@ -145,7 +188,12 @@ export const handleStripeWebhook = async (
     try {
       event = verifyWebhookSignature(payload, signature);
     } catch (error: any) {
-      logger.error('Webhook signature verification failed:', error);
+      logger.error('Webhook signature verification failed:', {
+        error: error.message,
+        payloadLength: payload.length,
+        payloadPreview: payload.substring(0, 100),
+        signature: signature.substring(0, 20) + '...',
+      });
       res.status(400).json({
         success: false,
         message: 'Invalid signature',
