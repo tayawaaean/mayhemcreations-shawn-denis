@@ -42,11 +42,12 @@ export const webhookBodyParser = async (req: any, res: Response, next: NextFunct
         logger.error('Webhook body parser: Request stream already consumed', {
           path: req.path,
         });
-        return res.status(400).json({
+        res.status(400).json({
           success: false,
           message: 'Request body stream already consumed',
           code: 'BODY_CONSUMED',
         });
+        return;
       }
 
       // Parse raw body for webhook signature verification
@@ -78,12 +79,13 @@ export const webhookBodyParser = async (req: any, res: Response, next: NextFunct
         contentType: req.headers['content-type'],
         contentLength: req.headers['content-length'],
       });
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         message: 'Failed to parse webhook body',
         code: 'BODY_PARSE_ERROR',
         error: err.message,
       });
+      return;
     }
   }
   
