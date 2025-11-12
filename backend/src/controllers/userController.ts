@@ -780,27 +780,60 @@ export class UserController {
    */
   static async getUserStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      // Get total users
-      const totalUsers = await User.count();
+      // Get optional role filter from query parameter
+      const roleFilter = req.query.role as string | undefined;
+      
+      // Build where clause for role filtering
+      const whereClause: any = {};
+      if (roleFilter) {
+        // Find role by name to get roleId
+        const role = await Role.findOne({ where: { name: roleFilter } });
+        if (role) {
+          whereClause.roleId = role.id;
+        } else {
+          // Role not found, return empty stats
+          return res.json({
+            success: true,
+            data: {
+              totalUsers: 0,
+              activeUsers: 0,
+              verifiedUsers: 0,
+              newUsersThisMonth: 0,
+              usersByRole: []
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
 
-      // Get active users
-      const activeUsers = await User.count({ where: { isActive: true } });
+      // Get total users (filtered by role if provided)
+      const totalUsers = await User.count({ where: whereClause });
 
-      // Get verified users (both email and phone)
+      // Get active users (filtered by role if provided)
+      const activeUsers = await User.count({ 
+        where: { 
+          ...whereClause,
+          isActive: true 
+        } 
+      });
+
+      // Get verified users (both email and phone, filtered by role if provided)
       const verifiedUsers = await User.count({
         where: {
+          ...whereClause,
           isEmailVerified: true,
           isPhoneVerified: true
         }
       });
 
-      // Get new users this month
+      // Get new users this month (filtered by role if provided)
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
 
       const newUsersThisMonth = await User.count({
         where: {
+          ...whereClause,
           createdAt: {
             [Op.gte]: startOfMonth
           }
@@ -809,7 +842,8 @@ export class UserController {
 
       // Get users by role using raw SQL query for proper grouping
       // Sequelize's findAll with group has issues with table aliases, so we use raw SQL
-      const [usersByRoleResult] = await sequelize.query(`
+      // If role filter is provided, only show stats for that role
+      let usersByRoleQuery = `
         SELECT 
           u.role_id,
           COUNT(u.id) as count,
@@ -817,8 +851,22 @@ export class UserController {
           r.display_name as role_display_name
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id
-        GROUP BY u.role_id, r.id, r.name, r.display_name
-      `);
+      `;
+      
+      const queryParams: any[] = [];
+      if (roleFilter) {
+        const role = await Role.findOne({ where: { name: roleFilter } });
+        if (role) {
+          usersByRoleQuery += ` WHERE u.role_id = ?`;
+          queryParams.push(role.id);
+        }
+      }
+      
+      usersByRoleQuery += ` GROUP BY u.role_id, r.id, r.name, r.display_name`;
+      
+      const [usersByRoleResult] = await sequelize.query(usersByRoleQuery, {
+        replacements: queryParams
+      });
 
       const formattedUsersByRole = (usersByRoleResult as any[]).map((row: any) => ({
         roleName: row.role_name || 'Unknown',

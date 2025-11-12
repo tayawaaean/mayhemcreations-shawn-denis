@@ -405,8 +405,9 @@ class ApiService {
     });
   }
 
-  async getUserStats(): Promise<ApiResponse<UserStats>> {
-    return this.request('/users/stats');
+  async getUserStats(role?: string): Promise<ApiResponse<UserStats>> {
+    const endpoint = role ? `/users/stats?role=${encodeURIComponent(role)}` : '/users/stats';
+    return this.request(endpoint);
   }
 
   // Health check

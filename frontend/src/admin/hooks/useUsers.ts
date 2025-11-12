@@ -78,7 +78,8 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
     }
     
     try {
-      const response = await apiService.getUserStats();
+      // Pass role parameter if provided in params to filter stats
+      const response = await apiService.getUserStats(params.role);
       
       if (response.success && response.data) {
         setStats(response.data);
@@ -96,7 +97,7 @@ export const useUsers = (params: UseUsersParams = {}): UseUsersReturn => {
       }
       // Silently fail for permission errors - user may not have admin/manager role
     }
-  }, [canViewStats]);
+  }, [canViewStats, params.role]);
 
   const refetch = useCallback(async () => {
     isFetchingRef.current = false; // Reset the ref to allow refetch
