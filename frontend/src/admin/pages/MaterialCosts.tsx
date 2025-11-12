@@ -11,6 +11,7 @@ export default function MaterialCosts() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<MaterialCost | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     cost: '',
@@ -94,9 +95,37 @@ export default function MaterialCosts() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError(null) // Clear previous errors
+    
+    // Client-side validation: Check for duplicate name
+    if (!editingMaterial) {
+      const trimmedName = formData.name.trim().toLowerCase()
+      const duplicate = materialCosts.find(
+        material => material.name.trim().toLowerCase() === trimmedName
+      )
+      
+      if (duplicate) {
+        setFormError('A material cost with this name already exists. Please use a different name.')
+        return
+      }
+    } else {
+      // When editing, check for duplicates excluding the current material
+      const trimmedName = formData.name.trim().toLowerCase()
+      const duplicate = materialCosts.find(
+        material => 
+          material.id !== editingMaterial.id && 
+          material.name.trim().toLowerCase() === trimmedName
+      )
+      
+      if (duplicate) {
+        setFormError('A material cost with this name already exists. Please use a different name.')
+        return
+      }
+    }
+
     try {
       const data = {
-        name: formData.name,
+        name: formData.name.trim(),
         cost: parseFloat(formData.cost),
         width: parseFloat(formData.width),
         length: parseFloat(formData.length),
@@ -110,7 +139,13 @@ export default function MaterialCosts() {
           await loadMaterialCosts()
           resetForm()
         } else {
-          setError('Failed to update material cost')
+          // Extract error message from response
+          const errorMessage = response.message || 'Failed to update material cost'
+          if (errorMessage.includes('already exists') || errorMessage.includes('duplicate')) {
+            setFormError('A material cost with this name already exists. Please use a different name.')
+          } else {
+            setFormError(errorMessage)
+          }
         }
       } else {
         const response = await materialCostApiService.createMaterialCost(data)
@@ -118,11 +153,23 @@ export default function MaterialCosts() {
           await loadMaterialCosts()
           resetForm()
         } else {
-          setError('Failed to create material cost')
+          // Extract error message from response, check for duplicate error
+          const errorMessage = response.message || 'Failed to create material cost'
+          if (errorMessage.includes('already exists') || errorMessage.includes('duplicate')) {
+            setFormError('A material cost with this name already exists. Please use a different name.')
+          } else {
+            setFormError(errorMessage)
+          }
         }
       }
-    } catch (err) {
-      setError('Failed to save material cost')
+    } catch (err: any) {
+      // Handle API errors (network errors, etc.)
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to save material cost'
+      if (errorMessage.includes('already exists') || errorMessage.includes('duplicate') || err?.response?.status === 409) {
+        setFormError('A material cost with this name already exists. Please use a different name.')
+      } else {
+        setFormError(errorMessage)
+      }
       console.error('Error saving material cost:', err)
     }
   }
@@ -137,6 +184,7 @@ export default function MaterialCosts() {
       wasteFactor: material.wasteFactor.toString(),
       isActive: material.isActive
     })
+    setFormError(null) // Clear any previous errors
     setShowForm(true)
   }
 
@@ -180,6 +228,7 @@ export default function MaterialCosts() {
       isActive: true
     })
     setEditingMaterial(null)
+    setFormError(null)
     setShowForm(false)
   }
 
@@ -211,7 +260,10 @@ export default function MaterialCosts() {
               </p>
             </div>
             <Button
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setFormError(null) // Clear any previous errors
+                setShowForm(true)
+              }}
               className="group w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform" />
@@ -484,6 +536,16 @@ export default function MaterialCosts() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Form Error Message */}
+                  {formError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start">
+                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-400 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs sm:text-sm text-red-700 break-words">{formError}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
                       Material Name *
@@ -492,8 +554,13 @@ export default function MaterialCosts() {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value })
+                        setFormError(null) // Clear error when user starts typing
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent ${
+                        formError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="e.g., Fabric, Thread, Bobbin"
                       required
                     />
