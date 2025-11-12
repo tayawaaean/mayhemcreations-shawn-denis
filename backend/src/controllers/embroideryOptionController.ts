@@ -126,6 +126,13 @@ export const getEmbroideryOptionById = async (req: Request, res: Response): Prom
 
 export const createEmbroideryOption = async (req: Request, res: Response): Promise<void> => {
   try {
+    logger.info('Creating embroidery option:', {
+      body: req.body,
+      hasBody: !!req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : [],
+      contentType: req.headers['content-type'],
+    });
+
     const {
       name,
       description,
@@ -142,9 +149,22 @@ export const createEmbroideryOption = async (req: Request, res: Response): Promi
 
     // Validate required fields
     if (!name || !description || !category || !level) {
+      logger.warn('Missing required fields for embroidery option:', {
+        hasName: !!name,
+        hasDescription: !!description,
+        hasCategory: !!category,
+        hasLevel: !!level,
+        body: req.body
+      });
       res.status(400).json({
         success: false,
-        message: 'Missing required fields: name, description, category, level'
+        message: 'Missing required fields: name, description, category, level',
+        received: {
+          name: !!name,
+          description: !!description,
+          category: !!category,
+          level: !!level
+        }
       });
       return;
     }

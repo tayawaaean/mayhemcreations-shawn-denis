@@ -159,6 +159,7 @@ export const requireRole = (roleNames: string | string[]) => {
           userId: session?.userId,
           requiredRoles: roles,
           userRole: session?.role,
+          hasAnyRole: SessionService.hasAnyRole(req, roles),
         });
         
         res.status(403).json({
@@ -166,6 +167,7 @@ export const requireRole = (roleNames: string | string[]) => {
           message: 'Insufficient role privileges',
           code: 'INSUFFICIENT_ROLE',
           requiredRoles: roles,
+          userRole: session?.role,
         });
         return;
       }
