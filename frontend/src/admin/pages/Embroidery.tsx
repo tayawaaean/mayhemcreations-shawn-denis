@@ -30,6 +30,7 @@ const Embroidery: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedOption, setSelectedOption] = useState<EmbroideryOption | null>(null)
   const [selectedType, setSelectedType] = useState('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const [isHelpOpen, setIsHelpOpen] = useState(false)
@@ -45,6 +46,7 @@ const Embroidery: React.FC = () => {
         
         const response = await embroideryOptionApiService.getEmbroideryOptions({
           category: selectedType === 'all' ? undefined : selectedType,
+          isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
           page: currentPage,
           limit: itemsPerPage
         })
@@ -71,7 +73,7 @@ const Embroidery: React.FC = () => {
     }
 
     fetchEmbroideryOptions()
-  }, [selectedType, currentPage])
+  }, [selectedType, statusFilter, currentPage])
 
   // No need for client-side filtering or pagination since API handles it
   const paginatedOptions = embroideryOptions
@@ -297,10 +299,28 @@ const Embroidery: React.FC = () => {
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')
+                setCurrentPage(1) // Reset to first page when filter changes
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+            </select>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
+              onChange={(e) => {
+                setSelectedType(e.target.value)
+                setCurrentPage(1) // Reset to first page when filter changes
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             >
               {typeOptions.map(option => (

@@ -18,7 +18,7 @@ export const getEmbroideryOptions = async (req: Request, res: Response): Promise
     const {
       category,
       level,
-      isActive = true,
+      isActive,
       isPopular,
       search,
       page = 1,
@@ -38,8 +38,9 @@ export const getEmbroideryOptions = async (req: Request, res: Response): Promise
       whereClause.level = level;
     }
 
-    // Filter by active status
-    if (isActive !== undefined) {
+    // Filter by active status (only if explicitly provided)
+    // If not provided, show all items (both active and inactive)
+    if (isActive !== undefined && isActive !== null && isActive !== '') {
       whereClause.isActive = typeof isActive === 'boolean' ? isActive : isActive === 'true';
     }
 

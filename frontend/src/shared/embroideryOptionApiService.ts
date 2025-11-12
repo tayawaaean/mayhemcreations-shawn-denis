@@ -56,7 +56,10 @@ class EmbroideryOptionApiService {
     
     if (filters.category) params.append('category', filters.category);
     if (filters.level) params.append('level', filters.level);
-    if (filters.isActive !== undefined) params.append('isActive', filters.isActive.toString());
+    // Only include isActive if it's explicitly set (true or false), not undefined
+    if (filters.isActive !== undefined && filters.isActive !== null) {
+      params.append('isActive', filters.isActive.toString());
+    }
     if (filters.isPopular !== undefined) params.append('isPopular', filters.isPopular.toString());
     if (filters.search) params.append('search', filters.search);
     if (filters.page) params.append('page', filters.page.toString());
