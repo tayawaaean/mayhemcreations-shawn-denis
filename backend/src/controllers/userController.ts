@@ -792,7 +792,7 @@ export class UserController {
           whereClause.roleId = role.id;
         } else {
           // Role not found, return empty stats
-          return res.json({
+          res.json({
             success: true,
             data: {
               totalUsers: 0,
@@ -803,6 +803,7 @@ export class UserController {
             },
             timestamp: new Date().toISOString()
           });
+          return;
         }
       }
 
