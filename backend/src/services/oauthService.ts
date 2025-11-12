@@ -174,12 +174,32 @@ export class OAuthService {
         }
       }
 
+      // Ensure role is loaded before validation
+      if (!(user as any).role) {
+        const { Role } = await import('../models');
+        user = await User.findByPk(user.id, {
+          include: [{ model: Role, as: 'role' }]
+        }) as User;
+        
+        if (!(user as any).role) {
+          logger.error('Google OAuth: User role not found after reload', {
+            userId: user.id,
+            roleId: user.roleId
+          });
+          return {
+            success: false,
+            message: 'User role not found'
+          };
+        }
+      }
+
       // Validate role access
       const allowedRoles = this.getAllowedRolesForLogin(expectedRole);
-      if (!allowedRoles.includes((user as any).role.name)) {
+      const userRoleName = (user as any).role?.name;
+      if (!userRoleName || !allowedRoles.includes(userRoleName)) {
         return {
           success: false,
-          message: `Access denied. This account (${(user as any).role.name}) cannot access ${expectedRole} area.`
+          message: `Access denied. This account (${userRoleName || 'unknown role'}) cannot access ${expectedRole} area.`
         };
       }
 
@@ -205,6 +225,18 @@ export class OAuthService {
 
       logger.info(`Google OAuth login successful: ${user.email} (${isNewUser ? 'new user' : 'existing user'})`);
 
+      // Ensure role is available before accessing properties
+      const userRole = (user as any).role;
+      if (!userRole) {
+        logger.error('Google OAuth: User role is missing in response', {
+          userId: user.id
+        });
+        return {
+          success: false,
+          message: 'User role information is missing'
+        };
+      }
+
       return {
         success: true,
         message: isNewUser ? 'Account created and logged in successfully' : 'Login successful',
@@ -214,8 +246,8 @@ export class OAuthService {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
-            role: (user as any).role.name,
-            permissions: (user as any).role.permissions,
+            role: userRole.name,
+            permissions: userRole.permissions || [],
             isEmailVerified: user.isEmailVerified,
             avatar: user.avatar,
             lastLoginAt: user.lastLoginAt,

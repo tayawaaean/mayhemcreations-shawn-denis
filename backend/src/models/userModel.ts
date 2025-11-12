@@ -209,9 +209,12 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
     provider: string;
     providerId: string;
   }, roleId: number): Promise<{ user: User; isNewUser: boolean }> {
-    // First, try to find existing user by email
+    const { Role } = await import('./roleModel');
+    
+    // First, try to find existing user by email (include role)
     let user = await User.findOne({
-      where: { email: oauthData.email }
+      where: { email: oauthData.email },
+      include: [{ model: Role, as: 'role' }]
     });
 
     let isNewUser = false;
@@ -221,6 +224,13 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
       if (user.loginMethod === 'password') {
         user.loginMethod = 'both';
         await user.save();
+      }
+      
+      // Reload with role if not already included
+      if (!(user as any).role) {
+        user = await User.findByPk(user.id, {
+          include: [{ model: Role, as: 'role' }]
+        }) as User;
       }
     } else {
       // Create new user
@@ -236,6 +246,11 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
         failedLoginAttempts: 0
       });
       isNewUser = true;
+      
+      // Reload with role association
+      user = await User.findByPk(user.id, {
+        include: [{ model: Role, as: 'role' }]
+      }) as User;
     }
 
     return { user, isNewUser };
