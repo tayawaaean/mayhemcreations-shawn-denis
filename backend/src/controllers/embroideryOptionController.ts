@@ -40,7 +40,7 @@ export const getEmbroideryOptions = async (req: Request, res: Response): Promise
 
     // Filter by active status (only if explicitly provided)
     // If not provided, show all items (both active and inactive)
-    if (isActive !== undefined && isActive !== null && isActive !== '') {
+    if (isActive !== undefined && isActive !== null) {
       whereClause.isActive = typeof isActive === 'boolean' ? isActive : isActive === 'true';
     }
 
