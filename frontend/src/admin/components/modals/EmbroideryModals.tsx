@@ -19,7 +19,7 @@ const embroideryTypes = [
     description: 'Special material options'
   },
   {
-    value: 'thread',
+    value: 'threads',
     label: 'Thread',
     icon: Circle,
     description: 'Premium thread colors and types'
@@ -31,7 +31,7 @@ const embroideryTypes = [
     description: 'Border and edging designs'
   },
   {
-    value: 'upgrade',
+    value: 'upgrades',
     label: 'Upgrade',
     icon: ArrowUp,
     description: 'Premium upgrade options'
@@ -41,6 +41,12 @@ const embroideryTypes = [
     label: 'Cutting',
     icon: Scissors,
     description: 'Custom cutting and shaping'
+  },
+  {
+    value: 'backing',
+    label: 'Backing',
+    icon: Layers,
+    description: 'Backing material options'
   }
 ]
 
@@ -179,11 +185,16 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // Ensure description is not empty
+    if (!formData.description || formData.description.trim() === '') {
+      alert('Description is required')
+      return
+    }
     onAdd({
       ...formData,
       image: formData.image || '',
       stitches: 0,
-      estimatedTime: '',
+      estimatedTime: '0 days',
       level: 'basic',
       isPopular: false,
       isActive: true,
@@ -286,14 +297,15 @@ export const AddEmbroideryModal: React.FC<AddEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-              Description
-              <InfoTooltip text="Optional detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
+              Description *
+              <InfoTooltip text="Required detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
             </label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               rows={3}
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter option description"
             />
@@ -451,14 +463,15 @@ export const EditEmbroideryModal: React.FC<EditEmbroideryModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-              Description
-              <InfoTooltip text="Optional detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
+              Description *
+              <InfoTooltip text="Required detailed description explaining what this embroidery option includes, its features, or any special characteristics. This helps customers make informed decisions when selecting customization options." />
             </label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
               rows={3}
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter option description"
             />

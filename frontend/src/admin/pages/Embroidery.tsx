@@ -99,12 +99,29 @@ const Embroidery: React.FC = () => {
 
   const handleAddOption = async (optionData: Omit<EmbroideryOption, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
+      // Ensure required fields are present and valid
+      if (!optionData.name || !optionData.description || !optionData.category || !optionData.level) {
+        setError('Missing required fields: name, description, category, or level')
+        return
+      }
+      
       const createData = {
-        ...optionData,
-        isIncompatible: optionData.isIncompatible ? JSON.parse(optionData.isIncompatible) : undefined
+        name: optionData.name,
+        description: optionData.description,
+        price: optionData.price || 0,
+        image: optionData.image || '',
+        stitches: optionData.stitches || 0,
+        estimatedTime: optionData.estimatedTime || '0 days',
+        category: optionData.category,
+        level: optionData.level,
+        isPopular: optionData.isPopular || false,
+        isActive: optionData.isActive !== undefined ? optionData.isActive : true,
+        isIncompatible: optionData.isIncompatible ? (typeof optionData.isIncompatible === 'string' ? JSON.parse(optionData.isIncompatible) : optionData.isIncompatible) : undefined
       }
       const response = await embroideryOptionApiService.createEmbroideryOption(createData)
-      setEmbroideryOptions(prev => response.data ? [...prev, response.data] : prev)
+      if (response.data) {
+        setEmbroideryOptions(prev => [...prev, response.data!])
+      }
     } catch (err) {
       console.error('Error creating embroidery option:', err)
       setError('Failed to create embroidery option')
