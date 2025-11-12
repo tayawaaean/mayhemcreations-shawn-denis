@@ -49,13 +49,51 @@ export class OAuthService {
         return null;
       }
 
+      // Helper function to extract lastName from full name if family_name is missing
+      const extractLastName = (name: string, givenName: string): string => {
+        if (!name || !givenName) return 'User'; // Default fallback
+        
+        // Try to extract last name from full name
+        const nameParts = name.trim().split(/\s+/);
+        if (nameParts.length > 1) {
+          // Remove the first name (given_name) and join the rest as last name
+          const givenNameParts = givenName.trim().split(/\s+/);
+          const lastNameParts = nameParts.slice(givenNameParts.length);
+          if (lastNameParts.length > 0) {
+            return lastNameParts.join(' ');
+          }
+        }
+        return 'User'; // Default fallback if extraction fails
+      };
+
+      const givenName = payload.given_name || '';
+      const familyName = payload.family_name || '';
+      const fullName = payload.name || '';
+      
+      // Ensure firstName is valid (at least 2 chars) - use full name or default if given_name is missing/short
+      let firstName = givenName;
+      if (!firstName || firstName.length < 2) {
+        if (fullName) {
+          // Try to extract first name from full name
+          const nameParts = fullName.trim().split(/\s+/);
+          firstName = nameParts[0] || 'User';
+        } else {
+          firstName = 'User';
+        }
+      }
+      
+      // Use family_name if available, otherwise try to extract from full name, otherwise use default
+      const lastName = (familyName && familyName.length >= 2) 
+        ? familyName 
+        : (fullName ? extractLastName(fullName, firstName) : 'User');
+
       return {
         id: payload.sub,
         email: payload.email || '',
         verified_email: payload.email_verified || false,
-        name: payload.name || '',
-        given_name: payload.given_name || '',
-        family_name: payload.family_name || '',
+        name: fullName,
+        given_name: firstName, // Use processed firstName (with fallback)
+        family_name: lastName, // Use extracted/fallback lastName
         picture: payload.picture || '',
         locale: payload.locale || 'en',
       };
@@ -130,13 +168,18 @@ export class OAuthService {
         if (existingUser) {
           user = existingUser;
           // User exists, link OAuth provider
+          // Ensure lastName is valid (not empty, at least 2 chars) for OAuth provider record
+          const validLastName = googleUserInfo.family_name && googleUserInfo.family_name.length >= 2 
+            ? googleUserInfo.family_name 
+            : 'User';
+          
           oauthProvider = await OAuthProvider.create({
             userId: user.id,
             provider: 'google',
             providerId: googleUserInfo.id,
             email: googleUserInfo.email,
-            firstName: googleUserInfo.given_name,
-            lastName: googleUserInfo.family_name,
+            firstName: googleUserInfo.given_name || 'User',
+            lastName: validLastName,
             avatar: googleUserInfo.picture,
             isActive: true
           });
@@ -147,11 +190,19 @@ export class OAuthService {
             await user.save();
           }
         } else {
+          // Ensure firstName and lastName are valid (not empty, at least 2 chars) for user creation
+          const validFirstName = googleUserInfo.given_name && googleUserInfo.given_name.length >= 2 
+            ? googleUserInfo.given_name 
+            : 'User';
+          const validLastName = googleUserInfo.family_name && googleUserInfo.family_name.length >= 2 
+            ? googleUserInfo.family_name 
+            : 'User';
+
           // Create new user and OAuth provider
           const { user: newUser, isNewUser: newUserFlag } = await User.findOrCreateForOAuth({
             email: googleUserInfo.email,
-            firstName: googleUserInfo.given_name,
-            lastName: googleUserInfo.family_name,
+            firstName: validFirstName,
+            lastName: validLastName,
             avatar: googleUserInfo.picture,
             provider: 'google',
             providerId: googleUserInfo.id
@@ -166,8 +217,8 @@ export class OAuthService {
             provider: 'google',
             providerId: googleUserInfo.id,
             email: googleUserInfo.email,
-            firstName: googleUserInfo.given_name,
-            lastName: googleUserInfo.family_name,
+            firstName: validFirstName,
+            lastName: validLastName,
             avatar: googleUserInfo.picture,
             isActive: true
           });
