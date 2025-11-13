@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Edit3, Calculator, Save, X, MessageSquare, Copy, Info, Ruler } from 'lucide-react'
+import { Edit3, Calculator, Save, X, MessageSquare, Copy, Info, Ruler, RotateCw } from 'lucide-react'
 import { useCustomization, EmbroideryDesignData } from '../context/CustomizationContext'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 
@@ -18,6 +18,7 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
   const [editingNotesValue, setEditingNotesValue] = useState('')
   const [editingDimensions, setEditingDimensions] = useState<{[key: string]: {width: string, height: string}}>({})
+  const [editingRotation, setEditingRotation] = useState<{[key: string]: string}>({})
 
   const handleEditNotes = (designId: string, currentNotes: string) => {
     setEditingNotes(designId)
@@ -345,6 +346,116 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
                     </p>
                   </div>
 
+                  {/* Rotation Controls */}
+                  <div className="bg-white border border-gray-200 rounded-lg p-2.5 sm:p-3">
+                    <h5 className="text-xs sm:text-sm font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center">
+                      <RotateCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 text-gray-600 flex-shrink-0" />
+                      Set Rotation (Optional)
+                    </h5>
+                    <div className="space-y-2 sm:space-y-3">
+                      {/* Preset Angle Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => updateDesign(design.id, { rotation: 0 })}
+                          className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                            design.rotation === 0 || design.rotation === 360
+                              ? 'bg-accent text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          0°
+                        </button>
+                        <button
+                          onClick={() => updateDesign(design.id, { rotation: 90 })}
+                          className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                            design.rotation === 90
+                              ? 'bg-accent text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          90°
+                        </button>
+                        <button
+                          onClick={() => updateDesign(design.id, { rotation: 180 })}
+                          className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                            design.rotation === 180
+                              ? 'bg-accent text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          180°
+                        </button>
+                        <button
+                          onClick={() => updateDesign(design.id, { rotation: 270 })}
+                          className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
+                            design.rotation === 270
+                              ? 'bg-accent text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          270°
+                        </button>
+                      </div>
+                      
+                      {/* Manual Input */}
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700 mb-1">
+                          Rotation (degrees)
+                        </label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={editingRotation[design.id] ?? Math.round(design.rotation).toString()}
+                          onFocus={() => {
+                            setEditingRotation(prev => ({
+                              ...prev,
+                              [design.id]: Math.round(design.rotation).toString()
+                            }))
+                          }}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            // Allow empty string and valid integers/decimals during typing
+                            if (value === '' || /^-?\d*\.?\d*$/.test(value)) {
+                              setEditingRotation(prev => ({
+                                ...prev,
+                                [design.id]: value
+                              }))
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur()
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value
+                            // Normalize rotation to 0-360 range and round to nearest integer
+                            let numValue = parseFloat(value)
+                            if (isNaN(numValue) || value === '') {
+                              numValue = design.rotation
+                            } else {
+                              // Normalize to 0-360 range
+                              numValue = ((numValue % 360) + 360) % 360
+                            }
+                            const rounded = Math.round(numValue)
+                            updateDesign(design.id, { rotation: rounded })
+                            // Clear editing state
+                            setEditingRotation(prev => {
+                              const newState = {...prev}
+                              delete newState[design.id]
+                              return newState
+                            })
+                          }}
+                          placeholder="0"
+                          className="w-full px-2 py-1.5 text-xs sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+                        />
+                        <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                          Current: {Math.round(design.rotation)}° • Range: 0° to 360°
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Live Calculator */}
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-2.5 sm:p-3 border border-blue-200">
                     <div className="flex items-center justify-between gap-2">
@@ -357,7 +468,7 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
                           ${calculateMaterialCost(design).toFixed(2)}
                         </div>
                         <div className="text-[10px] sm:text-xs text-blue-600 whitespace-nowrap">
-                          {design.dimensions.width * design.scale}" × {design.dimensions.height * design.scale}"
+                          {(design.dimensions.width * design.scale).toFixed(2)}" × {(design.dimensions.height * design.scale).toFixed(2)}"
                         </div>
                       </div>
                     </div>
@@ -425,7 +536,7 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
               </li>
               <li className="flex items-start">
                 <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">3.</span>
-                <span><strong>Hold Ctrl and scroll</strong> to rotate the design</span>
+                <span><strong>Drag the rotation handle</strong> at the top of the design to rotate it</span>
               </li>
             </ul>
           </div>
@@ -439,6 +550,10 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
               <li className="flex items-start">
                 <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>
                 <span>Click <strong>"Duplicate"</strong> to use the same design in multiple sizes</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>
+                <span>Use <strong>preset buttons (0°, 90°, 180°, 270°)</strong> or enter a custom rotation angle</span>
               </li>
               <li className="flex items-start">
                 <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>

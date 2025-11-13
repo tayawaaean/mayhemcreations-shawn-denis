@@ -210,7 +210,7 @@ const PerDesignCustomization: React.FC<PerDesignCustomizationProps> = ({ onCompl
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-gray-900 truncate" title={activeDesign.name}>{activeDesign.name}</h4>
                       <p className="text-xs sm:text-sm text-gray-600">
-                        {activeDesign.dimensions.width}" × {activeDesign.dimensions.height}" @ {Math.round(activeDesign.scale * 100)}%
+                        {activeDesign.dimensions.width.toFixed(2)}" × {activeDesign.dimensions.height.toFixed(2)}" @ {Math.round(activeDesign.scale * 100)}%
                       </p>
                     </div>
                     <div className="text-right">

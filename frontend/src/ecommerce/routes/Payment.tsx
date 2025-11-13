@@ -414,7 +414,7 @@ export default function Payment() {
           productName = 'Custom Embroidery'
           const dimensions = item.customization.embroideryData.dimensions
           if (dimensions) {
-            productDescription = `${dimensions.width}" × ${dimensions.height}" - Qty ${item.quantity}`
+            productDescription = `${dimensions.width.toFixed(2)}" × ${dimensions.height.toFixed(2)}" - Qty ${item.quantity}`
           }
         } else if (product) {
           productName = product.title || product.name || 'Custom Product'
@@ -517,7 +517,7 @@ export default function Payment() {
           productName = 'Custom Embroidery'
           const dimensions = item.customization.embroideryData.dimensions
           if (dimensions) {
-            productName = `Custom Embroidery (${dimensions.width}" × ${dimensions.height}")`
+            productName = `Custom Embroidery (${dimensions.width.toFixed(2)}" × ${dimensions.height.toFixed(2)}")`
           }
         } else if (product) {
           productName = product.title
@@ -984,7 +984,7 @@ export default function Payment() {
                                     <span className="truncate">Custom Embroidery</span>
                                     {item.customization.embroideryData.dimensions && (
                                       <span className="ml-1 whitespace-nowrap">
-                                        • {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                                        • {item.customization.embroideryData.dimensions.width.toFixed(2)}" × {item.customization.embroideryData.dimensions.height.toFixed(2)}"
                                       </span>
                                     )}
                                   </div>
@@ -1128,7 +1128,7 @@ export default function Payment() {
                         <h4 className="text-xs font-medium text-gray-900 line-clamp-2">{displayTitle}</h4>
                         {isCustomEmbroidery && item.customization?.embroideryData?.dimensions && (
                           <p className="text-xs text-purple-600 mt-0.5">
-                            {item.customization.embroideryData.dimensions.width}" × {item.customization.embroideryData.dimensions.height}"
+                            {item.customization.embroideryData.dimensions.width.toFixed(2)}" × {item.customization.embroideryData.dimensions.height.toFixed(2)}"
                           </p>
                         )}
                         <div className="flex items-center justify-between mt-1">

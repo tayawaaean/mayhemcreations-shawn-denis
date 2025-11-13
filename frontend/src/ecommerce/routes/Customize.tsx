@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Upload, X, RotateCcw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator, Eye } from 'lucide-react'
+import { Upload, X, RotateCcw, RotateCw, Download, Check, ArrowRight, Move, ShoppingCart, Grip, Info, ArrowLeft, Ruler, Calculator, Eye } from 'lucide-react'
 import { useCustomization, EmbroideryDesignData } from '../context/CustomizationContext'
 import { useCart } from '../context/CartContext'
 import { useAlertModal } from '../context/AlertModalContext'
@@ -14,6 +14,7 @@ import MultiEmbroideryManager from '../components/MultiEmbroideryManager'
 import DesignPositioningManager from '../components/DesignPositioningManager'
 import PerDesignCustomization from '../components/PerDesignCustomization'
 import ChatWidget from '../components/ChatWidget'
+import RotationControl from '../components/RotationControl'
 
 export default function Customize() {
   const { id } = useParams()
@@ -46,6 +47,12 @@ export default function Customize() {
   const [isResizing, setIsResizing] = useState(false)
   const [resizeHandle, setResizeHandle] = useState<string | null>(null)
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  // Rotation state
+  const [isRotating, setIsRotating] = useState(false)
+  const [rotatingDesignId, setRotatingDesignId] = useState<string | null>(null)
+  const [rotationStart, setRotationStart] = useState({ x: 0, y: 0, angle: 0, initialRotation: 0 })
+  const rotationAnimationRef = useRef<number | null>(null)
+  const lastRotationRef = useRef<number | null>(null)
   const [showGuidelines, setShowGuidelines] = useState(false)
   const [showFinalView, setShowFinalView] = useState(false)
   const [showFinalDesignModal, setShowFinalDesignModal] = useState(false)
@@ -241,6 +248,55 @@ export default function Customize() {
       }
     }
   }, [currentStep])
+
+  // Global mouse/touch handlers for rotation
+  useEffect(() => {
+    if (!isRotating) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (rotatingDesignId) {
+        handleRotationMove(e as any)
+      } else {
+        handleSingleRotationMove(e as any)
+      }
+    }
+
+    const handleMouseUp = () => {
+      if (rotatingDesignId) {
+        handleRotationEnd()
+      } else {
+        handleSingleRotationEnd()
+      }
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (rotatingDesignId) {
+        handleRotationMove(e as any)
+      } else {
+        handleSingleRotationMove(e as any)
+      }
+    }
+
+    const handleTouchEnd = () => {
+      if (rotatingDesignId) {
+        handleRotationEnd()
+      } else {
+        handleSingleRotationEnd()
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', handleTouchEnd)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isRotating, rotatingDesignId])
 
   // Get all available colors (considering currently selected size if any)
   const getAvailableColors = () => {
@@ -580,18 +636,10 @@ export default function Customize() {
 
   const handleDesignWheel = (e: React.WheelEvent) => {
     e.preventDefault()
-    
-    if (e.ctrlKey || e.metaKey) {
-      // Ctrl+scroll for rotation
-      const rotationChange = e.deltaY > 0 ? -15 : 15
-      const newRotation = (customizationData.designRotation + rotationChange) % 360
-      setCustomizationData({ designRotation: newRotation < 0 ? 360 + newRotation : newRotation })
-    } else {
-      // Regular scroll for scaling
-      const scaleChange = e.deltaY > 0 ? -0.1 : 0.1
-      const newScale = Math.max(0.5, Math.min(2, customizationData.designScale + scaleChange))
-      setCustomizationData({ designScale: newScale })
-    }
+    // Only scroll for scaling (rotation removed - use rotation handle instead)
+    const scaleChange = e.deltaY > 0 ? -0.1 : 0.1
+    const newScale = Math.max(0.5, Math.min(2, customizationData.designScale + scaleChange))
+    setCustomizationData({ designScale: newScale })
   }
 
   // Multi-design drag handlers
@@ -663,19 +711,10 @@ export default function Customize() {
     const design = getDesignById(designId)
     if (!design) return
     
-    if (e.ctrlKey || e.metaKey) {
-      // Ctrl+scroll for rotation
-      const rotationChange = e.deltaY > 0 ? -15 : 15
-      const newRotation = (design.rotation + rotationChange) % 360
-      updateDesign(designId, { 
-        rotation: newRotation < 0 ? 360 + newRotation : newRotation 
-      })
-    } else {
-      // Regular scroll for scaling
-      const scaleChange = e.deltaY > 0 ? -0.1 : 0.1
-      const newScale = Math.max(0.5, Math.min(2, design.scale + scaleChange))
-      updateDesign(designId, { scale: newScale })
-    }
+    // Only scroll for scaling (rotation removed - use rotation handle instead)
+    const scaleChange = e.deltaY > 0 ? -0.1 : 0.1
+    const newScale = Math.max(0.5, Math.min(2, design.scale + scaleChange))
+    updateDesign(designId, { scale: newScale })
   }
 
   // Resize handlers
@@ -757,9 +796,12 @@ export default function Customize() {
         break
     }
 
-    // Update design dimensions
+    // Update design dimensions - Round to 2 decimal places
     updateDesign(draggedDesignId, {
-      dimensions: { width: newWidth, height: newHeight }
+      dimensions: { 
+        width: Math.round(newWidth * 100) / 100, 
+        height: Math.round(newHeight * 100) / 100 
+      }
     })
   }
 
@@ -768,6 +810,227 @@ export default function Customize() {
     setResizeHandle(null)
     setDraggedDesignId(null)
     setResizeStart({ x: 0, y: 0, width: 0, height: 0 })
+  }
+
+  // Rotation handlers for multi-design
+  const handleRotationStart = (e: React.MouseEvent | React.TouchEvent, designId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const target = e.target as HTMLElement
+    if (target.closest('[data-chat-widget]')) return
+    
+    // Prevent drag from starting when rotating
+    setIsDragging(false)
+    setDraggedDesignId(null)
+    
+    if (!productRef.current) return
+    
+    const design = getDesignById(designId)
+    if (!design) return
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const rect = productRef.current.getBoundingClientRect()
+    
+    // Calculate center of design
+    const designCenterX = rect.left + design.position.x
+    const designCenterY = rect.top + design.position.y
+    
+    // Calculate initial angle
+    const deltaX = clientX - designCenterX
+    const deltaY = clientY - designCenterY
+    const initialAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+    
+    setIsRotating(true)
+    setRotatingDesignId(designId)
+    setRotationStart({ 
+      x: clientX, 
+      y: clientY, 
+      angle: initialAngle - design.rotation,
+      initialRotation: design.rotation
+    })
+    lastRotationRef.current = design.rotation
+  }
+
+  const handleRotationMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isRotating || !rotatingDesignId || !productRef.current) return
+    
+    const target = e.target as HTMLElement
+    if (target.closest('[data-chat-widget]')) return
+    
+    e.preventDefault()
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
+    const design = getDesignById(rotatingDesignId)
+    if (!design) return
+    
+    const rect = productRef.current.getBoundingClientRect()
+    const designCenterX = rect.left + design.position.x
+    const designCenterY = rect.top + design.position.y
+    
+    // Calculate distance from center (deadzone check)
+    const deltaX = clientX - designCenterX
+    const deltaY = clientY - designCenterY
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    
+    // Minimum distance threshold to prevent jitter (20px)
+    if (distance < 20) return
+    
+    // Calculate current angle
+    const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+    
+    // Calculate rotation with smoothing
+    let newRotation = currentAngle - rotationStart.angle
+    newRotation = (newRotation + 360) % 360
+    
+    // Smooth rotation: only update if change is significant (reduces jitter)
+    if (lastRotationRef.current !== null) {
+      const diff = Math.abs(newRotation - lastRotationRef.current)
+      // If difference is less than 2 degrees, use previous value (smoothing)
+      if (diff < 2 && diff > 358) {
+        // Handle wrap-around case
+        newRotation = lastRotationRef.current
+      } else if (diff < 2) {
+        newRotation = lastRotationRef.current
+      }
+    }
+    
+    // Snap to common angles when close (within 5 degrees)
+    const snapAngles = [0, 90, 180, 270, 360]
+    for (const snapAngle of snapAngles) {
+      const diff = Math.abs(newRotation - snapAngle)
+      if (diff < 5 || diff > 355) {
+        newRotation = snapAngle % 360
+        break
+      }
+    }
+    
+    lastRotationRef.current = newRotation
+    
+    // Use requestAnimationFrame for smooth updates
+    if (rotationAnimationRef.current) {
+      cancelAnimationFrame(rotationAnimationRef.current)
+    }
+    
+    rotationAnimationRef.current = requestAnimationFrame(() => {
+      updateDesign(rotatingDesignId, { rotation: Math.round(newRotation) })
+    })
+  }
+
+  const handleRotationEnd = () => {
+    if (rotationAnimationRef.current) {
+      cancelAnimationFrame(rotationAnimationRef.current)
+      rotationAnimationRef.current = null
+    }
+    setIsRotating(false)
+    setRotatingDesignId(null)
+    setRotationStart({ x: 0, y: 0, angle: 0, initialRotation: 0 })
+    lastRotationRef.current = null
+  }
+
+  // Rotation handlers for single design (legacy)
+  const handleSingleRotationStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Prevent drag from starting when rotating
+    setIsDragging(false)
+    
+    if (!productRef.current) return
+    
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    const rect = productRef.current.getBoundingClientRect()
+    
+    // Calculate center of design
+    const designCenterX = rect.left + (customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x)
+    const designCenterY = rect.top + (customizationData.placement === 'manual' ? customizationData.designPosition.y : getAutomaticPosition(customizationData.placement).y)
+    
+    // Calculate initial angle
+    const deltaX = clientX - designCenterX
+    const deltaY = clientY - designCenterY
+    const initialAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+    
+    setIsRotating(true)
+    setRotationStart({ 
+      x: clientX, 
+      y: clientY, 
+      angle: initialAngle - customizationData.designRotation,
+      initialRotation: customizationData.designRotation
+    })
+    lastRotationRef.current = customizationData.designRotation
+  }
+
+  const handleSingleRotationMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isRotating || !productRef.current) return
+    
+    e.preventDefault()
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+    
+    const rect = productRef.current.getBoundingClientRect()
+    const designCenterX = rect.left + (customizationData.placement === 'manual' ? customizationData.designPosition.x : getAutomaticPosition(customizationData.placement).x)
+    const designCenterY = rect.top + (customizationData.placement === 'manual' ? customizationData.designPosition.y : getAutomaticPosition(customizationData.placement).y)
+    
+    // Calculate distance from center (deadzone check)
+    const deltaX = clientX - designCenterX
+    const deltaY = clientY - designCenterY
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    
+    // Minimum distance threshold to prevent jitter (20px)
+    if (distance < 20) return
+    
+    // Calculate current angle
+    const currentAngle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+    
+    // Calculate rotation with smoothing
+    let newRotation = currentAngle - rotationStart.angle
+    newRotation = (newRotation + 360) % 360
+    
+    // Smooth rotation: only update if change is significant (reduces jitter)
+    if (lastRotationRef.current !== null) {
+      const diff = Math.abs(newRotation - lastRotationRef.current)
+      // If difference is less than 2 degrees, use previous value (smoothing)
+      if (diff < 2 && diff > 358) {
+        // Handle wrap-around case
+        newRotation = lastRotationRef.current
+      } else if (diff < 2) {
+        newRotation = lastRotationRef.current
+      }
+    }
+    
+    // Snap to common angles when close (within 5 degrees)
+    const snapAngles = [0, 90, 180, 270, 360]
+    for (const snapAngle of snapAngles) {
+      const diff = Math.abs(newRotation - snapAngle)
+      if (diff < 5 || diff > 355) {
+        newRotation = snapAngle % 360
+        break
+      }
+    }
+    
+    lastRotationRef.current = newRotation
+    
+    // Use requestAnimationFrame for smooth updates
+    if (rotationAnimationRef.current) {
+      cancelAnimationFrame(rotationAnimationRef.current)
+    }
+    
+    rotationAnimationRef.current = requestAnimationFrame(() => {
+      setCustomizationData({ designRotation: Math.round(newRotation) })
+    })
+  }
+
+  const handleSingleRotationEnd = () => {
+    if (rotationAnimationRef.current) {
+      cancelAnimationFrame(rotationAnimationRef.current)
+      rotationAnimationRef.current = null
+    }
+    setIsRotating(false)
+    setRotationStart({ x: 0, y: 0, angle: 0, initialRotation: 0 })
+    lastRotationRef.current = null
   }
 
 
@@ -1335,26 +1598,37 @@ export default function Customize() {
                             onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleResizeStart(e, design.id, 'e') : undefined}
                           ></div>
                       
-                          {/* Rotation Handle - Always visible on mobile */}
-                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-accent rounded-full border border-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"></div>
-                           
-                          {/* Enhanced Tooltip - Always visible on mobile */}
-                          {currentStep < 4 && (
-                            <div className={`absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap transition-all duration-200 ${
-                              isDragging || isResizing ? 'opacity-100 scale-110' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-                            }`}>
-                               <div className="flex items-center space-x-2">
-                                 <Grip className="w-3 h-3" />
-                                 <span>Drag to move</span>
-                                 <span className="text-gray-400">•</span>
-                                 <span>Drag handles to resize</span>
-                                 <span className="text-gray-400">•</span>
-                                 <span>Ctrl+scroll to rotate</span>
-                           </div>
-                                 {/* Tooltip Arrow */}
-                                 <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                         </div>
-                           )}
+                          {/* Rotation Handle - Photoshop style, draggable - Positioned at top */}
+                          <div 
+                            className="absolute left-1/2 top-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                            style={{
+                              transform: `translateX(-50%) translateY(-100%) rotate(${design.rotation}deg)`,
+                              transformOrigin: 'center bottom'
+                            }}
+                          >
+                            {/* Rotation line extending from top of design */}
+                            <div className="w-1 h-12 bg-accent/80 mx-auto"></div>
+                            {/* Rotation handle circle - Larger and more visible */}
+                            <div 
+                              className="w-8 h-8 bg-accent rounded-full border-3 border-white shadow-xl flex items-center justify-center mt-1.5 hover:scale-125 active:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing hover:bg-accent/90"
+                              onMouseDown={!showFinalView && currentStep < 4 ? (e) => handleRotationStart(e, design.id) : undefined}
+                              onTouchStart={!showFinalView && currentStep < 4 ? (e) => handleRotationStart(e, design.id) : undefined}
+                            >
+                              <RotateCw className="w-4 h-4 text-white" />
+                            </div>
+                            {/* Rotation angle display - Always visible when rotating */}
+                            {isRotating && rotatingDesignId === design.id && (
+                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full mb-3 bg-gray-900 text-white text-sm font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-50">
+                                {design.rotation}°
+                              </div>
+                            )}
+                            {/* Helpful hint on hover */}
+                            {!isRotating && (
+                              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full mb-3 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                                Drag to rotate
+                              </div>
+                            )}
+                          </div>
                          
                          </>
                        )}
@@ -1426,27 +1700,40 @@ export default function Customize() {
                           <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"></div>
                           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-accent rounded-full border-2 border-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"></div>
                       
-                          {/* Rotation Handle - Always visible on mobile */}
-                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-accent rounded-full border border-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"></div>
-                           
-                          {/* Enhanced Tooltip - Only show in manual mode, always visible on mobile */}
+                          {/* Rotation Handle - Photoshop style, draggable - Positioned at top */}
                           {customizationData.placement === 'manual' && (
-                            <div className={`absolute -top-12 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap transition-all duration-200 ${
-                              isDragging ? 'opacity-100 scale-110' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-                            }`}>
-                               <div className="flex items-center space-x-2">
-                                 <Grip className="w-3 h-3" />
-                                 <span>Drag handle to move</span>
-                                 <span className="text-gray-400">•</span>
-                                 <span>Scroll to resize</span>
-                                 <span className="text-gray-400">•</span>
-                                 <span>Ctrl+scroll to rotate</span>
-                           </div>
-                               {/* Tooltip Arrow */}
-                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                             </div>
-                           )}
-                     
+                            <div 
+                              className="absolute left-1/2 top-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200"
+                              style={{
+                                transform: `translateX(-50%) translateY(-100%) rotate(${customizationData.designRotation}deg)`,
+                                transformOrigin: 'center bottom'
+                              }}
+                            >
+                              {/* Rotation line extending from top of design */}
+                              <div className="w-1 h-12 bg-accent/80 mx-auto"></div>
+                              {/* Rotation handle circle - Larger and more visible */}
+                              <div 
+                                className="w-8 h-8 bg-accent rounded-full border-3 border-white shadow-xl flex items-center justify-center mt-1.5 hover:scale-125 active:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing hover:bg-accent/90"
+                                onMouseDown={!showFinalView && currentStep < 4 ? handleSingleRotationStart : undefined}
+                                onTouchStart={!showFinalView && currentStep < 4 ? handleSingleRotationStart : undefined}
+                              >
+                                <RotateCw className="w-4 h-4 text-white" />
+                              </div>
+                              {/* Rotation angle display - Always visible when rotating */}
+                              {isRotating && !rotatingDesignId && (
+                                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full mb-3 bg-gray-900 text-white text-sm font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-50">
+                                  {customizationData.designRotation}°
+                                </div>
+                              )}
+                              {/* Helpful hint on hover */}
+                              {!isRotating && (
+                                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full mb-3 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                                  Drag to rotate
+                                </div>
+                              )}
+                            </div>
+                          )}
+                         
                          </>
                        )}
                      </div>
@@ -1475,7 +1762,7 @@ export default function Customize() {
                         <div className="w-4 h-4 bg-accent rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">↻</span>
                         </div>
-                        <span>Ctrl+scroll to rotate</span>
+                        <span>Drag rotation handle to rotate</span>
                       </div>
                       <div className="block sm:hidden text-xs text-accent font-medium">
                         💡 Touch and drag on mobile
@@ -1502,7 +1789,7 @@ export default function Customize() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Width: {embroideryWidth.toFixed(1)}"
+                        Width: {embroideryWidth.toFixed(2)}"
                       </label>
                       <input
                         type="range"
@@ -1510,13 +1797,16 @@ export default function Customize() {
                         max="12"
                         step="0.1"
                         value={embroideryWidth}
-                        onChange={(e) => setEmbroideryWidth(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0
+                          setEmbroideryWidth(Math.round(value * 100) / 100)
+                        }}
                         className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Height: {embroideryHeight.toFixed(1)}"
+                        Height: {embroideryHeight.toFixed(2)}"
                       </label>
                       <input
                         type="range"
@@ -1524,25 +1814,19 @@ export default function Customize() {
                         max="12"
                         step="0.1"
                         value={embroideryHeight}
-                        onChange={(e) => setEmbroideryHeight(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0
+                          setEmbroideryHeight(Math.round(value * 100) / 100)
+                        }}
                         className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                       />
                     </div>
                   </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Rotation: {customizationData.designRotation}°
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="360"
-                        step="15"
+                    <RotationControl
                       value={customizationData.designRotation}
-                        onChange={(e) => setCustomizationData({ designRotation: parseInt(e.target.value) })}
-                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
+                      onChange={(angle) => setCustomizationData({ designRotation: angle })}
+                      label="Rotation"
+                    />
                   <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                     <Button
                       variant="outline"
@@ -1735,8 +2019,11 @@ export default function Customize() {
                          min="0.5"
                          max="12"
                          step="0.1"
-                         value={embroideryWidth || ''}
-                         onChange={(e) => setEmbroideryWidth(parseFloat(e.target.value) || 0)}
+                        value={embroideryWidth ? embroideryWidth.toFixed(2) : ''}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0
+                          setEmbroideryWidth(Math.round(value * 100) / 100)
+                        }}
                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
                          placeholder="Enter width"
                        />
@@ -1751,8 +2038,11 @@ export default function Customize() {
                          min="0.5"
                          max="12"
                          step="0.1"
-                         value={embroideryHeight || ''}
-                         onChange={(e) => setEmbroideryHeight(parseFloat(e.target.value) || 0)}
+                        value={embroideryHeight ? embroideryHeight.toFixed(2) : ''}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0
+                          setEmbroideryHeight(Math.round(value * 100) / 100)
+                        }}
                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-accent"
                          placeholder="Enter height"
                        />
@@ -1934,7 +2224,7 @@ export default function Customize() {
                                 Design {index + 1}: {design.name}
                               </span>
                               <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
-                                {design.dimensions.width}" × {design.dimensions.height}" @ {Math.round(design.scale * 100)}%
+                                {design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}" @ {Math.round(design.scale * 100)}%
                               </span>
                       </div>
                   
@@ -2024,7 +2314,7 @@ export default function Customize() {
                         
                         {embroideryPricing && (
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth}" × {embroideryHeight}")</span>
+                            <span className="text-sm sm:text-base text-gray-600">Embroidery Base Price ({embroideryWidth.toFixed(2)}" × {embroideryHeight.toFixed(2)}")</span>
                             <span className="font-semibold text-sm sm:text-base text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
                     </div>
                         )}
@@ -2370,7 +2660,7 @@ export default function Customize() {
                             <div className="text-sm text-gray-700">
                               <div className="font-semibold mb-1">Design {index + 1}</div>
                               <div className="text-gray-500 truncate text-xs">{design.name}</div>
-                              <div className="text-gray-400 text-xs mt-1">{design.dimensions.width}" × {design.dimensions.height}"</div>
+                              <div className="text-gray-400 text-xs mt-1">{design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}"</div>
                         </div>
                           </div>
                         ))}
@@ -2417,7 +2707,7 @@ export default function Customize() {
                               <div className="space-y-2">
                         <div className="flex justify-between">
                                 <span className="text-gray-600">Dimensions:</span>
-                                <span className="font-medium">{design.dimensions.width}" × {design.dimensions.height}"</span>
+                                <span className="font-medium">{design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}"</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Scale:</span>
