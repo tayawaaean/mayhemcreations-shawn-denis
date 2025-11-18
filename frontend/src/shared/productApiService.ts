@@ -136,12 +136,15 @@ class ProductApiService {
 
   /**
    * Get all products with optional filtering and pagination
+   * @param filters - Filter options
+   * @param requireAuth - Whether to require authentication (default: false for public, true for admin)
    */
-  async getProducts(filters: ProductFilters = {}): Promise<ApiResponse<Product[]>> {
+  async getProducts(filters: ProductFilters = {}, requireAuth: boolean = false): Promise<ApiResponse<Product[]>> {
     const params = new URLSearchParams();
     
     if (filters.categoryId) params.append('categoryId', filters.categoryId.toString());
     if (filters.subcategoryId) params.append('subcategoryId', filters.subcategoryId.toString());
+    // Don't pass status if not specified - backend will handle default based on auth
     if (filters.status) params.append('status', filters.status);
     if (filters.featured !== undefined) params.append('featured', filters.featured.toString());
     if (filters.search) params.append('search', filters.search);
@@ -155,7 +158,9 @@ class ProductApiService {
     const queryString = params.toString();
     const endpoint = `/products${queryString ? `?${queryString}` : ''}`;
 
-    return apiAuthService.get<Product[]>(endpoint, false); // No auth required for public read
+    // For admin requests, send auth cookies even if not required, so backend can detect admin
+    // Set requireAuth to true to ensure cookies are sent
+    return apiAuthService.get<Product[]>(endpoint, requireAuth);
   }
 
   /**

@@ -47,7 +47,7 @@ export default function Hero() {
               </h1>
               <p className="text-lg text-gray-600 max-w-lg">
                 Transform your ideas into stunning embroidered apparel, patches, and accessories.
-                Professional quality, fast turnaround, and exceptional customer service since 2018.
+                Professional quality, fast turnaround, and exceptional customer service since 2019.
               </p>
             </div>
 
@@ -106,16 +106,16 @@ export default function Hero() {
 
           {/* Image */}
           <div className="relative">
-            <div className="aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 shadow-2xl">
+            <div className="aspect-[3/4] lg:aspect-[2/3] rounded-2xl overflow-hidden bg-gray-100 shadow-2xl">
               {!imageLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse">
                   <div className="text-gray-400 text-sm">Loading...</div>
                 </div>
               )}
               <img
-                src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop&crop=center"
+                src="/machine.jpg"
                 alt="Professional embroidery machine creating custom designs"
-                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                className={`w-full h-full object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => setImageLoaded(true)}
                 onError={(e) => {
                   // Fallback to a working embroidery image

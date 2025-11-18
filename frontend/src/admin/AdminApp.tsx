@@ -19,6 +19,7 @@ import Customers from './pages/Customers'
 import Reviews from './pages/Reviews'
 import UsersPage from './pages/Users'
 import Messages from './pages/Messages'
+import ContactSubmissions from './pages/ContactSubmissions'
 import Inventory from './pages/Inventory'
 import Categories from './pages/Categories'
 import Embroidery from './pages/Embroidery'
@@ -65,6 +66,7 @@ const AdminApp: React.FC = () => {
                             <Route path="reviews" element={<Reviews />} />
                             <Route path="users" element={<UsersPage />} />
                             <Route path="messages" element={<Messages />} />
+                            <Route path="contact-submissions" element={<ContactSubmissions />} />
                             <Route path="inventory" element={<Inventory />} />
                             <Route path="categories" element={<Categories />} />
                             <Route path="embroidery" element={<Embroidery />} />

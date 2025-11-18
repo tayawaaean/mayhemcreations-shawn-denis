@@ -29,7 +29,8 @@ import {
   Cog,
   RotateCcw,
   Clock,
-  Truck
+  Truck,
+  Mail
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -93,6 +94,7 @@ const navigationSections = [
     icon: MessageSquare,
     items: [
       { name: 'Messages', href: '/admin/messages', icon: MessageSquare, adminOnly: false },
+      { name: 'Contact Submissions', href: '/admin/contact-submissions', icon: Mail, adminOnly: false },
       { name: 'FAQs', href: '/admin/faqs', icon: HelpCircle, adminOnly: false }
     ]
   },

@@ -52,7 +52,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-gray-400 text-sm">
-              Crafting quality custom embroidery since 2018. We bring your vision to life with professional-grade equipment and exceptional attention to detail.
+              Crafting quality custom embroidery since 2019. We bring your vision to life with professional-grade equipment and exceptional attention to detail.
             </p>
             <div className="flex space-x-4">
               {socialLinks.etsy && (

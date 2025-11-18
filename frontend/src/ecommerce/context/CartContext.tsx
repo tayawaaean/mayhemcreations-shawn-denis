@@ -97,11 +97,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (response.success && response.data) {
         // Transform backend cart items to frontend format
-        const transformedItems = response.data.map(item => {
+        const transformedItems = await Promise.all(response.data.map(async (item: any) => {
           // Find the product data if it's missing from the response
           let product = item.product
           if (!product && item.productId) {
+            // First try static products array
             product = products.find(p => p.id === item.productId)
+            
+            // If not found in static array and productId is numeric, fetch from API
+            if (!product && typeof item.productId === 'string' && !isNaN(Number(item.productId))) {
+              try {
+                const productResponse = await productApiService.getProductById(Number(item.productId))
+                if (productResponse.success && productResponse.data) {
+                  product = productResponse.data
+                }
+              } catch (error) {
+                console.warn(`Failed to fetch product ${item.productId} from API:`, error)
+              }
+            }
           }
           
           return {
@@ -112,7 +125,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
             reviewStatus: item.reviewStatus || (item.customization ? 'pending' : 'approved'),
             product: product, // Include the full product data
           }
-        })
+        }))
         
         setItems(transformedItems)
         
@@ -524,8 +537,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // Find the product to include in cart item
-    const product = products.find(p => p.id === productId)
+    // Find the product to include in cart item - try static array first, then API
+    let product = products.find(p => p.id === productId)
+    
+    // If not found in static array and productId is numeric, fetch from API
+    if (!product && typeof productId === 'string' && !isNaN(Number(productId))) {
+      try {
+        const productResponse = await productApiService.getProductById(Number(productId))
+        if (productResponse.success && productResponse.data) {
+          product = productResponse.data
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch product ${productId} from API:`, error)
+      }
+    }
 
     // Add to database
     try {

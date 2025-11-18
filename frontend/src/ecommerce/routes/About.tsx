@@ -12,13 +12,13 @@ export default function About() {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
     name: 'About Mayhem Creations',
-    description: 'Learn about Mayhem Creations - crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
+    description: 'Learn about Mayhem Creations - crafting exceptional custom embroidery since 2019. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
     url: 'https://mayhemcreation.com/about',
     mainEntity: {
       '@type': 'Organization',
       name: 'Mayhem Creations',
-      foundingDate: '2018',
-      description: 'Crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
+      foundingDate: '2019',
+      description: 'Crafting exceptional custom embroidery since 2019. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality.',
       url: 'https://mayhemcreation.com',
       logo: 'https://mayhemcreation.com/logo.png',
       sameAs: socialLinks
@@ -28,8 +28,8 @@ export default function About() {
   return (
     <main className="min-h-screen">
       <SEO
-        title="About Us - Mayhem Creations | Custom Embroidery Since 2018"
-        description="Learn about Mayhem Creations - crafting exceptional custom embroidery since 2018. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality."
+        title="About Us - Mayhem Creations | Custom Embroidery Since 2019"
+        description="Learn about Mayhem Creations - crafting exceptional custom embroidery since 2019. We bring your vision to life with professional-grade equipment and an unwavering commitment to quality."
         url="/about"
         type="website"
         structuredData={aboutPageSchema}
@@ -46,7 +46,7 @@ export default function About() {
               About <span className="text-accent">Mayhem Creation</span>
             </h1>
             <p className="text-xl lg:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Crafting exceptional custom embroidery since 2018. We bring your vision to life with 
+              Crafting exceptional custom embroidery since 2019. We bring your vision to life with 
               professional-grade equipment and an unwavering commitment to quality.
             </p>
           </div>
@@ -64,21 +64,13 @@ export default function About() {
                 </h2>
                 <div className="space-y-6 text-lg text-gray-600 leading-relaxed">
                   <p>
-                    Mayhem Creation was born from a simple passion: the love of creating beautiful, 
-                    personalized embroidery that tells a story. What started as a small home-based 
-                    business in 2018 has grown into a trusted name in the custom embroidery industry.
+                    Welcome to Mayhem Creations! What started as a small passion project in 2019 has grown into a brand full of heart, creativity, and a little bit of mayhem.
                   </p>
                   <p>
-                    Our founder, Sarah Johnson, began with just one embroidery machine and a dream 
-                    to help people express their unique identity through quality craftsmanship. 
-                    Today, we serve customers nationwide with the same attention to detail and 
-                    personal touch that started it all.
+                    It all began with a simple idea: to create something fun, cute, and meaningful. I started with candles, each one handmade with care, bringing warmth and joy into people's homes. But I couldn't stop there. In 2024, I discovered the world of embroidery, and instantly fell in love with the endless possibilities it offered for creating unique, whimsical designs.
                   </p>
                   <p>
-                    Every piece we create is more than just embroidery – it's a reflection of your 
-                    personality, your business, or your special moments. We believe that quality 
-                    should never be compromised, and that's why we use only the finest materials 
-                    and state-of-the-art equipment.
+                    Now, Mayhem Creations is a place where my love for all things cute and crafty comes together. From starting out with hand-poured candles now to custom embroidery pieces, everything I make is designed to bring a little more joy, color, and personality to your world. Every item is crafted with care, passion, and a touch of mayhem—because life's too short to be anything but playful!
                   </p>
                 </div>
               </div>

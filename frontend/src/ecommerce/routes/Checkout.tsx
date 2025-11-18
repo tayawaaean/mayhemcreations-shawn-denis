@@ -1188,11 +1188,16 @@ export default function Checkout() {
                                 </h4>
                                 <p className="text-sm text-gray-600 mt-1">
                                   {rate.carrier}
-                                  {rate.estimatedDeliveryDays && ` • ${rate.estimatedDeliveryDays} business days`}
+                                  {rate.estimatedDeliveryDays && ` • ${rate.estimatedDeliveryDays} business day${rate.estimatedDeliveryDays !== 1 ? 's' : ''}`}
                                   {rate.guaranteed && ' • Guaranteed delivery'}
                                   {rate.trackable && ' • Trackable'}
                                 </p>
-                                {rate.otherCost > 0 && (
+                                {rate.estimatedDeliveryDays === 1 && (
+                                  <p className="text-xs text-amber-600 mt-1 font-medium">
+                                    + $20 rush service charge included
+                                  </p>
+                                )}
+                                {rate.otherCost > 0 && rate.estimatedDeliveryDays !== 1 && (
                                   <p className="text-xs text-gray-500 mt-1 cursor-help" title="Additional fees and surcharges imposed by the carrier (fuel surcharges, residential delivery fees, signature confirmation, etc.)">
                                     Other fees included
                                   </p>

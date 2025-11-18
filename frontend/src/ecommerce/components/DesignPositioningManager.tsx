@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Edit3, Calculator, Save, X, MessageSquare, Copy, Info, Ruler, RotateCw } from 'lucide-react'
+import { Edit3, Calculator, Save, X, MessageSquare, Copy, Info, Ruler, RotateCw, Trash2 } from 'lucide-react'
 import { useCustomization, EmbroideryDesignData } from '../context/CustomizationContext'
 import { MaterialPricingService } from '../../shared/materialPricingService'
 
@@ -12,7 +12,8 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
     customizationData, 
     updateDesign,
     calculateDesignPrice,
-    setCustomizationData
+    setCustomizationData,
+    removeDesignById
   } = useCustomization()
   
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
@@ -125,14 +126,26 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
                       {design.name}
                     </h4>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                      <button
-                        onClick={() => handleDuplicateDesign(design)}
-                        className="px-2.5 sm:px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium"
-                        title="Duplicate this design with different size"
-                      >
-                        <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span>Duplicate</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleDuplicateDesign(design)}
+                          className="px-2.5 sm:px-3 py-1 bg-green-100 text-green-700 hover:bg-green-200 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium"
+                          title="Duplicate this design with different size"
+                        >
+                          <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span>Duplicate</span>
+                        </button>
+                        {customizationData.designs.length > 1 && (
+                          <button
+                            onClick={() => removeDesignById(design.id)}
+                            className="px-2.5 sm:px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded-md transition-colors flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-medium"
+                            title="Delete this design"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span>Delete</span>
+                          </button>
+                        )}
+                      </div>
                       <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
                         {design.dimensions.width}" × {design.dimensions.height}" @ {Math.round(design.scale * 100)}%
                       </span>
@@ -550,6 +563,10 @@ const DesignPositioningManager: React.FC<DesignPositioningManagerProps> = ({ sho
               <li className="flex items-start">
                 <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>
                 <span>Click <strong>"Duplicate"</strong> to use the same design in multiple sizes</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>
+                <span>Click <strong>"Delete"</strong> to remove a duplicated design (you must keep at least one design)</span>
               </li>
               <li className="flex items-start">
                 <span className="text-blue-500 mr-1.5 sm:mr-2 mt-0.5 flex-shrink-0">•</span>

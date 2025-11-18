@@ -207,8 +207,8 @@ const Inventory: React.FC = () => {
     }
   }
 
-  // Only show variants in inventory
-  const allItems = (variantData?.variants?.map(variant => ({
+  // Show variants in inventory
+  const variantItems = (variantData?.variants?.map(variant => ({
     id: variant.id.toString(),
     productId: variant.productId,
     productTitle: variant.product?.title || 'Unknown Product',
@@ -223,6 +223,33 @@ const Inventory: React.FC = () => {
     size: variant.size || 'One Size',
     type: 'variant' as const
   })) || [])
+
+  // Also show active products that don't have variants yet (so admin can create variants)
+  const productsWithVariants = new Set(variantItems.map(item => item.productId))
+  const productsWithoutVariants = products
+    .filter(product => 
+      product.status === 'active' && 
+      !productsWithVariants.has(String(product.id))
+    )
+    .map(product => ({
+      id: `product-${product.id}`,
+      productId: String(product.id),
+      productTitle: product.title || 'Unknown Product',
+      productImage: product.image || '/placeholder-image.jpg',
+      productSku: product.sku || 'N/A',
+      category: product.category?.name || 'Uncategorized',
+      subcategory: '',
+      price: product.price || 0,
+      stock: 0,
+      color: 'N/A',
+      colorHex: '#000000',
+      size: 'N/A',
+      type: 'product' as const,
+      needsVariants: true
+    }))
+
+  // Combine variants and products without variants
+  const allItems = [...variantItems, ...productsWithoutVariants]
 
   // Debug logging (uncomment for debugging)
   // console.log('Variant data:', variantData)
@@ -257,6 +284,12 @@ const Inventory: React.FC = () => {
       const item = filteredItems.find(i => i.id === itemId)
       if (!item) {
         showErrorToast('Item not found. Please refresh the page.')
+        return
+      }
+
+      // Don't allow stock adjustments on products without variants
+      if (item.type === 'product' || (item as any).needsVariants) {
+        showErrorToast('Please create variants for this product first. Use the "Add Variant" button.')
         return
       }
 
@@ -651,6 +684,11 @@ const Inventory: React.FC = () => {
                               Variant: {item.color} • {item.size}
                             </div>
                           )}
+                          {item.type === 'product' && (item as any).needsVariants && (
+                            <div className="text-xs text-amber-600 mt-1 font-medium">
+                              ⚠️ No variants - Create variants to manage inventory
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -690,29 +728,42 @@ const Inventory: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
+                      {item.type === 'product' && (item as any).needsVariants ? (
                         <button
-                          onClick={() => handleStockAdjustment(item.id, -1)}
-                          disabled={adjustingStock === item.id}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          onClick={() => {
+                            setNewVariant(prev => ({ ...prev, productId: item.productId }))
+                            setIsAddVariantOpen(true)
+                          }}
+                          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                          title="Create Variant"
                         >
-                          <Minus className="h-4 w-4" />
+                          Add Variant
                         </button>
-                        <button
-                          onClick={() => handleStockAdjustment(item.id, 1)}
-                          disabled={adjustingStock === item.id}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditVariantClick(item)}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                          title="Edit Item"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                      </div>
+                      ) : (
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => handleStockAdjustment(item.id, -1)}
+                            disabled={adjustingStock === item.id}
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleStockAdjustment(item.id, 1)}
+                            disabled={adjustingStock === item.id}
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditVariantClick(item)}
+                            className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                            title="Edit Item"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )
@@ -739,7 +790,11 @@ const Inventory: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="text-sm font-medium text-gray-900 truncate">{item.productTitle}</h3>
                           <p className="text-sm text-gray-500 truncate">{item.color} • {item.size}</p>
-                          <p className="text-xs text-blue-600 mt-1">Variant</p>
+                          {item.type === 'product' && (item as any).needsVariants ? (
+                            <p className="text-xs text-amber-600 mt-1 font-medium">⚠️ No variants - Create variants to manage inventory</p>
+                          ) : (
+                            <p className="text-xs text-blue-600 mt-1">Variant</p>
+                          )}
                           <p className="text-xs text-gray-400 mt-1">SKU: {item.productSku}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">

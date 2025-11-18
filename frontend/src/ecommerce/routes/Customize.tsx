@@ -580,6 +580,47 @@ export default function Customize() {
     }
   }
 
+  const handleDownloadDesign = (preview: string, filename: string) => {
+    try {
+      // Handle base64 data URLs
+      if (preview.startsWith('data:')) {
+        const link = document.createElement('a')
+        link.href = preview
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else {
+        // Handle blob URLs or regular URLs
+        fetch(preview)
+          .then(res => res.blob())
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+          })
+          .catch(err => {
+            console.error('Error downloading image:', err)
+            // Fallback: try direct download
+            const link = document.createElement('a')
+            link.href = preview
+            link.download = filename
+            link.target = '_blank'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+          })
+      }
+    } catch (error) {
+      console.error('Error downloading design:', error)
+    }
+  }
+
   const handleDesignStart = (e: React.MouseEvent | React.TouchEvent) => {
     // Only allow dragging in manual mode
     if (customizationData.placement !== 'manual') return
@@ -2611,12 +2652,25 @@ export default function Customize() {
               
               <div className="space-y-6">
                 {/* Product with Design - Centered and Full Width */}
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-6 text-center">
-                    {product?.title} - Final Product Preview
-                  </h3>
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-8 relative group">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-semibold text-gray-900 text-center flex-1">
+                      {product?.title} - Final Product Preview
+                    </h3>
+                    {(finalDesignImage || product?.image) && (
+                      <button
+                        onClick={() => handleDownloadDesign(finalDesignImage || product?.image || '', `${product?.title || 'final-design'}-preview.jpg`)}
+                        className="ml-4 flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors shadow-lg"
+                        title="Download final design preview"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">Download Preview</span>
+                        <span className="sm:hidden">Download</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="flex justify-center items-center">
-                    <div className="relative w-full max-w-3xl">
+                    <div className="relative w-full max-w-3xl group">
                       {finalDesignImage ? (
                         <img
                           src={finalDesignImage}
@@ -2631,6 +2685,16 @@ export default function Customize() {
                           className="w-full h-auto object-contain rounded-lg shadow-2xl"
                           style={{ imageRendering: 'crisp-edges' as any, maxHeight: '600px' }}
                         />
+                      )}
+                      {/* Hover download button overlay */}
+                      {(finalDesignImage || product?.image) && (
+                        <button
+                          onClick={() => handleDownloadDesign(finalDesignImage || product?.image || '', `${product?.title || 'final-design'}-preview.jpg`)}
+                          className="absolute top-4 right-4 bg-accent text-white p-3 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-accent/90 flex items-center justify-center"
+                          title="Download final design preview"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
                       )}
                     </div>
                   </div>
@@ -2649,18 +2713,32 @@ export default function Customize() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {customizationData.designs.map((design, index) => (
                           <div key={design.id} className="text-center">
-                            <div className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200 flex items-center justify-center" style={{ minHeight: '200px' }}>
+                            <div className="bg-gray-50 rounded-xl p-4 mb-3 border border-gray-200 flex items-center justify-center relative group" style={{ minHeight: '200px' }}>
                           <img
                             src={design.preview}
                                 alt={`Design ${index + 1}`}
                                 className="max-w-full max-h-48 object-contain rounded"
                                 style={{ imageRendering: 'crisp-edges' as any }}
                           />
+                          <button
+                            onClick={() => handleDownloadDesign(design.preview, design.name)}
+                            className="absolute top-2 right-2 bg-accent text-white p-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-accent/90 flex items-center justify-center"
+                            title="Download image"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
                           </div>
                             <div className="text-sm text-gray-700">
                               <div className="font-semibold mb-1">Design {index + 1}</div>
                               <div className="text-gray-500 truncate text-xs">{design.name}</div>
                               <div className="text-gray-400 text-xs mt-1">{design.dimensions.width.toFixed(2)}" × {design.dimensions.height.toFixed(2)}"</div>
+                              <button
+                                onClick={() => handleDownloadDesign(design.preview, design.name)}
+                                className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 rounded-lg hover:bg-accent/20 transition-colors"
+                              >
+                                <Download className="w-3 h-3" />
+                                Download
+                              </button>
                         </div>
                           </div>
                         ))}
@@ -2671,17 +2749,31 @@ export default function Customize() {
                     {customizationData.designs.length === 0 && customizationData.design && (
                       <div className="flex justify-center">
                         <div className="text-center max-w-md">
-                          <div className="bg-gray-50 rounded-xl p-6 mb-4 border border-gray-200 flex items-center justify-center" style={{ minHeight: '300px' }}>
+                          <div className="bg-gray-50 rounded-xl p-6 mb-4 border border-gray-200 flex items-center justify-center relative group" style={{ minHeight: '300px' }}>
                             <img
                               src={customizationData.design.preview}
                               alt="Design"
                               className="max-w-full max-h-64 object-contain rounded"
                               style={{ imageRendering: 'crisp-edges' as any }}
                             />
+                            <button
+                              onClick={() => handleDownloadDesign(customizationData.design!.preview, customizationData.design!.name)}
+                              className="absolute top-2 right-2 bg-accent text-white p-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-accent/90 flex items-center justify-center"
+                              title="Download image"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
                           </div>
                           <div className="text-sm text-gray-700">
                             <div className="font-semibold mb-1">{customizationData.design.name}</div>
-                            <div className="text-gray-500 text-xs">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</div>
+                            <div className="text-gray-500 text-xs mb-2">{(customizationData.design.size / 1024 / 1024).toFixed(2)} MB</div>
+                            <button
+                              onClick={() => handleDownloadDesign(customizationData.design!.preview, customizationData.design!.name)}
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-accent bg-accent/10 rounded-lg hover:bg-accent/20 transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                              Download Image
+                            </button>
                           </div>
                         </div>
                       </div>

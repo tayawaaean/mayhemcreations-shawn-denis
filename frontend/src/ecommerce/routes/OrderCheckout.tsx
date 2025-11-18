@@ -1165,8 +1165,13 @@ export default function OrderCheckout() {
                                   )}
                                 </div>
                                 <p className="text-sm text-gray-600 mt-1">
-                                  {rate.carrier} • {rate.estimatedDeliveryDays ? `${rate.estimatedDeliveryDays}-day delivery` : 'Standard delivery'}
+                                  {rate.carrier} • {rate.estimatedDeliveryDays ? `${rate.estimatedDeliveryDays} business day${rate.estimatedDeliveryDays !== 1 ? 's' : ''}` : 'Standard delivery'}
                                 </p>
+                                {rate.estimatedDeliveryDays === 1 && (
+                                  <p className="text-xs text-amber-600 mt-1 font-medium">
+                                    + $20 rush service charge included
+                                  </p>
+                                )}
                               </div>
                               <div className="flex items-center ml-4">
                                 <span className="text-lg font-semibold text-gray-900 mr-4">

@@ -100,7 +100,12 @@ export default function Cart() {
       product = customEmbroideryProduct;
     } else if (!product) {
       // Fallback: try to find product if it's missing from cart item
-      product = products.find((p) => p.id === it.productId);
+      product = products.find((p) => {
+        // Handle both string and numeric IDs
+        const pId = typeof p.id === 'string' ? p.id : String(p.id)
+        const itId = typeof it.productId === 'string' ? it.productId : String(it.productId)
+        return pId === itId || p.id === it.productId
+      });
     }
     
     return {
@@ -108,9 +113,10 @@ export default function Cart() {
       product
     };
   }).filter(item => {
-    const hasProduct = !!item.product;
-    return hasProduct;
-  }) // Filter out items without product data
+    // Don't filter out items - show them even if product data is missing
+    // This prevents cart from appearing empty when product data isn't loaded yet
+    return true;
+  })
   
   const calculateItemPrice = (item: typeof enriched[0]) => {
     // For custom embroidery items, use the total price from embroideryData
@@ -611,13 +617,22 @@ export default function Cart() {
                 <div key={item.productId} className="bg-white rounded-2xl shadow-sm border border-gray-200">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4 p-4 sm:p-6">
                     <img 
-                      src={item.customization?.mockup || item.product?.image || ''} 
-                      alt={item.product?.alt || ''} 
+                      src={item.customization?.mockup || item.product?.image || '/placeholder-product.png'} 
+                      alt={item.product?.alt || item.product?.title || 'Product'} 
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-md flex-shrink-0" 
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        const target = e.target as HTMLImageElement
+                        target.src = '/placeholder-product.png'
+                      }}
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{item.product?.title || ''}</h3>
-                      <p className="text-xs sm:text-sm text-gray-600 mt-1">{item.product?.description || ''}</p>
+                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                        {item.product?.title || `Product #${item.productId}`}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        {item.product?.description || 'Product details loading...'}
+                      </p>
                       
                       {/* Review Status for All Items */}
                       <div className="mt-2 space-y-1">

@@ -35,10 +35,18 @@ export const useProducts = () => {
       setLoading(true)
       setError(null)
       
+      // For admin, don't pass status filter - backend will return all products for admin
+      // Only pass status if explicitly requested
+      const adminFilters = { ...filters }
+      // Remove status filter if not explicitly set, so backend returns all products
+      if (!filters.status) {
+        delete adminFilters.status
+      }
+      
       const response = await productApiService.getProducts({
-        ...filters,
+        ...adminFilters,
         limit: filters.limit || 50 // Default to 50 for admin
-      })
+      }, true) // Require auth for admin requests so backend can detect admin role
       
       // Transform database products to admin format
       const transformedProducts = (response.data || []).map(product => ({
