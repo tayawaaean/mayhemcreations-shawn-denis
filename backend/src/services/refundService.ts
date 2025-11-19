@@ -777,7 +777,7 @@ export class RefundService {
       const provider = refund.paymentProvider;
 
       if (provider === 'stripe') {
-        return await this.processStripeRefund(refund);
+        return await this.processStripeRefund(refund, manualCaptureId);
       } else if (provider === 'paypal') {
         return await this.processPayPalRefund(refund, manualCaptureId);
       } else {
@@ -793,19 +793,112 @@ export class RefundService {
    * Process Stripe refund
    */
   private static async processStripeRefund(
-    refund: RefundRequest
+    refund: RefundRequest,
+    manualPaymentIntentId?: string
   ): Promise<{ success: boolean; message?: string; refundId?: string; response?: any }> {
     try {
-      // Fetch order to get payment intent ID
-      const order = await OrderReview.findByPk(refund.orderId);
-      
-      if (!order || !order.paymentIntentId) {
-        return { success: false, message: 'No Stripe payment intent ID found' };
+      let paymentIntentId = manualPaymentIntentId; // Use manual payment intent ID if provided
+
+      // If manual payment intent ID not provided, try to find it
+      if (!paymentIntentId) {
+        // Fetch order to get payment intent ID
+        const order = await OrderReview.findByPk(refund.orderId);
+        
+        if (order?.paymentIntentId) {
+          paymentIntentId = order.paymentIntentId;
+        } else {
+          // If payment intent ID is not in the order, try to get it from the payments table
+          logger.warn('Stripe payment intent ID not found in order, checking payments table:', {
+            refundId: refund.id,
+            orderId: refund.orderId,
+            hasTransactionId: !!order?.transactionId,
+            transactionId: order?.transactionId
+          });
+
+          try {
+            const { sequelize } = await import('../config/database');
+            const [paymentRecords] = await sequelize.query(
+              `SELECT provider_transaction_id, transaction_id, gateway_response 
+               FROM payments 
+               WHERE order_id = ? AND provider = 'stripe' AND status = 'completed'
+               ORDER BY id DESC LIMIT 1`,
+              { replacements: [refund.orderId] }
+            );
+
+            const payment = paymentRecords[0] as any;
+            if (payment?.provider_transaction_id) {
+              // Check if it's a payment intent ID (starts with pi_) or charge ID (starts with ch_)
+              const transactionId = payment.provider_transaction_id;
+              if (transactionId.startsWith('pi_')) {
+                paymentIntentId = transactionId;
+                logger.info('Found Stripe payment intent ID in payments table:', paymentIntentId);
+              } else if (transactionId.startsWith('ch_')) {
+                // If we have a charge ID, we can use it directly for refunds
+                // Stripe allows refunding by charge ID as well
+                paymentIntentId = transactionId;
+                logger.info('Found Stripe charge ID in payments table, using for refund:', paymentIntentId);
+              }
+            } else if (payment?.transaction_id) {
+              // Check transaction_id field as well
+              const transactionId = payment.transaction_id;
+              if (transactionId.startsWith('pi_') || transactionId.startsWith('ch_')) {
+                paymentIntentId = transactionId;
+                logger.info('Found Stripe transaction ID in payments table:', paymentIntentId);
+              }
+            } else if (payment?.gateway_response) {
+              try {
+                const gatewayData = JSON.parse(payment.gateway_response);
+                paymentIntentId = gatewayData.paymentIntentId || gatewayData.payment_intent_id || gatewayData.id;
+                if (paymentIntentId) {
+                  logger.info('Found Stripe payment intent ID in gateway response:', paymentIntentId);
+                }
+              } catch (e) {
+                logger.warn('Failed to parse gateway response:', e);
+              }
+            }
+          } catch (error) {
+            logger.error('Error fetching Stripe payment intent ID from payments table:', error);
+          }
+        }
       }
 
+      // If still no payment intent ID, return error with helpful message
+      if (!paymentIntentId) {
+        logger.error('No Stripe payment intent ID found anywhere for refund:', {
+          refundId: refund.id,
+          orderId: refund.orderId,
+          orderNumber: refund.orderNumber
+        });
+        return {
+          success: false,
+          message: 'MANUAL_REFUND_REQUIRED: Stripe payment intent ID not found. Please:\n1. Log into your Stripe dashboard\n2. Find the payment for this order\n3. Process the refund manually\n4. Update the refund status in the admin panel\n\nAlternatively, you can provide the Stripe Payment Intent ID (starts with pi_) or Charge ID (starts with ch_) manually when approving the refund.'
+        };
+      }
+
+      // Validate payment intent ID format (Stripe payment intent IDs start with pi_, charge IDs start with ch_)
+      if (typeof paymentIntentId !== 'string' || paymentIntentId.trim().length === 0) {
+        logger.error('Invalid Stripe payment intent ID format:', {
+          refundId: refund.id,
+          paymentIntentId: paymentIntentId,
+          paymentIntentIdType: typeof paymentIntentId
+        });
+        return {
+          success: false,
+          message: 'MANUAL_REFUND_REQUIRED: Invalid Stripe payment intent ID format. Please provide a valid Payment Intent ID (starts with pi_) or Charge ID (starts with ch_) from Stripe dashboard.'
+        };
+      }
+
+      logger.info('Processing Stripe refund with payment intent/charge ID:', {
+        refundId: refund.id,
+        orderId: refund.orderId,
+        paymentIntentId: paymentIntentId,
+        amount: refund.refundAmount,
+        isManual: !!manualPaymentIntentId
+      });
+
       // Create refund in Stripe
-      const stripeRefund = await stripe.refunds.create({
-        payment_intent: order.paymentIntentId,
+      // Stripe allows refunding by payment_intent or charge ID
+      const refundParams: any = {
         amount: Math.round(Number(refund.refundAmount) * 100), // Convert to cents
         reason: this.mapReasonToStripeReason(refund.reason),
         metadata: {
@@ -813,7 +906,19 @@ export class RefundService {
           order_number: refund.orderNumber,
           customer_email: refund.customerEmail
         }
-      });
+      };
+
+      // Use payment_intent if it's a payment intent ID, otherwise use charge
+      if (paymentIntentId.startsWith('pi_')) {
+        refundParams.payment_intent = paymentIntentId;
+      } else if (paymentIntentId.startsWith('ch_')) {
+        refundParams.charge = paymentIntentId;
+      } else {
+        // Try as payment_intent first, Stripe will validate
+        refundParams.payment_intent = paymentIntentId;
+      }
+
+      const stripeRefund = await stripe.refunds.create(refundParams);
 
       logger.info(`Stripe refund created: ${stripeRefund.id} for refund request ${refund.id}`);
 
@@ -824,6 +929,16 @@ export class RefundService {
       };
     } catch (error: any) {
       logger.error('Stripe refund error:', error);
+      
+      // Check if error indicates missing payment intent
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('No such payment_intent') || errorMessage.includes('No such charge')) {
+        return {
+          success: false,
+          message: 'MANUAL_REFUND_REQUIRED: Invalid Stripe payment intent or charge ID. Please verify the ID in your Stripe dashboard and provide the correct Payment Intent ID (starts with pi_) or Charge ID (starts with ch_).'
+        };
+      }
+      
       return {
         success: false,
         message: 'Stripe refund failed: ' + error.message

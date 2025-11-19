@@ -168,9 +168,10 @@ export class SessionService {
       // Update last activity
       await dbSession.updateActivity();
 
-      // Update session data with fresh data
+      // Update session data with fresh data from database
       const updatedSessionData: SessionData = {
         ...sessionData,
+        role: (dbSession as any).user.role.name, // Update role from database
         lastActivity: new Date(),
         permissions: (dbSession as any).user.role.permissions,
       };

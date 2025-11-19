@@ -376,30 +376,53 @@ export const getShipEngineRates = async (
         const hasErrors = rate.error_messages && rate.error_messages.length > 0;
         if (hasErrors) {
           logger.debug(`Filtering out failed rate: ${rate.carrier_friendly_name} - ${rate.service_type}`);
+          return false;
         }
-        return !hasErrors;
+        
+        // Filter out overnight shipping options
+        const serviceName = (rate.service_type || '').toLowerCase();
+        const isOvernight = serviceName.includes('overnight') || 
+                           serviceName.includes('next day') ||
+                           serviceName.includes('same day') ||
+                           serviceName.includes('express overnight');
+        
+        if (isOvernight) {
+          logger.debug(`Filtering out overnight shipping: ${rate.carrier_friendly_name} - ${rate.service_type}`);
+          return false;
+        }
+        
+        return true;
       })
-      .map(rate => ({
-        serviceName: rate.service_type,
-        serviceCode: rate.service_code,
-        carrier: rate.carrier_friendly_name,
-        carrierCode: rate.carrier_code,
-        shipmentCost: rate.shipping_amount.amount,
-        taxAmount: rate.tax_amount?.amount || 0, // Tax amount from ShipEngine
-        insuranceCost: rate.insurance_amount?.amount || 0, // Insurance fees
-        confirmationCost: rate.confirmation_amount?.amount || 0, // Delivery confirmation fees
-        otherCost: rate.other_amount?.amount || 0, // Additional fees (fuel surcharge, residential, etc.)
-        totalCost: rate.shipping_amount.amount + 
+      .map(rate => {
+        const baseTotalCost = rate.shipping_amount.amount + 
                    (rate.tax_amount?.amount || 0) + // Include tax in total cost
                    (rate.insurance_amount?.amount || 0) + 
                    (rate.confirmation_amount?.amount || 0) + 
-                   (rate.other_amount?.amount || 0),
-        estimatedDeliveryDays: rate.delivery_days,
-        estimatedDeliveryDate: rate.estimated_delivery_date,
-        guaranteed: rate.guaranteed_service || false,
-        trackable: rate.trackable !== false,
-        rateId: rate.rate_id, // Include rate ID for label creation
-      }));
+                   (rate.other_amount?.amount || 0);
+        
+        // Add $20 service charge for 1 business day shipping
+        const isOneBusinessDay = rate.delivery_days === 1;
+        const serviceCharge = isOneBusinessDay ? 20.00 : 0;
+        const totalCost = baseTotalCost + serviceCharge;
+        
+        return {
+          serviceName: rate.service_type,
+          serviceCode: rate.service_code,
+          carrier: rate.carrier_friendly_name,
+          carrierCode: rate.carrier_code,
+          shipmentCost: rate.shipping_amount.amount,
+          taxAmount: rate.tax_amount?.amount || 0, // Tax amount from ShipEngine
+          insuranceCost: rate.insurance_amount?.amount || 0, // Insurance fees
+          confirmationCost: rate.confirmation_amount?.amount || 0, // Delivery confirmation fees
+          otherCost: (rate.other_amount?.amount || 0) + serviceCharge, // Include service charge in otherCost
+          totalCost: totalCost,
+          estimatedDeliveryDays: rate.delivery_days,
+          estimatedDeliveryDate: rate.estimated_delivery_date,
+          guaranteed: rate.guaranteed_service || false,
+          trackable: rate.trackable !== false,
+          rateId: rate.rate_id, // Include rate ID for label creation
+        };
+      });
 
     // Sort by cost (cheapest first)
     simplifiedRates.sort((a, b) => a.totalCost - b.totalCost);
@@ -572,24 +595,17 @@ export const getFallbackShippingRates = (destinationState: string): SimplifiedRa
       carrier: 'USPS',
       carrierCode: 'stamps_com',
       shipmentCost: isLocal ? 7.99 : 9.99,
+      taxAmount: 0,
+      insuranceCost: 0,
+      confirmationCost: 0,
       otherCost: 0,
       totalCost: isLocal ? 7.99 : 9.99,
       estimatedDeliveryDays: isLocal ? 2 : 3,
       guaranteed: false,
       trackable: true,
     },
-    {
-      serviceName: 'USPS Priority Mail Express',
-      serviceCode: 'usps_priority_mail_express',
-      carrier: 'USPS',
-      carrierCode: 'stamps_com',
-      shipmentCost: isLocal ? 22.99 : 24.99,
-      otherCost: 0,
-      totalCost: isLocal ? 22.99 : 24.99,
-      estimatedDeliveryDays: isLocal ? 1 : 2,
-      guaranteed: true,
-      trackable: true,
-    },
+    // Removed overnight/express options per business requirements
+    // 1 business day options would have $20 service charge added
   ];
 };
 

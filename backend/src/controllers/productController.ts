@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { Op, QueryTypes } from 'sequelize';
 import { sequelize } from '../config/database';
 import { getWebSocketService } from '../services/websocketService';
+import { SessionService } from '../services/sessionService';
 
 export interface ProductFilters {
   categoryId?: number;
@@ -126,7 +127,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     const {
       categoryId,
       subcategoryId,
-      status = 'active',
+      status, // Don't default to 'active' - only filter if explicitly provided
       featured,
       search,
       minPrice,
@@ -137,8 +138,23 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
       limit = 20
     } = req.query;
 
+    // Check if user is admin/seller (for admin panel, show all products by default)
+    // Try to get session data even if route is public
+    let isAdmin = false;
+    try {
+      if (SessionService.isAuthenticated(req)) {
+        const sessionData = SessionService.getSession(req);
+        isAdmin = sessionData?.role === 'admin' || sessionData?.role === 'seller';
+      }
+    } catch (error) {
+      // Ignore auth errors for public route
+    }
+    
+    // Default to 'active' only for public (customer) requests, show all for admin
+    const defaultStatus = isAdmin ? undefined : 'active';
+
     const filters: ProductFilters = {
-      status: status as 'active' | 'inactive' | 'draft',
+      status: status ? (status as 'active' | 'inactive' | 'draft') : defaultStatus,
       featured: featured === 'true' ? true : featured === 'false' ? false : undefined,
       search: search as string,
       minPrice: minPrice ? Number(minPrice) : undefined,
@@ -152,6 +168,7 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
     // Build where clause
     const whereClause: any = {};
 
+    // Only filter by status if explicitly provided (or default for public)
     if (filters.status) {
       whereClause.status = filters.status;
     }
@@ -468,9 +485,13 @@ export const createProduct = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Check if product with slug already exists
+    // Check if product with slug already exists (only check active products for uniqueness)
+    // Allow inactive/draft products to reuse slugs since they're not publicly visible
     const existingProduct = await Product.findOne({
-      where: { slug: productData.slug }
+      where: { 
+        slug: productData.slug,
+        status: 'active' // Only enforce uniqueness for active products
+      }
     });
 
     if (existingProduct) {
@@ -869,9 +890,14 @@ export const updateProduct = async (req: Request, res: Response): Promise<void> 
     }
 
     // Check if slug is being changed and if it already exists
+    // Only enforce uniqueness for active products, and exclude the current product
     if (updateData.slug && updateData.slug !== product.slug) {
       const existingProduct = await Product.findOne({
-        where: { slug: updateData.slug }
+        where: { 
+          slug: updateData.slug,
+          status: 'active', // Only check active products
+          id: { [Op.ne]: product.id } // Exclude current product
+        }
       });
 
       if (existingProduct) {

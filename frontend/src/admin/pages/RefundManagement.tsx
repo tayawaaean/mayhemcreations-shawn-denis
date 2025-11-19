@@ -133,13 +133,14 @@ const RefundManagement: React.FC = () => {
         await fetchRefunds()
         await fetchStats()
       } else {
-        // Check if this is a manual refund required error for PayPal
+        // Check if this is a manual refund required error for PayPal or Stripe
         const errorMessage = response.message || 'Unknown error'
         if (errorMessage.includes('MANUAL_REFUND_REQUIRED')) {
-          // Show detailed error message with option to enter capture ID
+          // Show detailed error message with option to enter transaction ID
+          const providerName = selectedRequest?.paymentProvider === 'stripe' ? 'Stripe Payment Intent/Charge' : 'PayPal Capture'
           const enterManually = await showConfirm(
-            errorMessage + '\n\nWould you like to enter the PayPal Capture ID manually?',
-            'Manual PayPal Capture Required'
+            errorMessage + `\n\nWould you like to enter the ${providerName} ID manually?`,
+            `Manual ${selectedRequest?.paymentProvider === 'stripe' ? 'Stripe' : 'PayPal'} Transaction Required`
           )
           if (enterManually) {
             setShowManualInput(true)
@@ -795,37 +796,63 @@ const RefundManagement: React.FC = () => {
                 />
               </div>
 
-              {/* Manual PayPal Capture ID (for PayPal orders only) */}
-              {selectedRequest.paymentProvider === 'paypal' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+              {/* Manual Payment Provider Transaction ID (for PayPal and Stripe) */}
+              {(selectedRequest.paymentProvider === 'paypal' || selectedRequest.paymentProvider === 'stripe') && (
+                <div className={`border rounded-md p-4 ${
+                  selectedRequest.paymentProvider === 'paypal' 
+                    ? 'bg-yellow-50 border-yellow-200' 
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
                   <div className="flex items-start">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <AlertCircle className={`w-5 h-5 mt-0.5 mr-2 flex-shrink-0 ${
+                      selectedRequest.paymentProvider === 'paypal' 
+                        ? 'text-yellow-600' 
+                        : 'text-blue-600'
+                    }`} />
                     <div className="flex-1">
-                      <h4 className="text-sm font-medium text-yellow-900 mb-1">PayPal Refund</h4>
-                      <p className="text-xs text-yellow-700 mb-3">
-                        If automatic PayPal refund fails, you can manually enter the PayPal Capture ID to retry.
+                      <h4 className={`text-sm font-medium mb-1 ${
+                        selectedRequest.paymentProvider === 'paypal' 
+                          ? 'text-yellow-900' 
+                          : 'text-blue-900'
+                      }`}>
+                        {selectedRequest.paymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} Refund
+                      </h4>
+                      <p className={`text-xs mb-3 ${
+                        selectedRequest.paymentProvider === 'paypal' 
+                          ? 'text-yellow-700' 
+                          : 'text-blue-700'
+                      }`}>
+                        If automatic {selectedRequest.paymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} refund fails, you can manually enter the transaction ID to retry.
                       </p>
                       <button
                         type="button"
                         onClick={() => setShowManualInput(!showManualInput)}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        {showManualInput ? 'Hide Manual Input' : 'Enter PayPal Capture ID Manually'}
+                        {showManualInput ? 'Hide Manual Input' : `Enter ${selectedRequest.paymentProvider === 'paypal' ? 'PayPal Capture' : 'Stripe Payment Intent/Charge'} ID Manually`}
                       </button>
                       {showManualInput && (
                         <div className="mt-3">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
-                            PayPal Capture ID
+                            {selectedRequest.paymentProvider === 'paypal' 
+                              ? 'PayPal Capture ID' 
+                              : 'Stripe Payment Intent ID or Charge ID'}
                           </label>
                           <input
                             type="text"
                             value={manualCaptureId}
                             onChange={(e) => setManualCaptureId(e.target.value)}
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono"
-                            placeholder="e.g., 5TY45345KP543532R"
+                            placeholder={
+                              selectedRequest.paymentProvider === 'paypal' 
+                                ? 'e.g., 5TY45345KP543532R' 
+                                : 'e.g., pi_1234567890 or ch_1234567890'
+                            }
                           />
                           <p className="mt-1 text-xs text-gray-500">
-                            Find this in your PayPal dashboard under transaction details
+                            {selectedRequest.paymentProvider === 'paypal' 
+                              ? 'Find this in your PayPal dashboard under transaction details'
+                              : 'Find this in your Stripe dashboard. Payment Intent IDs start with "pi_" and Charge IDs start with "ch_"'}
                           </p>
                         </div>
                       )}

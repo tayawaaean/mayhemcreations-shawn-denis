@@ -14,9 +14,37 @@ import {
 
 export class EmailService {
   private transporter: nodemailer.Transporter;
+  private frontendUrl: string;
 
   constructor() {
     this.transporter = createEmailTransporter();
+    // Get frontend URL from environment, with validation
+    this.frontendUrl = this.getFrontendUrl();
+  }
+
+  /**
+   * Get frontend URL from environment variables
+   * Throws error if not set in production
+   */
+  private getFrontendUrl(): string {
+    const url = process.env.FRONTEND_URL;
+    
+    if (!url) {
+      if (process.env.NODE_ENV === 'production') {
+        logger.error('❌ FRONTEND_URL environment variable is not set in production!');
+        throw new Error('FRONTEND_URL environment variable is required in production');
+      }
+      logger.warn('⚠️ FRONTEND_URL not set, using localhost fallback (development only)');
+      return 'http://localhost:5173';
+    }
+
+    // Validate URL doesn't contain localhost in production
+    if (process.env.NODE_ENV === 'production' && url.includes('localhost')) {
+      logger.error('❌ FRONTEND_URL contains localhost in production! This is not allowed.');
+      throw new Error('FRONTEND_URL cannot contain localhost in production');
+    }
+
+    return url;
   }
 
   /**
@@ -237,7 +265,7 @@ Please log into the admin panel to respond to this message.
         </div>
         
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat" class="cta-button">View Full Conversation</a>
+          <a href="${this.frontendUrl}/chat" class="cta-button">View Full Conversation</a>
         </div>
         
         <div class="footer">
@@ -261,7 +289,7 @@ ${data.message}
 
 Sent at: ${new Date(data.timestamp).toLocaleString()}
 
-To view the full conversation, please visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat
+To view the full conversation, please visit: ${this.frontendUrl}/chat
 
 This message was sent from the ${data.companyName} chat system.
 If you need immediate assistance, please contact us directly.
@@ -436,7 +464,7 @@ If you need immediate assistance, please contact us directly.
         </div>
         
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat" class="cta-button">Continue Conversation</a>
+          <a href="${this.frontendUrl}/chat" class="cta-button">Continue Conversation</a>
         </div>
         
         <div class="footer">
@@ -476,7 +504,7 @@ Here's a summary of your recent conversation with our support team:
 
 ${messageList}
 
-To continue the conversation, please visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat
+To continue the conversation, please visit: ${this.frontendUrl}/chat
 
 This conversation summary was sent from the ${data.companyName} chat system.
 If you need immediate assistance, please contact us directly.
@@ -531,7 +559,7 @@ If you need immediate assistance, please contact us directly.
         </div>
         
         <div style="text-align: center;">
-          <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages" class="cta-button">View Messages</a>
+          <a href="${this.frontendUrl}/admin/messages" class="cta-button">View Messages</a>
         </div>
         
         <div class="footer">
@@ -569,7 +597,7 @@ Customer Information:
 Last Message Preview:
 ${data.lastMessage}
 
-To view and respond to messages, please visit: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages
+To view and respond to messages, please visit: ${this.frontendUrl}/admin/messages
 
 This alert was sent from the ${data.companyName} chat system.
 Please check the admin panel to respond to unread messages.
@@ -624,7 +652,7 @@ Please check the admin panel to respond to unread messages.
           </div>
           
           <div style="text-align: center;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages" class="cta-button">View Chat Messages</a>
+            <a href="${this.frontendUrl}/admin/messages" class="cta-button">View Chat Messages</a>
           </div>
           
           <div class="footer">
@@ -661,7 +689,7 @@ Customer Information:
 Action Required:
 This customer is waiting for a response. Please log into the admin panel to start the conversation.
 
-Admin Panel: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin/messages
+Admin Panel: ${this.frontendUrl}/admin/messages
 
 This alert was sent from the ${data.companyName} chat system.
 Please respond promptly to maintain good customer service.
@@ -816,7 +844,7 @@ Please respond promptly to maintain good customer service.
             ` : ''}
             
             <div style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}" class="cta-button">View Order Status</a>
+              <a href="${this.frontendUrl}/orders/${data.orderId}" class="cta-button">View Order Status</a>
             </div>
           </div>
           
@@ -878,7 +906,7 @@ ${data.shippingAddress.phone ? 'Phone: ' + data.shippingAddress.phone : ''}
 
 ${data.estimatedDeliveryDate ? 'Estimated Delivery: ' + new Date(data.estimatedDeliveryDate).toLocaleDateString() : ''}
 
-View your order status: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
+View your order status: ${this.frontendUrl}/orders/${data.orderId}
 
 Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
@@ -991,7 +1019,7 @@ Need help? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.co
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}" class="cta-button" style="background: #667eea;">View Order Details</a>
+              <a href="${this.frontendUrl}/orders/${data.orderId}" class="cta-button" style="background: #667eea;">View Order Details</a>
             </div>
           </div>
           
@@ -1045,7 +1073,7 @@ ${data.shippingAddress.country}
 ITEMS IN THIS SHIPMENT:
 ${itemsList}
 
-View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
+View order details: ${this.frontendUrl}/orders/${data.orderId}
 
 Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
@@ -1124,8 +1152,8 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.co
             <p>We'd love to hear about your experience! Your feedback helps us improve and assists other customers in making informed decisions.</p>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}/review" class="cta-button">Leave a Review</a>
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}" class="cta-button" style="background: #667eea;">View Order</a>
+              <a href="${this.frontendUrl}/orders/${data.orderId}/review" class="cta-button">Leave a Review</a>
+              <a href="${this.frontendUrl}/orders/${data.orderId}" class="cta-button" style="background: #667eea;">View Order</a>
             </div>
             
             <div style="background: #fff3cd; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ffc107;">
@@ -1166,8 +1194,8 @@ We hope you love your new items from Mayhem Creation!
 
 We'd love to hear about your experience. Your feedback helps us improve and assists other customers.
 
-Leave a review: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}/review
-View order: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
+Leave a review: ${this.frontendUrl}/orders/${data.orderId}/review
+View order: ${this.frontendUrl}/orders/${data.orderId}
 
 Issues with your order? Contact our support team within 7 days of delivery.
 
@@ -1321,7 +1349,7 @@ ${refundedItemsList}
 WHEN WILL I RECEIVE MY REFUND?
 The refund will appear in your ${data.refundInfo.refundMethod} within 5-10 business days, depending on your financial institution's processing time.
 
-View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
+View order details: ${this.frontendUrl}/orders/${data.orderId}
 
 Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
@@ -1419,7 +1447,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.co
             </div>
             
             <div style="text-align: center;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders" class="cta-button">View My Orders</a>
+              <a href="${this.frontendUrl}/my-orders" class="cta-button">View My Orders</a>
             </div>
           </div>
           
@@ -1468,7 +1496,7 @@ WHAT CAN I DO NEXT?
 NEED HELP?
 Our customer support team is here to assist you. Reply to this email or contact us directly.
 
-View your orders: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/my-orders
+View your orders: ${this.frontendUrl}/my-orders
 
 Questions or concerns? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
@@ -1605,7 +1633,7 @@ Date: ${new Date().toLocaleDateString()}
 
 Keep this receipt for your records. You can also view your order and payment details anytime in your account.
 
-View order details: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders/${data.orderId}
+View order details: ${this.frontendUrl}/orders/${data.orderId}
 
 Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.com'}
 
@@ -1694,7 +1722,7 @@ Questions? Contact us at ${process.env.ADMIN_EMAIL || 'support@mayhemcreation.co
             <p style="text-align: center; font-size: 18px; font-weight: bold; margin: 30px 0 20px 0;">How would you rate your experience?</p>
             
             <div style="text-align: center;">
-              <a href="${data.reviewUrl || process.env.FRONTEND_URL + '/orders/' + data.orderId + '/review'}" class="cta-button">Write a Review</a>
+              <a href="${data.reviewUrl || this.frontendUrl + '/orders/' + data.orderId + '/review'}" class="cta-button">Write a Review</a>
             </div>
             
             <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 30px 0; border-left: 4px solid #2196f3;">
@@ -1742,7 +1770,7 @@ ${productsList}
 
 How would you rate your experience?
 
-Write a review: ${data.reviewUrl || process.env.FRONTEND_URL + '/orders/' + data.orderId + '/review'}
+Write a review: ${data.reviewUrl || this.frontendUrl + '/orders/' + data.orderId + '/review'}
 
 SPECIAL THANK YOU!
 As a token of our appreciation, you'll receive a 10% discount code for your next purchase after leaving a review!
@@ -1818,7 +1846,7 @@ Mayhem Creation Team
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/products" class="cta-button">Shop Now</a>
+              <a href="${this.frontendUrl}/products" class="cta-button">Shop Now</a>
             </div>
           </div>
           
@@ -1852,7 +1880,7 @@ Hi ${data.recipientName},
 
 ${textContent}
 
-Shop now: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/products
+Shop now: ${this.frontendUrl}/products
 
 © ${new Date().getFullYear()} Mayhem Creation. All rights reserved.
 ${data.unsubscribeUrl ? '\nUnsubscribe: ' + data.unsubscribeUrl : ''}
