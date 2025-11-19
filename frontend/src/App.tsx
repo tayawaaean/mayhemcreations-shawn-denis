@@ -28,6 +28,7 @@ import RefundTracking from './ecommerce/routes/RefundTracking'
 import MyReviews from './ecommerce/routes/MyReviews'
 import Profile from './ecommerce/routes/Profile'
 import Payment from './ecommerce/routes/Payment'
+import Chat from './ecommerce/routes/Chat'
 import VerifyEmail from './pages/VerifyEmail'
 import PaymentSuccess from './pages/PaymentSuccess'
 import PaymentCancel from './pages/PaymentCancel'
@@ -100,6 +101,11 @@ export default function App() {
             <Route path="/contact" element={
               <EcommerceLayout>
                 <Contact />
+              </EcommerceLayout>
+            } />
+            <Route path="/chat" element={
+              <EcommerceLayout>
+                <Chat />
               </EcommerceLayout>
             } />
             <Route path="/cart" element={
