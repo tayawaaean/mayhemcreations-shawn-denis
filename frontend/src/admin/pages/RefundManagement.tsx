@@ -796,47 +796,63 @@ const RefundManagement: React.FC = () => {
                 />
               </div>
 
-              {/* Manual Payment Provider Transaction ID (for PayPal and Stripe) */}
-              {(selectedRequest.paymentProvider === 'paypal' || selectedRequest.paymentProvider === 'stripe') && (
+              {/* Manual Payment Provider Transaction ID (for PayPal and Stripe, or when provider is unknown) */}
+              {(selectedRequest.paymentProvider === 'paypal' || selectedRequest.paymentProvider === 'stripe' || !selectedRequest.paymentProvider || selectedRequest.status === 'failed') && (
                 <div className={`border rounded-md p-4 ${
                   selectedRequest.paymentProvider === 'paypal' 
                     ? 'bg-yellow-50 border-yellow-200' 
-                    : 'bg-blue-50 border-blue-200'
+                    : selectedRequest.paymentProvider === 'stripe'
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-gray-50 border-gray-200'
                 }`}>
                   <div className="flex items-start">
                     <AlertCircle className={`w-5 h-5 mt-0.5 mr-2 flex-shrink-0 ${
                       selectedRequest.paymentProvider === 'paypal' 
                         ? 'text-yellow-600' 
-                        : 'text-blue-600'
+                        : selectedRequest.paymentProvider === 'stripe'
+                        ? 'text-blue-600'
+                        : 'text-gray-600'
                     }`} />
                     <div className="flex-1">
                       <h4 className={`text-sm font-medium mb-1 ${
                         selectedRequest.paymentProvider === 'paypal' 
                           ? 'text-yellow-900' 
-                          : 'text-blue-900'
+                          : selectedRequest.paymentProvider === 'stripe'
+                          ? 'text-blue-900'
+                          : 'text-gray-900'
                       }`}>
-                        {selectedRequest.paymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} Refund
+                        {selectedRequest.paymentProvider === 'paypal' 
+                          ? 'PayPal' 
+                          : selectedRequest.paymentProvider === 'stripe'
+                          ? 'Stripe'
+                          : 'Payment'} Refund
                       </h4>
                       <p className={`text-xs mb-3 ${
                         selectedRequest.paymentProvider === 'paypal' 
                           ? 'text-yellow-700' 
-                          : 'text-blue-700'
+                          : selectedRequest.paymentProvider === 'stripe'
+                          ? 'text-blue-700'
+                          : 'text-gray-700'
                       }`}>
-                        If automatic {selectedRequest.paymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} refund fails, you can manually enter the transaction ID to retry.
+                        {!selectedRequest.paymentProvider 
+                          ? 'Payment provider could not be determined automatically. Please enter the transaction ID manually to process the refund.'
+                          : `If automatic ${selectedRequest.paymentProvider === 'paypal' ? 'PayPal' : 'Stripe'} refund fails, you can manually enter the transaction ID to retry.`}
                       </p>
                       <button
                         type="button"
                         onClick={() => setShowManualInput(!showManualInput)}
                         className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                       >
-                        {showManualInput ? 'Hide Manual Input' : `Enter ${selectedRequest.paymentProvider === 'paypal' ? 'PayPal Capture' : 'Stripe Payment Intent/Charge'} ID Manually`}
+                        {showManualInput ? 'Hide Manual Input' : `Enter ${selectedRequest.paymentProvider === 'paypal' ? 'PayPal Capture' : selectedRequest.paymentProvider === 'stripe' ? 'Stripe Payment Intent/Charge' : 'Payment Transaction'} ID Manually`}
                       </button>
                       {showManualInput && (
                         <div className="mt-3">
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             {selectedRequest.paymentProvider === 'paypal' 
                               ? 'PayPal Capture ID' 
-                              : 'Stripe Payment Intent ID or Charge ID'}
+                              : selectedRequest.paymentProvider === 'stripe'
+                              ? 'Stripe Payment Intent ID or Charge ID'
+                              : 'Payment Transaction ID (Stripe or PayPal)'}
                           </label>
                           <input
                             type="text"
@@ -846,13 +862,17 @@ const RefundManagement: React.FC = () => {
                             placeholder={
                               selectedRequest.paymentProvider === 'paypal' 
                                 ? 'e.g., 5TY45345KP543532R' 
-                                : 'e.g., pi_1234567890 or ch_1234567890'
+                                : selectedRequest.paymentProvider === 'stripe'
+                                ? 'e.g., pi_1234567890 or ch_1234567890'
+                                : 'e.g., pi_1234567890 (Stripe) or 5TY45345KP543532R (PayPal)'
                             }
                           />
                           <p className="mt-1 text-xs text-gray-500">
                             {selectedRequest.paymentProvider === 'paypal' 
                               ? 'Find this in your PayPal dashboard under transaction details'
-                              : 'Find this in your Stripe dashboard. Payment Intent IDs start with "pi_" and Charge IDs start with "ch_"'}
+                              : selectedRequest.paymentProvider === 'stripe'
+                              ? 'Find this in your Stripe dashboard. Payment Intent IDs start with "pi_" and Charge IDs start with "ch_"'
+                              : 'Enter the Payment Intent ID (starts with pi_ or ch_ for Stripe) or Capture ID (17+ characters for PayPal) from your payment dashboard'}
                           </p>
                         </div>
                       )}

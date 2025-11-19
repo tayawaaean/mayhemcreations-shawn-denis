@@ -327,6 +327,39 @@ export class RefundService {
         ? orderWithIncludes.payments[0] 
         : null;
 
+      // Detect payment provider from order if payment record doesn't exist
+      let paymentProvider: 'stripe' | 'paypal' | null = payment?.provider || null;
+      
+      // If no payment provider found, try to detect from order fields
+      if (!paymentProvider) {
+        // Check if order has paymentIntentId (Stripe) or transactionId that looks like PayPal
+        if (order.paymentIntentId) {
+          // Check if it's a Stripe payment intent (starts with pi_) or charge (starts with ch_)
+          if (order.paymentIntentId.startsWith('pi_') || order.paymentIntentId.startsWith('ch_')) {
+            paymentProvider = 'stripe';
+          }
+        }
+        
+        // Check transactionId for PayPal patterns
+        if (!paymentProvider && order.transactionId) {
+          // PayPal transaction IDs are typically 17 characters, alphanumeric, uppercase
+          // Or check if it matches PayPal capture ID pattern
+          if (order.transactionId.length >= 17 && /^[A-Z0-9]+$/.test(order.transactionId)) {
+            paymentProvider = 'paypal';
+          }
+        }
+        
+        // Check order payment method or gateway field if available
+        if (!paymentProvider && (order as any).paymentMethod) {
+          const paymentMethod = (order as any).paymentMethod.toLowerCase();
+          if (paymentMethod.includes('stripe') || paymentMethod.includes('card')) {
+            paymentProvider = 'stripe';
+          } else if (paymentMethod.includes('paypal')) {
+            paymentProvider = 'paypal';
+          }
+        }
+      }
+
       // Calculate refund amount
       const refundAmount = data.refundAmount || parseFloat(order.total.toString());
       const refundType = data.refundType || 'full';
@@ -348,7 +381,7 @@ export class RefundService {
         imagesUrls: data.imagesUrls || null,
         status: 'pending',
         refundMethod: 'original_payment',
-        paymentProvider: payment?.provider || null,
+        paymentProvider: paymentProvider,
         refundItems: data.refundItems || null,
         inventoryRestored: false,
         requestedAt: new Date(),
@@ -768,13 +801,65 @@ export class RefundService {
     try {
       // Fetch payment if not included
       const refundWithPayment = refund as any;
-      const payment = refundWithPayment.payment || await Payment.findByPk(refund.paymentId!);
+      let payment = refundWithPayment.payment;
       
-      if (!payment) {
-        return { success: false, message: 'No payment information found for this order' };
+      if (!payment && refund.paymentId) {
+        payment = await Payment.findByPk(refund.paymentId);
       }
 
-      const provider = refund.paymentProvider;
+      // Determine payment provider
+      let provider = refund.paymentProvider;
+      
+      // If provider is not set, try to detect it
+      if (!provider) {
+        // Try to get from payment record
+        if (payment) {
+          provider = payment.provider as 'stripe' | 'paypal' | null;
+        }
+        
+        // If still not found, try to detect from order
+        if (!provider && refund.order) {
+          const order = refund.order as any;
+          if (order.paymentIntentId) {
+            if (order.paymentIntentId.startsWith('pi_') || order.paymentIntentId.startsWith('ch_')) {
+              provider = 'stripe';
+            }
+          }
+          if (!provider && order.transactionId) {
+            if (order.transactionId.length >= 17 && /^[A-Z0-9]+$/.test(order.transactionId)) {
+              provider = 'paypal';
+            }
+          }
+        }
+        
+        // If manual capture ID is provided, try to detect provider from ID format
+        if (!provider && manualCaptureId) {
+          if (manualCaptureId.startsWith('pi_') || manualCaptureId.startsWith('ch_')) {
+            provider = 'stripe';
+          } else if (manualCaptureId.length >= 17 && /^[A-Z0-9]+$/.test(manualCaptureId)) {
+            provider = 'paypal';
+          }
+        }
+      }
+
+      // If we still don't have a provider and no manual capture ID, return error
+      if (!provider && !manualCaptureId) {
+        return { 
+          success: false, 
+          message: 'MANUAL_REFUND_REQUIRED: Payment provider could not be determined. Please provide the Payment Intent ID (Stripe) or Capture ID (PayPal) manually. For Stripe, use a Payment Intent ID (starts with pi_) or Charge ID (starts with ch_). For PayPal, use the Capture ID from your PayPal dashboard.' 
+        };
+      }
+
+      // If we have a manual capture ID but no provider, try both providers
+      if (!provider && manualCaptureId) {
+        // Try Stripe first if it looks like a Stripe ID
+        if (manualCaptureId.startsWith('pi_') || manualCaptureId.startsWith('ch_')) {
+          provider = 'stripe';
+        } else {
+          // Assume PayPal for other formats
+          provider = 'paypal';
+        }
+      }
 
       if (provider === 'stripe') {
         return await this.processStripeRefund(refund, manualCaptureId);
