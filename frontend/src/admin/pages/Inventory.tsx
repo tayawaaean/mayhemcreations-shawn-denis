@@ -214,7 +214,7 @@ const Inventory: React.FC = () => {
   // Show variants in inventory
   const variantItems = (variantData?.variants?.map(variant => ({
     id: variant.id.toString(),
-    productId: variant.productId,
+    productId: String(variant.productId), // Ensure consistent string type
     productTitle: variant.product?.title || 'Unknown Product',
     productImage: variant.image || variant.product?.image || '/placeholder-image.jpg',
     productSku: variant.sku,
@@ -229,11 +229,12 @@ const Inventory: React.FC = () => {
   })) || [])
 
   // Also show active products that don't have variants yet (so admin can create variants)
+  // Use Set with consistent string comparison
   const productsWithVariants = new Set(variantItems.map(item => item.productId))
   const productsWithoutVariants = products
     .filter(product => 
       product.status === 'active' && 
-      !productsWithVariants.has(String(product.id))
+      !productsWithVariants.has(String(product.id)) // Consistent string comparison
     )
     .map(product => ({
       id: `product-${product.id}`,
