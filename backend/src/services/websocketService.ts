@@ -5,12 +5,19 @@ import Message from '../models/messageModel';
 import { sequelize } from '../config/database';
 import { emailWebhookService } from './emailWebhookService';
 
+// Interface for tracking last conversation summary sent
+interface LastSummaryInfo {
+  lastSentTimestamp: number; // Timestamp when summary was last sent
+  lastMessageTimestamp: number; // Timestamp of the most recent message included in the last summary
+}
+
 export class WebSocketService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, Set<string>> = new Map(); // userId -> Set of socketIds
   private userOnlineStatus: Map<string, boolean> = new Map(); // userId -> isOnline
   private adminSockets: Set<string> = new Set(); // Set of admin socket IDs
   private isAdminOnline: boolean = false; // Global admin online status
+  private lastSummarySent: Map<string, LastSummaryInfo> = new Map(); // customerId -> LastSummaryInfo
 
   constructor(server: HttpServer) {
     this.io = new SocketIOServer(server, {
@@ -564,6 +571,25 @@ export class WebSocketService {
         return;
       }
 
+      // Get the most recent message timestamp
+      const mostRecentMessage = messages[0];
+      const mostRecentMessageTimestamp = new Date(mostRecentMessage.createdAt).getTime();
+      
+      // Get last summary info for this customer
+      const lastSummary = this.lastSummarySent.get(customerId);
+      const now = Date.now();
+      
+      // Check if we should send a summary:
+      // 1. No previous summary sent, OR
+      // 2. There are new messages since the last summary (new message timestamp > last message timestamp in summary), OR
+      // 3. At least 1 hour has passed since the last summary (to avoid spam but allow periodic updates)
+      const MIN_TIME_BETWEEN_SUMMARIES = 60 * 60 * 1000; // 1 hour in milliseconds
+      const hasNewMessages = !lastSummary || mostRecentMessageTimestamp > lastSummary.lastMessageTimestamp;
+      const enoughTimePassed = !lastSummary || (now - lastSummary.lastSentTimestamp) >= MIN_TIME_BETWEEN_SUMMARIES;
+      
+      // Send summary if there are new messages OR enough time has passed (not both required)
+      const shouldSendSummary = !lastSummary || hasNewMessages || enoughTimePassed;
+
       // Check if there are unread admin messages (admin messages that customer hasn't seen)
       const unreadAdminMessages = messages.filter(msg => 
         msg.sender === 'admin' && 
@@ -586,9 +612,9 @@ export class WebSocketService {
         }
       }
 
-      // Send conversation summary to customer if they have email
+      // Send conversation summary to customer if they have email and conditions are met
       const guestEmail = isGuest ? messages.find(msg => (msg as any).email)?.email : null;
-      if (profile?.email || guestEmail) {
+      if ((profile?.email || guestEmail) && shouldSendSummary) {
         const customerEmail = profile?.email || guestEmail;
         const customerName = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Customer' : 'Guest User';
         
@@ -604,6 +630,21 @@ export class WebSocketService {
             type: (msg as any).type || 'text'
           }))
         });
+        
+        // Update tracking info after successfully sending summary
+        this.lastSummarySent.set(customerId, {
+          lastSentTimestamp: now,
+          lastMessageTimestamp: mostRecentMessageTimestamp
+        });
+        
+        const reason = !lastSummary ? 'first summary' : (hasNewMessages ? 'new messages' : 'time threshold reached');
+        logger.info(`📧 Conversation summary sent for customer ${customerId} (reason: ${reason})`);
+      } else if ((profile?.email || guestEmail) && !shouldSendSummary && lastSummary) {
+        // Log why summary was skipped (only if user has email and we have previous summary data)
+        if (!hasNewMessages && !enoughTimePassed) {
+          const timeUntilNextSummary = Math.ceil((MIN_TIME_BETWEEN_SUMMARIES - (now - lastSummary.lastSentTimestamp)) / 1000 / 60);
+          logger.debug(`⏭️ Skipping conversation summary for ${customerId}: No new messages and only ${timeUntilNextSummary} minutes since last summary (min: ${MIN_TIME_BETWEEN_SUMMARIES / 1000 / 60} minutes)`);
+        }
       }
 
       // Send admin notification if there are unread messages

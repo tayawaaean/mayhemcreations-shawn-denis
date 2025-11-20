@@ -12,9 +12,18 @@ import {
   RefundInfo 
 } from '../types';
 
+// Interface for tracking last conversation summary sent per customer
+interface LastSummaryInfo {
+  lastSentTimestamp: number; // Timestamp when summary was last sent
+  lastMessageTimestamp: number; // Timestamp of the most recent message included in the last summary
+  messageHash: string; // Hash of the message content to detect if conversation changed
+}
+
 export class EmailService {
   private transporter: nodemailer.Transporter;
   private frontendUrl: string;
+  // Track last conversation summary sent per customer (customerId -> LastSummaryInfo)
+  private lastSummarySent: Map<string, LastSummaryInfo> = new Map();
 
   constructor() {
     this.transporter = createEmailTransporter();
@@ -297,7 +306,18 @@ If you need immediate assistance, please contact us directly.
   }
 
   /**
+   * Generate a simple hash of messages to detect if conversation changed
+   */
+  private getMessagesHash(messages: Array<{ text: string; sender: 'user' | 'admin'; timestamp: Date; type: string }>): string {
+    // Create a hash based on message count, latest message timestamp, and combined text
+    const latestTimestamp = messages.length > 0 ? new Date(messages[0].timestamp).getTime() : 0;
+    const combinedText = messages.map(m => `${m.sender}:${m.text || ''}`).join('|');
+    return `${messages.length}_${latestTimestamp}_${combinedText.slice(0, 100)}`;
+  }
+
+  /**
    * Send conversation summary email to customer
+   * Includes duplicate prevention to ensure we don't send the same summary multiple times
    */
   async sendConversationSummary(profile: UserProfile, messages: Array<{
     text: string;
@@ -308,6 +328,32 @@ If you need immediate assistance, please contact us directly.
     if (!profile.email) {
       logger.info(`📧 Skipping conversation summary for user without email ${profile.id}`);
       return true;
+    }
+
+    // Additional safeguard: Check if we should send this summary
+    const customerId = String(profile.id);
+    const now = Date.now();
+    const mostRecentMessage = messages.length > 0 ? messages[0] : null;
+    const mostRecentMessageTimestamp = mostRecentMessage ? new Date(mostRecentMessage.timestamp).getTime() : 0;
+    const messageHash = this.getMessagesHash(messages);
+    
+    const lastSummary = this.lastSummarySent.get(customerId);
+    const MIN_TIME_BETWEEN_SUMMARIES = 60 * 60 * 1000; // 1 hour in milliseconds
+    
+    // Check if we should send:
+    // 1. No previous summary, OR
+    // 2. New messages (different hash or newer timestamp), OR
+    // 3. Enough time passed (1 hour)
+    const hasNewMessages = !lastSummary || 
+                          messageHash !== lastSummary.messageHash || 
+                          mostRecentMessageTimestamp > lastSummary.lastMessageTimestamp;
+    const enoughTimePassed = !lastSummary || (now - lastSummary.lastSentTimestamp) >= MIN_TIME_BETWEEN_SUMMARIES;
+    const shouldSendSummary = !lastSummary || hasNewMessages || enoughTimePassed;
+    
+    if (!shouldSendSummary) {
+      const timeUntilNextSummary = lastSummary ? Math.ceil((MIN_TIME_BETWEEN_SUMMARIES - (now - lastSummary.lastSentTimestamp)) / 1000 / 60) : 0;
+      logger.debug(`⏭️ Email service: Skipping duplicate conversation summary for customer ${customerId}. Same messages and only ${timeUntilNextSummary} minutes since last summary.`);
+      return true; // Return true to avoid error, but don't send email
     }
 
     const customerName = this.getCustomerDisplayName(profile);
@@ -321,7 +367,7 @@ If you need immediate assistance, please contact us directly.
       companyName: 'Mayhem Creation'
     });
 
-    return this.sendEmail({
+    const emailSent = await this.sendEmail({
       to: profile.email,
       subject,
       html,
@@ -333,6 +379,19 @@ If you need immediate assistance, please contact us directly.
         companyName: 'Mayhem Creation'
       })
     });
+
+    // Update tracking after successful send
+    if (emailSent) {
+      this.lastSummarySent.set(customerId, {
+        lastSentTimestamp: now,
+        lastMessageTimestamp: mostRecentMessageTimestamp,
+        messageHash: messageHash
+      });
+      const reason = !lastSummary ? 'first summary' : (hasNewMessages ? 'new messages' : 'time threshold reached');
+      logger.info(`✅ Email service: Conversation summary sent to ${profile.email} for customer ${customerId} (reason: ${reason})`);
+    }
+
+    return emailSent;
   }
 
   /**

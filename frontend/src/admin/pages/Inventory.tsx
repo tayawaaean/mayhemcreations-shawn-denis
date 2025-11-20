@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Download,
   Upload,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from 'lucide-react'
 import HelpModal from '../components/modals/HelpModal'
 import { variantApiService, Variant, VariantInventoryStatus } from '../../shared/variantApiService'
@@ -40,6 +41,9 @@ const Inventory: React.FC = () => {
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditVariantOpen, setIsEditVariantOpen] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [variantToDelete, setVariantToDelete] = useState<any>(null)
+  const [deletingVariant, setDeletingVariant] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   
@@ -401,6 +405,12 @@ const Inventory: React.FC = () => {
   }
 
   const handleEditVariantClick = (variant: any) => {
+    // Don't allow editing products without variants (N/A variants)
+    if (variant.type === 'product' || (variant as any).needsVariants) {
+      showErrorToast('Cannot edit product without variants. Please create a variant first using the "Add Variant" button.')
+      return
+    }
+
     setSelectedVariant(variant)
     setEditVariant({
       id: variant.id,
@@ -416,17 +426,84 @@ const Inventory: React.FC = () => {
     setIsEditVariantOpen(true)
   }
 
-  const handleUpdateVariant = async () => {
-    if (!editVariant.productId || !editVariant.color || !editVariant.size || !editVariant.sku) return
-
-    const product = products.find(p => p.id.toString() === editVariant.productId)
-    if (product) {
-      // Reload data to get updated variants
-      await loadInventoryData()
+  const handleDeleteVariantClick = (variant: any) => {
+    // Don't allow deleting products without variants (N/A variants)
+    if (variant.type === 'product' || (variant as any).needsVariants) {
+      showErrorToast('Cannot delete product without variants. This is a product entry, not a variant.')
+      return
     }
 
-    setIsEditVariantOpen(false)
-    setSelectedVariant(null)
+    setVariantToDelete(variant)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!variantToDelete) return
+
+    setDeletingVariant(true)
+    try {
+      await variantApiService.deleteVariant(Number(variantToDelete.id))
+      showSuccessToast(`Variant "${variantToDelete.color} • ${variantToDelete.size}" deleted successfully`)
+      
+      // Reload inventory data
+      await loadInventoryData()
+      
+      setIsDeleteModalOpen(false)
+      setVariantToDelete(null)
+    } catch (error: any) {
+      const errorInfo = apiService.extractErrorInfo(error)
+      let errorMessage = `Failed to delete variant: ${errorInfo.message}`
+      
+      if (errorInfo.category === 'not_found') {
+        errorMessage = 'Variant not found. It may have already been deleted.'
+      } else if (errorInfo.category === 'validation') {
+        errorMessage = 'Cannot delete: This variant has active orders or inventory commitments.'
+      }
+      
+      showErrorToast(errorMessage)
+    } finally {
+      setDeletingVariant(false)
+    }
+  }
+
+  const handleUpdateVariant = async () => {
+    if (!editVariant.id || !editVariant.productId || !editVariant.color || !editVariant.size || !editVariant.sku) {
+      showErrorToast('Please fill in all required fields')
+      return
+    }
+
+    try {
+      // Update variant via API
+      await variantApiService.updateVariant(Number(editVariant.id), {
+        color: editVariant.color,
+        colorHex: editVariant.colorHex,
+        size: editVariant.size,
+        sku: editVariant.sku,
+        stock: editVariant.stock,
+        name: `${editVariant.color} - ${editVariant.size}`
+      })
+
+      showSuccessToast('Variant updated successfully')
+      
+      // Reload data to get updated variants
+      await loadInventoryData()
+      
+      setIsEditVariantOpen(false)
+      setSelectedVariant(null)
+    } catch (error: any) {
+      const errorInfo = apiService.extractErrorInfo(error)
+      let errorMessage = `Failed to update variant: ${errorInfo.message}`
+      
+      if (errorInfo.category === 'validation') {
+        if (error?.response?.data?.message?.includes('SKU')) {
+          errorMessage = 'SKU already exists. Please use a different SKU.'
+        } else {
+          errorMessage = `Validation error: ${error?.response?.data?.message || 'Invalid variant data'}`
+        }
+      }
+      
+      showErrorToast(errorMessage)
+    }
   }
 
   const productCategories = Array.from(new Set(products.map(p => p.category?.name || 'Uncategorized')))
@@ -745,6 +822,7 @@ const Inventory: React.FC = () => {
                             onClick={() => handleStockAdjustment(item.id, -1)}
                             disabled={adjustingStock === item.id}
                             className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Decrease Stock"
                           >
                             <Minus className="h-4 w-4" />
                           </button>
@@ -752,15 +830,23 @@ const Inventory: React.FC = () => {
                             onClick={() => handleStockAdjustment(item.id, 1)}
                             disabled={adjustingStock === item.id}
                             className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Increase Stock"
                           >
                             <Plus className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleEditVariantClick(item)}
                             className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                            title="Edit Item"
+                            title="Edit Variant"
                           >
                             <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteVariantClick(item)}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Delete Variant"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       )}
@@ -798,26 +884,52 @@ const Inventory: React.FC = () => {
                           <p className="text-xs text-gray-400 mt-1">SKU: {item.productSku}</p>
                       </div>
                       <div className="flex items-center space-x-2 ml-2">
-                        <button
-                          onClick={() => handleStockAdjustment(item.id, -1)}
-                          disabled={adjustingStock === item.id}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleStockAdjustment(item.id, 1)}
-                          disabled={adjustingStock === item.id}
-                          className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditVariantClick(item)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
+                        {item.type !== 'product' && !(item as any).needsVariants && (
+                          <>
+                            <button
+                              onClick={() => handleStockAdjustment(item.id, -1)}
+                              disabled={adjustingStock === item.id}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Decrease Stock"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleStockAdjustment(item.id, 1)}
+                              disabled={adjustingStock === item.id}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Increase Stock"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEditVariantClick(item)}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                              title="Edit Variant"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVariantClick(item)}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                              title="Delete Variant"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                        {item.type === 'product' && (item as any).needsVariants && (
+                          <button
+                            onClick={() => {
+                              setNewVariant(prev => ({ ...prev, productId: item.productId }))
+                              setIsAddVariantOpen(true)
+                            }}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            title="Create Variant"
+                          >
+                            Add Variant
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -1285,6 +1397,77 @@ const Inventory: React.FC = () => {
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Update Variant
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && variantToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">Delete Variant</h2>
+              <button
+                onClick={() => {
+                  setIsDeleteModalOpen(false)
+                  setVariantToDelete(null)
+                }}
+                disabled={deletingVariant}
+                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-900 font-medium mb-2">Are you sure you want to delete this variant?</p>
+                <div className="bg-gray-50 rounded-lg p-4 mt-3">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Product:</span> {variantToDelete.productTitle}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1">
+                    <span className="font-medium">Variant:</span> {variantToDelete.color} • {variantToDelete.size}
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1">
+                    <span className="font-medium">SKU:</span> {variantToDelete.productSku}
+                  </p>
+                </div>
+                <p className="text-sm text-red-600 mt-4 font-medium">
+                  ⚠️ This action cannot be undone. The variant and its inventory data will be permanently deleted.
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={() => {
+                    setIsDeleteModalOpen(false)
+                    setVariantToDelete(null)
+                  }}
+                  disabled={deletingVariant}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deletingVariant}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center"
+                >
+                  {deletingVariant ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Variant
+                    </>
+                  )}
                 </button>
               </div>
             </div>
