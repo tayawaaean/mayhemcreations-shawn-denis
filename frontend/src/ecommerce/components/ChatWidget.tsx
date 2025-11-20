@@ -33,6 +33,7 @@ export default function ChatWidget() {
   const [messageSendError, setMessageSendError] = useState<string | null>(null)
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +51,17 @@ export default function ChatWidget() {
       inputRef.current.focus()
     }
   }, [isOpen])
+
+  // Handle ESC key to close image modal
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedImage) {
+        setSelectedImage(null)
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [selectedImage])
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -440,7 +452,13 @@ export default function ChatWidget() {
                       <img 
                         src={typeof message.attachment === 'string' ? message.attachment : message.attachment.data} 
                         alt={message.attachment?.name || 'image'} 
-                        className="max-w-full rounded-md mb-1" 
+                        className="max-w-full rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity" 
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const imageSrc = typeof message.attachment === 'string' ? message.attachment : message.attachment.data
+                          setSelectedImage(imageSrc)
+                        }}
                       />
                     ) : null}
                     {message.type === 'file' && message.attachment ? (
@@ -616,6 +634,33 @@ export default function ChatWidget() {
           </>
         )}
       </div>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-75 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedImage(null)
+              }}
+              className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors"
+              aria-label="Close image"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="Full size"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
