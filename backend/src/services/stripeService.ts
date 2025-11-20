@@ -44,7 +44,7 @@ export interface CreateCheckoutSessionData {
     country: string;
   };
   shippingCost?: number; // Shipping cost in dollars
-  taxAmount?: number; // Tax amount in dollars
+  taxAmount?: number; // Deprecated: Tax is now calculated automatically by Stripe Tax. This field is kept for backwards compatibility but not used in checkout session.
   metadata?: Record<string, string>;
 }
 
@@ -144,21 +144,10 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       });
     }
 
-    // Add tax as a line item if provided
-    if (data.taxAmount && data.taxAmount > 0) {
-      allLineItems.push({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Tax',
-            description: 'Sales tax',
-            images: undefined,
-          },
-          unit_amount: Math.round(data.taxAmount * 100), // Convert to cents
-        },
-        quantity: 1,
-      });
-    }
+    // Note: Tax is now calculated automatically by Stripe Tax
+    // The taxAmount parameter is no longer used as a line item
+    // Stripe Tax will calculate tax based on the customer's shipping address
+    // The calculated tax will appear in total_details.amount_tax on the session
 
     // Truncate metadata values very aggressively to prevent URL length issues
     // Only keep essential metadata - remove non-critical fields
@@ -189,6 +178,10 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       billing_address_collection: 'required',
       shipping_address_collection: {
         allowed_countries: ['US'], // US only
+      },
+      // Enable Stripe Tax automatic calculation
+      automatic_tax: {
+        enabled: true,
       },
     };
 
@@ -241,6 +234,12 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
     // Using customer will pre-fill shipping address from customer.shipping
     if (customerId) {
       sessionData.customer = customerId;
+      // Update customer with shipping address collected during checkout
+      // This ensures Stripe Tax uses the most current address
+      sessionData.customer_update = {
+        shipping: 'auto',
+        address: 'auto',
+      };
     } else if (data.customerInfo?.email) {
       sessionData.customer_email = data.customerInfo.email;
     }
@@ -257,7 +256,7 @@ export const createCheckoutSession = async (data: CreateCheckoutSessionData): Pr
       totalLineItems: allLineItems.length,
       hasShippingAddress: !!data.shippingAddress,
       shippingCost: data.shippingCost || 0,
-      taxAmount: data.taxAmount || 0,
+      automaticTaxEnabled: true,
     });
 
     return {
