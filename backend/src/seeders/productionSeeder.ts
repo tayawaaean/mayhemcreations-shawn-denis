@@ -9,6 +9,7 @@ import { seedAddresses, clearAddresses } from './addressSeeder';
 import { clearProducts } from './productSeeder';
 import { clearCategories } from './categorySeeder';
 import { clearVariants } from './variantSeeder';
+import { clearAllOrders, clearOrderReviews } from './clearOrdersSeeder';
 import Message from '../models/messageModel';
 
 /**
@@ -50,6 +51,29 @@ export async function runProductionSeeders(options: ProductionSeederOptions = {}
       if (options.rolesOnly) {
         logger.info('⚠️ Skipping role clearing for roles-only seeding');
       } else if (options.usersOnly) {
+        // Clear dependent data before clearing users
+        try {
+          logger.info('🧹 Clearing refund requests...');
+          await sequelize.query('DELETE FROM refund_requests');
+        } catch (error: any) {
+          if (!error.message?.includes("doesn't exist")) {
+            logger.warn('⚠️ Error clearing refund requests:', error.message);
+          }
+        }
+        try {
+          logger.info('🧹 Clearing orders...');
+          await clearOrderReviews();
+        } catch (error: any) {
+          logger.warn('⚠️ Error clearing orders:', error.message);
+        }
+        try {
+          logger.info('🧹 Clearing payments...');
+          await sequelize.query('DELETE FROM payments');
+        } catch (error: any) {
+          if (!error.message?.includes("doesn't exist")) {
+            logger.warn('⚠️ Error clearing payments:', error.message);
+          }
+        }
         await clearUsers();
       } else if (options.embroideryOnly) {
         await clearEmbroideryOptions();
@@ -62,13 +86,47 @@ export async function runProductionSeeders(options: ProductionSeederOptions = {}
       } else {
         // Clear all production seedable data
         // Also clear products, categories, and variants (even though we don't seed them)
+        logger.info('🧹 Clearing order-related data first (to avoid foreign key constraints)...');
+        
+        // Clear refund requests first (they reference order_reviews)
+        try {
+          logger.info('🧹 Clearing refund requests...');
+          const [refundResult] = await sequelize.query('DELETE FROM refund_requests');
+          const refundCount = (refundResult as any).affectedRows || 0;
+          logger.info(`✅ Cleared ${refundCount} refund requests`);
+        } catch (error: any) {
+          // If table doesn't exist, just log and continue
+          if (error.message?.includes("doesn't exist")) {
+            logger.info('ℹ️ Refund requests table does not exist, skipping...');
+          } else {
+            logger.warn('⚠️ Error clearing refund requests:', error.message);
+          }
+        }
+        
+        // Clear orders and related data (this will clear order_reviews)
+        await clearAllOrders();
+        
+        // Clear payments (they reference users)
+        try {
+          logger.info('🧹 Clearing payments...');
+          const [paymentResult] = await sequelize.query('DELETE FROM payments');
+          const paymentCount = (paymentResult as any).affectedRows || 0;
+          logger.info(`✅ Cleared ${paymentCount} payments`);
+        } catch (error: any) {
+          if (error.message?.includes("doesn't exist")) {
+            logger.info('ℹ️ Payments table does not exist, skipping...');
+          } else {
+            logger.warn('⚠️ Error clearing payments:', error.message);
+          }
+        }
+        
         logger.info('🧹 Clearing products, categories, and variants...');
         await clearVariants(); // Clear variants first to avoid foreign key constraint
         await clearProducts(); // Clear products second to avoid foreign key constraint
         await clearCategories();
         
         logger.info('🧹 Clearing production seedable data...');
-        await clearUsers();
+        await clearUsers(); // Now safe to clear users
         await clearRoles();
         await clearEmbroideryOptions();
         await clearFAQs();
