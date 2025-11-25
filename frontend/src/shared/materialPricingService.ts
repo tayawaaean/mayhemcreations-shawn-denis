@@ -24,14 +24,15 @@ export class MaterialPricingService {
    */
   static setMaterials(materials: MaterialCost[]): void {
     // Convert string values to numbers and filter for active materials only
+    // Create a completely new array to ensure reference changes
     this.materials = materials
       .filter(material => material.isActive)
       .map(material => ({
         ...material,
-        cost: typeof material.cost === 'string' ? parseFloat(material.cost) || 0 : material.cost,
-        width: typeof material.width === 'string' ? parseFloat(material.width) || 0 : material.width,
-        length: typeof material.length === 'string' ? parseFloat(material.length) || 0 : material.length,
-        wasteFactor: typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) || 1.0 : material.wasteFactor
+        cost: typeof material.cost === 'string' ? parseFloat(material.cost) || 0 : (typeof material.cost === 'number' ? material.cost : 0),
+        width: typeof material.width === 'string' ? parseFloat(material.width) || 0 : (typeof material.width === 'number' ? material.width : 0),
+        length: typeof material.length === 'string' ? parseFloat(material.length) || 0 : (typeof material.length === 'number' ? material.length : 0),
+        wasteFactor: typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) || 1.0 : (typeof material.wasteFactor === 'number' ? material.wasteFactor : 1.0)
       }))
   }
 
@@ -128,19 +129,21 @@ export class MaterialPricingService {
     }
 
     // Find materials by name (flexible matching with common variations)
-    // Try multiple name variations to handle different naming conventions
-    const fabric = findMaterialByName('Fabric') || findMaterialByName('fabric')
-    const patchAttach = findMaterialByName('Patch Attach') || findMaterialByName('Patch Attach') || findMaterialByName('patch attach')
-    const thread = findMaterialByName('Thread') || findMaterialByName('thread')
-    const bobbin = findMaterialByName('Bobbin') || findMaterialByName('bobbin')
+    // The findMaterialByName function already handles case-insensitive matching
+    // Try to find materials that match the expected names
+    const fabric = findMaterialByName('Fabric')
+    const patchAttach = findMaterialByName('Patch Attach')
+    const thread = findMaterialByName('Thread')
+    const bobbin = findMaterialByName('Bobbin')
     const cutAwayStabilizer = findMaterialByName('Cut-Away Stabilizer') || 
-                              findMaterialByName('Cut Away Stabilizer') || 
-                              findMaterialByName('cut-away stabilizer') ||
+                              findMaterialByName('Cut Away Stabilizer') ||
                               findMaterialByName('Cut-Away')
-    const washAwayStabilizer = findMaterialByName('Wash-Away Stabilizer') || 
-                              findMaterialByName('Wash Away Stabilizer') || 
-                              findMaterialByName('wash-away stabilizer') ||
-                              findMaterialByName('Wash-Away')
+    // Handle variations including "Wash-Away Stabilizer2" (with number suffix)
+    // Look for any material with "wash-away" or "wash away" in the name
+    const washAwayStabilizer = this.materials.find(m => {
+      const name = m.name.toLowerCase().trim()
+      return name.includes('wash-away') || name.includes('wash away')
+    }) || null
 
     // Calculate costs for each material (use 0 if material not found)
     // Fabric Cost = Area-based calculation (width > 0)
@@ -160,6 +163,17 @@ export class MaterialPricingService {
 
     // Wash-Away Stabilizer Cost = Area-based calculation (width > 0)
     const washAwayStabilizerCost = washAwayStabilizer ? this.roundToTwoDecimals(calculateAreaBasedCost(washAwayStabilizer)) : 0
+    
+    // Debug: Log what materials were found and their values
+    if (fabric) {
+      console.log('Fabric found:', { name: fabric.name, cost: fabric.cost, width: fabric.width, length: fabric.length, wasteFactor: fabric.wasteFactor, calculated: fabricCost })
+    }
+    if (patchAttach) {
+      console.log('Patch Attach found:', { name: patchAttach.name, cost: patchAttach.cost, width: patchAttach.width, length: patchAttach.length, wasteFactor: patchAttach.wasteFactor, calculated: patchAttachCost })
+    }
+    if (!fabric || !patchAttach) {
+      console.log('Available materials:', this.materials.map(m => ({ name: m.name, cost: m.cost, width: m.width, length: m.length, isActive: m.isActive })))
+    }
 
     const totalCost = this.roundToTwoDecimals(
       fabricCost + 

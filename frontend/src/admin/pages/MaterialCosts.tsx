@@ -67,7 +67,7 @@ export default function MaterialCosts() {
       setPricingLoading(true)
       
       // Ensure materials are up to date in the service before calculating
-      // This ensures we're using the latest material costs, including newly added/edited ones
+      // Pass the current materialCosts directly - they should already be the latest from the API
       MaterialPricingService.setMaterials(materialCosts)
       
       const input: InputParameters = {
