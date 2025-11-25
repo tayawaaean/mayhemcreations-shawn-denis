@@ -2118,45 +2118,33 @@ export default function Customize() {
                            </div>
                            
                            <div className="border-t pt-2">
-                             <div className="flex items-center justify-between text-lg font-bold">
-                               <span>Base Material Cost:</span>
-                               <span className="text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
-                             </div>
-                           </div>
-                           
-                           {/* Collapsible Material Breakdown */}
-                           <details className="mt-3">
-                             <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 flex items-center">
-                               <span>View Material Breakdown</span>
-                               <ArrowRight className="w-3 h-3 ml-1 transform transition-transform" />
-                             </summary>
-                             <div className="mt-2 space-y-1 text-xs text-gray-600">
-                               <div className="flex justify-between">
-                                 <span>Fabric</span>
-                                 <span>${embroideryPricing.fabricCost.toFixed(2)}</span>
-                               </div>
-                               <div className="flex justify-between">
-                                 <span>Patch Attach</span>
-                                 <span>${embroideryPricing.patchAttachCost.toFixed(2)}</span>
-                               </div>
-                               <div className="flex justify-between">
-                                 <span>Thread</span>
-                                 <span>${embroideryPricing.threadCost.toFixed(2)}</span>
-                               </div>
-                               <div className="flex justify-between">
-                                 <span>Bobbin</span>
-                                 <span>${embroideryPricing.bobbinCost.toFixed(2)}</span>
-                               </div>
-                               <div className="flex justify-between">
-                                 <span>Cut-Away Stabilizer</span>
-                                 <span>${embroideryPricing.cutAwayStabilizerCost.toFixed(2)}</span>
-                               </div>
-                               <div className="flex justify-between">
-                                 <span>Wash-Away Stabilizer</span>
-                                 <span>${embroideryPricing.washAwayStabilizerCost.toFixed(2)}</span>
-                               </div>
-                             </div>
-                           </details>
+                          <div className="flex items-center justify-between text-lg font-bold">
+                            <span>Base Material Cost:</span>
+                            <span className="text-accent">${embroideryPricing.totalCost.toFixed(2)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Collapsible Material Breakdown */}
+                        {embroideryPricing.items.length > 0 ? (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800 flex items-center">
+                              <span>View Material Breakdown</span>
+                              <ArrowRight className="w-3 h-3 ml-1 transform transition-transform" />
+                            </summary>
+                            <div className="mt-2 space-y-1 text-xs text-gray-600">
+                              {embroideryPricing.items.map(item => (
+                                <div key={item.id} className="flex justify-between">
+                                  <span>{item.name}</span>
+                                  <span>${item.cost.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ) : (
+                          <div className="mt-3 text-xs text-gray-500">
+                            No material costs configured yet.
+                          </div>
+                        )}
                          </div>
                        ) : null}
                      </div>

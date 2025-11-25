@@ -350,71 +350,23 @@ export default function MaterialCosts() {
             )}
 
             {/* Material Cost Breakdown */}
-            {calculatedCosts && patchWidth > 0 && patchHeight > 0 && (
+            {calculatedCosts && patchWidth > 0 && patchHeight > 0 && calculatedCosts.items.length > 0 && (
               <div className="space-y-4">
                 <h4 className="text-md font-semibold text-gray-900 mb-4">Material Cost Breakdown</h4>
                 
                 {/* Cost Items */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-blue-600 mr-2" />
-                      <span className="text-sm text-gray-700">Fabric</span>
+                  {calculatedCosts.items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100">
+                      <div className="flex items-center">
+                        <Package className="w-4 h-4 text-accent mr-2" />
+                        <span className="text-sm text-gray-700">{item.name}</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatPrice(item.cost)}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.fabricCost)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-green-600 mr-2" />
-                      <span className="text-sm text-gray-700">Patch Attach</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.patchAttachCost)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-purple-600 mr-2" />
-                      <span className="text-sm text-gray-700">Thread</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.threadCost)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-orange-600 mr-2" />
-                      <span className="text-sm text-gray-700">Bobbin</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.bobbinCost)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-red-600 mr-2" />
-                      <span className="text-sm text-gray-700">Cut-Away Stabilizer</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.cutAwayStabilizerCost)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 text-indigo-600 mr-2" />
-                      <span className="text-sm text-gray-700">Wash-Away Stabilizer</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatPrice(calculatedCosts.washAwayStabilizerCost)}
-                    </span>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Total Cost */}
@@ -429,6 +381,12 @@ export default function MaterialCosts() {
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {calculatedCosts && patchWidth > 0 && patchHeight > 0 && calculatedCosts.items.length === 0 && (
+              <div className="bg-gray-50 border border-dashed border-gray-200 rounded-lg p-4 text-center text-sm text-gray-600">
+                No material costs available. Add materials in the list below to see the breakdown here.
               </div>
             )}
 

@@ -5,14 +5,24 @@ export interface InputParameters {
   patchHeight: number // in inches
 }
 
+export interface MaterialCostBreakdownItem {
+  id: number
+  name: string
+  cost: number
+}
+
 export interface CostBreakdown {
+  items: MaterialCostBreakdownItem[]
+  totalCost: number
+  // Legacy named properties (kept for backwards compatibility wherever
+  // specific materials are referenced in the UI)
   fabricCost: number
   patchAttachCost: number
   threadCost: number
   bobbinCost: number
   cutAwayStabilizerCost: number
   washAwayStabilizerCost: number
-  totalCost: number
+  manualLaborCost: number
 }
 
 export class MaterialPricingService {
@@ -75,13 +85,15 @@ export class MaterialPricingService {
     // If no materials are loaded, return zeros (materials must be loaded from API first)
     if (this.materials.length === 0) {
       return {
+        items: [],
+        totalCost: 0,
         fabricCost: 0,
         patchAttachCost: 0,
         threadCost: 0,
         bobbinCost: 0,
         cutAwayStabilizerCost: 0,
         washAwayStabilizerCost: 0,
-        totalCost: 0
+        manualLaborCost: 0
       }
     }
     
@@ -138,60 +150,61 @@ export class MaterialPricingService {
     const cutAwayStabilizer = findMaterialByName('Cut-Away Stabilizer') || 
                               findMaterialByName('Cut Away Stabilizer') ||
                               findMaterialByName('Cut-Away')
-    // Handle variations including "Wash-Away Stabilizer2" (with number suffix)
-    // Look for any material with "wash-away" or "wash away" in the name
-    const washAwayStabilizer = this.materials.find(m => {
-      const name = m.name.toLowerCase().trim()
-      return name.includes('wash-away') || name.includes('wash away')
-    }) || null
-
-    // Calculate costs for each material (use 0 if material not found)
-    // Fabric Cost = Area-based calculation (width > 0)
-    const fabricCost = fabric ? this.roundToTwoDecimals(calculateAreaBasedCost(fabric)) : 0
-
-    // Patch Attach Cost = Area-based calculation (width > 0)
-    const patchAttachCost = patchAttach ? this.roundToTwoDecimals(calculateAreaBasedCost(patchAttach)) : 0
-
-    // Thread Cost = Length-based calculation (width = 0)
-    const threadCost = thread ? this.roundToTwoDecimals(calculateLengthBasedCost(thread)) : 0
-
-    // Bobbin Cost = Length-based calculation (width = 0)
-    const bobbinCost = bobbin ? this.roundToTwoDecimals(calculateLengthBasedCost(bobbin)) : 0
-
-    // Cut-Away Stabilizer Cost = Area-based calculation (width > 0)
-    const cutAwayStabilizerCost = cutAwayStabilizer ? this.roundToTwoDecimals(calculateAreaBasedCost(cutAwayStabilizer)) : 0
-
-    // Wash-Away Stabilizer Cost = Area-based calculation (width > 0)
-    const washAwayStabilizerCost = washAwayStabilizer ? this.roundToTwoDecimals(calculateAreaBasedCost(washAwayStabilizer)) : 0
-    
-    // Debug: Log what materials were found and their values
-    if (fabric) {
-      console.log('Fabric found:', { name: fabric.name, cost: fabric.cost, width: fabric.width, length: fabric.length, wasteFactor: fabric.wasteFactor, calculated: fabricCost })
+    // Helper to convert values to numbers safely
+    const toNumber = (value: string | number | undefined, defaultValue = 0) => {
+      if (typeof value === 'number' && !isNaN(value)) {
+        return value
+      }
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value)
+        return isNaN(parsed) ? defaultValue : parsed
+      }
+      return defaultValue
     }
-    if (patchAttach) {
-      console.log('Patch Attach found:', { name: patchAttach.name, cost: patchAttach.cost, width: patchAttach.width, length: patchAttach.length, wasteFactor: patchAttach.wasteFactor, calculated: patchAttachCost })
-    }
-    if (!fabric || !patchAttach) {
-      console.log('Available materials:', this.materials.map(m => ({ name: m.name, cost: m.cost, width: m.width, length: m.length, isActive: m.isActive })))
-    }
+
+    // Calculate costs for every available material
+    const breakdownItems: MaterialCostBreakdownItem[] = this.materials.map(material => {
+      const width = toNumber(material.width)
+      const length = toNumber(material.length)
+      const cost = toNumber(material.cost)
+      const wasteFactor = toNumber(material.wasteFactor, 1)
+
+      let calculatedCost = 0
+      if (width > 0 && length > 0 && cost > 0) {
+        const costPerSqIn = cost / (width * length)
+        calculatedCost = this.roundToTwoDecimals(patchArea * costPerSqIn * wasteFactor)
+      }
+
+      return {
+        id: material.id,
+        name: material.name,
+        cost: calculatedCost
+      }
+    })
 
     const totalCost = this.roundToTwoDecimals(
-      fabricCost + 
-      patchAttachCost + 
-      threadCost + 
-      bobbinCost + 
-      cutAwayStabilizerCost + 
-      washAwayStabilizerCost
+      breakdownItems.reduce((sum, item) => sum + item.cost, 0)
     )
 
+    // Maintain legacy named cost fields for existing UI references
+    const getCostByName = (search: string): number => {
+      const normalized = search.toLowerCase()
+      const match = breakdownItems.find(item =>
+        item.name.toLowerCase().includes(normalized)
+      )
+      return match ? match.cost : 0
+    }
+
     return {
-      fabricCost,
-      patchAttachCost,
-      threadCost,
-      bobbinCost,
-      cutAwayStabilizerCost,
-      washAwayStabilizerCost,
-      totalCost
+      items: breakdownItems,
+      totalCost,
+      fabricCost: getCostByName('fabric'),
+      patchAttachCost: getCostByName('patch attach'),
+      threadCost: getCostByName('thread'),
+      bobbinCost: getCostByName('bobbin'),
+      cutAwayStabilizerCost: getCostByName('cut-away'),
+      washAwayStabilizerCost: getCostByName('wash-away'),
+      manualLaborCost: getCostByName('manual labor')
     }
   }
 

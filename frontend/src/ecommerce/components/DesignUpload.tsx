@@ -753,37 +753,25 @@ const DesignUpload: React.FC<DesignUploadProps> = ({ onPriceUpdate, onDesignUpda
                 </div>
 
                 {/* Material Cost Breakdown - Collapsible */}
-                <details className="mb-4">
-                  <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-accent">
-                    View Material Breakdown
-                  </summary>
-                  <div className="mt-3 space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Fabric</span>
-                      <span className="font-medium">{formatPrice(materialCosts.fabricCost)}</span>
+                {materialCosts.items.length > 0 ? (
+                  <details className="mb-4">
+                    <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-accent">
+                      View Material Breakdown
+                    </summary>
+                    <div className="mt-3 space-y-1 text-sm">
+                      {materialCosts.items.map(item => (
+                        <div key={item.id} className="flex justify-between">
+                          <span className="text-gray-600">{item.name}</span>
+                          <span className="font-medium">{formatPrice(item.cost)}</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Patch Attach</span>
-                      <span className="font-medium">{formatPrice(materialCosts.patchAttachCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Thread</span>
-                      <span className="font-medium">{formatPrice(materialCosts.threadCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Bobbin</span>
-                      <span className="font-medium">{formatPrice(materialCosts.bobbinCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Cut-Away Stabilizer</span>
-                      <span className="font-medium">{formatPrice(materialCosts.cutAwayStabilizerCost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Wash-Away Stabilizer</span>
-                      <span className="font-medium">{formatPrice(materialCosts.washAwayStabilizerCost)}</span>
-                    </div>
+                  </details>
+                ) : (
+                  <div className="mb-4 text-xs text-gray-500">
+                    No active material costs configured for the calculator.
                   </div>
-                </details>
+                )}
 
                 {/* Options Cost */}
                 {(() => {
