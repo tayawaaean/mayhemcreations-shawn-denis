@@ -37,10 +37,14 @@ export default function MaterialCosts() {
       setLoading(true)
       setError(null)
       const response = await materialCostApiService.getMaterialCosts()
-      if (response.success) {
-        setMaterialCosts(response.data)
-        // Update the pricing service with fresh data (filters for active materials and converts types)
-        MaterialPricingService.setMaterials(response.data)
+      if (response.success && response.data) {
+        // Create a new array reference to ensure React detects the change
+        const updatedMaterials = [...response.data]
+        // Update the pricing service with fresh data BEFORE updating state
+        // This ensures the service has the latest materials
+        MaterialPricingService.setMaterials(updatedMaterials)
+        // Update state - this will trigger the useEffect to recalculate
+        setMaterialCosts(updatedMaterials)
       } else {
         setError('Failed to load material costs')
       }
@@ -51,16 +55,21 @@ export default function MaterialCosts() {
     }
   }
 
-  // Calculate pricing when dimensions change
+  // Calculate pricing when dimensions or materials change
   useEffect(() => {
-    if (patchWidth > 0 && patchHeight > 0) {
-      calculatePricing()
+    // Only calculate if we have valid dimensions and materials are loaded
+    if (patchWidth <= 0 || patchHeight <= 0 || materialCosts.length === 0) {
+      setCalculatedCosts(null)
+      return
     }
-  }, [patchWidth, patchHeight, materialCosts])
-
-  const calculatePricing = () => {
+    
     try {
       setPricingLoading(true)
+      
+      // Ensure materials are up to date in the service before calculating
+      // This ensures we're using the latest material costs, including newly added/edited ones
+      MaterialPricingService.setMaterials(materialCosts)
+      
       const input: InputParameters = {
         patchWidth,
         patchHeight
@@ -70,10 +79,11 @@ export default function MaterialCosts() {
       setCalculatedCosts(costs)
     } catch (err) {
       // Error calculating pricing
+      setCalculatedCosts(null)
     } finally {
       setPricingLoading(false)
     }
-  }
+  }, [patchWidth, patchHeight, materialCosts])
 
   const handleWidthChange = (value: string) => {
     const numValue = parseFloat(value) || 0
@@ -132,7 +142,7 @@ export default function MaterialCosts() {
       if (editingMaterial) {
         const response = await materialCostApiService.updateMaterialCost(editingMaterial.id, data)
         if (response.success) {
-          await loadMaterialCosts()
+          await loadMaterialCosts() // This will trigger recalculation automatically
           resetForm()
         } else {
           // Extract error message from response
@@ -146,7 +156,7 @@ export default function MaterialCosts() {
       } else {
         const response = await materialCostApiService.createMaterialCost(data)
         if (response.success) {
-          await loadMaterialCosts()
+          await loadMaterialCosts() // This will trigger recalculation automatically
           resetForm()
         } else {
           // Extract error message from response, check for duplicate error

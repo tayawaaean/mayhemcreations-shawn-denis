@@ -16,14 +16,8 @@ export interface CostBreakdown {
 }
 
 export class MaterialPricingService {
-  private static materials: MaterialCost[] = [
-    { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-    { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
-  ]
+  // Start with empty array - materials must be loaded from API via setMaterials()
+  private static materials: MaterialCost[] = []
 
   /**
    * Set materials from API data
@@ -77,14 +71,37 @@ export class MaterialPricingService {
     const { patchWidth, patchHeight } = input
     const patchArea = patchWidth * patchHeight
     
-    // Helper function to find material by name (case-insensitive, flexible matching)
+    // If no materials are loaded, return zeros (materials must be loaded from API first)
+    if (this.materials.length === 0) {
+      return {
+        fabricCost: 0,
+        patchAttachCost: 0,
+        threadCost: 0,
+        bobbinCost: 0,
+        cutAwayStabilizerCost: 0,
+        washAwayStabilizerCost: 0,
+        totalCost: 0
+      }
+    }
+    
+    // Helper function to find material by name (case-insensitive, prioritizing exact matches)
     const findMaterialByName = (name: string): MaterialCost | null => {
       const normalizedName = name.toLowerCase().trim()
-      return this.materials.find(m => 
-        m.name.toLowerCase().trim() === normalizedName ||
-        m.name.toLowerCase().trim().includes(normalizedName) ||
-        normalizedName.includes(m.name.toLowerCase().trim())
-      ) || null
+      
+      // First try exact match
+      let material = this.materials.find(m => 
+        m.name.toLowerCase().trim() === normalizedName
+      )
+      
+      // If no exact match, try partial match (material name contains search term)
+      if (!material) {
+        material = this.materials.find(m => 
+          m.name.toLowerCase().trim().includes(normalizedName) ||
+          normalizedName.includes(m.name.toLowerCase().trim())
+        ) || null
+      }
+      
+      return material || null
     }
 
     // Helper function to calculate area-based cost for materials with width > 0
@@ -110,13 +127,20 @@ export class MaterialPricingService {
       return 0
     }
 
-    // Find materials by name (flexible matching)
-    const fabric = findMaterialByName('Fabric')
-    const patchAttach = findMaterialByName('Patch Attach')
-    const thread = findMaterialByName('Thread')
-    const bobbin = findMaterialByName('Bobbin')
-    const cutAwayStabilizer = findMaterialByName('Cut-Away Stabilizer')
-    const washAwayStabilizer = findMaterialByName('Wash-Away Stabilizer')
+    // Find materials by name (flexible matching with common variations)
+    // Try multiple name variations to handle different naming conventions
+    const fabric = findMaterialByName('Fabric') || findMaterialByName('fabric')
+    const patchAttach = findMaterialByName('Patch Attach') || findMaterialByName('Patch Attach') || findMaterialByName('patch attach')
+    const thread = findMaterialByName('Thread') || findMaterialByName('thread')
+    const bobbin = findMaterialByName('Bobbin') || findMaterialByName('bobbin')
+    const cutAwayStabilizer = findMaterialByName('Cut-Away Stabilizer') || 
+                              findMaterialByName('Cut Away Stabilizer') || 
+                              findMaterialByName('cut-away stabilizer') ||
+                              findMaterialByName('Cut-Away')
+    const washAwayStabilizer = findMaterialByName('Wash-Away Stabilizer') || 
+                              findMaterialByName('Wash Away Stabilizer') || 
+                              findMaterialByName('wash-away stabilizer') ||
+                              findMaterialByName('Wash-Away')
 
     // Calculate costs for each material (use 0 if material not found)
     // Fabric Cost = Area-based calculation (width > 0)
