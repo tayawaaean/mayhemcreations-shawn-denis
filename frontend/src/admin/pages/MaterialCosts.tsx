@@ -39,15 +39,13 @@ export default function MaterialCosts() {
       const response = await materialCostApiService.getMaterialCosts()
       if (response.success) {
         setMaterialCosts(response.data)
-        // Update the pricing service with fresh data
+        // Update the pricing service with fresh data (filters for active materials and converts types)
         MaterialPricingService.setMaterials(response.data)
-        console.log('Admin: Materials loaded and set in pricing service:', response.data)
       } else {
         setError('Failed to load material costs')
       }
     } catch (err) {
       setError('Failed to load material costs')
-      console.error('Error loading material costs:', err)
     } finally {
       setLoading(false)
     }
@@ -68,12 +66,10 @@ export default function MaterialCosts() {
         patchHeight
       }
       
-      console.log('Admin: Calculating pricing for:', input)
       const costs = MaterialPricingService.calculateMaterialCosts(input)
-      console.log('Admin: Calculated costs:', costs)
       setCalculatedCosts(costs)
     } catch (err) {
-      console.error('Error calculating pricing:', err)
+      // Error calculating pricing
     } finally {
       setPricingLoading(false)
     }
@@ -170,7 +166,6 @@ export default function MaterialCosts() {
       } else {
         setFormError(errorMessage)
       }
-      console.error('Error saving material cost:', err)
     }
   }
 
@@ -200,7 +195,6 @@ export default function MaterialCosts() {
       }
     } catch (err) {
       setError('Failed to delete material cost')
-      console.error('Error deleting material cost:', err)
     }
   }
 
@@ -214,7 +208,6 @@ export default function MaterialCosts() {
       }
     } catch (err) {
       setError('Failed to toggle material cost status')
-      console.error('Error toggling material cost status:', err)
     }
   }
 

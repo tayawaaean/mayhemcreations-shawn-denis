@@ -29,7 +29,16 @@ export class MaterialPricingService {
    * Set materials from API data
    */
   static setMaterials(materials: MaterialCost[]): void {
+    // Convert string values to numbers and filter for active materials only
     this.materials = materials
+      .filter(material => material.isActive)
+      .map(material => ({
+        ...material,
+        cost: typeof material.cost === 'string' ? parseFloat(material.cost) || 0 : material.cost,
+        width: typeof material.width === 'string' ? parseFloat(material.width) || 0 : material.width,
+        length: typeof material.length === 'string' ? parseFloat(material.length) || 0 : material.length,
+        wasteFactor: typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) || 1.0 : material.wasteFactor
+      }))
   }
 
   /**
@@ -55,13 +64,9 @@ export class MaterialPricingService {
           wasteFactor: typeof material.wasteFactor === 'string' ? parseFloat(material.wasteFactor) : material.wasteFactor
         }))
         this.setMaterials(materials)
-      } else {
-        console.warn('Failed to load materials from API or no data received, using default values')
-        // Keep using the hardcoded default values
       }
     } catch (error) {
-      console.warn('Error loading materials from API, using default values:', error)
-      // Keep using the hardcoded default values
+      // Error loading materials from API, keep using existing materials
     }
   }
 
@@ -72,35 +77,14 @@ export class MaterialPricingService {
     const { patchWidth, patchHeight } = input
     const patchArea = patchWidth * patchHeight
     
-    // Ensure we have materials loaded
-    if (this.materials.length === 0) {
-      console.warn('No materials loaded, using default values')
-      // Load default materials if none are loaded
-      this.materials = [
-        { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-        { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
-      ]
-    } else {
-      // Check if the first material has valid width and length for area calculation
-      const firstMaterial = this.materials[0]
-      const width = typeof firstMaterial.width === 'string' ? parseFloat(firstMaterial.width) : firstMaterial.width
-      const length = typeof firstMaterial.length === 'string' ? parseFloat(firstMaterial.length) : firstMaterial.length
-      
-      if (width <= 0 || length <= 0) {
-        console.warn('API materials have invalid dimensions, using default values')
-        this.materials = [
-          { id: 1, name: 'Fabric', cost: 34.4, width: 30, length: 36, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 2, name: 'Patch Attach', cost: 100.8, width: 9, length: 360, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 3, name: 'Thread', cost: 4, width: 0, length: 5000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 4, name: 'Bobbin', cost: 50, width: 0, length: 35000, wasteFactor: 1.2, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 5, name: 'Cut-Away Stabilizer', cost: 192, width: 18, length: 3600, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' },
-          { id: 6, name: 'Wash-Away Stabilizer', cost: 60, width: 15, length: 900, wasteFactor: 1.5, isActive: true, createdAt: '', updatedAt: '' }
-        ]
-      }
+    // Helper function to find material by name (case-insensitive, flexible matching)
+    const findMaterialByName = (name: string): MaterialCost | null => {
+      const normalizedName = name.toLowerCase().trim()
+      return this.materials.find(m => 
+        m.name.toLowerCase().trim() === normalizedName ||
+        m.name.toLowerCase().trim().includes(normalizedName) ||
+        normalizedName.includes(m.name.toLowerCase().trim())
+      ) || null
     }
 
     // Helper function to calculate area-based cost for materials with width > 0
@@ -126,37 +110,32 @@ export class MaterialPricingService {
       return 0
     }
 
-    // Ensure we have at least 6 materials
-    if (this.materials.length < 6) {
-      console.error('Not enough materials loaded:', this.materials.length, 'expected 6')
-      return {
-        fabricCost: 0,
-        patchAttachCost: 0,
-        threadCost: 0,
-        bobbinCost: 0,
-        cutAwayStabilizerCost: 0,
-        washAwayStabilizerCost: 0,
-        totalCost: 0
-      }
-    }
+    // Find materials by name (flexible matching)
+    const fabric = findMaterialByName('Fabric')
+    const patchAttach = findMaterialByName('Patch Attach')
+    const thread = findMaterialByName('Thread')
+    const bobbin = findMaterialByName('Bobbin')
+    const cutAwayStabilizer = findMaterialByName('Cut-Away Stabilizer')
+    const washAwayStabilizer = findMaterialByName('Wash-Away Stabilizer')
 
+    // Calculate costs for each material (use 0 if material not found)
     // Fabric Cost = Area-based calculation (width > 0)
-    const fabricCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[0]))
+    const fabricCost = fabric ? this.roundToTwoDecimals(calculateAreaBasedCost(fabric)) : 0
 
     // Patch Attach Cost = Area-based calculation (width > 0)
-    const patchAttachCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[1]))
+    const patchAttachCost = patchAttach ? this.roundToTwoDecimals(calculateAreaBasedCost(patchAttach)) : 0
 
     // Thread Cost = Length-based calculation (width = 0)
-    const threadCost = this.roundToTwoDecimals(calculateLengthBasedCost(this.materials[2]))
+    const threadCost = thread ? this.roundToTwoDecimals(calculateLengthBasedCost(thread)) : 0
 
     // Bobbin Cost = Length-based calculation (width = 0)
-    const bobbinCost = this.roundToTwoDecimals(calculateLengthBasedCost(this.materials[3]))
+    const bobbinCost = bobbin ? this.roundToTwoDecimals(calculateLengthBasedCost(bobbin)) : 0
 
     // Cut-Away Stabilizer Cost = Area-based calculation (width > 0)
-    const cutAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[4]))
+    const cutAwayStabilizerCost = cutAwayStabilizer ? this.roundToTwoDecimals(calculateAreaBasedCost(cutAwayStabilizer)) : 0
 
     // Wash-Away Stabilizer Cost = Area-based calculation (width > 0)
-    const washAwayStabilizerCost = this.roundToTwoDecimals(calculateAreaBasedCost(this.materials[5]))
+    const washAwayStabilizerCost = washAwayStabilizer ? this.roundToTwoDecimals(calculateAreaBasedCost(washAwayStabilizer)) : 0
 
     const totalCost = this.roundToTwoDecimals(
       fabricCost + 
