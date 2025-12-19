@@ -13,10 +13,12 @@ import {
   Building,
   Package,
   MessageSquare,
-  Calendar
+  Calendar,
+  Reply
 } from 'lucide-react'
 import { contactApiService, Contact } from '../../shared/contactApiService'
 import { useAlertModal } from '../../ecommerce/context/AlertModalContext'
+import { openEmailReply, createReplyBody, generateReplySubject } from '../../shared/emailUtils'
 
 const ContactSubmissions: React.FC = () => {
   const { showSuccess, showError } = useAlertModal()
@@ -98,6 +100,37 @@ const ContactSubmissions: React.FC = () => {
     } catch (error: any) {
       console.error('Error updating contact status:', error)
       showError('Failed to update contact status', 'Error')
+    }
+  }
+
+  const handleReply = (contact: Contact) => {
+    try {
+      const subject = generateReplySubject(`Contact form submission from ${contact.name}`)
+      const replyBody = createReplyBody(
+        contact.name,
+        contact.message,
+        new Date(contact.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      )
+      
+      openEmailReply({
+        to: contact.email,
+        subject: subject,
+        body: replyBody
+      })
+      
+      // Mark as read when replying
+      if (contact.status === 'new') {
+        handleStatusUpdate(contact.id, 'responded')
+      }
+    } catch (error: any) {
+      console.error('Error opening email client:', error)
+      showError('Failed to open email client. Please copy the email and reply manually.', 'Error')
     }
   }
 
@@ -404,7 +437,14 @@ const ContactSubmissions: React.FC = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="pt-4 border-t border-gray-200">
+                <div className="pt-4 border-t border-gray-200 space-y-2">
+                  <button
+                    onClick={() => handleReply(selectedContact)}
+                    className="w-full px-4 py-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                  >
+                    <Reply className="w-4 h-4" />
+                    Reply via Email
+                  </button>
                   <button
                     onClick={() => handleDelete(selectedContact.id)}
                     className="w-full px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
