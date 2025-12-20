@@ -106,17 +106,31 @@ const ContactSubmissions: React.FC = () => {
   const handleReply = (contact: Contact) => {
     try {
       const subject = generateReplySubject(`Contact form submission from ${contact.name}`)
-      const replyBody = createReplyBody(
-        contact.name,
-        contact.message,
-        new Date(contact.createdAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      )
+      const submissionDate = new Date(contact.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+      
+      // Create a more detailed reply body with submission context
+      let replyBody = `Hello ${contact.name},\n\n`
+      replyBody += `Thank you for contacting Mayhem Creations regarding your inquiry about ${contact.projectType}.\n\n`
+      replyBody += `[Please type your reply above this line]\n\n`
+      replyBody += `---\n`
+      replyBody += `Original message received on ${submissionDate}:\n\n`
+      if (contact.company) {
+        replyBody += `Company: ${contact.company}\n`
+      }
+      if (contact.phone) {
+        replyBody += `Phone: ${contact.phone}\n`
+      }
+      if (contact.quantity) {
+        replyBody += `Quantity: ${contact.quantity}\n`
+      }
+      replyBody += `Project Type: ${contact.projectType}\n\n`
+      replyBody += `Message:\n${contact.message.split('\n').map(line => `> ${line}`).join('\n')}`
       
       openEmailReply({
         to: contact.email,
@@ -124,13 +138,15 @@ const ContactSubmissions: React.FC = () => {
         body: replyBody
       })
       
-      // Mark as read when replying
-      if (contact.status === 'new') {
+      // Mark as responded when replying
+      if (contact.status !== 'responded') {
         handleStatusUpdate(contact.id, 'responded')
       }
+      
+      showSuccess('Opening email client to reply...', 'Reply')
     } catch (error: any) {
       console.error('Error opening email client:', error)
-      showError('Failed to open email client. Please copy the email and reply manually.', 'Error')
+      showError('Failed to open email client. Please ensure Outlook or your default email client is configured.', 'Error')
     }
   }
 
@@ -279,13 +295,15 @@ const ContactSubmissions: React.FC = () => {
                 {filteredContacts.map((contact) => (
                   <div
                     key={contact.id}
-                    onClick={() => setSelectedContact(contact)}
-                    className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    className={`p-4 hover:bg-gray-50 transition-colors ${
                       selectedContact?.id === contact.id ? 'bg-accent/5 border-l-4 border-accent' : ''
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
+                      <div 
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => setSelectedContact(contact)}
+                      >
                         <h3 className="font-semibold text-gray-900 truncate">{contact.name}</h3>
                         <p className="text-sm text-gray-600 truncate">{contact.email}</p>
                       </div>
@@ -304,8 +322,36 @@ const ContactSubmissions: React.FC = () => {
                       </div>
                     </div>
                     {contact.message && (
-                      <p className="text-sm text-gray-600 mt-2 line-clamp-2">{contact.message}</p>
+                      <p 
+                        className="text-sm text-gray-600 mt-2 line-clamp-2 cursor-pointer"
+                        onClick={() => setSelectedContact(contact)}
+                      >
+                        {contact.message}
+                      </p>
                     )}
+                    <div className="flex items-center gap-2 mt-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleReply(contact)
+                        }}
+                        className="px-3 py-1.5 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors flex items-center gap-2 text-xs font-medium"
+                        title="Reply via email (opens Outlook or default email client)"
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                        Reply
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedContact(contact)
+                        }}
+                        className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2 text-xs font-medium"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View Details
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -441,9 +487,10 @@ const ContactSubmissions: React.FC = () => {
                   <button
                     onClick={() => handleReply(selectedContact)}
                     className="w-full px-4 py-2 bg-accent/10 text-accent rounded-lg hover:bg-accent/20 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                    title="Opens Outlook or your default email client with a pre-filled reply"
                   >
                     <Reply className="w-4 h-4" />
-                    Reply via Email
+                    Reply via Email (Open Outlook)
                   </button>
                   <button
                     onClick={() => handleDelete(selectedContact.id)}
